@@ -1,6 +1,7 @@
 🚀 Echoes (inspired by Pink Floyd’s album)
 A multi-functional Windows networking utility built with C# (.NET Framework 4.7.2).
 Entirely developed with AI assistance — optimized for performance, simplicity, and practical use.
+![Echoes UI](2025-07-05_001816.png)
 
 ✨ Features
 🛰 #Ping Utility
