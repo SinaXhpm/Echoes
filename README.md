@@ -1,9 +1,9 @@
-#🚀 Echoes Utility App
+🚀 Echoes (inspired by Pink Floyd’s album)
 A multi-functional Windows networking utility built with C# (.NET Framework 4.7.2).
 Entirely developed with AI assistance — optimized for performance, simplicity, and practical use.
 
 ✨ Features
-#🛰 Ping Utility
+🛰 #Ping Utility
 Supports single IP, hostname, and IP ranges
 
 Live detection and auto-start on valid input
@@ -22,7 +22,7 @@ Real-time logging with timestamps and auto-scroll
 
 DNS resolution happens once before ping starts
 
-#🔍 DNS Lookup
+🔍 #DNS Lookup
 Lookup any domain with custom DNS servers (multi-line input)
 
 Supports multiple record types (A, MX, TXT, etc.)
@@ -31,7 +31,7 @@ Performed for all selected DNS resolvers
 
 Logs individual responses in a unified log box
 
-#🌐 Curl-like Web Request
+🌐 #Curl-like Web Request
 Send HTTP GET requests to any URL
 
 Supports:
@@ -44,7 +44,7 @@ SSL ignore switch
 
 Response shows full headers and body, neatly formatted
 
-#🧠 IP Information Utility
+🧠 #IP Information Utility
 Fetch your public IP using reliable APIs (ipify, icanhazip, etc.)
 
 Lookup geolocation and data center info of any IP via APIs (ipapi, ipinfo, etc.)
