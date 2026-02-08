@@ -34,11 +34,13 @@ jobs:
 
     - name: Install Linux Dependencies
       if: matrix.os == 'ubuntu-latest'
-      run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang zlib1g-dev
 
     - name: Publish
       run: |
-        dotnet publish -c Release -r ${{ matrix.rid }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=link -p:OptimizationPreference=Size -p:StackTraceSupport=false -p:InvariantGlobalization=true -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
+        dotnet publish -c Release -r ${{ matrix.rid }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=copyused -p:OptimizationPreference=Size -p:StackTraceSupport=true -p:InvariantGlobalization=false -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
 
     - name: Package Windows
       if: matrix.os == 'windows-latest'
