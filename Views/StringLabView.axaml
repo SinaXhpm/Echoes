@@ -6,7 +6,7 @@
 
     <UserControl.Styles>
         <Style Selector="TabItem">
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="MinHeight" Value="22"/>
             <Setter Property="Padding" Value="10,0"/>
             <Setter Property="Opacity" Value="1"/>
@@ -16,7 +16,7 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="Background" Value="#08FFFFFF"/>
             <Setter Property="BorderBrush" Value="#15FFFFFF"/>
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontSize" Value="12"/>
         </Style>
         <Style Selector="Button">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -80,9 +80,9 @@
             <TabItem Header="TEXT LAB">
                 <Grid RowDefinitions="Auto, *" Margin="0,2,0,0">
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="15" Margin="0,0,0,5" Opacity="0.6">
-                        <TextBlock Text="{Binding CharCount, StringFormat='CHARS: \{0\}'}" FontSize="9"/>
-                        <TextBlock Text="{Binding WordCount, StringFormat='WORDS: \{0\}'}" FontSize="9"/>
-                        <TextBlock Text="{Binding LineCount, StringFormat='LINES: \{0\}'}" FontSize="9"/>
+                        <TextBlock Text="{Binding CharCount, StringFormat='CHARS: \{0\}'}" FontSize="10"/>
+                        <TextBlock Text="{Binding WordCount, StringFormat='WORDS: \{0\}'}" FontSize="10"/>
+                        <TextBlock Text="{Binding LineCount, StringFormat='LINES: \{0\}'}" FontSize="10"/>
                     </StackPanel>
                     <Grid Grid.Row="1" ColumnDefinitions="*, 110">
                         <TextBox Grid.Column="0" Text="{Binding EditInput, Mode=TwoWay}" Watermark="Edit text here..."/>

@@ -57,12 +57,12 @@
         </Grid>
 
         <Grid Grid.Row="1" ColumnDefinitions="80, 1*, 60, 80, 80, 80" Margin="10,0,25,5">
-            <TextBlock Grid.Column="0" Text="TIME" FontSize="9" Opacity="0.5"/>
-            <TextBlock Grid.Column="1" Text="ADDRESS" FontSize="9" Opacity="0.5"/>
-            <TextBlock Grid.Column="2" Text="HTTP" FontSize="9" Opacity="0.5"/>
-            <TextBlock Grid.Column="3" Text="LATENCY" FontSize="9" Opacity="0.5"/>
-            <TextBlock Grid.Column="4" Text="PING" FontSize="9" Opacity="0.5"/>
-            <TextBlock Grid.Column="5" Text="MS" FontSize="9" Opacity="0.5" HorizontalAlignment="Right"/>
+            <TextBlock Grid.Column="0" Text="TIME" FontSize="10" Opacity="0.5"/>
+            <TextBlock Grid.Column="1" Text="ADDRESS" FontSize="10" Opacity="0.5"/>
+            <TextBlock Grid.Column="2" Text="HTTP" FontSize="10" Opacity="0.5"/>
+            <TextBlock Grid.Column="3" Text="LATENCY" FontSize="10" Opacity="0.5"/>
+            <TextBlock Grid.Column="4" Text="PING" FontSize="10" Opacity="0.5"/>
+            <TextBlock Grid.Column="5" Text="MS" FontSize="10" Opacity="0.5" HorizontalAlignment="Right"/>
         </Grid>
 
         <ListBox Grid.Row="2" ItemsSource="{Binding Results}" Background="Transparent" Padding="0" Name="MonitorList">
