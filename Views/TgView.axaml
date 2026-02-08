@@ -1,0 +1,76 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Echoes.ViewModels"
+             x:Class="Echoes.Views.TgView"
+             x:DataType="vm:TgViewModel">
+
+    <Grid RowDefinitions="Auto,Auto,*" Margin="15">
+        
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+            <TextBox Text="{Binding BotToken}" 
+                     Watermark="Bot Token (e.g. 123456:ABC-DEF)" 
+                     Height="35"
+                     VerticalContentAlignment="Center"
+                      FontSize="11"
+                     PasswordChar="*">
+                <TextBox.KeyBindings>
+                    <KeyBinding Command="{Binding ExecuteTgCommand}" Gesture="Enter"/>
+                </TextBox.KeyBindings>
+                </TextBox>
+            <Button Grid.Column="1" 
+                    Content="EXECUTE" 
+
+                    Command="{Binding ExecuteTgCommand}" 
+                    IsDefault="True"
+                    IsEnabled="{Binding !IsBusy}"
+                    Width="100"
+                    Height="35"
+                    Margin="8,0,0,0"
+                    Background="#2D5A2D"
+                    Foreground="White"
+                    FontSize="11"
+                    FontWeight="Bold"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"/>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnDefinitions="*,*" Margin="0,0,0,12">
+            <ComboBox Grid.Column="0" 
+                      ItemsSource="{Binding AvailableMethods}" 
+                      SelectedItem="{Binding SelectedMethod}" 
+                      HorizontalAlignment="Stretch" 
+                      Height="35"
+                      Margin="0,0,8,0"/>
+            <TextBox Grid.Column="1" 
+                     Text="{Binding ProxyAddress}" 
+                     Height="35"
+                     FontSize="11"
+                     VerticalContentAlignment="Center"
+                     Watermark="Proxy (e.g. http://127.0.0.1:1080)"/>
+        </Grid>
+
+        <Grid Grid.Row="2" ColumnDefinitions="*,*">
+            <TextBox Grid.Column="0" 
+                     Text="{Binding CustomParameters}" 
+                     AcceptsReturn="True" 
+                     Watermark="Method Parameters (key=value)"
+                     FontFamily="Cascadia Code,Consolas,Monospace"
+                     FontSize="10"
+                     Padding="10"
+                     Margin="0,0,8,0"
+                     BorderBrush="#333"
+                     Background="#151515"/>
+            
+            <TextBox Grid.Column="1" 
+                     Text="{Binding ResponseLog}" 
+                     IsReadOnly="True" 
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     FontFamily="Cascadia Code,Consolas,Monospace"
+                     Background="#0D0D0D"
+                     Foreground="#4AF626"
+                     FontSize="10"/>
+        </Grid>
+        
+    </Grid>
+</UserControl>

@@ -1,0 +1,71 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            suffix: .zip
+          - os: ubuntu-latest
+            rid: linux-x64
+            suffix: .tar.gz
+          - os: macos-latest
+            rid: osx-x64
+            suffix: .tar.gz
+          - os: macos-latest
+            rid: osx-arm64
+            suffix: .tar.gz
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Install Linux Dependencies
+      if: matrix.os == 'ubuntu-latest'
+      run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+    - name: Publish
+      run: |
+        dotnet publish **/*.csproj -c Release -r ${{ matrix.rid }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=link -p:OptimizationPreference=Size -p:StackTraceSupport=false -p:InvariantGlobalization=true -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
+
+    - name: Package Windows
+      if: matrix.os == 'windows-latest'
+      run: Compress-Archive -Path ./publish/* -DestinationPath ./Echoes-${{ matrix.rid }}${{ matrix.suffix }}
+
+    - name: Package Unix
+      if: matrix.os != 'windows-latest'
+      run: tar -czvf ./Echoes-${{ matrix.rid }}${{ matrix.suffix }} -C ./publish .
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Echoes-${{ matrix.rid }}
+        path: Echoes-${{ matrix.rid }}${{ matrix.suffix }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download All Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./artifacts
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ./artifacts/**/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
