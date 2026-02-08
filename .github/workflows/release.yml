@@ -38,15 +38,17 @@ jobs:
 
     - name: Publish
       run: |
-        dotnet publish **/*.csproj -c Release -r ${{ matrix.rid }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=link -p:OptimizationPreference=Size -p:StackTraceSupport=false -p:InvariantGlobalization=true -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
+        dotnet publish -c Release -r ${{ matrix.rid }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=link -p:OptimizationPreference=Size -p:StackTraceSupport=false -p:InvariantGlobalization=true -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
 
     - name: Package Windows
       if: matrix.os == 'windows-latest'
-      run: Compress-Archive -Path ./publish/* -DestinationPath ./Echoes-${{ matrix.rid }}${{ matrix.suffix }}
+      run: |
+        Compress-Archive -Path ./publish/* -DestinationPath ./Echoes-${{ matrix.rid }}${{ matrix.suffix }}
 
     - name: Package Unix
       if: matrix.os != 'windows-latest'
-      run: tar -czvf ./Echoes-${{ matrix.rid }}${{ matrix.suffix }} -C ./publish .
+      run: |
+        tar -czvf ./Echoes-${{ matrix.rid }}${{ matrix.suffix }} -C ./publish .
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
