@@ -69,7 +69,7 @@
         <TabControl Grid.Row="2" Padding="0,4,0,0">
             <TabControl.Styles>
                 <Style Selector="TabItem">
-                    <Setter Property="FontSize" Value="9"/>
+                    <Setter Property="FontSize" Value="10"/>
                     <Setter Property="MinHeight" Value="28"/>
                     <Setter Property="Padding" Value="10,0"/>
                 </Style>
