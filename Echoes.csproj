@@ -13,10 +13,11 @@
     
     <ApplicationIcon>Assets\echoes.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    
   </PropertyGroup>
 
   <PropertyGroup>
-    <PublishSingleFile>true</PublishSingleFile>
+    <PublishSingleFile>false</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>full</TrimMode>
