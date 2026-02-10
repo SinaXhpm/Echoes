@@ -22,7 +22,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _currentVersion = "0.1.0";
     [ObservableProperty] private string _latestVersion = "0.1.0";
     [ObservableProperty] private bool _isUpdateAvailable;
-    [ObservableProperty] private string _currentUrl = "https://www.google.com";
+    public static bool IsMac => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
     public MainViewModel()
     {
         _ = CheckForUpdatesAsync();
