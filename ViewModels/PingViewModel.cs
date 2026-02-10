@@ -50,7 +50,6 @@ public partial class PingViewModel : ObservableObject
         _cts?.Cancel();
         IsPinging = false;
     }
-
     private async Task RunProcess(CancellationToken token)
     {
         try
@@ -59,8 +58,24 @@ public partial class PingViewModel : ObservableObject
             else await RunPingLoop(token);
         }
         catch (OperationCanceledException) { }
-        catch (Exception ex) { UpdateLog($"Error: {ex.Message}"); }
-        finally { IsPinging = false; }
+        catch (Exception ex)
+        {
+            var e = ex is System.Net.NetworkInformation.PingException pe && pe.InnerException != null ? pe.InnerException : ex;
+
+            string message = e switch
+            {
+                System.Net.Sockets.SocketException s when s.SocketErrorCode == System.Net.Sockets.SocketError.HostNotFound => "Host not found",
+                System.Net.Sockets.SocketException s when s.SocketErrorCode == System.Net.Sockets.SocketError.AddressFamilyNotSupported => "Invalid address",
+                System.Net.Sockets.SocketException s when s.SocketErrorCode == System.Net.Sockets.SocketError.NetworkUnreachable => "Network unreachable",
+                _ => e.Message
+            };
+
+            UpdateLog($"Error: {message}");
+        }
+        finally
+        {
+            IsPinging = false;
+        }
     }
 
     private async Task RunPingLoop(CancellationToken token)
