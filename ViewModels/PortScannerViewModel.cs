@@ -46,7 +46,7 @@ public partial class PortScannerViewModel : ObservableObject
     {
         _cts?.Cancel();
         IsScanning = false;
-        
+
         lock (_activeSockets)
         {
             foreach (var socket in _activeSockets.ToList())
@@ -92,17 +92,17 @@ public partial class PortScannerViewModel : ObservableObject
                 {
                     if (token.IsCancellationRequested) break;
                     var tasks = new List<Task>();
-                    
+
                     foreach (var port in ports)
                     {
                         if (token.IsCancellationRequested) break;
-                        
+
                         if (UseTcp) tasks.Add(ScanTcp(ip, port, token));
                         if (UseUdp) tasks.Add(ScanUdp(ip, port, token));
-                        
-                        if (tasks.Count >= 20) 
-                        { 
-                            await Task.WhenAll(tasks); 
+
+                        if (tasks.Count >= 20)
+                        {
+                            await Task.WhenAll(tasks);
                             tasks.Clear();
                         }
                     }
@@ -117,12 +117,12 @@ public partial class PortScannerViewModel : ObservableObject
             } while (Repeat && !token.IsCancellationRequested);
         }
         catch { }
-        finally 
-        { 
+        finally
+        {
             IsScanning = false;
             _cts?.Dispose();
             _cts = null;
-            
+
             lock (_activeSockets)
             {
                 _activeSockets.Clear();
@@ -135,7 +135,7 @@ public partial class PortScannerViewModel : ObservableObject
         if (ct.IsCancellationRequested) return;
         var result = new PortResult { IP = ip, Port = port, Protocol = "TCP" };
         var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        
+
         lock (_activeSockets) _activeSockets.Add(socket);
 
         try
@@ -162,7 +162,8 @@ public partial class PortScannerViewModel : ObservableObject
 
         if (!ct.IsCancellationRequested)
         {
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
                 if (result.Status == "OPEN") Results.Insert(0, result);
                 else Results.Add(result);
             });
@@ -174,7 +175,7 @@ public partial class PortScannerViewModel : ObservableObject
         if (ct.IsCancellationRequested) return;
         var result = new PortResult { IP = ip, Port = port, Protocol = "UDP" };
         var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        
+
         lock (_activeSockets) _activeSockets.Add(socket);
 
         try
@@ -192,7 +193,8 @@ public partial class PortScannerViewModel : ObservableObject
 
         if (!ct.IsCancellationRequested)
         {
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
                 if (result.Status == "SENT") Results.Insert(0, result);
                 else Results.Add(result);
             });

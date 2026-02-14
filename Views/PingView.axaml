@@ -1,80 +1,80 @@
 <UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:Echoes.ViewModels"
-             x:Class="Echoes.Views.PingView"
-             x:DataType="vm:PingViewModel"
-             x:CompileBindings="True">
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 xmlns:vm="using:Echoes.ViewModels"
+			 x:Class="Echoes.Views.PingView"
+			 x:DataType="vm:PingViewModel"
+			 x:CompileBindings="True">
 
-    <Grid RowDefinitions="Auto, Auto, *, Auto" Margin="12">
-        <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
-            <TextBox Grid.Column="0" 
-                     Text="{Binding TargetHost}" 
-                     Watermark="Enter Host or IP (e.g. 8.8.8.8)" 
-                     FontSize="12" Height="32" 
-                     VerticalContentAlignment="Center"
-                     Background="#22000000"
-                     BorderBrush="#33FFFFFF" 
-                     Margin="0,0,8,0">
-                <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding TogglePingCommand}" />
-                </TextBox.KeyBindings>
-            </TextBox>
-            
-            <Button Grid.Column="1" 
-        Command="{Binding TogglePingCommand}" 
-        Width="90" Height="28" 
-        HorizontalContentAlignment="Center"
-        VerticalContentAlignment="Center"
-        Classes.active="{Binding IsPinging}"> <Button.Styles>
-        <Style Selector="Button">
-            <Setter Property="Background" Value="#42B883"/>
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.2"/>
-                </Transitions>
-            </Setter>
-        </Style>
+	<Grid RowDefinitions="Auto, Auto, *, Auto" Margin="12">
+		<Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
+			<TextBox Grid.Column="0"
+					 Text="{Binding TargetHost}"
+					 Watermark="Enter Host or IP (e.g. 8.8.8.8)"
+					 FontSize="12" Height="32"
+					 VerticalContentAlignment="Center"
+					 Background="#22000000"
+					 BorderBrush="#33FFFFFF"
+					 Margin="0,0,8,0">
+				<TextBox.KeyBindings>
+					<KeyBinding Gesture="Enter" Command="{Binding TogglePingCommand}" />
+				</TextBox.KeyBindings>
+			</TextBox>
 
-        <Style Selector="Button.active">
-            <Setter Property="Background" Value="#E35F5F"/>
-        </Style>
+			<Button Grid.Column="1"
+					Command="{Binding TogglePingCommand}"
+					Width="90" Height="28"
+					HorizontalContentAlignment="Center"
+					VerticalContentAlignment="Center"
+					Classes.active="{Binding IsPinging}"> <Button.Styles>
+						<Style Selector="Button">
+							<Setter Property="Background" Value="#42B883"/>
+							<Setter Property="Transitions">
+								<Transitions>
+									<BrushTransition Property="Background" Duration="0:0:0.2"/>
+								</Transitions>
+							</Setter>
+						</Style>
 
-        <Style Selector="Button:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#52C893"/>
-        </Style>
-        <Style Selector="Button.active:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#F36F6F"/>
-        </Style>
-    </Button.Styles>
+						<Style Selector="Button.active">
+							<Setter Property="Background" Value="#E35F5F"/>
+						</Style>
 
-    <Panel>
-        <TextBlock Text="START" IsVisible="{Binding !IsPinging}" FontSize="11" FontWeight="Bold" Foreground="White"/>
-        <TextBlock Text="STOP" IsVisible="{Binding IsPinging}" FontSize="11" FontWeight="Bold" Foreground="White"/>
-    </Panel>
-</Button>
-        </Grid>
+						<Style Selector="Button:pointerover /template/ ContentPresenter">
+							<Setter Property="Background" Value="#52C893"/>
+						</Style>
+						<Style Selector="Button.active:pointerover /template/ ContentPresenter">
+							<Setter Property="Background" Value="#F36F6F"/>
+						</Style>
+					</Button.Styles>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="20" Margin="5,0,0,12">
-            <CheckBox IsChecked="{Binding IsTraceRoute}" Content="Trace Route" FontSize="11" />
-            <CheckBox IsChecked="{Binding NotifyOnline}" Content="Alert Online" FontSize="11" />
-            <CheckBox IsChecked="{Binding NotifyOffline}" Content="Alert Offline" FontSize="11" />
-        </StackPanel>
+				<Panel>
+					<TextBlock Text="START" IsVisible="{Binding !IsPinging}" FontSize="11" FontWeight="Bold" Foreground="White"/>
+					<TextBlock Text="STOP" IsVisible="{Binding IsPinging}" FontSize="11" FontWeight="Bold" Foreground="White"/>
+				</Panel>
+			</Button>
+		</Grid>
 
-        <Border Grid.Row="2" Background="#66000000" CornerRadius="4" BorderThickness="1" BorderBrush="#11FFFFFF">
-            <TextBox Text="{Binding LogText}" 
-                     IsReadOnly="True" 
-                     AcceptsReturn="True"
-                     Background="Transparent" 
-                     Foreground="#00FF66" 
-                     FontFamily="Cascadia Code,Consolas,Monospace"
-                     FontSize="12" 
-                     BorderThickness="0" 
-                     CaretIndex="{Binding LogText.Length}"
-                     ScrollViewer.VerticalScrollBarVisibility="Visible"/>
-        </Border>
+		<StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="20" Margin="5,0,0,12">
+			<CheckBox IsChecked="{Binding IsTraceRoute}" Content="Trace Route" FontSize="11" />
+			<CheckBox IsChecked="{Binding NotifyOnline}" Content="Alert Online" FontSize="11" />
+			<CheckBox IsChecked="{Binding NotifyOffline}" Content="Alert Offline" FontSize="11" />
+		</StackPanel>
 
-        <Border Grid.Row="3" Margin="0,10,0,0" Padding="12,8" Background="#11FFFFFF" CornerRadius="4">
-            <TextBlock Text="{Binding StatsSummary}" FontSize="11" FontFamily="Consolas" Foreground="#BBBBBB"/>
-        </Border>
-    </Grid>
+		<Border Grid.Row="2" Background="#66000000" CornerRadius="4" BorderThickness="1" BorderBrush="#11FFFFFF">
+			<TextBox Text="{Binding LogText}"
+					 IsReadOnly="True"
+					 AcceptsReturn="True"
+					 Background="Transparent"
+					 Foreground="#00FF66"
+					 FontFamily="Cascadia Code,Consolas,Monospace"
+					 FontSize="12"
+					 BorderThickness="0"
+					 CaretIndex="{Binding LogText.Length}"
+					 ScrollViewer.VerticalScrollBarVisibility="Visible"/>
+		</Border>
+
+		<Border Grid.Row="3" Margin="0,10,0,0" Padding="12,8" Background="#11FFFFFF" CornerRadius="4">
+			<TextBlock Text="{Binding StatsSummary}" FontSize="11" FontFamily="Consolas" Foreground="#BBBBBB"/>
+		</Border>
+	</Grid>
 </UserControl>
