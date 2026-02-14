@@ -4,7 +4,7 @@
 		xmlns:views="using:Echoes.Views"
 		x:Class="Echoes.Views.MainWindow"
 		x:DataType="vm:MainViewModel"
-		Icon="avares://Echoes/Assets/512.png"
+		Icon="avares://Echoes/Assets/logo.png"
 		Title="Echoes"
 		Width="610"
 		Height="420"

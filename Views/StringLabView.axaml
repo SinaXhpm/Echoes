@@ -1,108 +1,108 @@
 ﻿<UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:Echoes.ViewModels"
-             x:Class="Echoes.Views.StringLabView"
-             x:DataType="vm:StringLabViewModel">
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 xmlns:vm="using:Echoes.ViewModels"
+			 x:Class="Echoes.Views.StringLabView"
+			 x:DataType="vm:StringLabViewModel">
 
-    <UserControl.Styles>
-        <Style Selector="TabItem">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="MinHeight" Value="22"/>
-            <Setter Property="Padding" Value="10,0"/>
-            <Setter Property="Opacity" Value="1"/>
-        </Style>
-        <Style Selector="TextBox">
-            <Setter Property="AcceptsReturn" Value="True"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="Background" Value="#08FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#15FFFFFF"/>
-            <Setter Property="FontSize" Value="12"/>
-        </Style>
-        <Style Selector="Button">
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="Height" Value="26"/>
-            <Setter Property="FontSize" Value="10"/>
-        </Style>
-    </UserControl.Styles>
+	<UserControl.Styles>
+		<Style Selector="TabItem">
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="MinHeight" Value="22"/>
+			<Setter Property="Padding" Value="10,0"/>
+			<Setter Property="Opacity" Value="1"/>
+		</Style>
+		<Style Selector="TextBox">
+			<Setter Property="AcceptsReturn" Value="True"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="Background" Value="#08FFFFFF"/>
+			<Setter Property="BorderBrush" Value="#15FFFFFF"/>
+			<Setter Property="FontSize" Value="12"/>
+		</Style>
+		<Style Selector="Button">
+			<Setter Property="HorizontalAlignment" Value="Stretch"/>
+			<Setter Property="HorizontalContentAlignment" Value="Center"/>
+			<Setter Property="Height" Value="26"/>
+			<Setter Property="FontSize" Value="10"/>
+		</Style>
+	</UserControl.Styles>
 
-    <Grid RowDefinitions="*, Auto" Margin="10,0,10,10">
-        <TabControl Grid.Row="0" Background="Transparent" Padding="0">
-            
-            <TabItem Header="BASE64">
-                <Grid ColumnDefinitions="*, 110, *" Margin="0,2,0,0">
-                    <TextBox Grid.Column="0" Text="{Binding B64Input, Mode=TwoWay}" Watermark="Input..."/>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5" Margin="8,0">
-                        <Button Command="{Binding B64ActionCommand}" CommandParameter="enc" Content="ENCODE ➔" Background="#27AE60"/>
-                        <Button Command="{Binding B64ActionCommand}" CommandParameter="dec" Content="DECODE ➔" Background="#2980B9"/>
-                        <Button Command="{Binding ClearCommand}" CommandParameter="b64" Content="CLEAR" Background="#33FFFFFF"/>
-                    </StackPanel>
-                    <TextBox Grid.Column="2" Text="{Binding B64Output}" IsReadOnly="True" Watermark="Result..."/>
-                </Grid>
-            </TabItem>
+	<Grid RowDefinitions="*, Auto" Margin="10,0,10,10">
+		<TabControl Grid.Row="0" Background="Transparent" Padding="0">
 
-            <TabItem Header="URL">
-                <Grid ColumnDefinitions="*, 110, *" Margin="0,2,0,0">
-                    <TextBox Grid.Column="0" Text="{Binding UrlInput, Mode=TwoWay}" Watermark="URL..."/>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5" Margin="8,0">
-                        <Button Command="{Binding UrlActionCommand}" CommandParameter="enc" Content="ENCODE ➔" Background="#27AE60"/>
-                        <Button Command="{Binding UrlActionCommand}" CommandParameter="dec" Content="DECODE ➔" Background="#2980B9"/>
-                        <Button Command="{Binding ClearCommand}" CommandParameter="url" Content="CLEAR" Background="#33FFFFFF"/>
-                    </StackPanel>
-                    <TextBox Grid.Column="2" Text="{Binding UrlOutput}" IsReadOnly="True" Watermark="Result..."/>
-                </Grid>
-            </TabItem>
+			<TabItem Header="BASE64">
+				<Grid ColumnDefinitions="*, 110, *" Margin="0,2,0,0">
+					<TextBox Grid.Column="0" Text="{Binding B64Input, Mode=TwoWay}" Watermark="Input..."/>
+					<StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5" Margin="8,0">
+						<Button Command="{Binding B64ActionCommand}" CommandParameter="enc" Content="ENCODE ➔" Background="#27AE60"/>
+						<Button Command="{Binding B64ActionCommand}" CommandParameter="dec" Content="DECODE ➔" Background="#2980B9"/>
+						<Button Command="{Binding ClearCommand}" CommandParameter="b64" Content="CLEAR" Background="#33FFFFFF"/>
+					</StackPanel>
+					<TextBox Grid.Column="2" Text="{Binding B64Output}" IsReadOnly="True" Watermark="Result..."/>
+				</Grid>
+			</TabItem>
 
-            <TabItem Header="JSON LAB">
-                <Grid ColumnDefinitions="*, 110, *" Margin="0,2,0,0">
-                    <TextBox Grid.Column="0" Text="{Binding JsonInput, Mode=TwoWay}" Watermark="Paste JSON here..."/>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5" Margin="8,0">
-                        <Button Command="{Binding JsonActionCommand}" CommandParameter="format" Content="BEAUTIFY" Background="#27AE60"/>
-                        <Button Command="{Binding JsonActionCommand}" CommandParameter="minify" Content="MINIFY" Background="#2980B9"/>
-                        <Button Command="{Binding ClearCommand}" CommandParameter="json" Content="CLEAR" Background="#33FFFFFF"/>
-                    </StackPanel>
-                    <TextBox Grid.Column="2" Text="{Binding JsonOutput}" IsReadOnly="True" Watermark="Result..." FontFamily="Cascadia Code,Consolas"/>
-                </Grid>
-            </TabItem>
+			<TabItem Header="URL">
+				<Grid ColumnDefinitions="*, 110, *" Margin="0,2,0,0">
+					<TextBox Grid.Column="0" Text="{Binding UrlInput, Mode=TwoWay}" Watermark="URL..."/>
+					<StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5" Margin="8,0">
+						<Button Command="{Binding UrlActionCommand}" CommandParameter="enc" Content="ENCODE ➔" Background="#27AE60"/>
+						<Button Command="{Binding UrlActionCommand}" CommandParameter="dec" Content="DECODE ➔" Background="#2980B9"/>
+						<Button Command="{Binding ClearCommand}" CommandParameter="url" Content="CLEAR" Background="#33FFFFFF"/>
+					</StackPanel>
+					<TextBox Grid.Column="2" Text="{Binding UrlOutput}" IsReadOnly="True" Watermark="Result..."/>
+				</Grid>
+			</TabItem>
 
-            <TabItem Header="HASH">
-                <Grid ColumnDefinitions="*, 110, *" Margin="0,2,0,0">
-                    <TextBox Grid.Column="0" Text="{Binding HashInput, Mode=TwoWay}" Watermark="Text..."/>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5" Margin="8,0">
-                        <Button Command="{Binding HashActionCommand}" CommandParameter="md5" Content="MD5" Background="#8E44AD"/>
-                        <Button Command="{Binding HashActionCommand}" CommandParameter="sha256" Content="SHA256" Background="#D35400"/>
-                        <Button Command="{Binding ClearCommand}" CommandParameter="hash" Content="CLEAR" Background="#33FFFFFF"/>
-                    </StackPanel>
-                    <TextBox Grid.Column="2" Text="{Binding HashOutput}" IsReadOnly="True" Watermark="Hash..." FontFamily="Cascadia Code"/>
-                </Grid>
-            </TabItem>
+			<TabItem Header="JSON LAB">
+				<Grid ColumnDefinitions="*, 110, *" Margin="0,2,0,0">
+					<TextBox Grid.Column="0" Text="{Binding JsonInput, Mode=TwoWay}" Watermark="Paste JSON here..."/>
+					<StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5" Margin="8,0">
+						<Button Command="{Binding JsonActionCommand}" CommandParameter="format" Content="BEAUTIFY" Background="#27AE60"/>
+						<Button Command="{Binding JsonActionCommand}" CommandParameter="minify" Content="MINIFY" Background="#2980B9"/>
+						<Button Command="{Binding ClearCommand}" CommandParameter="json" Content="CLEAR" Background="#33FFFFFF"/>
+					</StackPanel>
+					<TextBox Grid.Column="2" Text="{Binding JsonOutput}" IsReadOnly="True" Watermark="Result..." FontFamily="Cascadia Code,Consolas"/>
+				</Grid>
+			</TabItem>
 
-            <TabItem Header="TEXT LAB">
-                <Grid RowDefinitions="Auto, *" Margin="0,2,0,0">
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="15" Margin="0,0,0,5" Opacity="0.6">
-                        <TextBlock Text="{Binding CharCount, StringFormat='CHARS: \{0\}'}" FontSize="10"/>
-                        <TextBlock Text="{Binding WordCount, StringFormat='WORDS: \{0\}'}" FontSize="10"/>
-                        <TextBlock Text="{Binding LineCount, StringFormat='LINES: \{0\}'}" FontSize="10"/>
-                    </StackPanel>
-                    <Grid Grid.Row="1" ColumnDefinitions="*, 110">
-                        <TextBox Grid.Column="0" Text="{Binding EditInput, Mode=TwoWay}" Watermark="Edit text here..."/>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4" Margin="8,0">
-                            <Button Command="{Binding EditActionCommand}" CommandParameter="sort" Content="SORT A-Z" Background="#2E4053"/>
-                            <Button Command="{Binding EditActionCommand}" CommandParameter="unique" Content="DISTINCT" Background="#2E4053"/>
-                            <Button Command="{Binding EditActionCommand}" CommandParameter="trim" Content="TRIM" Background="#2E4053"/>
-                            <Button Command="{Binding EditActionCommand}" CommandParameter="clean" Content="CLEAN UP" Background="#2E4053"/>
-                            <Button Command="{Binding EditActionCommand}" CommandParameter="upper" Content="UPPER" Background="#5D6D7E"/>
-                            <Button Command="{Binding EditActionCommand}" CommandParameter="lower" Content="lower" Background="#5D6D7E"/>
-                            <Button Command="{Binding ClearCommand}" CommandParameter="edit" Content="CLEAR" Background="#33FFFFFF" Margin="0,4,0,0"/>
-                        </StackPanel>
-                    </Grid>
-                </Grid>
-            </TabItem>
+			<TabItem Header="HASH">
+				<Grid ColumnDefinitions="*, 110, *" Margin="0,2,0,0">
+					<TextBox Grid.Column="0" Text="{Binding HashInput, Mode=TwoWay}" Watermark="Text..."/>
+					<StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5" Margin="8,0">
+						<Button Command="{Binding HashActionCommand}" CommandParameter="md5" Content="MD5" Background="#8E44AD"/>
+						<Button Command="{Binding HashActionCommand}" CommandParameter="sha256" Content="SHA256" Background="#D35400"/>
+						<Button Command="{Binding ClearCommand}" CommandParameter="hash" Content="CLEAR" Background="#33FFFFFF"/>
+					</StackPanel>
+					<TextBox Grid.Column="2" Text="{Binding HashOutput}" IsReadOnly="True" Watermark="Hash..." FontFamily="Cascadia Code"/>
+				</Grid>
+			</TabItem>
 
-        </TabControl>
+			<TabItem Header="TEXT LAB">
+				<Grid RowDefinitions="Auto, *" Margin="0,2,0,0">
+					<StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="15" Margin="0,0,0,5" Opacity="0.6">
+						<TextBlock Text="{Binding CharCount, StringFormat='CHARS: \{0\}'}" FontSize="10"/>
+						<TextBlock Text="{Binding WordCount, StringFormat='WORDS: \{0\}'}" FontSize="10"/>
+						<TextBlock Text="{Binding LineCount, StringFormat='LINES: \{0\}'}" FontSize="10"/>
+					</StackPanel>
+					<Grid Grid.Row="1" ColumnDefinitions="*, 110">
+						<TextBox Grid.Column="0" Text="{Binding EditInput, Mode=TwoWay}" Watermark="Edit text here..."/>
+						<StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4" Margin="8,0">
+							<Button Command="{Binding EditActionCommand}" CommandParameter="sort" Content="SORT A-Z" Background="#2E4053"/>
+							<Button Command="{Binding EditActionCommand}" CommandParameter="unique" Content="DISTINCT" Background="#2E4053"/>
+							<Button Command="{Binding EditActionCommand}" CommandParameter="trim" Content="TRIM" Background="#2E4053"/>
+							<Button Command="{Binding EditActionCommand}" CommandParameter="clean" Content="CLEAN UP" Background="#2E4053"/>
+							<Button Command="{Binding EditActionCommand}" CommandParameter="upper" Content="UPPER" Background="#5D6D7E"/>
+							<Button Command="{Binding EditActionCommand}" CommandParameter="lower" Content="lower" Background="#5D6D7E"/>
+							<Button Command="{Binding ClearCommand}" CommandParameter="edit" Content="CLEAR" Background="#33FFFFFF" Margin="0,4,0,0"/>
+						</StackPanel>
+					</Grid>
+				</Grid>
+			</TabItem>
 
-        <Border Grid.Row="1" Background="#40FF4444" BorderBrush="#80FF4444" BorderThickness="1" CornerRadius="4" Margin="0,10,0,0" Padding="10" IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-            <TextBlock Text="{Binding ErrorMessage}" Foreground="#FFFF4444" FontSize="11" FontWeight="Bold" TextWrapping="Wrap"/>
-        </Border>
-    </Grid>
+		</TabControl>
+
+		<Border Grid.Row="1" Background="#40FF4444" BorderBrush="#80FF4444" BorderThickness="1" CornerRadius="4" Margin="0,10,0,0" Padding="10" IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+			<TextBlock Text="{Binding ErrorMessage}" Foreground="#FFFF4444" FontSize="11" FontWeight="Bold" TextWrapping="Wrap"/>
+		</Border>
+	</Grid>
 </UserControl>

@@ -1,121 +1,121 @@
 <UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:avalonia="using:TheArtOfDev.HtmlRenderer.Avalonia"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:Echoes.ViewModels"
-             x:Class="Echoes.Views.CurlView"
-             xmlns:controls="using:Echoes.Controls"
-             xmlns:html="clr-namespace:TheArtOfDev.HtmlRenderer.Avalonia;assembly=TheArtOfDev.HtmlRenderer.Avalonia"
-             xmlns:local="using:Echoes.Views"
-             x:DataType="vm:CurlViewModel">
+			 xmlns:avalonia="using:TheArtOfDev.HtmlRenderer.Avalonia"
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 xmlns:vm="using:Echoes.ViewModels"
+			 x:Class="Echoes.Views.CurlView"
+			 xmlns:controls="using:Echoes.Controls"
+			 xmlns:html="clr-namespace:TheArtOfDev.HtmlRenderer.Avalonia;assembly=TheArtOfDev.HtmlRenderer.Avalonia"
+			 xmlns:local="using:Echoes.Views"
+			 x:DataType="vm:CurlViewModel">
 
-     
-    <Grid RowDefinitions="Auto, Auto, *, Auto" Margin="10">
-        
-        <Grid Grid.Row="0" ColumnDefinitions="*, 120, 85" Margin="0,0,0,8">
-            <TextBox Grid.Column="0" Text="{Binding Url}" Watermark="Target URL..." 
-                     Height="30" FontSize="11" VerticalContentAlignment="Center" 
-                     Background="#12000000" Margin="0,0,4,0">
-                <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}" />
-                </TextBox.KeyBindings>
-            </TextBox>
 
-            <TextBox Grid.Column="1" Text="{Binding OverrideIp}" Watermark="Override IP..." 
-                     Height="30" FontSize="11" VerticalContentAlignment="Center" 
-                     Background="#12000000" Margin="0,0,4,0"/>
-            
-            <Button Grid.Column="2" 
-                    Command="{Binding ToggleCurlCommand}" 
-                    Height="30" HorizontalAlignment="Stretch" 
-                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                    Classes.active="{Binding IsWorking}">
-                
-                <Button.Styles>
-                    <Style Selector="Button">
-                        <Setter Property="Background" Value="#42B883"/>
-                        <Setter Property="Transitions">
-                            <Transitions>
-                                <BrushTransition Property="Background" Duration="0:0:0.2"/>
-                            </Transitions>
-                        </Setter>
-                    </Style>
+	<Grid RowDefinitions="Auto, Auto, *, Auto" Margin="10">
 
-                    <Style Selector="Button.active">
-                        <Setter Property="Background" Value="#E35F5F"/>
-                    </Style>
+		<Grid Grid.Row="0" ColumnDefinitions="*, 120, 85" Margin="0,0,0,8">
+			<TextBox Grid.Column="0" Text="{Binding Url}" Watermark="Target URL..."
+					 Height="30" FontSize="11" VerticalContentAlignment="Center"
+					 Background="#12000000" Margin="0,0,4,0">
+				<TextBox.KeyBindings>
+					<KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}" />
+				</TextBox.KeyBindings>
+			</TextBox>
 
-                    <Style Selector="Button:pointerover /template/ ContentPresenter">
-                        <Setter Property="Background" Value="#52C893"/>
-                    </Style>
-                    <Style Selector="Button.active:pointerover /template/ ContentPresenter">
-                        <Setter Property="Background" Value="#F36F6F"/>
-                    </Style>
-                </Button.Styles>
+			<TextBox Grid.Column="1" Text="{Binding OverrideIp}" Watermark="Override IP..."
+					 Height="30" FontSize="11" VerticalContentAlignment="Center"
+					 Background="#12000000" Margin="0,0,4,0"/>
 
-                <Panel>
-                    <TextBlock Text="RUN" IsVisible="{Binding !IsWorking}" FontSize="11" FontWeight="Black" Foreground="White"/>
-                    <TextBlock Text="STOP" IsVisible="{Binding IsWorking}" FontSize="11" FontWeight="Black" Foreground="White"/>
-                </Panel>
-            </Button>
-        </Grid>
+			<Button Grid.Column="2"
+					Command="{Binding ToggleCurlCommand}"
+					Height="30" HorizontalAlignment="Stretch"
+					HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+					Classes.active="{Binding IsWorking}">
 
-        <Grid Grid.Row="1" ColumnDefinitions="*, 75, 75, Auto" Margin="0,0,0,8">
-            <TextBox Grid.Column="0" Text="{Binding Proxy}" Watermark="Proxy (IP:Port)" Height="28" FontSize="11" VerticalContentAlignment="Center" Background="#12000000" Margin="0,0,4,0"/>
-            <TextBox Grid.Column="1" Text="{Binding ProxyUser}" Watermark="User" Height="28" FontSize="11" VerticalContentAlignment="Center" Background="#12000000" Margin="0,0,4,0"/>
-            <TextBox Grid.Column="2" Text="{Binding ProxyPass}" Watermark="Pass" PasswordChar="*" Height="28" FontSize="11" VerticalContentAlignment="Center" Background="#12000000" Margin="0,0,4,0"/>
-            <CheckBox Grid.Column="3" IsChecked="{Binding SkipSslVerify}" Content="Insecure" FontSize="10" Margin="8,0,0,0" MinHeight="28"/>
-        </Grid>
+				<Button.Styles>
+					<Style Selector="Button">
+						<Setter Property="Background" Value="#42B883"/>
+						<Setter Property="Transitions">
+							<Transitions>
+								<BrushTransition Property="Background" Duration="0:0:0.2"/>
+							</Transitions>
+						</Setter>
+					</Style>
 
-        <TabControl Grid.Row="2" Padding="0,4,0,0">
-            <TabControl.Styles>
-                <Style Selector="TabItem">
-                    <Setter Property="FontSize" Value="10"/>
-                    <Setter Property="MinHeight" Value="28"/>
-                    <Setter Property="Padding" Value="10,0"/>
-                </Style>
-            </TabControl.Styles>
+					<Style Selector="Button.active">
+						<Setter Property="Background" Value="#E35F5F"/>
+					</Style>
 
-            <TabItem Header="LOGS">
-                <Border Background="#35000000" CornerRadius="3">
-                    <TextBox Text="{Binding FullLog}" IsReadOnly="True" AcceptsReturn="True" 
-                             Foreground="#D0D0D0" FontFamily="Cascadia Code,Consolas" FontSize="10.5" BorderThickness="0"/>
-                </Border>
-            </TabItem>
+					<Style Selector="Button:pointerover /template/ ContentPresenter">
+						<Setter Property="Background" Value="#52C893"/>
+					</Style>
+					<Style Selector="Button.active:pointerover /template/ ContentPresenter">
+						<Setter Property="Background" Value="#F36F6F"/>
+					</Style>
+				</Button.Styles>
 
-            <TabItem Header="RAW BODY">
-                <Border Background="#35000000" CornerRadius="3">
-                    <TextBox Text="{Binding RawBody}" IsReadOnly="True" AcceptsReturn="True" 
-                             Foreground="#00FF66" FontFamily="Cascadia Code,Consolas" FontSize="11" BorderThickness="0"/>
-                </Border>
-            </TabItem>
-            
-            <TabItem Header="HEADERS">
-                <Border Background="#35000000" CornerRadius="3">
-                    <TextBox Text="{Binding HeadersLog}" IsReadOnly="True" AcceptsReturn="True" 
-                             Foreground="#F1C40F" FontFamily="Cascadia Code,Consolas" FontSize="10.5" BorderThickness="0"/>
-                </Border>
-            </TabItem>
-            
-            <TabItem Header="SSL LOG">
-                <Border Background="#35000000" CornerRadius="3">
-                    <TextBox Text="{Binding SslLog}" IsReadOnly="True" AcceptsReturn="True" 
-                             Foreground="#3498DB" FontFamily="Cascadia Code,Consolas" FontSize="10.5" BorderThickness="0"/>
-                </Border>
-            </TabItem>
-            
-           <TabItem Header="PREVIEW" Name="PreviewTab">
-                <avalonia:HtmlPanel Background="White" Text="{Binding RawBody}" Name="MyHtmlPanel" 
-                        HorizontalAlignment="Stretch" 
-                        VerticalAlignment="Stretch" />
-        </TabItem>
-        </TabControl>
-        
-  
-              
+				<Panel>
+					<TextBlock Text="RUN" IsVisible="{Binding !IsWorking}" FontSize="11" FontWeight="Black" Foreground="White"/>
+					<TextBlock Text="STOP" IsVisible="{Binding IsWorking}" FontSize="11" FontWeight="Black" Foreground="White"/>
+				</Panel>
+			</Button>
+		</Grid>
 
-        <TextBox Grid.Row="3" Text="{Binding CustomFlags}" Watermark="Custom Flags (e.g. -H 'Auth: test')" 
-                 FontSize="9" Height="26" Margin="0,6,0,0" Background="#08FFFFFF" VerticalContentAlignment="Center"/>
+		<Grid Grid.Row="1" ColumnDefinitions="*, 75, 75, Auto" Margin="0,0,0,8">
+			<TextBox Grid.Column="0" Text="{Binding Proxy}" Watermark="Proxy (IP:Port)" Height="28" FontSize="11" VerticalContentAlignment="Center" Background="#12000000" Margin="0,0,4,0"/>
+			<TextBox Grid.Column="1" Text="{Binding ProxyUser}" Watermark="User" Height="28" FontSize="11" VerticalContentAlignment="Center" Background="#12000000" Margin="0,0,4,0"/>
+			<TextBox Grid.Column="2" Text="{Binding ProxyPass}" Watermark="Pass" PasswordChar="*" Height="28" FontSize="11" VerticalContentAlignment="Center" Background="#12000000" Margin="0,0,4,0"/>
+			<CheckBox Grid.Column="3" IsChecked="{Binding SkipSslVerify}" Content="Insecure" FontSize="10" Margin="8,0,0,0" MinHeight="28"/>
+		</Grid>
 
-         
-    </Grid>
+		<TabControl Grid.Row="2" Padding="0,4,0,0">
+			<TabControl.Styles>
+				<Style Selector="TabItem">
+					<Setter Property="FontSize" Value="10"/>
+					<Setter Property="MinHeight" Value="28"/>
+					<Setter Property="Padding" Value="10,0"/>
+				</Style>
+			</TabControl.Styles>
+
+			<TabItem Header="LOGS">
+				<Border Background="#35000000" CornerRadius="3">
+					<TextBox Text="{Binding FullLog}" IsReadOnly="True" AcceptsReturn="True"
+							 Foreground="#D0D0D0" FontFamily="Cascadia Code,Consolas" FontSize="10.5" BorderThickness="0"/>
+				</Border>
+			</TabItem>
+
+			<TabItem Header="RAW BODY">
+				<Border Background="#35000000" CornerRadius="3">
+					<TextBox Text="{Binding RawBody}" IsReadOnly="True" AcceptsReturn="True"
+							 Foreground="#00FF66" FontFamily="Cascadia Code,Consolas" FontSize="11" BorderThickness="0"/>
+				</Border>
+			</TabItem>
+
+			<TabItem Header="HEADERS">
+				<Border Background="#35000000" CornerRadius="3">
+					<TextBox Text="{Binding HeadersLog}" IsReadOnly="True" AcceptsReturn="True"
+							 Foreground="#F1C40F" FontFamily="Cascadia Code,Consolas" FontSize="10.5" BorderThickness="0"/>
+				</Border>
+			</TabItem>
+
+			<TabItem Header="SSL LOG">
+				<Border Background="#35000000" CornerRadius="3">
+					<TextBox Text="{Binding SslLog}" IsReadOnly="True" AcceptsReturn="True"
+							 Foreground="#3498DB" FontFamily="Cascadia Code,Consolas" FontSize="10.5" BorderThickness="0"/>
+				</Border>
+			</TabItem>
+
+			<TabItem Header="PREVIEW" Name="PreviewTab">
+				<avalonia:HtmlPanel Background="White" Text="{Binding RawBody}" Name="MyHtmlPanel"
+									HorizontalAlignment="Stretch"
+									VerticalAlignment="Stretch" />
+			</TabItem>
+		</TabControl>
+
+
+
+
+		<TextBox Grid.Row="3" Text="{Binding CustomFlags}" Watermark="Custom Flags (e.g. -H 'Auth: test')"
+				 FontSize="9" Height="26" Margin="0,6,0,0" Background="#08FFFFFF" VerticalContentAlignment="Center"/>
+
+
+	</Grid>
 </UserControl>

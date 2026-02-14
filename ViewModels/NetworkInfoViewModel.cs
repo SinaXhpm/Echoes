@@ -13,8 +13,8 @@ namespace Echoes.ViewModels;
 
 public class NetworkAdapterInfo
 {
-    public string Name { get; set; } = string.Empty;     
-    public string Model { get; set; } = string.Empty;      
+    public string Name { get; set; } = string.Empty;
+    public string Model { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public string IPv4 { get; set; } = string.Empty;
     public string MacAddress { get; set; } = string.Empty;
