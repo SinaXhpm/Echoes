@@ -44,14 +44,14 @@ jobs:
     - name: Package Linux
       if: matrix.os == 'ubuntu-latest'
       run: |
-        wget https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage
+        wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
         chmod +x appimagetool-x86_64.AppImage
         mkdir -p dist/Echoes.AppDir/usr/bin
         cp ./publish/Echoes dist/Echoes.AppDir/usr/bin/
         cp Assets/logo.png dist/Echoes.AppDir/Echoes.png
         printf "[Desktop Entry]\nName=Echoes\nExec=Echoes\nIcon=Echoes\nType=Application\nCategories=Utility;" > dist/Echoes.AppDir/Echoes.desktop
         ln -s usr/bin/Echoes dist/Echoes.AppDir/AppRun
-        ./appimagetool-x86_64.AppImage dist/Echoes.AppDir Echoes-Linux-x64.AppImage
+        ARCH=x86_64 ./appimagetool-x86_64.AppImage dist/Echoes.AppDir Echoes-Linux-x64.AppImage
         mkdir -p debian-dist/usr/bin
         cp ./publish/Echoes debian-dist/usr/bin/
         mkdir -p debian-dist/DEBIAN
