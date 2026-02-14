@@ -1,0 +1,97 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 xmlns:vm="using:Echoes.ViewModels"
+			 x:Class="Echoes.Views.NetworkInfoView"
+			 x:DataType="vm:NetworkInfoViewModel">
+	<UserControl.Styles>
+		<Style Selector="Button.refresh-btn">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderBrush" Value="#3300FF00"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="Padding" Value="12,6"/>
+			<Setter Property="Transitions">
+				<Transitions>
+					<BrushTransition Property="Background" Duration="0:0:0.2"/>
+					<BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
+					<TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.1"/>
+				</Transitions>
+			</Setter>
+		</Style>
+
+		<Style Selector="Button.refresh-btn:pointerover">
+			<Setter Property="Background" Value="#1500FF00"/>
+			<Setter Property="BorderBrush" Value="#00FF00"/>
+			<Setter Property="RenderTransform" Value="scale(1.05)"/>
+		</Style>
+
+		<Style Selector="Button.refresh-btn:pressed">
+			<Setter Property="RenderTransform" Value="scale(0.95)"/>
+		</Style>
+	</UserControl.Styles>
+	<Grid RowDefinitions="Auto, *">
+		<Button Grid.Row="0"
+				Classes="refresh-btn"
+				Command="{Binding RefreshCommand}"
+				Margin="15,10"
+				HorizontalAlignment="Right"
+				VerticalAlignment="Center">
+			<StackPanel Orientation="Horizontal" Spacing="8">
+				<Path Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"
+					  Fill="#00FF00"
+					  Width="14"
+					  Height="14"
+					  Stretch="Uniform"/>
+				<TextBlock Text="REFRESH ADAPTERS"
+						   FontSize="11"
+						   FontWeight="SemiBold"
+						   LetterSpacing="1"
+						   Foreground="#00FF00"
+						   VerticalAlignment="Center"/>
+			</StackPanel>
+		</Button>
+
+		<ScrollViewer Grid.Row="1">
+			<ItemsControl ItemsSource="{Binding Adapters}">
+				<ItemsControl.ItemTemplate>
+					<DataTemplate>
+						<Border Background="#1A1A1A" CornerRadius="3" Margin="10,2" Padding="8"
+								BorderBrush="#2A2A2A" BorderThickness="1">
+							<Grid ColumnDefinitions="*, 2*">
+								<StackPanel Grid.Column="0" VerticalAlignment="Center">
+									<TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="#00FF00" FontSize="13"/>
+									<TextBlock Text="{Binding Model}" Foreground="Gray" FontSize="10" TextWrapping="NoWrap"/>
+									<TextBlock Text="{Binding Status}" Foreground="#44FF44" FontSize="10" Opacity="0.7"/>
+								</StackPanel>
+
+								<UniformGrid Grid.Column="1" Columns="2">
+									<StackPanel Margin="5,0">
+										<TextBlock Text="IPv4" FontSize="9" Foreground="#555"/>
+										<StackPanel Orientation="Horizontal" Spacing="5">
+											<TextBlock Text="{Binding IPv4}" FontSize="12" Foreground="White"/>
+											<Button Command="{Binding ((vm:NetworkInfoViewModel)DataContext).CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+													CommandParameter="{Binding IPv4}"
+													Background="Transparent" BorderThickness="0" Padding="2" Cursor="Hand">
+												<Path Data="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
+													  Fill="#444" Width="10" Height="10" Stretch="Uniform"/>
+											</Button>
+										</StackPanel>
+									</StackPanel>
+
+									<StackPanel Margin="5,0">
+										<TextBlock Text="MAC" FontSize="9" Foreground="#555"/>
+										<TextBlock Text="{Binding MacAddress}" FontSize="12" Foreground="#CCC"/>
+									</StackPanel>
+
+									<StackPanel Margin="5,2">
+										<TextBlock Text="Gateway" FontSize="9" Foreground="#555"/>
+										<TextBlock Text="{Binding Gateway}" FontSize="11" Foreground="#CCC"/>
+									</StackPanel>
+								</UniformGrid>
+							</Grid>
+						</Border>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+		</ScrollViewer>
+	</Grid>
+</UserControl>
