@@ -3,7 +3,7 @@
 
 [GitHub Repository](https://github.com/SinaXhpm/Echoes) | [Telegram](https://t.me/the_pink_palace)
 
-<video src="https://raw.githubusercontent.com/sinaxhpm/echoes/main/Assets/echoes.mp4" width="100%" autoplay muted loop>
+<video src="https://github.com/SinaXhpm/Echoes/raw/refs/heads/master/Assets/echoes.mp4" width="100%" autoplay muted loop>
 </video>
 --
 ## 🚀 Installation & Usage
