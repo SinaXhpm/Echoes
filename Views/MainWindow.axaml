@@ -63,7 +63,7 @@
 				<TabItem Header="SCANNER"><views:PortScannerView DataContext="{Binding PortScannerVM}"/></TabItem>
 				<TabItem Header="IP INFO"><views:IpInfoView DataContext="{Binding IpInfoVM}"/></TabItem>
 				<TabItem Header="SSH"><views:SshView DataContext="{Binding SshVM}"/></TabItem>
-				<TabItem Header="String"><views:StringLabView DataContext="{Binding StringTool}"/></TabItem>
+				<TabItem Header="STRING"><views:StringLabView DataContext="{Binding StringTool}"/></TabItem>
 				<TabItem Header="MONITOR"><views:MonitorView DataContext="{Binding MonitorVM}"/></TabItem>
 				<TabItem Header="TG">
 					<views:TgView>
@@ -71,6 +71,9 @@
 							<vm:TgViewModel/>
 						</views:TgView.DataContext>
 					</views:TgView>
+				</TabItem>
+				<TabItem Header="NIC">
+					<views:NetworkInfoView DataContext="{Binding NetworkVM}"/>
 				</TabItem>
 			</TabControl>
 
