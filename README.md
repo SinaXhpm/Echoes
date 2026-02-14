@@ -2,7 +2,9 @@
 > *Small utilities for network, API, and string tasks;
 
 [GitHub Repository](https://github.com/SinaXhpm/Echoes) | [Telegram](https://t.me/the_pink_palace)
-![Demo Video](./Assets/echoes.mp4)
+
+<video src="https://raw.githubusercontent.com/sinaxhpm/echoes/main/Assets/echoes.mp4" width="100%" autoplay muted loop>
+</video>
 --
 ## 🚀 Installation & Usage
 
