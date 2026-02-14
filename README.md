@@ -2,8 +2,24 @@
 > *Small utilities for network, API, and string tasks;
 
 [GitHub Repository](https://github.com/SinaXhpm/Echoes) | [Telegram](https://t.me/the_pink_palace)
-
+<div align="center">
+	<video src="./Assets/echoes.mp4" width="100%" autoplay muted loop>
+	</video>
+</div>
 ---
+## 🚀 Installation & Usage
+
+Choose the package that fits your OS from the **[Releases](https://github.com/SinaXhpm/Echoes/releases)** section:
+
+| OS | Recommended Format | Installation |
+| :--- | :--- | :--- |
+| **Windows** | `.zip` | Extract and run `Echoes.exe` |
+| **macOS** | `.dmg` | Mount and drag `Echoes.app` to Applications |
+| **Linux (Universal)** | `.AppImage` | Make executable (`chmod +x`) and run |
+| **Debian/Ubuntu** | `.deb` | Install via `sudo dpkg -i echoes.deb` |
+
+> **Note:** Echoes is powered by **Native AOT**, meaning it's a zero-dependency standalone binary. You don't need to install .NET or any other runtime to use it.
+--
 
 ## Features
 
@@ -12,6 +28,7 @@
 - **Port Scanner:** TCP and UDP scanning supporting IP ranges, CIDR notation, and CSV export.
 - **SSH Terminal:** Integrated terminal with ANSI-color support, command history, and **SOCKS5 proxy connection/tunneling**.
 - **DNS & WHOIS:** Multi-record DNS querying (A, MX, TXT, etc.) via custom servers and RDAP domain lookups.
+- **NIC Explorer**: Detailed view of network adapters including IPv4, IPv6, MAC addresses, and operational status.
 
 ### 🌐 Web & API
 - **cURL Client:** GUI for cURL supporting **HTTP/SOCKS proxies**, custom flags, IP Override (Resolve), and detailed logging.
