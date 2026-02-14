@@ -68,7 +68,7 @@ jobs:
         mkdir -p debian-dist/usr/bin
         cp ./publish/Echoes debian-dist/usr/bin/
         mkdir -p debian-dist/DEBIAN
-        printf "Package: echoes\nVersion: 1.0.0\nArchitecture: amd64\nMaintainer: EchoesTeam\nDescription: Network Utility" > debian-dist/DEBIAN/control
+        printf "Package: echoes\nVersion: 0.2.0\nArchitecture: amd64\nMaintainer: EchoesTeam\nDescription: Network Utility" > debian-dist/DEBIAN/control
         dpkg-deb --build debian-dist echoes.deb
         
         tar -czvf ./Echoes-linux-x64.tar.gz -C ./publish .
@@ -82,7 +82,7 @@ jobs:
         mkdir -p "dist/Echoes.app/Contents/Resources"
         cp ./publish/Echoes "dist/Echoes.app/Contents/MacOS/"
         cp Assets/logo.icns "dist/Echoes.app/Contents/Resources/icon.icns"
-        printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Echoes</string><key>CFBundleIconFile</key><string>icon.icns</string><key>CFBundleIdentifier</key><string>com.echoes.app</string><key>CFBundleName</key><string>Echoes</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>1.0</string></dict></plist>' > "dist/Echoes.app/Contents/Info.plist"
+        printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Echoes</string><key>CFBundleIconFile</key><string>icon.icns</string><key>CFBundleIdentifier</key><string>com.echoes.app</string><key>CFBundleName</key><string>Echoes</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>0.2</string></dict></plist>' > "dist/Echoes.app/Contents/Info.plist"
         
         create-dmg --volname "Echoes Installer" --window-pos 200 120 --window-size 800 400 --icon-size 100 --icon "Echoes.app" 200 190 --hide-extension "Echoes.app" --app-drop-link 600 185 "Echoes-${{ matrix.rid }}.dmg" "dist/"
         tar -czvf ./Echoes-${{ matrix.rid }}.tar.gz -C ./publish .
