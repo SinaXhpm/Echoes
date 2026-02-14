@@ -20,7 +20,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private StringLabViewModel _stringTool = new();
     [ObservableProperty] private MonitorViewModel _monitorVM = new();
     [ObservableProperty] private NetworkInfoViewModel _networkVM = new();
-    [ObservableProperty] private string _currentVersion = "0.1.0";
+    [ObservableProperty] private string _currentVersion = "0.2.0";
     [ObservableProperty] private string _latestVersion = "0.1.0";
     [ObservableProperty] private bool _isUpdateAvailable;
     public static bool IsMac => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
