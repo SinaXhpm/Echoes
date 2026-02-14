@@ -13,16 +13,12 @@ jobs:
         include:
           - os: windows-latest
             rid: win-x64
-            suffix: .zip
           - os: ubuntu-latest
             rid: linux-x64
-            suffix: .tar.gz
           - os: macos-latest
             rid: osx-x64
-            suffix: .tar.gz
           - os: macos-latest
             rid: osx-arm64
-            suffix: .tar.gz
 
     steps:
     - uses: actions/checkout@v4
@@ -36,27 +32,71 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang zlib1g-dev
+        sudo apt-get install -y clang zlib1g-dev libfuse2 binutils
 
-    - name: Publish
+    - name: Publish (Native AOT)
       run: |
-        dotnet publish -c Release -r ${{ matrix.rid }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=copyused -p:OptimizationPreference=Size -p:StackTraceSupport=true -p:InvariantGlobalization=false -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
+        dotnet publish Echoes/Echoes.csproj -c Release -r ${{ matrix.rid }} \
+        -p:PublishAot=true \
+        -p:PublishTrimmed=true \
+        -p:TrimMode=copyused \
+        -p:OptimizationPreference=Size \
+        -p:StackTraceSupport=true \
+        -p:InvariantGlobalization=false \
+        -p:DebugType=none \
+        -p:DebugSymbols=false \
+        --self-contained true \
+        -o ./publish
 
-    - name: Package Windows
+    - name: Package Windows (.zip)
       if: matrix.os == 'windows-latest'
       run: |
-        Compress-Archive -Path ./publish/* -DestinationPath ./Echoes-${{ matrix.rid }}${{ matrix.suffix }}
+        Compress-Archive -Path ./publish/* -DestinationPath ./Echoes-${{ matrix.rid }}.zip
 
-    - name: Package Unix
-      if: matrix.os != 'windows-latest'
+    - name: Package Linux (AppImage & DEB)
+      if: matrix.os == 'ubuntu-latest'
       run: |
-        tar -czvf ./Echoes-${{ matrix.rid }}${{ matrix.suffix }} -C ./publish .
+        wget https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage
+        chmod +x appimagetool-x86_64.AppImage
+        mkdir -p dist/Echoes.AppDir/usr/bin
+        cp ./publish/Echoes dist/Echoes.AppDir/usr/bin/
+        cp Assets/logo.png dist/Echoes.AppDir/Echoes.png
+        printf "[Desktop Entry]\nName=Echoes\nExec=Echoes\nIcon=Echoes\nType=Application\nCategories=Utility;" > dist/Echoes.AppDir/Echoes.desktop
+        ln -s usr/bin/Echoes dist/Echoes.AppDir/AppRun
+        ./appimagetool-x86_64.AppImage dist/Echoes.AppDir Echoes-Linux-x64.AppImage
+        
+        mkdir -p debian-dist/usr/bin
+        cp ./publish/Echoes debian-dist/usr/bin/
+        mkdir -p debian-dist/DEBIAN
+        printf "Package: echoes\nVersion: 1.0.0\nArchitecture: amd64\nMaintainer: EchoesTeam\nDescription: Network Utility" > debian-dist/DEBIAN/control
+        dpkg-deb --build debian-dist echoes.deb
+        
+        tar -czvf ./Echoes-linux-x64.tar.gz -C ./publish .
+
+
+    - name: Package macOS (.dmg & .tar.gz)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install create-dmg
+        mkdir -p "dist/Echoes.app/Contents/MacOS"
+        mkdir -p "dist/Echoes.app/Contents/Resources"
+        cp ./publish/Echoes "dist/Echoes.app/Contents/MacOS/"
+        cp Assets/logo.icns "dist/Echoes.app/Contents/Resources/icon.icns"
+        printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Echoes</string><key>CFBundleIconFile</key><string>icon.icns</string><key>CFBundleIdentifier</key><string>com.echoes.app</string><key>CFBundleName</key><string>Echoes</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>1.0</string></dict></plist>' > "dist/Echoes.app/Contents/Info.plist"
+        
+        create-dmg --volname "Echoes Installer" --window-pos 200 120 --window-size 800 400 --icon-size 100 --icon "Echoes.app" 200 190 --hide-extension "Echoes.app" --app-drop-link 600 185 "Echoes-${{ matrix.rid }}.dmg" "dist/"
+        tar -czvf ./Echoes-${{ matrix.rid }}.tar.gz -C ./publish .
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: Echoes-${{ matrix.rid }}
-        path: Echoes-${{ matrix.rid }}${{ matrix.suffix }}
+        path: |
+          *.zip
+          *.tar.gz
+          *.AppImage
+          *.deb
+          *.dmg
 
   release:
     needs: build
@@ -68,7 +108,7 @@ jobs:
         path: ./artifacts
 
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: ./artifacts/**/*
       env:
