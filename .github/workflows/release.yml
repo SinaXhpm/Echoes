@@ -52,10 +52,11 @@ jobs:
         printf "[Desktop Entry]\nName=Echoes\nExec=Echoes\nIcon=Echoes\nType=Application\nCategories=Utility;" > dist/Echoes.AppDir/Echoes.desktop
         ln -s usr/bin/Echoes dist/Echoes.AppDir/AppRun
         ARCH=x86_64 ./appimagetool-x86_64.AppImage dist/Echoes.AppDir Echoes-Linux-x64.AppImage
+        
         mkdir -p debian-dist/usr/bin
         cp ./publish/Echoes debian-dist/usr/bin/
         mkdir -p debian-dist/DEBIAN
-        printf "Package: echoes\nVersion: 0.2.0\nArchitecture: amd64\nMaintainer: EchoesTeam\nDescription: Network Utility" > debian-dist/DEBIAN/control
+        printf "Package: echoes\nVersion: 0.2.0\nArchitecture: amd64\nMaintainer: EchoesTeam\nDescription: Network Utility\n" > debian-dist/DEBIAN/control
         dpkg-deb --build debian-dist echoes.deb
 
     - name: Package macOS
