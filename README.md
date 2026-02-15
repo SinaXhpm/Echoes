@@ -5,7 +5,9 @@
 
 <video src="https://github.com/SinaXhpm/Echoes/raw/refs/heads/master/Assets/echoes.mp4" width="80%" autoplay muted loop>
 </video>
+
 --
+
 ## 🚀 Installation & Usage
 
 Choose the package that fits your OS from the **[Releases](https://github.com/SinaXhpm/Echoes/releases)** section:
