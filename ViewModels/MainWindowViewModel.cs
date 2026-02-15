@@ -11,25 +11,36 @@ namespace Echoes.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
-    [ObservableProperty] private PingViewModel _pingVM = new();
-    [ObservableProperty] private DnsViewModel _dnsVM = new();
-    [ObservableProperty] private CurlViewModel _curlVM = new();
-    [ObservableProperty] private PortScannerViewModel _portScannerVM = new();
-    [ObservableProperty] private IpInfoViewModel _ipInfoVM = new();
-    [ObservableProperty] private SshViewModel _sshVM = new();
-    [ObservableProperty] private StringLabViewModel _stringTool = new();
-    [ObservableProperty] private MonitorViewModel _monitorVM = new();
-    [ObservableProperty] private NetworkInfoViewModel _networkVM = new();
+    private PingViewModel? _pingVM;
+    private DnsViewModel? _dnsVM;
+    private CurlViewModel? _curlVM;
+    private PortScannerViewModel? _portScannerVM;
+    private IpInfoViewModel? _ipInfoVM;
+    private SshViewModel? _sshVM;
+    private StringLabViewModel? _stringTool;
+    private MonitorViewModel? _monitorVM;
+    private NetworkInfoViewModel? _networkVM;
+
+    public PingViewModel PingVM => _pingVM ??= new();
+    public DnsViewModel DnsVM => _dnsVM ??= new();
+    public CurlViewModel CurlVM => _curlVM ??= new();
+    public PortScannerViewModel PortScannerVM => _portScannerVM ??= new();
+    public IpInfoViewModel IpInfoVM => _ipInfoVM ??= new();
+    public SshViewModel SshVM => _sshVM ??= new();
+    public StringLabViewModel StringTool => _stringTool ??= new();
+    public MonitorViewModel MonitorVM => _monitorVM ??= new();
+    public NetworkInfoViewModel NetworkVM => _networkVM ??= new();
+
     [ObservableProperty] private string _currentVersion = "0.2.0";
-    [ObservableProperty] private string _latestVersion = "0.1.0";
+    [ObservableProperty] private string _latestVersion = "0.2.0";
     [ObservableProperty] private bool _isUpdateAvailable;
     public static bool IsMac => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
     public MainViewModel()
     {
-        _ = CheckForUpdatesAsync();
+
     }
 
-    private async Task CheckForUpdatesAsync()
+    public async Task CheckForUpdatesAsync()
     {
         try
         {
