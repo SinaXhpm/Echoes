@@ -76,13 +76,24 @@ jobs:
         brew install create-dmg
         mkdir -p "dist/Echoes.app/Contents/MacOS"
         mkdir -p "dist/Echoes.app/Contents/Resources"
+        
         cp ./publish/Echoes "dist/Echoes.app/Contents/MacOS/"
+        cp ./publish/*.dylib "dist/Echoes.app/Contents/MacOS/" 2>/dev/null || true
+        
         chmod +x "dist/Echoes.app/Contents/MacOS/Echoes"
         cp Assets/logo.icns "dist/Echoes.app/Contents/Resources/icon.icns"
+        
         printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Echoes</string><key>CFBundleIconFile</key><string>icon.icns</string><key>CFBundleIdentifier</key><string>com.echoes.app</string><key>CFBundleName</key><string>Echoes</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${{ steps.get_version.outputs.VERSION }}</string><key>LSMinimumSystemVersion</key><string>10.15</string></dict></plist>' > "dist/Echoes.app/Contents/Info.plist"
+        
         printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>com.apple.security.network.client</key><true/><key>com.apple.security.network.server</key><true/><key>com.apple.security.cs.allow-jit</key><true/><key>com.apple.security.cs.disable-library-validation</key><true/></dict></plist>' > entitlements.plist
+        
         codesign --force --options runtime --entitlements entitlements.plist --deep --sign - "dist/Echoes.app"
-        create-dmg --volname "Echoes Installer" --window-pos 200 120 --window-size 800 400 --icon-size 100 --icon "Echoes.app" 200 190 --hide-extension "Echoes.app" --app-drop-link 600 185 "Echoes-${{ matrix.rid }}.dmg" "dist/"
+
+        mkdir -p dmg_prepare
+        cp -R "dist/Echoes.app" dmg_prepare/
+        ln -s /Applications dmg_prepare/Applications
+
+        hdiutil create -volname "Echoes Installer" -srcfolder dmg_prepare -ov -format UDZO "Echoes-${{ matrix.rid }}.dmg"
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
