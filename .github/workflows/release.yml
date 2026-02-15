@@ -52,6 +52,7 @@ jobs:
         printf "[Desktop Entry]\nName=Echoes\nExec=Echoes\nIcon=Echoes\nType=Application\nCategories=Utility;" > dist/Echoes.AppDir/Echoes.desktop
         ln -s usr/bin/Echoes dist/Echoes.AppDir/AppRun
         ARCH=x86_64 ./appimagetool-x86_64.AppImage dist/Echoes.AppDir Echoes-Linux-x64.AppImage
+        rm -f appimagetool-x86_64.AppImage || true
 
         mkdir -p debian-dist/usr/bin
         cp ./publish/Echoes debian-dist/usr/bin/
@@ -65,7 +66,7 @@ jobs:
         rpmbuild -bb --noclean --define "_topdir $(pwd)/rpmbuild" --define "_builddir $(pwd)/rpm-dist" --define "_rpmdir $(pwd)" --buildroot $(pwd)/rpm-dist echoes.spec
         mv x86_64/*.rpm . || true
 
-        rm appimagetool-x86_64.AppImage
+        
 
     - name: Package macOS
       if: matrix.os == 'macos-latest'
@@ -107,5 +108,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: ./artifacts/**/*
+        tag_name: ${{ github.ref_name }}
+        overwrite: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
