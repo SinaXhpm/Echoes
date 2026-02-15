@@ -50,8 +50,10 @@ jobs:
       run: |
         wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool
         chmod +x /tmp/appimagetool
+        
         mkdir -p dist/Echoes.AppDir/usr/bin
         cp ./publish/Echoes dist/Echoes.AppDir/usr/bin/
+        cp ./publish/*.so dist/Echoes.AppDir/usr/bin/ 2>/dev/null || true
         cp Assets/logo.png dist/Echoes.AppDir/Echoes.png
         printf "[Desktop Entry]\nName=Echoes\nExec=Echoes\nIcon=Echoes\nType=Application\nCategories=Utility;" > dist/Echoes.AppDir/Echoes.desktop
         ln -s usr/bin/Echoes dist/Echoes.AppDir/AppRun
@@ -59,13 +61,15 @@ jobs:
         
         mkdir -p debian-dist/usr/bin
         cp ./publish/Echoes debian-dist/usr/bin/
+        cp ./publish/*.so debian-dist/usr/bin/ 2>/dev/null || true
         mkdir -p debian-dist/DEBIAN
         printf "Package: echoes\nVersion: ${{ steps.get_version.outputs.VERSION }}\nArchitecture: amd64\nMaintainer: EchoesTeam\nDescription: Network Utility\n" > debian-dist/DEBIAN/control
         dpkg-deb --build debian-dist echoes.deb
 
         mkdir -p rpm-dist/usr/bin
         cp ./publish/Echoes rpm-dist/usr/bin/
-        printf "Name: echoes\nVersion: ${{ steps.get_version.outputs.VERSION }}\nRelease: 1\nSummary: Network Utility\nLicense: MIT\n\n%%description\nNetwork Utility\n\n%%files\n/usr/bin/Echoes\n" > echoes.spec
+        cp ./publish/*.so rpm-dist/usr/bin/ 2>/dev/null || true
+        printf "Name: echoes\nVersion: ${{ steps.get_version.outputs.VERSION }}\nRelease: 1\nSummary: Network Utility\nLicense: MIT\n\n%%description\nNetwork Utility\n\n%%files\n/usr/bin/*\n" > echoes.spec
         rpmbuild -bb --noclean --define "_topdir $(pwd)/rpmbuild" --define "_builddir $(pwd)/rpm-dist" --define "_rpmdir $(pwd)" --buildroot $(pwd)/rpm-dist echoes.spec
         find . -name "*.rpm" -exec mv {} . \;
         rm -f /tmp/appimagetool
