@@ -32,7 +32,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang zlib1g-dev libfuse2 binutils
+        sudo apt-get install -y clang zlib1g-dev libfuse2 binutils rpm
 
     - name: Publish
       run: dotnet publish -c Release -r ${{ matrix.rid }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=copyused -p:OptimizationPreference=Size -p:StackTraceSupport=true -p:InvariantGlobalization=false -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
@@ -59,6 +59,13 @@ jobs:
         printf "Package: echoes\nVersion: 0.2.0\nArchitecture: amd64\nMaintainer: EchoesTeam\nDescription: Network Utility\n" > debian-dist/DEBIAN/control
         dpkg-deb --build debian-dist echoes.deb
 
+        mkdir -p rpm-dist/usr/bin
+        cp ./publish/Echoes rpm-dist/usr/bin/
+        printf "Name: echoes\nVersion: 0.2.0\nRelease: 1\nSummary: Network Utility\nLicense: MIT\n\n%%description\nNetwork Utility\n\n%%files\n/usr/bin/Echoes\n" > echoes.spec
+        rpmbuild -bb --define "_topdir $(pwd)/rpmbuild" --define "_builddir $(pwd)/rpm-dist" --define "_rpmdir $(pwd)" --buildroot $(pwd)/rpm-dist echoes.spec
+
+        rm appimagetool-x86_64.AppImage
+
     - name: Package macOS
       if: matrix.os == 'macos-latest'
       run: |
@@ -68,7 +75,6 @@ jobs:
         cp ./publish/Echoes "dist/Echoes.app/Contents/MacOS/"
         
         chmod +x "dist/Echoes.app/Contents/MacOS/Echoes"
-        
         codesign --force --deep --sign - "dist/Echoes.app/Contents/MacOS/Echoes"
         
         cp Assets/logo.icns "dist/Echoes.app/Contents/Resources/icon.icns"
@@ -84,6 +90,7 @@ jobs:
           *.zip
           *.AppImage
           *.deb
+          *.rpm
           *.dmg
 
   release:
