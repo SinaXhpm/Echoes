@@ -60,18 +60,31 @@
 			<CheckBox IsChecked="{Binding NotifyOffline}" Content="Alert Offline" FontSize="11" />
 		</StackPanel>
 
-		<Border Grid.Row="2" Background="#66000000" CornerRadius="4" BorderThickness="1" BorderBrush="#11FFFFFF">
-			<TextBox Text="{Binding LogText}"
-					 IsReadOnly="True"
-					 AcceptsReturn="True"
-					 Background="Transparent"
-					 Foreground="#00FF66"
-					 FontFamily="Cascadia Code,Consolas,Monospace"
-					 FontSize="12"
-					 BorderThickness="0"
-					 CaretIndex="{Binding LogText.Length}"
-					 ScrollViewer.VerticalScrollBarVisibility="Visible"/>
-		</Border>
+		<Border Grid.Row="2" Background="#11000000" CornerRadius="4" BorderThickness="1" BorderBrush="#33FFFFFF">
+    <ListBox Name="LogList"
+             ItemsSource="{Binding LogItems}"
+             Background="Transparent"
+             BorderThickness="0"
+             FontSize="12"
+             Foreground="#00FF66"
+             FontFamily="Cascadia Code,Consolas,Monospace">
+        <ListBox.Styles>
+            <Style Selector="ListBoxItem">
+                <Setter Property="Padding" Value="2,1"/>
+                <Setter Property="MinHeight" Value="0"/>
+                <Setter Property="Background" Value="Transparent"/>
+            </Style>
+            <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                <Setter Property="Background" Value="#11FFFFFF"/>
+            </Style>
+        </ListBox.Styles>
+        <ListBox.ItemsPanel>
+            <ItemsPanelTemplate>
+                <VirtualizingStackPanel />
+            </ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
+    </ListBox>
+</Border>
 
 		<Border Grid.Row="3" Margin="0,10,0,0" Padding="12,8" Background="#11FFFFFF" CornerRadius="4">
 			<TextBlock Text="{Binding StatsSummary}" FontSize="11" FontFamily="Consolas" Foreground="#BBBBBB"/>

@@ -3,24 +3,25 @@ using CommunityToolkit.Mvvm.Input;
 using Echoes.Helpers;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Net.NetworkInformation;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 
 namespace Echoes.ViewModels;
 
 public partial class PingViewModel : ObservableObject
 {
     [ObservableProperty] private string _targetHost = string.Empty;
-    [ObservableProperty] private string _logText = string.Empty;
     [ObservableProperty] private bool _isPinging;
     [ObservableProperty] private bool _isTraceRoute;
     [ObservableProperty] private bool _notifyOnline;
     [ObservableProperty] private bool _notifyOffline;
     [ObservableProperty] private string _statsSummary = "Packets: Sent = 0, Received = 0, Lost = 0";
+
+    public ObservableCollection<string> LogItems { get; } = new();
 
     private CancellationTokenSource? _cts;
     private bool? _lastStatus;
@@ -40,7 +41,7 @@ public partial class PingViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(TargetHost)) return;
         IsPinging = true;
         _sent = 0; _received = 0; _times.Clear();
-        LogText = string.Empty;
+        LogItems.Clear();
         _cts = new CancellationTokenSource();
         Task.Run(() => RunProcess(_cts.Token));
     }
@@ -50,6 +51,7 @@ public partial class PingViewModel : ObservableObject
         _cts?.Cancel();
         IsPinging = false;
     }
+
     private async Task RunProcess(CancellationToken token)
     {
         try
@@ -60,8 +62,7 @@ public partial class PingViewModel : ObservableObject
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            var e = ex is System.Net.NetworkInformation.PingException pe && pe.InnerException != null ? pe.InnerException : ex;
-
+            var e = ex is PingException pe && pe.InnerException != null ? pe.InnerException : ex;
             string message = e switch
             {
                 System.Net.Sockets.SocketException s when s.SocketErrorCode == System.Net.Sockets.SocketError.HostNotFound => "Host not found",
@@ -69,7 +70,6 @@ public partial class PingViewModel : ObservableObject
                 System.Net.Sockets.SocketException s when s.SocketErrorCode == System.Net.Sockets.SocketError.NetworkUnreachable => "Network unreachable",
                 _ => e.Message
             };
-
             UpdateLog($"Error: {message}");
         }
         finally
@@ -117,7 +117,6 @@ public partial class PingViewModel : ObservableObject
         for (int ttl = 1; ttl <= 30; ttl++)
         {
             if (token.IsCancellationRequested) break;
-
             var options = new PingOptions(ttl, true);
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var reply = await pinger.SendPingAsync(TargetHost, 2000, buffer, options);
@@ -126,7 +125,6 @@ public partial class PingViewModel : ObservableObject
             long elapsed = reply.Status == IPStatus.TimedOut ? 0 : sw.ElapsedMilliseconds;
             string timeStr = reply.Status == IPStatus.TimedOut ? "*" : $"{elapsed} ms";
             string addr = reply.Status == IPStatus.TimedOut ? "Request timed out." : reply.Address?.ToString() ?? "*";
-
             UpdateLog($"{ttl}\t{timeStr}\t{addr}");
 
             if (reply.Status == IPStatus.Success)
@@ -155,5 +153,8 @@ public partial class PingViewModel : ObservableObject
         _lastStatus = current;
     }
 
-    private void UpdateLog(string m) => LogText += $"{m}{Environment.NewLine}";
+    private void UpdateLog(string m)
+    {
+        Dispatcher.UIThread.Post(() => LogItems.Add(m));
+    }
 }
