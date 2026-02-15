@@ -62,8 +62,8 @@ jobs:
         mkdir -p rpm-dist/usr/bin
         cp ./publish/Echoes rpm-dist/usr/bin/
         printf "Name: echoes\nVersion: 0.2.0\nRelease: 1\nSummary: Network Utility\nLicense: MIT\n\n%%description\nNetwork Utility\n\n%%files\n/usr/bin/Echoes\n" > echoes.spec
-        rpmbuild -bb --define "_topdir $(pwd)/rpmbuild" --define "_builddir $(pwd)/rpm-dist" --define "_rpmdir $(pwd)" --buildroot $(pwd)/rpm-dist echoes.spec
-
+        rpmbuild -bb --noclean --define "_topdir $(pwd)/rpmbuild" --define "_builddir $(pwd)/rpm-dist" --define "_rpmdir $(pwd)" --buildroot $(pwd)/rpm-dist echoes.spec
+        mv x86_64/*.rpm . || true
         rm appimagetool-x86_64.AppImage
 
     - name: Package macOS
