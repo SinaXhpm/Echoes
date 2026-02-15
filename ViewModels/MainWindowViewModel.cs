@@ -31,13 +31,15 @@ public partial class MainViewModel : ObservableObject
     public MonitorViewModel MonitorVM => _monitorVM ??= new();
     public NetworkInfoViewModel NetworkVM => _networkVM ??= new();
 
-    [ObservableProperty] private string _currentVersion = "0.2.0";
-    [ObservableProperty] private string _latestVersion = "0.2.0";
+    [ObservableProperty] private string _currentVersion;
+    [ObservableProperty] private string _latestVersion;
     [ObservableProperty] private bool _isUpdateAvailable;
     public static bool IsMac => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
     public MainViewModel()
     {
-
+        var assemblyVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        _currentVersion = $"{assemblyVersion?.Major}.{assemblyVersion?.Minor}.{assemblyVersion?.Build}";
+        _latestVersion = _currentVersion;
     }
 
     public async Task CheckForUpdatesAsync()

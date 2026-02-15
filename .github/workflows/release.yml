@@ -1,4 +1,4 @@
-name: Build and Release
+﻿name: Build and Release
 
 on:
   push:
@@ -28,6 +28,10 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
+    - name: Get Version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
     - name: Install Linux Dependencies
       if: matrix.os == 'ubuntu-latest'
       run: |
@@ -44,29 +48,27 @@ jobs:
     - name: Package Linux
       if: matrix.os == 'ubuntu-latest'
       run: |
-        wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-        chmod +x appimagetool-x86_64.AppImage
+        wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool
+        chmod +x /tmp/appimagetool
         mkdir -p dist/Echoes.AppDir/usr/bin
         cp ./publish/Echoes dist/Echoes.AppDir/usr/bin/
         cp Assets/logo.png dist/Echoes.AppDir/Echoes.png
         printf "[Desktop Entry]\nName=Echoes\nExec=Echoes\nIcon=Echoes\nType=Application\nCategories=Utility;" > dist/Echoes.AppDir/Echoes.desktop
         ln -s usr/bin/Echoes dist/Echoes.AppDir/AppRun
-        ARCH=x86_64 ./appimagetool-x86_64.AppImage dist/Echoes.AppDir Echoes-Linux-x64.AppImage
-        rm -f appimagetool-x86_64.AppImage || true
-
+        ARCH=x86_64 /tmp/appimagetool dist/Echoes.AppDir Echoes-Linux-x64.AppImage
+        
         mkdir -p debian-dist/usr/bin
         cp ./publish/Echoes debian-dist/usr/bin/
         mkdir -p debian-dist/DEBIAN
-        printf "Package: echoes\nVersion: 0.2.0\nArchitecture: amd64\nMaintainer: EchoesTeam\nDescription: Network Utility\n" > debian-dist/DEBIAN/control
+        printf "Package: echoes\nVersion: ${{ steps.get_version.outputs.VERSION }}\nArchitecture: amd64\nMaintainer: EchoesTeam\nDescription: Network Utility\n" > debian-dist/DEBIAN/control
         dpkg-deb --build debian-dist echoes.deb
 
         mkdir -p rpm-dist/usr/bin
         cp ./publish/Echoes rpm-dist/usr/bin/
-        printf "Name: echoes\nVersion: 0.2.0\nRelease: 1\nSummary: Network Utility\nLicense: MIT\n\n%%description\nNetwork Utility\n\n%%files\n/usr/bin/Echoes\n" > echoes.spec
+        printf "Name: echoes\nVersion: ${{ steps.get_version.outputs.VERSION }}\nRelease: 1\nSummary: Network Utility\nLicense: MIT\n\n%%description\nNetwork Utility\n\n%%files\n/usr/bin/Echoes\n" > echoes.spec
         rpmbuild -bb --noclean --define "_topdir $(pwd)/rpmbuild" --define "_builddir $(pwd)/rpm-dist" --define "_rpmdir $(pwd)" --buildroot $(pwd)/rpm-dist echoes.spec
-        mv x86_64/*.rpm . || true
-
-        
+        find . -name "*.rpm" -exec mv {} . \;
+        rm -f /tmp/appimagetool
 
     - name: Package macOS
       if: matrix.os == 'macos-latest'
@@ -77,10 +79,11 @@ jobs:
         cp ./publish/Echoes "dist/Echoes.app/Contents/MacOS/"
         chmod +x "dist/Echoes.app/Contents/MacOS/Echoes"
         cp Assets/logo.icns "dist/Echoes.app/Contents/Resources/icon.icns"
-        printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Echoes</string><key>CFBundleIconFile</key><string>icon.icns</string><key>CFBundleIdentifier</key><string>com.echoes.app</string><key>CFBundleName</key><string>Echoes</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>0.2.0</string><key>LSMinimumSystemVersion</key><string>10.15</string></dict></plist>' > "dist/Echoes.app/Contents/Info.plist"
+        printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Echoes</string><key>CFBundleIconFile</key><string>icon.icns</string><key>CFBundleIdentifier</key><string>com.echoes.app</string><key>CFBundleName</key><string>Echoes</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${{ steps.get_version.outputs.VERSION }}</string><key>LSMinimumSystemVersion</key><string>10.15</string></dict></plist>' > "dist/Echoes.app/Contents/Info.plist"
         printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>com.apple.security.network.client</key><true/><key>com.apple.security.network.server</key><true/><key>com.apple.security.cs.allow-jit</key><true/><key>com.apple.security.cs.disable-library-validation</key><true/></dict></plist>' > entitlements.plist
         codesign --force --options runtime --entitlements entitlements.plist --deep --sign - "dist/Echoes.app"
         create-dmg --volname "Echoes Installer" --window-pos 200 120 --window-size 800 400 --icon-size 100 --icon "Echoes.app" 200 190 --hide-extension "Echoes.app" --app-drop-link 600 185 "Echoes-${{ matrix.rid }}.dmg" "dist/"
+
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
