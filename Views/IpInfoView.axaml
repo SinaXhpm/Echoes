@@ -1,41 +1,57 @@
 <UserControl xmlns="https://github.com/avaloniaui"
-			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-			 xmlns:vm="using:Echoes.ViewModels"
-			 x:Class="Echoes.Views.IpInfoView"
-			 x:DataType="vm:IpInfoViewModel">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             x:Class="Echoes.Views.IpInfoView"
+             x:DataType="vm:IpInfoViewModel">
 
-	<Grid RowDefinitions="Auto, Auto, *" Margin="15">
-		<Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto" Margin="0,0,0,10">
-			<TextBox Grid.Column="0" Text="{Binding TargetIp}" Watermark="Lookup IP (Empty for My IP)..."
-					 Height="32" FontSize="12" VerticalContentAlignment="Center" Background="#15000000" Margin="0,0,10,0"/>
+    <Grid RowDefinitions="Auto, Auto, *" Margin="12">
+        
+        <Grid Grid.Row="0" ColumnDefinitions="*, Auto, 95, 95" Margin="0,0,0,12">
+            <TextBox Grid.Column="0" Text="{Binding TargetIp}" Watermark="Lookup IP (Empty for My IP)..."
+                     Height="34" FontSize="12" VerticalContentAlignment="Center" 
+                     Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Margin="0,0,10,0">
+                <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding LookupIpCommand}" />
+                </TextBox.KeyBindings>
+            </TextBox>
 
-			<Button Grid.Column="1" Command="{Binding LookupIpCommand}" Content="LOOKUP"
-					Background="#27AE60" Width="90" Height="32" FontSize="12"
-					HorizontalContentAlignment="Center" IsEnabled="{Binding !IsWorking}" Margin="0,0,5,0"/>
+            <CheckBox Grid.Column="1" IsChecked="{Binding UseProxy}" Name="ProxyToggle" 
+                      Content="Proxy" FontSize="11.5" Foreground="White" FontWeight="SemiBold"
+                      VerticalAlignment="Center" Margin="0,0,15,0"/>
 
-			<Button Grid.Column="2" Command="{Binding GetMyIpCommand}" Content="MY IP"
-					Background="#2980B9" Width="90" Height="32" FontSize="12"
-					HorizontalContentAlignment="Center" IsEnabled="{Binding !IsWorking}"/>
-		</Grid>
+            <Button Grid.Column="2" Command="{Binding LookupIpCommand}" Content="LOOKUP"
+                    Background="#42B883" Foreground="White" FontWeight="Bold"
+                    Height="34" HorizontalAlignment="Stretch" FontSize="12"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    IsEnabled="{Binding !IsWorking}" Margin="0,0,6,0"/>
 
-		<StackPanel Grid.Row="1" Margin="0,0,0,15">
-			<CheckBox IsChecked="{Binding UseProxy}" Content="USE PROXY" FontSize="11" FontWeight="Bold"/>
+            <Button Grid.Column="3" Command="{Binding GetMyIpCommand}" Content="MY IP"
+                    Background="#2E86C1" Foreground="White" FontWeight="Bold"
+                    Height="34" HorizontalAlignment="Stretch" FontSize="12"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    IsEnabled="{Binding !IsWorking}"/>
+        </Grid>
 
-			<Grid ColumnDefinitions="*, *, *" Margin="0,5,0,0" IsVisible="{Binding UseProxy}">
-				<TextBox Grid.Column="0" Text="{Binding ProxyAddress}" Watermark="Host:Port (e.g. 127.0.0.1:8080)"
-						 Height="30" FontSize="11" Margin="0,0,5,0" Background="#10FFFFFF"/>
-				<TextBox Grid.Column="1" Text="{Binding ProxyUser}" Watermark="User (Optional)"
-						 Height="30" FontSize="11" Margin="0,0,5,0" Background="#10FFFFFF"/>
-				<TextBox Grid.Column="2" Text="{Binding ProxyPass}" Watermark="Pass (Optional)"
-						 Height="30" FontSize="11" PasswordChar="*" Background="#10FFFFFF"/>
-			</Grid>
-		</StackPanel>
+        <Grid Grid.Row="1" ColumnDefinitions="*, *, *" Margin="2,0,0,15" IsVisible="{Binding UseProxy}">
+            <TextBox Grid.Column="0" Text="{Binding ProxyAddress}" Watermark="Host:Port (127.0.0.1:8080)"
+                     Height="32" FontSize="12" Margin="0,0,8,0" 
+                     Foreground="White" Background="#20000000" BorderBrush="#45FFFFFF" VerticalContentAlignment="Center"/>
+            <TextBox Grid.Column="1" Text="{Binding ProxyUser}" Watermark="User (Optional)"
+                     Height="32" FontSize="12" Margin="0,0,8,0" 
+                     Foreground="White" Background="#20000000" BorderBrush="#45FFFFFF" VerticalContentAlignment="Center"/>
+            <TextBox Grid.Column="2" Text="{Binding ProxyPass}" Watermark="Pass (Optional)"
+                     Height="32" FontSize="12" PasswordChar="*" 
+                     Foreground="White" Background="#20000000" BorderBrush="#45FFFFFF" VerticalContentAlignment="Center"/>
+        </Grid>
 
-		<Border Grid.Row="2" Background="#08FFFFFF" CornerRadius="4" BorderBrush="#15FFFFFF" BorderThickness="1">
-			<ScrollViewer>
-				<SelectableTextBlock Text="{Binding RawResult}" FontFamily="Cascadia Code,Consolas"
-									 FontSize="12" Foreground="#00FF99" Margin="10"/>
-			</ScrollViewer>
-		</Border>
-	</Grid>
+        <Border Grid.Row="2" Background="#40000000" CornerRadius="4" BorderBrush="#35FFFFFF" BorderThickness="1">
+            <ScrollViewer>
+                <SelectableTextBlock Text="{Binding RawResult}" 
+                                     FontFamily="Cascadia Code,Consolas"
+                                     FontSize="11.5" Foreground="#00FF99" 
+                                     Margin="12" LineHeight="20"/>
+            </ScrollViewer>
+        </Border>
+        
+    </Grid>
 </UserControl>

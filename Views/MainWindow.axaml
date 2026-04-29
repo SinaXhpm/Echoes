@@ -1,28 +1,21 @@
 <Window xmlns="https://github.com/avaloniaui"
-		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-		xmlns:vm="using:Echoes.ViewModels"
-		xmlns:views="using:Echoes.Views"
-		x:Class="Echoes.Views.MainWindow"
-		x:DataType="vm:MainViewModel"
-		Icon="avares://Echoes/Assets/logo.png"
-		Title="Echoes"
-		Width="610"
-		Height="420"
-		WindowStartupLocation="CenterScreen"
-		TransparencyLevelHint="AcrylicBlur"
-		Background="Transparent"
-		ExtendClientAreaToDecorationsHint="True"
-		>
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Echoes.ViewModels"
+        xmlns:views="using:Echoes.Views"
+        x:Class="Echoes.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Icon="avares://Echoes/Assets/logo.png"
+        Title=""
+        Width="625"
+        Height="420"
+        WindowStartupLocation="CenterScreen"
+        Background="#1e1e1e"
+        ExtendClientAreaToDecorationsHint="True"
+        WindowDecorations="Full"
+        ExtendClientAreaTitleBarHeightHint="-1">
 
 	<Panel>
-		<ExperimentalAcrylicBorder IsHitTestVisible="False">
-			<ExperimentalAcrylicBorder.Material>
-				<ExperimentalAcrylicMaterial BackgroundSource="Digger"
-											 TintColor="Black"
-											 TintOpacity="0.85"
-											 MaterialOpacity="0.7" />
-			</ExperimentalAcrylicBorder.Material>
-		</ExperimentalAcrylicBorder>
+
 
 		<Grid RowDefinitions="Auto, *, Auto">
 
@@ -65,6 +58,7 @@
 				<TabItem Header="SSH"><views:SshView DataContext="{Binding SshVM}"/></TabItem>
 				<TabItem Header="STRING"><views:StringLabView DataContext="{Binding StringTool}"/></TabItem>
 				<TabItem Header="MONITOR"><views:MonitorView DataContext="{Binding MonitorVM}"/></TabItem>
+				<TabItem Header="NOTES"><views:NoteView DataContext="{Binding NoteVM}"/></TabItem>
 				<TabItem Header="TG">
 					<views:TgView>
 						<views:TgView.DataContext>

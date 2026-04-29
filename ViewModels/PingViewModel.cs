@@ -39,16 +39,27 @@ public partial class PingViewModel : ObservableObject
     private void Start()
     {
         if (string.IsNullOrWhiteSpace(TargetHost)) return;
-        IsPinging = true;
-        _sent = 0; _received = 0; _times.Clear();
+
+        Stop();
+
+        _sent = 0;
+        _received = 0;
+        _times.Clear();
         LogItems.Clear();
+        StatsSummary = "Packets: Sent = 0, Received = 0, Lost = 0";
+
         _cts = new CancellationTokenSource();
-        Task.Run(() => RunProcess(_cts.Token));
+        var token = _cts.Token;
+
+        IsPinging = true;
+        Task.Run(() => RunProcess(token), token);
     }
 
     private void Stop()
     {
         _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
         IsPinging = false;
     }
 
@@ -62,6 +73,8 @@ public partial class PingViewModel : ObservableObject
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
+            if (token.IsCancellationRequested) return;
+
             var e = ex is PingException pe && pe.InnerException != null ? pe.InnerException : ex;
             string message = e switch
             {
@@ -74,7 +87,10 @@ public partial class PingViewModel : ObservableObject
         }
         finally
         {
-            IsPinging = false;
+            if (!token.IsCancellationRequested)
+            {
+                Dispatcher.UIThread.Post(() => IsPinging = false);
+            }
         }
     }
 
@@ -87,22 +103,28 @@ public partial class PingViewModel : ObservableObject
         while (!token.IsCancellationRequested)
         {
             _sent++;
-            var reply = await pinger.SendPingAsync(TargetHost, 1500);
-            bool success = reply.Status == IPStatus.Success;
-
-            if (success)
+            try
             {
-                _received++;
-                _times.Add(reply.RoundtripTime);
-                UpdateLog($"{reply.Buffer.Length + 28} bytes from {reply.Address}: icmp_seq={seq} ttl={reply.Options?.Ttl} time={reply.RoundtripTime} ms");
-            }
-            else
-            {
-                UpdateLog($"Request timeout for icmp_seq {seq}");
-            }
+                var reply = await pinger.SendPingAsync(TargetHost, 1500).WaitAsync(token);
+                bool success = reply.Status == IPStatus.Success;
 
-            UpdateStats();
-            HandleAlerts(success);
+                if (success)
+                {
+                    _received++;
+                    _times.Add(reply.RoundtripTime);
+                    UpdateLog($"{reply.Buffer.Length + 28} bytes from {reply.Address}: icmp_seq={seq} ttl={reply.Options?.Ttl} time={reply.RoundtripTime} ms");
+                }
+                else
+                {
+                    UpdateLog($"Request timeout from {TargetHost}: icmp_seq={seq}");
+                }
+
+                UpdateStats();
+                HandleAlerts(success);
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex) { UpdateLog($"Ping error: {ex.Message}"); }
+
             seq++;
             await Task.Delay(1000, token);
         }
@@ -117,28 +139,36 @@ public partial class PingViewModel : ObservableObject
         for (int ttl = 1; ttl <= 30; ttl++)
         {
             if (token.IsCancellationRequested) break;
-            var options = new PingOptions(ttl, true);
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            var reply = await pinger.SendPingAsync(TargetHost, 2000, buffer, options);
-            sw.Stop();
 
-            long elapsed = reply.Status == IPStatus.TimedOut ? 0 : sw.ElapsedMilliseconds;
-            string timeStr = reply.Status == IPStatus.TimedOut ? "*" : $"{elapsed} ms";
-            string addr = reply.Status == IPStatus.TimedOut ? "Request timed out." : reply.Address?.ToString() ?? "*";
-            UpdateLog($"{ttl}\t{timeStr}\t{addr}");
-
-            if (reply.Status == IPStatus.Success)
+            try
             {
-                UpdateLog("Trace complete.");
-                break;
+                var options = new PingOptions(ttl, true);
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var reply = await pinger.SendPingAsync(TargetHost, 2000, buffer, options).WaitAsync(token);
+                sw.Stop();
+
+                long elapsed = reply.Status == IPStatus.TimedOut ? 0 : sw.ElapsedMilliseconds;
+                string timeStr = reply.Status == IPStatus.TimedOut ? "*" : $"{elapsed} ms";
+                string addr = reply.Status == IPStatus.TimedOut ? "Request timed out." : reply.Address?.ToString() ?? "*";
+                UpdateLog($"{ttl}\t{timeStr}\t{addr}");
+
+                if (reply.Status == IPStatus.Success)
+                {
+                    UpdateLog("Trace complete.");
+                    break;
+                }
             }
+            catch (OperationCanceledException) { break; }
+
+            await Task.Delay(100, token);
         }
     }
 
     private void UpdateStats()
     {
         long lost = _sent - _received;
-        StatsSummary = $"Packets: Sent = {_sent}, Received = {_received}, Lost = {lost} ({((double)lost / _sent) * 100:F0}% loss)";
+        double lossPercent = _sent > 0 ? ((double)lost / _sent) * 100 : 0;
+        StatsSummary = $"Packets: Sent = {_sent}, Received = {_received}, Lost = {lost} ({lossPercent:F0}% loss)";
     }
 
     private void HandleAlerts(bool current)
