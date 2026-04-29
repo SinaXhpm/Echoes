@@ -20,7 +20,7 @@ public partial class MainViewModel : ObservableObject
     private StringLabViewModel? _stringTool;
     private MonitorViewModel? _monitorVM;
     private NetworkInfoViewModel? _networkVM;
-
+    private NoteViewModel? _noteVM;
     public PingViewModel PingVM => _pingVM ??= new();
     public DnsViewModel DnsVM => _dnsVM ??= new();
     public CurlViewModel CurlVM => _curlVM ??= new();
@@ -30,6 +30,7 @@ public partial class MainViewModel : ObservableObject
     public StringLabViewModel StringTool => _stringTool ??= new();
     public MonitorViewModel MonitorVM => _monitorVM ??= new();
     public NetworkInfoViewModel NetworkVM => _networkVM ??= new();
+    public NoteViewModel NoteVM => _noteVM ??= new();
 
     [ObservableProperty] private string _currentVersion;
     [ObservableProperty] private string _latestVersion;

@@ -16,13 +16,13 @@ public partial class CurlViewModel : ObservableObject
 {
     private Process? _currentProcess;
 
-    [ObservableProperty] private string _url = "https://api.ipify.org";
+    [ObservableProperty] private string _url = "https://";
     [ObservableProperty] private string _overrideIp = string.Empty;
     [ObservableProperty] private string _proxy = string.Empty;
     [ObservableProperty] private string _proxyUser = string.Empty;
     [ObservableProperty] private string _proxyPass = string.Empty;
     [ObservableProperty] private string _customFlags = string.Empty;
-    [ObservableProperty] private bool _skipSslVerify;
+    [ObservableProperty] private bool _skipSslVerify = true;
 
     [ObservableProperty] private string _rawBody = string.Empty;
     [ObservableProperty] private string _sslLog = string.Empty;
@@ -31,6 +31,35 @@ public partial class CurlViewModel : ObservableObject
 
     [ObservableProperty] private string _htmlPath = "about:blank";
     [ObservableProperty] private bool _isWorking;
+
+    partial void OnUrlChanged(string value) => UpdateCommand();
+    partial void OnOverrideIpChanged(string value) => UpdateCommand();
+    partial void OnProxyChanged(string value) => UpdateCommand();
+    partial void OnProxyUserChanged(string value) => UpdateCommand();
+    partial void OnProxyPassChanged(string value) => UpdateCommand();
+    partial void OnSkipSslVerifyChanged(bool value) => UpdateCommand();
+
+    private void UpdateCommand()
+    {
+        var args = new List<string> { "-v", "-s", "-L" };
+
+        if (SkipSslVerify) args.Add("-k");
+        if (!string.IsNullOrWhiteSpace(Proxy))
+        {
+            args.Add($"-x \"{Proxy}\"");
+            if (!string.IsNullOrWhiteSpace(ProxyUser) || !string.IsNullOrWhiteSpace(ProxyPass))
+                args.Add($"-U \"{ProxyUser}:{ProxyPass}\"");
+        }
+
+        if (!string.IsNullOrWhiteSpace(OverrideIp) && Uri.TryCreate(Url, UriKind.Absolute, out var uri))
+        {
+            int port = uri.Port > 0 ? uri.Port : (uri.Scheme == "https" ? 443 : 80);
+            args.Add($"--resolve \"{uri.Host}:{port}:{OverrideIp}\"");
+        }
+
+        args.Add($"\"{Url}\"");
+        CustomFlags = string.Join(" ", args);
+    }
 
     [RelayCommand]
     private void StopCurl()
@@ -87,41 +116,21 @@ public partial class CurlViewModel : ObservableObject
     [RelayCommand]
     private async Task ExecuteCurl()
     {
-        if (string.IsNullOrWhiteSpace(Url) || IsWorking) return;
+        if (string.IsNullOrWhiteSpace(CustomFlags) || IsWorking) return;
         IsWorking = true;
 
         RawBody = SslLog = HeadersLog = FullLog = string.Empty;
 
         _ = GetWindowsCertificateDetails(Url);
 
-        string guid = Guid.NewGuid().ToString();
-        string traceFile = Path.Combine(Path.GetTempPath(), $"echoes_trace_{guid}.txt");
-
-        var args = new List<string> { "-v", "-s", "-L", $"--trace-ascii \"{traceFile}\"" };
-
-        if (SkipSslVerify) args.Add("-k");
-        if (!string.IsNullOrWhiteSpace(Proxy))
-        {
-            args.Add($"-x \"{Proxy}\"");
-            if (!string.IsNullOrWhiteSpace(ProxyUser) || !string.IsNullOrWhiteSpace(ProxyPass))
-                args.Add($"-U \"{ProxyUser}:{ProxyPass}\"");
-        }
-
-        if (!string.IsNullOrWhiteSpace(OverrideIp) && Uri.TryCreate(Url, UriKind.Absolute, out var uri))
-        {
-            int port = uri.Port > 0 ? uri.Port : (uri.Scheme == "https" ? 443 : 80);
-            args.Add($"--resolve \"{uri.Host}:{port}:{OverrideIp}\"");
-        }
-
-        if (!string.IsNullOrWhiteSpace(CustomFlags)) args.Add(CustomFlags);
-        args.Add($"\"{Url}\"");
+        string finalArgs = $"{CustomFlags} -v";
 
         try
         {
             var psi = new ProcessStartInfo
             {
                 FileName = "curl",
-                Arguments = string.Join(" ", args),
+                Arguments = finalArgs,
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
@@ -145,14 +154,10 @@ public partial class CurlViewModel : ObservableObject
 
                 await _currentProcess.WaitForExitAsync();
 
-                if (File.Exists(traceFile))
+                if (!string.IsNullOrEmpty(stdErr))
                 {
-                    var traceLines = await File.ReadAllLinesAsync(traceFile);
+                    string[] traceLines = stdErr.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
                     ParseTraceLog(traceLines, stdErr);
-                }
-                else if (!string.IsNullOrEmpty(stdErr))
-                {
-                    FullLog = stdErr;
                 }
             }
         }
@@ -165,7 +170,6 @@ public partial class CurlViewModel : ObservableObject
             IsWorking = false;
             _currentProcess?.Dispose();
             _currentProcess = null;
-            try { if (File.Exists(traceFile)) File.Delete(traceFile); } catch { }
         }
     }
 

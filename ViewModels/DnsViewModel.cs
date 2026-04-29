@@ -12,6 +12,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 
 namespace Echoes.ViewModels;
 
@@ -102,25 +103,35 @@ public partial class DnsViewModel : ObservableObject
         var selectedTypes = GetSelectedTypes();
         if (!selectedTypes.Any()) { UpdateLog("Select at least one record type."); IsWorking = false; return; }
 
-        foreach (var server in DnsServers)
-        {
-            if (!IPAddress.TryParse(server, out var dnsIp)) continue;
-            var client = new LookupClient(dnsIp);
-            UpdateLog($"--- Querying via {server} ---");
-
-            foreach (var type in selectedTypes)
+        var queryTasks = DnsServers
+            .Where(server => IPAddress.TryParse(server, out _))
+            .SelectMany(server => selectedTypes.Select(async type =>
             {
                 try
                 {
+                    var options = new LookupClientOptions(IPAddress.Parse(server))
+                    {
+                        Timeout = TimeSpan.FromSeconds(5),
+                        Retries = 0
+                    };
+                    var client = new LookupClient(options);
                     var result = await client.QueryAsync(DomainName, type);
-                    UpdateLog($"[{type}] Results:");
-                    foreach (var record in result.Answers) UpdateLog(record.ToString());
-                    if (!result.Answers.Any()) UpdateLog("(no records)");
+
+                    var sb = new StringBuilder();
+                    sb.AppendLine($"--- [{type}] via {server} ---");
+                    foreach (var record in result.Answers) sb.AppendLine(record.ToString());
+                    if (!result.Answers.Any()) sb.AppendLine("(no records)");
+                    sb.AppendLine();
+
+                    UpdateLog(sb.ToString());
                 }
-                catch (Exception ex) { UpdateLog($"Error [{type}]: {ex.Message}"); }
-            }
-            UpdateLog(string.Empty);
-        }
+                catch (Exception ex)
+                {
+                    UpdateLog($"Error [{type}] via {server}: {ex.Message}{Environment.NewLine}");
+                }
+            }));
+
+        await Task.WhenAll(queryTasks);
         IsWorking = false;
     }
 
@@ -132,10 +143,10 @@ public partial class DnsViewModel : ObservableObject
         LogText = string.Empty;
 
         string[] providers = {
-        $"https://rdap.org/domain/{DomainName}",
-        $"https://rdap.verisign.com/com/v1/domain/{DomainName}",
-        $"https://rdap.apnic.net/domain/{DomainName}"
-    };
+            $"https://rdap.org/domain/{DomainName}",
+            $"https://rdap.verisign.com/com/v1/domain/{DomainName}",
+            $"https://rdap.apnic.net/domain/{DomainName}"
+        };
 
         bool success = false;
 
@@ -169,7 +180,6 @@ public partial class DnsViewModel : ObservableObject
     private string RunCurl(string url)
     {
         var args = new List<string> { "-s", "-L", "--connect-timeout 10" };
-
         args.Add($"\"{url}\"");
 
         var psi = new ProcessStartInfo
@@ -217,6 +227,7 @@ public partial class DnsViewModel : ObservableObject
             sb.AppendLine($"{indent}{element}");
         }
     }
+
     private List<QueryType> GetSelectedTypes()
     {
         var types = new List<QueryType>();
@@ -229,5 +240,8 @@ public partial class DnsViewModel : ObservableObject
         return types;
     }
 
-    private void UpdateLog(string m) => LogText += $"{m}{Environment.NewLine}";
+    private void UpdateLog(string m)
+    {
+        Dispatcher.UIThread.Post(() => LogText += $"{m}{Environment.NewLine}");
+    }
 }

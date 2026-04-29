@@ -3,6 +3,8 @@ using CommunityToolkit.Mvvm.Input;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -45,34 +47,94 @@ public partial class TgViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(BotToken) || IsBusy) return;
 
         IsBusy = true;
-        ResponseLog = "Executing cURL command...";
+        ResponseLog = "Executing...";
 
         try
         {
-            var result = await Task.Run(() => RunCurl());
-
-            if (string.IsNullOrWhiteSpace(result))
+            var psi = new ProcessStartInfo
             {
-                ResponseLog = "No response from cURL.";
-                return;
+                FileName = "curl",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8
+            };
+
+            psi.ArgumentList.Add("-s");
+            psi.ArgumentList.Add("-v");
+            psi.ArgumentList.Add("-L");
+            psi.ArgumentList.Add("-k");
+            psi.ArgumentList.Add("--connect-timeout");
+            psi.ArgumentList.Add("15");
+
+            if (!string.IsNullOrWhiteSpace(ProxyAddress))
+            {
+                var proxy = ProxyAddress.Trim();
+                if (!proxy.Contains("://"))
+                {
+                    if (proxy.Contains(":1080") || proxy.Contains(":1081") || proxy.Contains(":9050"))
+                        proxy = "socks5://" + proxy;
+                    else
+                        proxy = "http://" + proxy;
+                }
+                psi.ArgumentList.Add("-x");
+                psi.ArgumentList.Add(proxy);
             }
 
-            try
+            var lines = CustomParameters.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in lines)
             {
-                using var doc = JsonDocument.Parse(result);
-                var sb = new StringBuilder();
-                ParseElement(doc.RootElement, sb, "");
-
-                sb.AppendLine();
-                sb.AppendLine("--------------------------------------------");
-                sb.AppendLine("Response Received via Echoes");
-
-                ResponseLog = sb.ToString();
+                var parts = line.Split('=', 2);
+                if (parts.Length == 2)
+                {
+                    psi.ArgumentList.Add("-d");
+                    psi.ArgumentList.Add($"{parts[0].Trim()}={parts[1].Trim()}");
+                }
             }
-            catch
+
+            psi.ArgumentList.Add($"https://api.telegram.org/bot{BotToken}/{SelectedMethod}");
+
+            using var process = new Process { StartInfo = psi };
+            process.Start();
+
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+
+            await Task.WhenAll(outputTask, errorTask);
+            await process.WaitForExitAsync();
+
+            string result = outputTask.Result;
+            string verboseLog = errorTask.Result;
+
+            var sb = new StringBuilder();
+
+            if (!string.IsNullOrWhiteSpace(result))
             {
-                ResponseLog = result;
+                try
+                {
+                    using var doc = JsonDocument.Parse(result);
+                    ParseElement(doc.RootElement, sb, "");
+                }
+                catch
+                {
+                    sb.AppendLine(result);
+                }
             }
+
+            //if (!string.IsNullOrWhiteSpace(verboseLog))
+            //{
+            //    sb.AppendLine();
+            //    sb.AppendLine("--- CONNECTION INFO ---");
+            //    var logs = verboseLog.Split('\n');
+            //    foreach (var log in logs)
+            //    {
+            //        if (log.StartsWith("*") || log.Contains("HTTP/"))
+            //            sb.AppendLine(log);
+            //    }
+            //}
+
+            ResponseLog = sb.Length > 0 ? sb.ToString() : "Empty response.";
         }
         catch (Exception ex)
         {
@@ -82,40 +144,6 @@ public partial class TgViewModel : ObservableObject
         {
             IsBusy = false;
         }
-    }
-
-    private string RunCurl()
-    {
-        var url = $"https://api.telegram.org/bot{BotToken}/{SelectedMethod}";
-        var args = new List<string> { "-s", "-X POST", "-L", "--connect-timeout 15" };
-
-        if (!string.IsNullOrWhiteSpace(ProxyAddress))
-        {
-            args.Add($"-x \"{ProxyAddress}\"");
-        }
-
-        var lines = CustomParameters.Split('\n', System.StringSplitOptions.RemoveEmptyEntries);
-        foreach (var line in lines)
-        {
-            var parts = line.Split('=', 2);
-            if (parts.Length == 2)
-                args.Add($"-d \"{parts[0].Trim()}={parts[1].Trim()}\"");
-        }
-
-        args.Add($"\"{url}\"");
-
-        var psi = new ProcessStartInfo
-        {
-            FileName = "curl",
-            Arguments = string.Join(" ", args),
-            RedirectStandardOutput = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            StandardOutputEncoding = Encoding.UTF8
-        };
-
-        using var process = Process.Start(psi);
-        return process?.StandardOutput.ReadToEnd() ?? string.Empty;
     }
 
     private void ParseElement(JsonElement element, StringBuilder sb, string indent)

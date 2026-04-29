@@ -1,90 +1,95 @@
 <UserControl xmlns="https://github.com/avaloniaui"
-			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-			 xmlns:vm="using:Echoes.ViewModels"
-			 x:Class="Echoes.Views.DnsView"
-			 x:DataType="vm:DnsViewModel"
-			 x:CompileBindings="True">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             x:Class="Echoes.Views.DnsView"
+             x:DataType="vm:DnsViewModel"
+             x:CompileBindings="True">
 
-	<Grid ColumnDefinitions="*, 150" Margin="12">
-		<Grid Grid.Column="0" RowDefinitions="Auto, Auto, *, Auto" Margin="0,0,10,0">
+    <Grid ColumnDefinitions="*, 160" Margin="12">
+        <Grid Grid.Column="0" RowDefinitions="Auto, Auto, *, Auto" Margin="0,0,12,0">
 
-			<TextBox Grid.Row="0" Text="{Binding DomainName}"
-					 Watermark="Domain Name (e.g. google.com)"
-					 Height="34" FontSize="12"
-					 VerticalContentAlignment="Center"
-					 Background="#15000000" BorderBrush="#33FFFFFF">
-				<TextBox.KeyBindings>
-					<KeyBinding Gesture="Enter" Command="{Binding RunLookupCommand}" />
-				</TextBox.KeyBindings>
-			</TextBox>
+            <TextBox Grid.Row="0" Text="{Binding DomainName}"
+                     Watermark="Domain Name (e.g. google.com)"
+                     Height="34" FontSize="12"
+                     VerticalContentAlignment="Center"
+                     Foreground="White"
+                     Background="#25000000" BorderBrush="#60FFFFFF">
+                <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding RunLookupCommand}" />
+                </TextBox.KeyBindings>
+            </TextBox>
 
-			<WrapPanel Grid.Row="1" Margin="0,10">
-				<CheckBox IsChecked="{Binding TypeA}" Content="A" FontSize="11" Margin="0,0,15,5"/>
-				<CheckBox IsChecked="{Binding TypeAAAA}" Content="AAAA" FontSize="11" Margin="0,0,15,5"/>
-				<CheckBox IsChecked="{Binding TypeMX}" Content="MX" FontSize="11" Margin="0,0,15,5"/>
-				<CheckBox IsChecked="{Binding TypeNS}" Content="NS" FontSize="11" Margin="0,0,15,5"/>
-				<CheckBox IsChecked="{Binding TypeTXT}" Content="TXT" FontSize="11" Margin="0,0,15,5"/>
-				<CheckBox IsChecked="{Binding TypeCNAME}" Content="CNAME" FontSize="11" Margin="0,0,15,5"/>
-			</WrapPanel>
+            <WrapPanel Grid.Row="1" Margin="0,12">
+                <CheckBox IsChecked="{Binding TypeA}" Content="A" FontSize="11.5" Foreground="White" FontWeight="SemiBold" Margin="0,0,15,5"/>
+                <CheckBox IsChecked="{Binding TypeAAAA}" Content="AAAA" FontSize="11.5" Foreground="White" FontWeight="SemiBold" Margin="0,0,15,5"/>
+                <CheckBox IsChecked="{Binding TypeMX}" Content="MX" FontSize="11.5" Foreground="White" FontWeight="SemiBold" Margin="0,0,15,5"/>
+                <CheckBox IsChecked="{Binding TypeNS}" Content="NS" FontSize="11.5" Foreground="White" FontWeight="SemiBold" Margin="0,0,15,5"/>
+                <CheckBox IsChecked="{Binding TypeTXT}" Content="TXT" FontSize="11.5" Foreground="White" FontWeight="SemiBold" Margin="0,0,15,5"/>
+                <CheckBox IsChecked="{Binding TypeCNAME}" Content="CNAME" FontSize="11.5" Foreground="White" FontWeight="SemiBold" Margin="0,0,15,5"/>
+            </WrapPanel>
 
-			<Border Grid.Row="2" Background="#44000000" CornerRadius="4" BorderThickness="1" BorderBrush="#22FFFFFF">
-				<TextBox Text="{Binding LogText}" IsReadOnly="True" AcceptsReturn="True"
-						 Background="Transparent" Foreground="#00FF66"
-						 FontFamily="Cascadia Code,Consolas,Monospace"
-						 FontSize="12" BorderThickness="0"
-						 CaretIndex="{Binding LogText.Length}"
-						 ScrollViewer.VerticalScrollBarVisibility="Visible"/>
-			</Border>
+            <Border Grid.Row="2" Background="#40000000" CornerRadius="4" BorderThickness="1" BorderBrush="#35FFFFFF">
+                <TextBox Text="{Binding LogText}" IsReadOnly="True" AcceptsReturn="True"
+                         Background="Transparent" Foreground="#00FF99"
+                         FontFamily="Cascadia Code,Consolas,Monospace"
+                         FontSize="11.5" BorderThickness="0"
+                         CaretIndex="{Binding LogText.Length}"
+                         ScrollViewer.VerticalScrollBarVisibility="Visible"/>
+            </Border>
 
-			<Grid Grid.Row="3" ColumnDefinitions="*, *" Margin="0,10,0,0">
-				<Button Grid.Column="0" Command="{Binding RunLookupCommand}"
-						Content="DNS LOOKUP" Height="38" FontSize="11" FontWeight="Bold"
-						HorizontalAlignment="Stretch"
-						HorizontalContentAlignment="Center"
-						VerticalContentAlignment="Center"
-						Background="#2E86C1" IsEnabled="{Binding !IsWorking}"
-						Margin="0,0,5,0"/>
+            <Grid Grid.Row="3" ColumnDefinitions="*, *" Margin="0,12,0,0">
+                <Button Grid.Column="0" Command="{Binding RunLookupCommand}"
+                        Content="DNS LOOKUP" Height="36" FontSize="12" FontWeight="Bold"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Background="#2E86C1" Foreground="White"
+                        IsEnabled="{Binding !IsWorking}"
+                        Margin="0,0,6,0"/>
 
-				<Button Grid.Column="1" Command="{Binding RunWhoisCommand}"
-						Content="WHOIS (RDAP)" Height="38" FontSize="11" FontWeight="Bold"
-						HorizontalAlignment="Stretch"
-						HorizontalContentAlignment="Center"
-						VerticalContentAlignment="Center"
-						Background="#8E44AD" IsEnabled="{Binding !IsWorking}"
-						Margin="5,0,0,0"/>
-			</Grid>
-		</Grid>
+                <Button Grid.Column="1" Command="{Binding RunWhoisCommand}"
+                        Content="WHOIS (RDAP)" Height="36" FontSize="12" FontWeight="Bold"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Background="#8E44AD" Foreground="White"
+                        IsEnabled="{Binding !IsWorking}"
+                        Margin="6,0,0,0"/>
+            </Grid>
+        </Grid>
 
-		<Border Grid.Column="1" Background="#22000000"
-				CornerRadius="5" Padding="10" BorderThickness="1" BorderBrush="#11FFFFFF">
-			<Grid RowDefinitions="Auto, *, Auto">
-				<TextBlock Text="DNS SERVERS" FontSize="10" FontWeight="Black"
-						   Opacity="0.6" Margin="0,0,0,10" HorizontalAlignment="Center"/>
+        <Border Grid.Column="1" Background="#30000000"
+                CornerRadius="5" Padding="12" BorderThickness="1" BorderBrush="#35FFFFFF">
+            <Grid RowDefinitions="Auto, *, Auto">
+                <TextBlock Text="DNS SERVERS" FontSize="11" FontWeight="Bold"
+                           Foreground="White" Opacity="0.8" Margin="0,0,0,12" HorizontalAlignment="Center"/>
 
-				<ListBox Grid.Row="1" ItemsSource="{Binding DnsServers}" Background="Transparent">
-					<ListBox.ItemTemplate>
-						<DataTemplate>
-							<Grid ColumnDefinitions="*, Auto">
-								<TextBlock Text="{Binding}" FontSize="11" VerticalAlignment="Center"/>
-								<Button Grid.Column="1" Command="{Binding $parent[UserControl].((vm:DnsViewModel)DataContext).RemoveDnsServerCommand}"
+                <ListBox Grid.Row="1" ItemsSource="{Binding DnsServers}" Background="Transparent" BorderThickness="0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnDefinitions="*, Auto" Margin="0,2">
+                                <TextBlock Text="{Binding}" FontSize="11.5" Foreground="White" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Command="{Binding $parent[UserControl].((vm:DnsViewModel)DataContext).RemoveDnsServerCommand}"
 										CommandParameter="{Binding}" Content="X"
 										FontSize="10" FontWeight="Bold"
 										HorizontalContentAlignment="Center"
 										VerticalContentAlignment="Center"
 										Background="Transparent" Foreground="#FF5555" Padding="6,2"/>
-							</Grid>
-						</DataTemplate>
-					</ListBox.ItemTemplate>
-				</ListBox>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
 
-				<Grid Grid.Row="2" ColumnDefinitions="*, Auto" Margin="0,10,0,0">
-					<TextBox Text="{Binding NewDnsServer}" Watermark="IP..."
-							 FontSize="10" Height="30" VerticalContentAlignment="Center"/>
-					<Button Grid.Column="1" Command="{Binding AddDnsServerCommand}"
-							Content="+" Width="30" Height="30" Margin="5,0,0,0"
-							HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
-				</Grid>
-			</Grid>
-		</Border>
-	</Grid>
+                <Grid Grid.Row="2" ColumnDefinitions="*, Auto" Margin="0,12,0,0">
+                    <TextBox Text="{Binding NewDnsServer}" Watermark="IP..."
+                             FontSize="11.5" Height="32" VerticalContentAlignment="Center"
+                             Foreground="White" Background="#20000000" BorderBrush="#50FFFFFF"/>
+                    <Button Grid.Column="1" Command="{Binding AddDnsServerCommand}"
+                            Content="+" Width="32" Height="32" Margin="6,0,0,0"
+                            FontSize="16" FontWeight="Bold" Background="#42B883" Foreground="White"
+                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>

@@ -10,24 +10,24 @@ namespace Echoes.Views
         public CurlView()
         {
             InitializeComponent();
-            DataContextChanged += (s, e) =>
-            {
-                if (DataContext is CurlViewModel vm)
-                {
-                    vm.PropertyChanged += Vm_PropertyChanged;
-                }
-            };
+            //DataContextChanged += (s, e) =>
+            //{
+            //    if (DataContext is CurlViewModel vm)
+            //    {
+            //        vm.PropertyChanged += Vm_PropertyChanged;
+            //    }
+            //};
         }
 
-        private void Vm_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName == nameof(CurlViewModel.RawBody))
-            {
-                if (DataContext is CurlViewModel vm)
-                {
-                    MyHtmlPanel.Text = vm.RawBody;
-                }
-            }
-        }
+        //private void Vm_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        //{
+        //    if (e.PropertyName == nameof(CurlViewModel.RawBody))
+        //    {
+        //        if (DataContext is CurlViewModel vm)
+        //        {
+        //            FullLog.Text = vm.RawBody;
+        //        }
+        //    }
+        //}
     }
 }
