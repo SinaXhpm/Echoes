@@ -1,47 +1,56 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
              x:Class="Echoes.Views.NoteView"
              x:DataType="vm:NoteViewModel">
 
-    <Grid Margin="12">
+    <Grid Margin="8">
         <Border IsVisible="{Binding IsLocked}" VerticalAlignment="Center" HorizontalAlignment="Center" 
-                Width="320" Padding="25" Background="#30000000" CornerRadius="8" BorderBrush="#60FFFFFF" BorderThickness="1">
-            <StackPanel Spacing="15">
-                <TextBlock Text="ENCRYPTED STORAGE" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" Foreground="White"/>
+                Width="300" Padding="20" Background="#30000000" CornerRadius="8" BorderBrush="#60FFFFFF" BorderThickness="1">
+            <StackPanel Spacing="12">
+                <TextBlock Text="ENCRYPTED STORAGE" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" Foreground="White"/>
                 <TextBox Text="{Binding MasterKey}" PasswordChar="*" Watermark="Master Key..." 
-                         FontSize="12" Height="36" VerticalContentAlignment="Center" Background="#20000000" BorderBrush="#60FFFFFF">
+                         FontSize="12" Height="32" VerticalContentAlignment="Center" Background="#20000000" BorderBrush="#60FFFFFF">
                     <TextBox.KeyBindings>
                         <KeyBinding Command="{Binding UnlockCommand}" Gesture="Enter"/>
                     </TextBox.KeyBindings>
                 </TextBox>
                 <Button Command="{Binding UnlockCommand}" Content="UNLOCK" FontSize="12" FontWeight="Bold" 
-                        Height="36" Background="#42B883" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF4444" FontSize="11" HorizontalAlignment="Center"/>
+                        Height="32" Background="#42B883" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF4444" FontSize="10" HorizontalAlignment="Center"/>
             </StackPanel>
         </Border>
 
         <Grid IsVisible="{Binding !IsLocked}">
             <Grid RowDefinitions="Auto, *" IsVisible="{Binding !IsEditing}">
-                <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto" Margin="0,0,0,15">
-                    <TextBlock Grid.Column="0" Text="NOTES" FontSize="15" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-                    <Button Grid.Column="1" Command="{Binding LockAppCommand}" Content="LOCK" Background="#FF3333" 
-                            Foreground="White" FontSize="11" FontWeight="Bold" Padding="12,7" Margin="0,0,10,0"/>
+                <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto" Margin="0,0,0,8">
+                    <TextBlock Grid.Column="0" Text="NOTES" FontSize="14" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Command="{Binding LockAppCommand}" Content="LOCK" Background="#CCFF3333" 
+                            Foreground="White" FontSize="10" FontWeight="Bold" Padding="10,5" Margin="0,0,8,0"/>
                     <Button Grid.Column="2" Command="{Binding AddNoteCommand}" Content="+ NEW" Background="#42B883" 
-                            Foreground="White" FontWeight="Bold" FontSize="11" Padding="12,7"/>
+                            Foreground="White" FontWeight="Bold" FontSize="10" Padding="10,5"/>
                 </Grid>
 
-                <ListBox Grid.Row="1" ItemsSource="{Binding Notes}" Background="#40000000" BorderBrush="#35FFFFFF" BorderThickness="1" CornerRadius="4">
+                <ListBox Grid.Row="1" ItemsSource="{Binding Notes}" Background="#40000000" 
+                         BorderBrush="#35FFFFFF" BorderThickness="1" CornerRadius="4">
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="MinHeight" Value="30"/>
+                        </Style>
+                    </ListBox.Styles>
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:NoteItem">
-                            <Grid ColumnDefinitions="*, Auto" Height="40">
+                            <Grid ColumnDefinitions="*, Auto" Height="30">
                                 <Button Grid.Column="0" Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).OpenNoteCommand}"
-                                        CommandParameter="{Binding}" Background="Transparent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
-                                    <TextBlock Text="{Binding Title}" FontSize="12.5" Foreground="White" FontWeight="SemiBold"/>
+                                        CommandParameter="{Binding}" Background="Transparent" 
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="10,0">
+                                    <TextBlock Text="{Binding Title}" FontSize="12" Foreground="White" 
+                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                                 </Button>
                                 <Button Grid.Column="1" Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).DeleteNoteCommand}"
-                                        CommandParameter="{Binding}" Content="DEL" FontSize="10" Background="#30FFFFFF" 
-                                        Foreground="#FF5555" BorderBrush="#FF5555" BorderThickness="1" Padding="8,4" VerticalAlignment="Center"/>
+                                        CommandParameter="{Binding}" Content="DEL" FontSize="10" Background="#20FF0000" 
+                                        Foreground="#FF7777" Padding="8,4" Margin="0,0,5,0" VerticalAlignment="Center"/>
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
@@ -49,17 +58,17 @@
             </Grid>
 
             <Grid RowDefinitions="Auto, *" IsVisible="{Binding IsEditing}">
-                <Grid Grid.Row="0" ColumnDefinitions="Auto, *" Margin="0,0,0,15">
-                    <Button Grid.Column="0" Command="{Binding BackToListCommand}" Content="DONE / BACK" Background="#2E86C1" 
-                            Foreground="White" FontSize="11.5" FontWeight="Bold" Padding="15,8" Margin="0,0,15,0"/>
-                    <TextBox Grid.Column="1" Text="{Binding SelectedNote.Title, FallbackValue=''}" FontSize="12.5" FontWeight="Bold" 
-                             Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Height="38" VerticalContentAlignment="Center"/>
+                <Grid Grid.Row="0" ColumnDefinitions="Auto, *" Margin="0,0,0,10">
+                    <Button Grid.Column="0" Command="{Binding BackToListCommand}" Content="← DONE" Background="#2E86C1" 
+                            Foreground="White" FontSize="11" FontWeight="Bold" Padding="12,6" Margin="0,0,10,0"/>
+                    <TextBox Grid.Column="1" Text="{Binding SelectedNote.Title, FallbackValue=''}" FontSize="12" FontWeight="Bold" 
+                             Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Height="32" VerticalContentAlignment="Center"/>
                 </Grid>
 
                 <Border Grid.Row="1" Background="#40000000" CornerRadius="4" BorderBrush="#35FFFFFF" BorderThickness="1">
-                    <TextBox Text="{Binding SelectedNote.Content, FallbackValue=''}" AcceptsReturn="True" FontSize="12.5" 
+                    <TextBox TextWrapping="Wrap" Text="{Binding SelectedNote.Content, FallbackValue=''}" AcceptsReturn="True" FontSize="12" 
                              Foreground="#FFFFFF" Background="Transparent" BorderThickness="0"
-                             FontFamily="Cascadia Code,Consolas" Watermark="Type your note here..." Padding="15"/>
+                             FontFamily="Cascadia Code,Consolas" Watermark="Type your note here..." Padding="10"/>
                 </Border>
             </Grid>
         </Grid>
