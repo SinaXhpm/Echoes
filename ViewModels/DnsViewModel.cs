@@ -1,18 +1,16 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using Avalonia.Threading;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DnsClient;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Avalonia.Threading;
 
 namespace Echoes.ViewModels;
 
@@ -21,7 +19,7 @@ public partial class DnsViewModel : ObservableObject
     [ObservableProperty] private string _domainName = string.Empty;
     [ObservableProperty] private string _logText = string.Empty;
     [ObservableProperty] private bool _isWorking;
-    [ObservableProperty] private string _newDnsServer = string.Empty;
+    [ObservableProperty] private string _dnsServersText = string.Empty;
 
     [ObservableProperty] private bool _typeA = true;
     [ObservableProperty] private bool _typeAAAA;
@@ -29,8 +27,6 @@ public partial class DnsViewModel : ObservableObject
     [ObservableProperty] private bool _typeNS;
     [ObservableProperty] private bool _typeTXT;
     [ObservableProperty] private bool _typeCNAME;
-
-    public ObservableCollection<string> DnsServers { get; } = new();
 
     private readonly string _storagePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "dns_settings.txt");
 
@@ -43,95 +39,70 @@ public partial class DnsViewModel : ObservableObject
     {
         try
         {
-            if (File.Exists(_storagePath))
-            {
-                var lines = File.ReadAllLines(_storagePath);
-                foreach (var line in lines)
-                {
-                    if (!string.IsNullOrWhiteSpace(line)) DnsServers.Add(line.Trim());
-                }
-            }
+            if (File.Exists(_storagePath)) DnsServersText = File.ReadAllText(_storagePath);
         }
         catch { }
 
-        if (DnsServers.Count == 0)
+        if (string.IsNullOrWhiteSpace(DnsServersText))
         {
-            DnsServers.Add("1.1.1.1");
-            DnsServers.Add("8.8.8.8");
+            DnsServersText = "1.1.1.1" + Environment.NewLine + "8.8.8.8";
             SaveServers();
         }
     }
 
     private void SaveServers()
     {
-        try
-        {
-            File.WriteAllLines(_storagePath, DnsServers);
-        }
-        catch { }
+        try { File.WriteAllText(_storagePath, DnsServersText); } catch { }
     }
 
-    [RelayCommand]
-    private void AddDnsServer()
-    {
-        if (!string.IsNullOrWhiteSpace(NewDnsServer) && IPAddress.TryParse(NewDnsServer, out _))
-        {
-            if (!DnsServers.Contains(NewDnsServer))
-            {
-                DnsServers.Add(NewDnsServer);
-                SaveServers();
-            }
-            NewDnsServer = string.Empty;
-        }
-    }
-
-    [RelayCommand]
-    private void RemoveDnsServer(string server)
-    {
-        DnsServers.Remove(server);
-        if (DnsServers.Count == 0) DnsServers.Add("1.1.1.1");
-        SaveServers();
-    }
-
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task RunLookup()
     {
         if (string.IsNullOrWhiteSpace(DomainName) || IsWorking) return;
+        SaveServers();
         IsWorking = true;
         LogText = string.Empty;
 
-        var selectedTypes = GetSelectedTypes();
-        if (!selectedTypes.Any()) { UpdateLog("Select at least one record type."); IsWorking = false; return; }
+        var servers = DnsServersText.Split(new[] { '\n', '\r', ',' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim()).Where(s => IPAddress.TryParse(s, out _)).ToList();
 
-        var queryTasks = DnsServers
-            .Where(server => IPAddress.TryParse(server, out _))
-            .SelectMany(server => selectedTypes.Select(async type =>
+        var selectedTypes = GetSelectedTypes();
+        if (!selectedTypes.Any() || !servers.Any())
+        {
+            IsWorking = false;
+            return;
+        }
+
+        var tasks = servers.Select(async server =>
+        {
+            foreach (var type in selectedTypes)
             {
                 try
                 {
-                    var options = new LookupClientOptions(IPAddress.Parse(server))
-                    {
-                        Timeout = TimeSpan.FromSeconds(5),
-                        Retries = 0
-                    };
+                    var options = new LookupClientOptions(IPAddress.Parse(server)) { Timeout = TimeSpan.FromSeconds(3), Retries = 0 };
                     var client = new LookupClient(options);
                     var result = await client.QueryAsync(DomainName, type);
 
                     var sb = new StringBuilder();
-                    sb.AppendLine($"--- [{type}] via {server} ---");
-                    foreach (var record in result.Answers) sb.AppendLine(record.ToString());
-                    if (!result.Answers.Any()) sb.AppendLine("(no records)");
-                    sb.AppendLine();
-
+                    if (result.Answers.Any())
+                    {
+                        foreach (var record in result.Answers)
+                            sb.AppendLine($"{server,-15} | {type,-5} | {record}");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"{server,-15} | {type,-5} | no records");
+                    }
                     UpdateLog(sb.ToString());
                 }
-                catch (Exception ex)
+                catch
                 {
-                    UpdateLog($"Error [{type}] via {server}: {ex.Message}{Environment.NewLine}");
+                    UpdateLog($"{server,-15} | {type,-5} | timeout");
                 }
-            }));
+            }
+        });
 
-        await Task.WhenAll(queryTasks);
+        await Task.WhenAll(tasks);
         IsWorking = false;
     }
 
@@ -140,15 +111,12 @@ public partial class DnsViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(DomainName) || IsWorking) return;
         IsWorking = true;
-        LogText = string.Empty;
+        LogText = $"# whois {DomainName}" + Environment.NewLine;
 
         string[] providers = {
             $"https://rdap.org/domain/{DomainName}",
-            $"https://rdap.verisign.com/com/v1/domain/{DomainName}",
-            $"https://rdap.apnic.net/domain/{DomainName}"
+            $"https://rdap.verisign.com/com/v1/domain/{DomainName}"
         };
-
-        bool success = false;
 
         foreach (var url in providers)
         {
@@ -159,72 +127,48 @@ public partial class DnsViewModel : ObservableObject
                 {
                     using var doc = JsonDocument.Parse(result);
                     var sb = new StringBuilder();
-                    ParseElement(doc.RootElement, sb, "");
-
-                    sb.AppendLine();
-                    sb.AppendLine("--------------------------------------------");
-                    sb.AppendLine("RDAP Lookup Successful");
-
+                    ParseElement(doc.RootElement, sb);
                     LogText = sb.ToString();
-                    success = true;
-                    break;
+                    IsWorking = false;
+                    return;
                 }
             }
             catch { }
         }
-
-        if (!success) LogText = "WHOIS/RDAP lookup failed on all providers.";
+        LogText = "timeout / failed";
         IsWorking = false;
     }
 
     private string RunCurl(string url)
     {
-        var args = new List<string> { "-s", "-L", "--connect-timeout 10" };
-        args.Add($"\"{url}\"");
-
         var psi = new ProcessStartInfo
         {
             FileName = "curl",
-            Arguments = string.Join(" ", args),
+            Arguments = $"-s -L --connect-timeout 5 \"{url}\"",
             RedirectStandardOutput = true,
             UseShellExecute = false,
             CreateNoWindow = true,
             StandardOutputEncoding = Encoding.UTF8
         };
-
         using var process = Process.Start(psi);
         return process?.StandardOutput.ReadToEnd() ?? string.Empty;
     }
 
-    private void ParseElement(JsonElement element, StringBuilder sb, string indent)
+    private void ParseElement(JsonElement element, StringBuilder sb)
     {
         if (element.ValueKind == JsonValueKind.Object)
         {
             foreach (var property in element.EnumerateObject())
             {
-                if (property.Value.ValueKind == JsonValueKind.Object)
-                {
-                    sb.AppendLine($"{indent}■ {property.Name.ToUpper()}:");
-                    ParseElement(property.Value, sb, indent + "  ");
-                }
-                else if (property.Value.ValueKind == JsonValueKind.Array)
-                {
-                    sb.AppendLine($"{indent}■ {property.Name.ToUpper()}:");
-                    foreach (var item in property.Value.EnumerateArray())
-                    {
-                        ParseElement(item, sb, indent + "  - ");
-                    }
-                }
+                if (property.Value.ValueKind == JsonValueKind.Object || property.Value.ValueKind == JsonValueKind.Array)
+                    ParseElement(property.Value, sb);
                 else
-                {
-                    string key = property.Name.Replace("_", " ").PadRight(20);
-                    sb.AppendLine($"{indent}  {key} : {property.Value}");
-                }
+                    sb.AppendLine($"{property.Name}: {property.Value}");
             }
         }
-        else
+        else if (element.ValueKind == JsonValueKind.Array)
         {
-            sb.AppendLine($"{indent}{element}");
+            foreach (var item in element.EnumerateArray()) ParseElement(item, sb);
         }
     }
 
@@ -240,8 +184,8 @@ public partial class DnsViewModel : ObservableObject
         return types;
     }
 
-    private void UpdateLog(string m)
+    private void UpdateLog(string msg)
     {
-        Dispatcher.UIThread.Post(() => LogText += $"{m}{Environment.NewLine}");
+        Dispatcher.UIThread.Post(() => LogText += msg);
     }
 }
