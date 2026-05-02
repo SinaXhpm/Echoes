@@ -4,120 +4,91 @@
              x:Class="Echoes.Views.MonitorView"
              x:DataType="vm:MonitorViewModel">
 
-    <Grid RowDefinitions="Auto, Auto, *" Margin="12">
-        
-        <Grid Grid.Row="0" ColumnDefinitions="*, 60, 95, Auto, 95" Margin="0,0,0,12">
-            <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                <TextBlock Text="TARGET URL" FontSize="10" FontWeight="Bold" Foreground="White" Opacity="0.9" Margin="2,0,0,5"/>
-                <TextBox Text="{Binding TargetUrl}" Height="34" FontSize="12" VerticalContentAlignment="Center" 
-                         Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Watermark="https://..."/>
-            </StackPanel>
+    <Grid RowDefinitions="Auto, Auto, *" Margin="15">
+        <Grid Grid.Row="0" ColumnDefinitions="*, 240" Height="100" Margin="0,0,0,20">
+            <Grid Grid.Column="0" RowDefinitions="Auto, *">
+                <TextBlock Grid.Row="0" Text="TARGETS" FontSize="10" FontWeight="Bold" Foreground="White" Opacity="0.4" Margin="5,0,0,5"/>
+                <TextBox Grid.Row="1" Text="{Binding InputAddresses}" AcceptsReturn="True" FontSize="12" 
+                         Foreground="White" Background="#10000000" BorderBrush="#30FFFFFF" CornerRadius="4"
+                         VerticalAlignment="Stretch" Margin="0,0,12,0" Watermark="IP or URL per line..."/>
+            </Grid>
 
-            <StackPanel Grid.Column="1" Margin="0,0,8,0">
-                <TextBlock Text="DELAY" FontSize="10" FontWeight="Bold" Foreground="White" Opacity="0.9" Margin="2,0,0,5"/>
-                <TextBox Text="{Binding Interval}" Height="34" FontSize="12" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" 
-                         Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF"/>
-            </StackPanel>
+            <Border Grid.Column="1" Background="#10000000" CornerRadius="4" Padding="12" BorderBrush="#20FFFFFF" BorderThickness="1" VerticalAlignment="Stretch">
+                <Grid RowDefinitions="Auto, *">
+                    <UniformGrid Grid.Row="0" Columns="3" Margin="0,0,0,10">
+                        <CheckBox IsChecked="{Binding CheckPing}" Content="PING" FontSize="9" Padding="4,0,0,0" HorizontalAlignment="Center"/>
+                        <CheckBox IsChecked="{Binding CheckTcp}" Content="TCP" FontSize="9" Padding="4,0,0,0" HorizontalAlignment="Center"/>
+                        <CheckBox IsChecked="{Binding CheckHttp}" Content="HTTP" FontSize="9" Padding="4,0,0,0" HorizontalAlignment="Center"/>
+                    </UniformGrid>
 
-            <StackPanel Grid.Column="2" Margin="0,0,8,0">
-                <TextBlock Text="SUCCESS" FontSize="10" FontWeight="Bold" Foreground="White" Opacity="0.9" Margin="2,0,0,5"/>
-                <TextBox Text="{Binding SuccessCodes}" Height="34" FontSize="11.5" VerticalContentAlignment="Center" 
-                         Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Watermark="200, 301"/>
-            </StackPanel>
+                    <Grid Grid.Row="1" ColumnDefinitions="Auto, *, Auto" VerticalAlignment="Bottom">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="INT (S):" VerticalAlignment="Center" FontSize="9" FontWeight="Bold" Opacity="0.4" Margin="0,0,5,0"/>
+                            <TextBox Text="{Binding Interval}" Width="35" Height="24" Padding="0" FontSize="10" 
+                                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center" BorderThickness="0,0,0,1" Background="Transparent"/>
+                        </StackPanel>
 
-            <StackPanel Grid.Column="3" Margin="5,0,12,0" VerticalAlignment="Bottom">
-                <CheckBox IsChecked="{Binding EnableSound}" Content="BEEP" FontSize="11" Foreground="White" FontWeight="SemiBold" MinHeight="34"/>
-            </StackPanel>
-
-            <Button Grid.Column="4" VerticalAlignment="Bottom" Height="34" Width="95"
-                    Command="{Binding ToggleMonitorCommand}"
-                    Classes.active="{Binding IsMonitoring}"
-                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
-                <Button.Styles>
-                    <Style Selector="Button">
-                        <Setter Property="Background" Value="#42B883"/>
-                        <Setter Property="Foreground" Value="White"/>
-                        <Setter Property="FontWeight" Value="Bold"/>
-                        <Setter Property="Transitions">
-                            <Transitions>
-                                <BrushTransition Property="Background" Duration="0:0:0.2"/>
-                            </Transitions>
-                        </Setter>
-                    </Style>
-                    <Style Selector="Button.active">
-                        <Setter Property="Background" Value="#FF3333"/>
-                    </Style>
-                    <Style Selector="Button:pointerover /template/ ContentPresenter">
-                        <Setter Property="Background" Value="#52C893"/>
-                        <Setter Property="Foreground" Value="White"/>
-                    </Style>
-                    <Style Selector="Button.active:pointerover /template/ ContentPresenter">
-                        <Setter Property="Background" Value="#FF5555"/>
-                        <Setter Property="Foreground" Value="White"/>
-                    </Style>
-                </Button.Styles>
-                <Panel>
-                    <TextBlock Text="START" IsVisible="{Binding !IsMonitoring}" FontSize="12"/>
-                    <TextBlock Text="STOP" IsVisible="{Binding IsMonitoring}" FontSize="12"/>
-                </Panel>
-            </Button>
+                        <Button Grid.Column="2" Command="{Binding ToggleMonitorCommand}" Width="90" Height="30" 
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                Classes.active="{Binding IsMonitoring}">
+                            <Button.Styles>
+                                <Style Selector="Button">
+                                    <Setter Property="Background" Value="#42B883"/>
+                                    <Setter Property="Padding" Value="0"/>
+                                    <Setter Property="Template">
+                                        <ControlTemplate>
+                                            <ContentPresenter x:Name="PART_ContentPresenter"
+                                                              Background="{TemplateBinding Background}"
+                                                              Content="{TemplateBinding Content}"
+                                                              HorizontalContentAlignment="Center"
+                                                              VerticalContentAlignment="Center"
+                                                              CornerRadius="3"/>
+                                        </ControlTemplate>
+                                    </Setter>
+                                </Style>
+                                <Style Selector="Button.active">
+                                    <Setter Property="Background" Value="#FF4444"/>
+                                </Style>
+                            </Button.Styles>
+                            <Panel>
+                                <TextBlock Text="START" IsVisible="{Binding !IsMonitoring}" FontSize="10" FontWeight="Black"/>
+                                <TextBlock Text="STOP" IsVisible="{Binding IsMonitoring}" FontSize="10" FontWeight="Black"/>
+                            </Panel>
+                        </Button>
+                    </Grid>
+                </Grid>
+            </Border>
         </Grid>
 
-        <Grid Grid.Row="1" ColumnDefinitions="90, 1*, 70, 90, 90, 90" Margin="12,0,28,10">
-            <TextBlock Grid.Column="0" Text="TIME" FontSize="10.5" Foreground="White" FontWeight="Bold" Opacity="0.8"/>
-            <TextBlock Grid.Column="1" Text="ADDRESS" FontSize="10.5" Foreground="White" FontWeight="Bold" Opacity="0.8"/>
-            <TextBlock Grid.Column="2" Text="HTTP" FontSize="10.5" Foreground="White" FontWeight="Bold" Opacity="0.8"/>
-            <TextBlock Grid.Column="3" Text="LATENCY" FontSize="10.5" Foreground="White" FontWeight="Bold" Opacity="0.8"/>
-            <TextBlock Grid.Column="4" Text="PING" FontSize="10.5" Foreground="White" FontWeight="Bold" Opacity="0.8"/>
-            <TextBlock Grid.Column="5" Text="MS" FontSize="10.5" Foreground="White" FontWeight="Bold" Opacity="0.8" HorizontalAlignment="Right"/>
+        <Grid Grid.Row="1" ColumnDefinitions="2*, 1*, 1*, 1.2*, 0.8*" Margin="15,0,15,10">
+            <TextBlock Grid.Column="0" Text="ADDRESS" FontSize="10" FontWeight="Bold" Opacity="0.3"/>
+            <TextBlock Grid.Column="1" Text="PING" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Center"/>
+            <TextBlock Grid.Column="2" Text="TCP" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Center"/>
+            <TextBlock Grid.Column="3" Text="HTTP" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Center"/>
+            <TextBlock Grid.Column="4" Text="FAILS" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Right"/>
         </Grid>
 
-        <ListBox Grid.Row="2" ItemsSource="{Binding Results}" Background="#40000000" BorderBrush="#35FFFFFF" BorderThickness="1" CornerRadius="4" Padding="0" Name="MonitorList">
-            <ListBox.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <VirtualizingStackPanel />
-                </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
-
-            <ListBox.Styles>
-                <Style Selector="ListBoxItem">
-                    <Setter Property="Padding" Value="0"/>
-                    <Setter Property="Margin" Value="0,1"/>
-                    <Setter Property="Background" Value="Transparent"/>
-                    <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-                        <Setter Property="Background" Value="Transparent"/>
-                    </Style>
-                    <Style Selector="^:selected /template/ ContentPresenter#PART_ContentPresenter">
-                        <Setter Property="Background" Value="Transparent"/>
-                    </Style>
-                </Style>
-            </ListBox.Styles>
-
+        <ListBox Grid.Row="2" ItemsSource="{Binding Targets}" Background="Transparent" Padding="0">
             <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:MonitorResult">
-                    <Border CornerRadius="3" Margin="4,1" Padding="10,5" MinHeight="32" VerticalAlignment="Center">
+                <DataTemplate x:DataType="vm:MonitorTarget">
+                    <Border CornerRadius="3" Margin="0,1" Padding="12,7" Classes.success="{Binding IsSuccess}" Classes.failed="{Binding !IsSuccess}">
                         <Border.Styles>
                             <Style Selector="Border">
-                                <Setter Property="Background" Value="#18FFFFFF"/>
+                                <Setter Property="Background" Value="#05FFFFFF"/>
                             </Style>
-                            <Style Selector="Border[Tag=True]">
-                                <Setter Property="Background" Value="#4542B883"/>
+                            <Style Selector="Border.success">
+                                <Setter Property="Background" Value="#1042B883"/>
                             </Style>
-                            <Style Selector="Border[Tag=False]">
-                                <Setter Property="Background" Value="#45FF3333"/>
+                            <Style Selector="Border.failed">
+                                <Setter Property="Background" Value="#10FF4444"/>
                             </Style>
                         </Border.Styles>
-                        <Border.Tag>
-                            <Binding Path="IsSuccess"/>
-                        </Border.Tag>
-
-                        <Grid ColumnDefinitions="90, 1*, 70, 90, 90, 90" VerticalAlignment="Center">
-                            <TextBlock Grid.Column="0" Text="{Binding Time}" FontSize="11" Foreground="White" Opacity="0.7" VerticalAlignment="Center" FontFamily="Cascadia Code,Consolas"/>
-                            <TextBlock Grid.Column="1" Text="{Binding Url}" FontSize="11.5" Foreground="White" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontWeight="Medium"/>
-                            <TextBlock Grid.Column="2" Text="{Binding HttpStatus}" FontSize="11.5" Foreground="White" FontWeight="Heavy" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="3" Text="{Binding HttpLatency}" FontSize="11.5" Foreground="White" VerticalAlignment="Center" Opacity="0.9"/>
-                            <TextBlock Grid.Column="4" Text="{Binding PingStatus}" FontSize="11" Foreground="White" VerticalAlignment="Center" Opacity="0.7"/>
-                            <TextBlock Grid.Column="5" Text="{Binding PingLatency}" FontSize="11.5" Foreground="White" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        <Grid ColumnDefinitions="2*, 1*, 1*, 1.2*, 0.8*">
+                            <TextBlock Grid.Column="0" Text="{Binding Address}" FontSize="11.5" Foreground="White" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="1" Text="{Binding PingStatus}" FontSize="10.5" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7"/>
+                            <TextBlock Grid.Column="2" Text="{Binding TcpStatus}" FontSize="10.5" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7"/>
+                            <TextBlock Grid.Column="3" Text="{Binding HttpStatus}" FontSize="10.5" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="4" Text="{Binding FailedCount}" FontSize="11" Foreground="#FF6666" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
                         </Grid>
                     </Border>
                 </DataTemplate>
