@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace Echoes.ViewModels;
@@ -51,7 +52,7 @@ public partial class MainViewModel : ObservableObject
 
             var url = "https://raw.githubusercontent.com/SinaXhpm/Echoes/refs/heads/master/version.json";
             var response = await client.GetStringAsync(url);
-            var data = JsonSerializer.Deserialize<VersionData>(response);
+            var data = JsonSerializer.Deserialize(response, VersionDataContext.Default.VersionData);
 
             if (data != null)
             {
@@ -101,4 +102,9 @@ public partial class MainViewModel : ObservableObject
 public class VersionData
 {
     public string version { get; set; } = string.Empty;
+}
+
+[JsonSerializable(typeof(VersionData))]
+internal partial class VersionDataContext : JsonSerializerContext
+{
 }

@@ -32,7 +32,7 @@ Choose the package that fits your OS from the **[Releases](https://github.com/Si
 ### 🌐 Web & API
 - **cURL Client:** GUI for cURL supporting **HTTP/SOCKS proxies**, custom flags, IP Override (Resolve), and detailed logging.
 - **Telegram Bot Tester:** GUI for Bot API methods with **real-time verbose logging** directly from memory (no temp files).
-- **SSL Inspector:** Extracts native Windows certificate details including Subject, Issuer, Validity, and Key Size.
+- **SSL Inspector:** Extracts TLS certificate details (cross-platform) including Subject, Issuer, Validity, and Key Size.
 - **IP Intelligence:** Public IP detection and GeoIP lookup with **smart SOCKS5/HTTP auto-detection** based on port.
 - **Service Monitor:** Automated uptime and latency tracking for URLs and hosts.
 

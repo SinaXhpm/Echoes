@@ -4,22 +4,37 @@
              x:Class="Echoes.Views.CurlView"
              x:DataType="vm:CurlViewModel">
 
+    <UserControl.Styles>
+        <!-- Read-only log/body panes: scroll instead of wrapping (faster + keeps alignment) -->
+        <Style Selector="TextBox[IsReadOnly=True]">
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+        </Style>
+    </UserControl.Styles>
+
     <Grid RowDefinitions="Auto, *, Auto" Margin="12">
         
-        <Grid Grid.Row="0" ColumnDefinitions="*, 140, 90" Margin="0,0,0,12">
-            <TextBox Grid.Column="0" Text="{Binding Url}" Watermark="Target URL (https://...)"
-                     Height="34" FontSize="12" VerticalContentAlignment="Center"
-                     Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Margin="0,0,8,0">
-                <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}" />
-                </TextBox.KeyBindings>
-            </TextBox>
+        <Grid Grid.Row="0" ColumnDefinitions="86, *, 130, 90" Margin="0,0,0,12">
+            <ComboBox Grid.Column="0" ItemsSource="{Binding HttpMethods}" SelectedItem="{Binding HttpMethod}"
+                      Height="34" FontSize="12" HorizontalAlignment="Stretch" Margin="0,0,8,0"
+                      Foreground="White" Background="#25000000"/>
 
-            <TextBox Grid.Column="1" Text="{Binding OverrideIp}" Watermark="Override IP..."
+            <AutoCompleteBox Grid.Column="1" Text="{Binding Url}"
+                     ItemsSource="{Binding UrlHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                     Watermark="Target URL (https://...)"
+                     Height="34" FontSize="12"
+                     Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Margin="0,0,8,0">
+                <AutoCompleteBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}" />
+                </AutoCompleteBox.KeyBindings>
+            </AutoCompleteBox>
+
+            <TextBox Grid.Column="2" Text="{Binding OverrideIp}" Watermark="Override IP..."
                      Height="34" FontSize="12" VerticalContentAlignment="Center"
                      Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Margin="0,0,8,0"/>
 
-            <Button Grid.Column="2"
+            <Button Grid.Column="3"
                     Command="{Binding ToggleCurlCommand}"
                     Height="34" HorizontalAlignment="Stretch"
                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
@@ -94,8 +109,10 @@
         <StackPanel Grid.Row="2" Margin="0,12,0,0">
             
             <Grid ColumnDefinitions="*, 120, 120" IsVisible="{Binding #ProxyToggle.IsChecked}" Margin="0,0,0,10">
-                <TextBox Grid.Column="0" Text="{Binding Proxy}" Watermark="Proxy (IP:Port)" 
-                         Height="32" FontSize="12" VerticalContentAlignment="Center" 
+                <AutoCompleteBox Grid.Column="0" Text="{Binding Proxy}"
+                         ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         Watermark="Proxy (IP:Port)"
+                         Height="32" FontSize="12"
                          Foreground="White" Background="#25000000" BorderBrush="#45FFFFFF" Margin="0,0,6,0"/>
                 <TextBox Grid.Column="1" Text="{Binding ProxyUser}" Watermark="User" 
                          Height="32" FontSize="12" VerticalContentAlignment="Center" 
@@ -105,20 +122,25 @@
                          Foreground="White" Background="#25000000" BorderBrush="#45FFFFFF"/>
             </Grid>
 
-            <Grid ColumnDefinitions="*, Auto, Auto">
+            <Grid ColumnDefinitions="*, Auto, Auto, Auto">
                 <Border Grid.Column="0" Background="#2AFFFFFF" CornerRadius="4" Padding="8,0" BorderThickness="1" BorderBrush="#50FFFFFF">
                     <Grid ColumnDefinitions="Auto, *">
-                        <TextBlock Grid.Column="0" Text="curl > " Foreground="White" FontWeight="Bold"
+                        <TextBlock Grid.Column="0" Text="flags &gt; " Foreground="White" FontWeight="Bold"
                                    VerticalAlignment="Center" FontSize="12" FontFamily="Consolas"/>
-                        <TextBox Grid.Column="1" Text="{Binding CustomFlags}" Watermark="Additional flags..."
+                        <TextBox Grid.Column="1" Text="{Binding CustomFlags}" Watermark="curl-style flags (-H, -d, -x, --resolve...)"
                                  FontSize="12" BorderThickness="0" Background="Transparent" Foreground="White"
                                  FontFamily="Cascadia Code,Consolas" VerticalContentAlignment="Center" Height="30"/>
                     </Grid>
                 </Border>
 
-                <CheckBox Name="ProxyToggle" Grid.Column="1" Content="Proxy" FontSize="11.5" 
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding UseDotNetEngine}"
+                              OnContent=".NET" OffContent="curl" FontSize="11" FontWeight="SemiBold"
+                              MinWidth="0" Margin="15,0,0,0" VerticalAlignment="Center"
+                              ToolTip.Tip="Engine: system curl binary, or built-in .NET HttpClient (no curl needed)"/>
+
+                <CheckBox Name="ProxyToggle" Grid.Column="2" Content="Proxy" FontSize="11.5"
                           Foreground="White" FontWeight="SemiBold" MinHeight="0" Margin="15,0,0,0" VerticalAlignment="Center"/>
-                <CheckBox IsChecked="{Binding SkipSslVerify}" Grid.Column="2" Content="Insecure" FontSize="11.5" 
+                <CheckBox IsChecked="{Binding SkipSslVerify}" Grid.Column="3" Content="Insecure" FontSize="11.5"
                           Foreground="White" FontWeight="SemiBold" MinHeight="0" Margin="15,0,0,0" VerticalAlignment="Center"/>
             </Grid>
         </StackPanel>

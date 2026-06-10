@@ -23,6 +23,13 @@ public partial class PingViewModel : ObservableObject
 
     public ObservableCollection<string> LogItems { get; } = new();
 
+    public ObservableCollection<string> TargetHostHistory => HistoryService.Instance.Get("ping.host");
+
+    public PingViewModel()
+    {
+        if (HistoryService.Instance.Last("ping.host") is { } last) TargetHost = last;
+    }
+
     private CancellationTokenSource? _cts;
     private bool? _lastStatus;
     private long _sent;
@@ -36,16 +43,22 @@ public partial class PingViewModel : ObservableObject
         else Start();
     }
 
+    [RelayCommand]
+    private async Task CopyLog()
+        => await Helpers.ClipboardHelper.SetTextAsync(string.Join(Environment.NewLine, LogItems));
+
     private void Start()
     {
         if (string.IsNullOrWhiteSpace(TargetHost)) return;
+
+        HistoryService.Instance.Add("ping.host", TargetHost);
 
         Stop();
 
         _sent = 0;
         _received = 0;
         _times.Clear();
-        LogItems.Clear();
+        Dispatcher.UIThread.Invoke(() => LogItems.Clear());
         StatsSummary = "Packets: Sent = 0, Received = 0, Lost = 0";
 
         _cts = new CancellationTokenSource();
@@ -84,6 +97,7 @@ public partial class PingViewModel : ObservableObject
                 _ => e.Message
             };
             UpdateLog($"Error: {message}");
+            if (IsPermissionError(e)) UpdateLog(PermissionHint);
         }
         finally
         {
@@ -96,34 +110,51 @@ public partial class PingViewModel : ObservableObject
 
     private async Task RunPingLoop(CancellationToken token)
     {
-        using var pinger = new Ping();
-        UpdateLog($"PING {TargetHost} ({TargetHost}) 32(60) bytes of data.");
+        System.Net.IPAddress addr;
+        try
+        {
+            addr = await IcmpPinger.ResolveAsync(TargetHost, token);
+        }
+        catch (OperationCanceledException) { return; }
+        catch
+        {
+            UpdateLog("Error: Host not found");
+            return;
+        }
+
+        int bytes = IcmpPinger.PayloadSize + 28; // ICMP header + IP header, classic ping accounting
+        UpdateLog($"PING {TargetHost} ({addr}) {IcmpPinger.PayloadSize}({bytes}) bytes of data.");
 
         int seq = 1;
         while (!token.IsCancellationRequested)
         {
             _sent++;
-            try
+
+            var r = await IcmpPinger.SendAsync(addr, 1500, token);
+            if (token.IsCancellationRequested) break;
+
+            if (r.PermissionDenied)
             {
-                var reply = await pinger.SendPingAsync(TargetHost, 1500).WaitAsync(token);
-                bool success = reply.Status == IPStatus.Success;
-
-                if (success)
-                {
-                    _received++;
-                    _times.Add(reply.RoundtripTime);
-                    UpdateLog($"{reply.Buffer.Length + 28} bytes from {reply.Address}: icmp_seq={seq} ttl={reply.Options?.Ttl} time={reply.RoundtripTime} ms");
-                }
-                else
-                {
-                    UpdateLog($"Request timeout from {TargetHost}: icmp_seq={seq}");
-                }
-
-                UpdateStats();
-                HandleAlerts(success);
+                UpdateLog($"Ping error: {r.Error}");
+                UpdateLog(PermissionHint);
+                break;
             }
-            catch (OperationCanceledException) { break; }
-            catch (Exception ex) { UpdateLog($"Ping error: {ex.Message}"); }
+
+            if (r.Success)
+            {
+                _received++;
+                _times.Add(r.RoundtripMs);
+                string ttl = r.Ttl >= 0 ? r.Ttl.ToString() : "?";
+                UpdateLog($"{bytes} bytes from {r.Address}: icmp_seq={seq} ttl={ttl} time={r.RoundtripMs} ms");
+            }
+            else
+            {
+                string extra = !string.IsNullOrEmpty(r.Error) && r.Error != "Request timed out" ? $" ({r.Error})" : "";
+                UpdateLog($"Request timeout from {TargetHost}: icmp_seq={seq}{extra}");
+            }
+
+            UpdateStats();
+            HandleAlerts(r.Success);
 
             seq++;
             await Task.Delay(1000, token);
@@ -183,8 +214,33 @@ public partial class PingViewModel : ObservableObject
         _lastStatus = current;
     }
 
+    private static readonly string PermissionHint =
+        OperatingSystem.IsLinux()
+            ? "Hint: ICMP on Linux needs privileges. Run:  sudo sysctl -w net.ipv4.ping_group_range=\"0 2147483647\"  (or launch Echoes with sudo)."
+            : "Hint: raw ICMP sockets require elevated privileges on this platform.";
+
+    private static bool IsPermissionError(Exception e)
+    {
+        if (e is System.Net.Sockets.SocketException s &&
+            (s.SocketErrorCode == System.Net.Sockets.SocketError.AccessDenied ||
+             s.SocketErrorCode == System.Net.Sockets.SocketError.SocketError))
+            return true;
+
+        var msg = e.Message;
+        return msg.Contains("Operation not permitted", StringComparison.OrdinalIgnoreCase)
+            || msg.Contains("Permission denied", StringComparison.OrdinalIgnoreCase)
+            || msg.Contains("Access denied", StringComparison.OrdinalIgnoreCase)
+            || msg.Contains("not allowed", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private const int MaxLogItems = 5000;
+
     private void UpdateLog(string m)
     {
-        Dispatcher.UIThread.Post(() => LogItems.Add(m));
+        Dispatcher.UIThread.Post(() =>
+        {
+            LogItems.Add(m);
+            while (LogItems.Count > MaxLogItems) LogItems.RemoveAt(0);
+        });
     }
 }

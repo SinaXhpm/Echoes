@@ -6,117 +6,13 @@
         x:DataType="vm:MainViewModel"
         Icon="avares://Echoes/Assets/logo.png"
         Title=""
-        Width="625"
-        Height="420"
+        Width="760"
+        Height="470"
         WindowStartupLocation="CenterScreen"
         Background="#1e1e1e"
         ExtendClientAreaToDecorationsHint="True"
         WindowDecorations="Full"
         ExtendClientAreaTitleBarHeightHint="-1">
 
-	<Panel>
-
-
-		<Grid RowDefinitions="Auto, *, Auto">
-
-			<StackPanel Grid.Row="0" Orientation="Horizontal" Margin="15,12,15,5" Spacing="8">
-				<Border Width="80" IsVisible="{Binding IsMac}"/>
-				<TextBlock Text="Echoes"
-						   FontSize="20"
-						   FontWeight="Black"
-						   Foreground="White"
-						   Opacity="0.9"
-						   LetterSpacing="-0.5"/>
-			</StackPanel>
-
-			<TabControl Grid.Row="1" Margin="5,0">
-				<TabControl.Styles>
-					<Style Selector="TabItem">
-						<Setter Property="FontSize" Value="11"/>
-						<Setter Property="FontWeight" Value="SemiBold"/>
-						<Setter Property="Foreground" Value="#70FFFFFF"/>
-						<Setter Property="Margin" Value="0,0,2,0"/>
-						<Setter Property="Padding" Value="10,6"/>
-						<Setter Property="MinHeight" Value="32"/>
-						<Setter Property="VerticalContentAlignment" Value="Center"/>
-					</Style>
-					<Style Selector="TabItem:selected">
-						<Setter Property="Foreground" Value="White"/>
-					</Style>
-					<Style Selector="TabItem:selected /template/ Border#PART_SelectedPipe">
-						<Setter Property="Background" Value="#42B883"/>
-						<Setter Property="Height" Value="2"/>
-						<Setter Property="Margin" Value="8,0,8,1"/>
-					</Style>
-				</TabControl.Styles>
-
-				<TabItem Header="PING"><views:PingView DataContext="{Binding PingVM}"/></TabItem>
-				<TabItem Header="DNS"><views:DnsView DataContext="{Binding DnsVM}"/></TabItem>
-				<TabItem Header="CURL"><views:CurlView DataContext="{Binding CurlVM}"/></TabItem>
-				<TabItem Header="SCANNER"><views:PortScannerView DataContext="{Binding PortScannerVM}"/></TabItem>
-				<TabItem Header="IP INFO"><views:IpInfoView DataContext="{Binding IpInfoVM}"/></TabItem>
-				<TabItem Header="SSH"><views:SshView DataContext="{Binding SshVM}"/></TabItem>
-				<TabItem Header="STRING"><views:StringLabView DataContext="{Binding StringTool}"/></TabItem>
-				<TabItem Header="MONITOR"><views:MonitorView DataContext="{Binding MonitorVM}"/></TabItem>
-				<TabItem Header="NOTES"><views:NoteView DataContext="{Binding NoteVM}"/></TabItem>
-				<TabItem Header="TG">
-					<views:TgView>
-						<views:TgView.DataContext>
-							<vm:TgViewModel/>
-						</views:TgView.DataContext>
-					</views:TgView>
-				</TabItem>
-				<TabItem Header="NIC">
-					<views:NetworkInfoView DataContext="{Binding NetworkVM}"/>
-				</TabItem>
-			</TabControl>
-
-			<Border Grid.Row="2" Height="24" Background="#10000000" BorderBrush="#10FFFFFF" BorderThickness="0,1,0,0">
-				<Grid ColumnDefinitions="*, Auto, Auto">
-
-					<StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0" Opacity="0.3">
-						<TextBlock FontSize="9">
-							<Run Text="v"/>
-							<Run Text="{Binding CurrentVersion}"/>
-						</TextBlock>
-					</StackPanel>
-
-					<Button Grid.Column="1"
-							Command="{Binding OpenGitHubCommand}"
-							Background="Transparent"
-							BorderThickness="0"
-							Padding="12,0"
-							Cursor="Hand"
-							VerticalAlignment="Stretch">
-						<Button.Styles>
-							<Style Selector="Button:pointerover TextBlock">
-								<Setter Property="Foreground" Value="#42B883"/>
-								<Setter Property="Opacity" Value="1"/>
-							</Style>
-						</Button.Styles>
-						<TextBlock Text="ABOUT"
-								   FontSize="8"
-								   FontWeight="Black"
-								   Foreground="White"
-								   Opacity="0.4"
-								   VerticalAlignment="Center"/>
-					</Button>
-
-					<Button Grid.Column="2"
-							Command="{Binding OpenGitHubCommand}"
-							IsVisible="{Binding IsUpdateAvailable}"
-							Background="Transparent"
-							BorderThickness="0"
-							Padding="10,0"
-							Cursor="Hand"
-							VerticalAlignment="Stretch">
-						<StackPanel Orientation="Horizontal" Spacing="6">
-							<Ellipse Width="5" Height="5" Fill="#FF9D00" VerticalAlignment="Center"/>
-							<TextBlock Text="UPDATE AVAILABLE" FontSize="8" FontWeight="Black" Foreground="#FF9D00" VerticalAlignment="Center"/>
-						</StackPanel>
-					</Button>
-				</Grid>
-			</Border>
-		</Grid>
-	</Panel>
+	<views:MainView/>
 </Window>

@@ -1,10 +1,10 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Echoes.Helpers;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
+using System.Collections.ObjectModel;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -31,7 +31,13 @@ public partial class TgViewModel : ObservableObject
 
     public List<string> AvailableMethods => new(_methodTemplates.Keys);
 
-    public TgViewModel() => UpdateTemplate();
+    public ObservableCollection<string> ProxyHistory => HistoryService.Instance.Get("tg.proxy");
+
+    public TgViewModel()
+    {
+        UpdateTemplate();
+        if (HistoryService.Instance.Last("tg.proxy") is { } p) ProxyAddress = p;
+    }
 
     partial void OnSelectedMethodChanged(string value) => UpdateTemplate();
 
@@ -49,63 +55,28 @@ public partial class TgViewModel : ObservableObject
         IsBusy = true;
         ResponseLog = "Executing...";
 
+        if (!string.IsNullOrWhiteSpace(ProxyAddress)) HistoryService.Instance.Add("tg.proxy", ProxyAddress);
+
         try
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "curl",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                StandardOutputEncoding = Encoding.UTF8
-            };
+            string? proxy = string.IsNullOrWhiteSpace(ProxyAddress) ? null : ProxyAddress;
+            // Verify TLS — the bot token is a credential and must not be sent over an unverified connection.
+            using var client = HttpHelper.Create(proxy, timeout: TimeSpan.FromSeconds(15));
 
-            psi.ArgumentList.Add("-s");
-            psi.ArgumentList.Add("-v");
-            psi.ArgumentList.Add("-L");
-            psi.ArgumentList.Add("-k");
-            psi.ArgumentList.Add("--connect-timeout");
-            psi.ArgumentList.Add("15");
-
-            if (!string.IsNullOrWhiteSpace(ProxyAddress))
-            {
-                var proxy = ProxyAddress.Trim();
-                if (!proxy.Contains("://"))
-                {
-                    if (proxy.Contains(":1080") || proxy.Contains(":1081") || proxy.Contains(":9050"))
-                        proxy = "socks5://" + proxy;
-                    else
-                        proxy = "http://" + proxy;
-                }
-                psi.ArgumentList.Add("-x");
-                psi.ArgumentList.Add(proxy);
-            }
-
+            var fields = new List<KeyValuePair<string, string>>();
             var lines = CustomParameters.Split('\n', StringSplitOptions.RemoveEmptyEntries);
             foreach (var line in lines)
             {
                 var parts = line.Split('=', 2);
                 if (parts.Length == 2)
-                {
-                    psi.ArgumentList.Add("-d");
-                    psi.ArgumentList.Add($"{parts[0].Trim()}={parts[1].Trim()}");
-                }
+                    fields.Add(new KeyValuePair<string, string>(parts[0].Trim(), parts[1].Trim()));
             }
 
-            psi.ArgumentList.Add($"https://api.telegram.org/bot{BotToken}/{SelectedMethod}");
+            using var content = new FormUrlEncodedContent(fields);
+            var url = $"https://api.telegram.org/bot{BotToken}/{SelectedMethod}";
 
-            using var process = new Process { StartInfo = psi };
-            process.Start();
-
-            var outputTask = process.StandardOutput.ReadToEndAsync();
-            var errorTask = process.StandardError.ReadToEndAsync();
-
-            await Task.WhenAll(outputTask, errorTask);
-            await process.WaitForExitAsync();
-
-            string result = outputTask.Result;
-            string verboseLog = errorTask.Result;
+            using var response = await client.PostAsync(url, content);
+            string result = await response.Content.ReadAsStringAsync();
 
             var sb = new StringBuilder();
 
@@ -122,19 +93,7 @@ public partial class TgViewModel : ObservableObject
                 }
             }
 
-            //if (!string.IsNullOrWhiteSpace(verboseLog))
-            //{
-            //    sb.AppendLine();
-            //    sb.AppendLine("--- CONNECTION INFO ---");
-            //    var logs = verboseLog.Split('\n');
-            //    foreach (var log in logs)
-            //    {
-            //        if (log.StartsWith("*") || log.Contains("HTTP/"))
-            //            sb.AppendLine(log);
-            //    }
-            //}
-
-            ResponseLog = sb.Length > 0 ? sb.ToString() : "Empty response.";
+            ResponseLog = sb.Length > 0 ? TextLimit.Cap(sb.ToString()) : "Empty response.";
         }
         catch (Exception ex)
         {

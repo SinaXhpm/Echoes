@@ -4,54 +4,111 @@
              x:Class="Echoes.Views.IpInfoView"
              x:DataType="vm:IpInfoViewModel">
 
-    <Grid RowDefinitions="Auto, Auto, *" Margin="12">
-        
-        <Grid Grid.Row="0" ColumnDefinitions="*, Auto, 95, 95" Margin="0,0,0,12">
-            <TextBox Grid.Column="0" Text="{Binding TargetIp}" Watermark="Lookup IP (Empty for My IP)..."
-                     Height="34" FontSize="12" VerticalContentAlignment="Center" 
-                     Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Margin="0,0,10,0">
-                <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding LookupIpCommand}" />
-                </TextBox.KeyBindings>
-            </TextBox>
+    <TabControl Padding="0,6,0,0" Margin="10,0,10,8">
+        <TabControl.Styles>
+            <Style Selector="TabItem">
+                <Setter Property="FontSize" Value="11.5"/>
+                <Setter Property="MinHeight" Value="30"/>
+                <Setter Property="Padding" Value="14,0"/>
+                <Setter Property="Foreground" Value="#999999"/>
+            </Style>
+            <Style Selector="TabItem:selected">
+                <Setter Property="Foreground" Value="White"/>
+            </Style>
+        </TabControl.Styles>
 
-            <CheckBox Grid.Column="1" IsChecked="{Binding UseProxy}" Name="ProxyToggle" 
-                      Content="Proxy" FontSize="11.5" Foreground="White" FontWeight="SemiBold"
-                      VerticalAlignment="Center" Margin="0,0,15,0"/>
+        <TabItem Header="LOOKUP">
+            <Grid RowDefinitions="Auto, Auto, *" Margin="0,4,0,0">
+                <Grid Grid.Row="0" ColumnDefinitions="*, Auto, 95, 95" Margin="0,0,0,12">
+                    <AutoCompleteBox Grid.Column="0" Text="{Binding TargetIp}" Watermark="Lookup IP (Empty for My IP)..."
+                             ItemsSource="{Binding TargetHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                             Height="34" FontSize="12"
+                             Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Margin="0,0,10,0">
+                        <AutoCompleteBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding LookupIpCommand}" />
+                        </AutoCompleteBox.KeyBindings>
+                    </AutoCompleteBox>
 
-            <Button Grid.Column="2" Command="{Binding LookupIpCommand}" Content="LOOKUP"
-                    Background="#42B883" Foreground="White" FontWeight="Bold"
-                    Height="34" HorizontalAlignment="Stretch" FontSize="12"
-                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                    IsEnabled="{Binding !IsWorking}" Margin="0,0,6,0"/>
+                    <CheckBox Grid.Column="1" IsChecked="{Binding UseProxy}" Name="ProxyToggle"
+                              Content="Proxy" FontSize="11.5" Foreground="White" FontWeight="SemiBold"
+                              VerticalAlignment="Center" Margin="0,0,15,0"/>
 
-            <Button Grid.Column="3" Command="{Binding GetMyIpCommand}" Content="MY IP"
-                    Background="#2E86C1" Foreground="White" FontWeight="Bold"
-                    Height="34" HorizontalAlignment="Stretch" FontSize="12"
-                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                    IsEnabled="{Binding !IsWorking}"/>
-        </Grid>
+                    <Button Grid.Column="2" Command="{Binding LookupIpCommand}" Content="LOOKUP"
+                            Background="#42B883" Foreground="White" FontWeight="Bold"
+                            Height="34" HorizontalAlignment="Stretch" FontSize="12"
+                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                            IsEnabled="{Binding !IsWorking}" Margin="0,0,6,0"/>
 
-        <Grid Grid.Row="1" ColumnDefinitions="*, *, *" Margin="2,0,0,15" IsVisible="{Binding UseProxy}">
-            <TextBox Grid.Column="0" Text="{Binding ProxyAddress}" Watermark="Host:Port (127.0.0.1:8080)"
-                     Height="32" FontSize="12" Margin="0,0,8,0" 
-                     Foreground="White" Background="#20000000" BorderBrush="#45FFFFFF" VerticalContentAlignment="Center"/>
-            <TextBox Grid.Column="1" Text="{Binding ProxyUser}" Watermark="User (Optional)"
-                     Height="32" FontSize="12" Margin="0,0,8,0" 
-                     Foreground="White" Background="#20000000" BorderBrush="#45FFFFFF" VerticalContentAlignment="Center"/>
-            <TextBox Grid.Column="2" Text="{Binding ProxyPass}" Watermark="Pass (Optional)"
-                     Height="32" FontSize="12" PasswordChar="*" 
-                     Foreground="White" Background="#20000000" BorderBrush="#45FFFFFF" VerticalContentAlignment="Center"/>
-        </Grid>
+                    <Button Grid.Column="3" Command="{Binding GetMyIpCommand}" Content="MY IP"
+                            Background="#2E86C1" Foreground="White" FontWeight="Bold"
+                            Height="34" HorizontalAlignment="Stretch" FontSize="12"
+                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                            IsEnabled="{Binding !IsWorking}"/>
+                </Grid>
 
-        <Border Grid.Row="2" Background="#40000000" CornerRadius="4" BorderBrush="#35FFFFFF" BorderThickness="1">
-            <ScrollViewer>
-                <SelectableTextBlock Text="{Binding RawResult}" 
-                                     FontFamily="Cascadia Code,Consolas"
-                                     FontSize="11.5" Foreground="#00FF99" 
-                                     Margin="12" LineHeight="20"/>
-            </ScrollViewer>
-        </Border>
-        
-    </Grid>
+                <Grid Grid.Row="1" ColumnDefinitions="*, *, *" Margin="2,0,0,15" IsVisible="{Binding UseProxy}">
+                    <AutoCompleteBox Grid.Column="0" Text="{Binding ProxyAddress}" Watermark="Host:Port (127.0.0.1:8080)"
+                             ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                             Height="32" FontSize="12" Margin="0,0,8,0"
+                             Foreground="White" Background="#20000000" BorderBrush="#45FFFFFF"/>
+                    <TextBox Grid.Column="1" Text="{Binding ProxyUser}" Watermark="User (Optional)"
+                             Height="32" FontSize="12" Margin="0,0,8,0"
+                             Foreground="White" Background="#20000000" BorderBrush="#45FFFFFF" VerticalContentAlignment="Center"/>
+                    <TextBox Grid.Column="2" Text="{Binding ProxyPass}" Watermark="Pass (Optional)"
+                             Height="32" FontSize="12" PasswordChar="*"
+                             Foreground="White" Background="#20000000" BorderBrush="#45FFFFFF" VerticalContentAlignment="Center"/>
+                </Grid>
+
+                <Grid Grid.Row="2">
+                    <Border Background="#40000000" CornerRadius="4" BorderBrush="#35FFFFFF" BorderThickness="1">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <SelectableTextBlock Text="{Binding RawResult}"
+                                                 FontFamily="Cascadia Code,Consolas"
+                                                 FontSize="11.5" Foreground="#00FF99"
+                                                 Margin="12" LineHeight="20"/>
+                        </ScrollViewer>
+                    </Border>
+                    <Button Command="{Binding CopyResultCommand}" Content="COPY"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,18,0"
+                            FontSize="9" FontWeight="Bold" Padding="8,3"
+                            Background="#3042B883" Foreground="#FFFFFF" BorderThickness="0"
+                            IsVisible="{Binding RawResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                </Grid>
+            </Grid>
+        </TabItem>
+
+        <TabItem Header="SUBNET / CIDR">
+            <Grid RowDefinitions="Auto, *" Margin="0,4,0,0">
+                <Grid Grid.Row="0" ColumnDefinitions="*, 90" Margin="0,0,0,10">
+                    <TextBox Grid.Column="0" Text="{Binding SubnetInput}" AcceptsReturn="False"
+                             Watermark="192.168.1.0/24" Height="34" FontSize="12"
+                             FontFamily="Cascadia Code,Consolas" VerticalContentAlignment="Center"
+                             Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Margin="0,0,8,0">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding RunSubnetCommand}"/>
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                    <Button Grid.Column="1" Command="{Binding RunSubnetCommand}" Content="CALC"
+                            Background="#42B883" Foreground="White" FontWeight="Bold" Height="34" FontSize="12"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                </Grid>
+
+                <Grid Grid.Row="1">
+                    <Border Background="#40000000" CornerRadius="4" BorderBrush="#35FFFFFF" BorderThickness="1">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <SelectableTextBlock Text="{Binding SubnetOutput}"
+                                                 FontFamily="Cascadia Code,Consolas"
+                                                 FontSize="12" Foreground="#00FF99"
+                                                 Margin="12" LineHeight="20"/>
+                        </ScrollViewer>
+                    </Border>
+                    <Button Command="{Binding CopySubnetCommand}" Content="COPY"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,18,0"
+                            FontSize="9" FontWeight="Bold" Padding="8,3"
+                            Background="#3042B883" Foreground="#FFFFFF" BorderThickness="0"
+                            IsVisible="{Binding SubnetOutput, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                </Grid>
+            </Grid>
+        </TabItem>
+    </TabControl>
 </UserControl>

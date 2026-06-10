@@ -19,9 +19,14 @@ public partial class MonitorTarget : ObservableObject
     [ObservableProperty] private string _pingStatus = "-";
     [ObservableProperty] private string _tcpStatus = "-";
     [ObservableProperty] private string _httpStatus = "-";
-    [ObservableProperty] private int _failedCount = 0;
+    [ObservableProperty] private int _failedCount = 0;          // consecutive failures
     [ObservableProperty] private bool _isSuccess;
+    [ObservableProperty] private string _latency = "-";
+    [ObservableProperty] private string _uptime = "-";
+    [ObservableProperty] private string _history = string.Empty; // recent status sparkline
 
+    public int TotalChecks;
+    public int SuccessChecks;
     public string Host { get; set; } = string.Empty;
     public int Port { get; set; } = 80;
     public string HttpUrl { get; set; } = string.Empty;
@@ -38,7 +43,13 @@ public partial class MonitorViewModel : ObservableObject
     [ObservableProperty] private bool _checkPing = true;
     [ObservableProperty] private bool _checkTcp = true;
     [ObservableProperty] private bool _checkHttp = true;
+    [ObservableProperty] private bool _alertSound = true;
     [ObservableProperty] private ObservableCollection<MonitorTarget> _targets = new();
+
+    public MonitorViewModel()
+    {
+        if (Helpers.HistoryService.Instance.Last("monitor.addresses") is { } a) InputAddresses = a;
+    }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task ToggleMonitor()
@@ -50,6 +61,7 @@ public partial class MonitorViewModel : ObservableObject
             return;
         }
 
+        Helpers.HistoryService.Instance.Add("monitor.addresses", InputAddresses);
         PrepareTargets();
         if (Targets.Count == 0) return;
 
@@ -122,18 +134,50 @@ public partial class MonitorViewModel : ObservableObject
                               (!CheckTcp || target.TcpStatus.Contains("ms")) &&
                               (!CheckHttp || (!target.HttpStatus.Contains("FAIL") && !target.HttpStatus.Contains("Err")));
 
+        bool first = target.TotalChecks == 0;
+        bool wasSuccess = target.IsSuccess;
+
+        target.TotalChecks++;
+        if (currentSuccess) { target.SuccessChecks++; target.FailedCount = 0; }
+        else target.FailedCount++;
+
         target.IsSuccess = currentSuccess;
-        if (!currentSuccess) target.FailedCount++;
+        target.Uptime = $"{100.0 * target.SuccessChecks / target.TotalChecks:F0}%";
+        target.Latency = FirstLatency(target.PingStatus, target.TcpStatus, target.HttpStatus);
+
+        // sparkline of the last 24 checks
+        string dot = currentSuccess ? "▰" : "▱";
+        target.History = (target.History + dot) is { Length: > 24 } h ? h[^24..] : target.History + dot;
+
+        // beep only when a target flips up<->down (not on the very first check)
+        if (AlertSound && !first && wasSuccess != currentSuccess)
+            Helpers.SoundHelper.PlayNotify(currentSuccess);
+    }
+
+    private static string FirstLatency(params string[] statuses)
+    {
+        foreach (var s in statuses)
+        {
+            int i = s.IndexOf("ms", StringComparison.Ordinal);
+            if (i > 0)
+            {
+                // grab the run of digits immediately before "ms"
+                int start = i;
+                while (start > 0 && char.IsDigit(s[start - 1])) start--;
+                if (start < i) return s[start..i] + "ms";
+            }
+        }
+        return "-";
     }
 
     private async Task<string> RunPing(string host, CancellationToken ct)
     {
         try
         {
-            using var p = new Ping();
-            var reply = await p.SendPingAsync(host, 2000);
+            var addr = await Helpers.IcmpPinger.ResolveAsync(host, ct);
+            var r = await Helpers.IcmpPinger.SendAsync(addr, 2000, ct);
             if (ct.IsCancellationRequested) return "-";
-            return reply.Status == IPStatus.Success ? $"{reply.RoundtripTime}ms" : "ERR";
+            return r.Success ? $"{r.RoundtripMs}ms" : "ERR";
         }
         catch { return "ERR"; }
     }

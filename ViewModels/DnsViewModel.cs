@@ -2,8 +2,10 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DnsClient;
+using Echoes.Helpers;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -27,12 +29,19 @@ public partial class DnsViewModel : ObservableObject
     [ObservableProperty] private bool _typeNS;
     [ObservableProperty] private bool _typeTXT;
     [ObservableProperty] private bool _typeCNAME;
+    [ObservableProperty] private bool _typeSOA;
+    [ObservableProperty] private bool _typeSRV;
+    [ObservableProperty] private bool _typeCAA;
+    [ObservableProperty] private bool _typePTR;
 
-    private readonly string _storagePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "dns_settings.txt");
+    private readonly string _storagePath = AppStorage.ResolvePath("dns_settings.txt");
+
+    public ObservableCollection<string> DomainHistory => HistoryService.Instance.Get("dns.domain");
 
     public DnsViewModel()
     {
         LoadServers();
+        if (HistoryService.Instance.Last("dns.domain") is { } last) DomainName = last;
     }
 
     private void LoadServers()
@@ -59,8 +68,10 @@ public partial class DnsViewModel : ObservableObject
     private async Task RunLookup()
     {
         if (string.IsNullOrWhiteSpace(DomainName) || IsWorking) return;
+        HistoryService.Instance.Add("dns.domain", DomainName);
         SaveServers();
         IsWorking = true;
+        _logBuilder.Clear();
         LogText = string.Empty;
 
         var servers = DnsServersText.Split(new[] { '\n', '\r', ',' }, StringSplitOptions.RemoveEmptyEntries)
@@ -81,7 +92,11 @@ public partial class DnsViewModel : ObservableObject
                 {
                     var options = new LookupClientOptions(IPAddress.Parse(server)) { Timeout = TimeSpan.FromSeconds(3), Retries = 0 };
                     var client = new LookupClient(options);
-                    var result = await client.QueryAsync(DomainName, type);
+
+                    // PTR on an IP → reverse lookup; everything else is a forward query.
+                    var result = (type == QueryType.PTR && IPAddress.TryParse(DomainName.Trim(), out var revIp))
+                        ? await client.QueryReverseAsync(revIp)
+                        : await client.QueryAsync(DomainName, type);
 
                     var sb = new StringBuilder();
                     if (result.Answers.Any())
@@ -110,25 +125,34 @@ public partial class DnsViewModel : ObservableObject
     private async Task RunWhois()
     {
         if (string.IsNullOrWhiteSpace(DomainName) || IsWorking) return;
+        HistoryService.Instance.Add("dns.domain", DomainName);
         IsWorking = true;
-        LogText = $"# whois {DomainName}" + Environment.NewLine;
+        string query = DomainName.Trim();
+        LogText = $"# whois {query}" + Environment.NewLine;
 
-        string[] providers = {
-            $"https://rdap.org/domain/{DomainName}",
-            $"https://rdap.verisign.com/com/v1/domain/{DomainName}"
-        };
+        // rdap.org is the IANA bootstrap — it follows to the authoritative RDAP server for any
+        // TLD/registry, and also covers IPs and ASNs. Pick the right object type from the input.
+        string kind =
+            System.Net.IPAddress.TryParse(query, out _) ? "ip" :
+            System.Text.RegularExpressions.Regex.IsMatch(query, @"^(AS)?\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                ? "autnum" : "domain";
+        string key = kind == "autnum" ? query.TrimStart('A', 'S', 'a', 's') : query;
+
+        var providers = new List<string> { $"https://rdap.org/{kind}/{key}" };
+        if (kind == "domain")
+            providers.Add($"https://rdap.verisign.com/com/v1/domain/{key}");   // .com/.net fallback
 
         foreach (var url in providers)
         {
             try
             {
-                var result = await Task.Run(() => RunCurl(url));
+                var result = await FetchRdap(url);
                 if (!string.IsNullOrWhiteSpace(result) && result.Contains("{"))
                 {
                     using var doc = JsonDocument.Parse(result);
                     var sb = new StringBuilder();
                     ParseElement(doc.RootElement, sb);
-                    LogText = sb.ToString();
+                    LogText = TextLimit.Cap(sb.ToString());
                     IsWorking = false;
                     return;
                 }
@@ -139,19 +163,14 @@ public partial class DnsViewModel : ObservableObject
         IsWorking = false;
     }
 
-    private string RunCurl(string url)
+    private static async Task<string> FetchRdap(string url)
     {
-        var psi = new ProcessStartInfo
-        {
-            FileName = "curl",
-            Arguments = $"-s -L --connect-timeout 5 \"{url}\"",
-            RedirectStandardOutput = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            StandardOutputEncoding = Encoding.UTF8
-        };
-        using var process = Process.Start(psi);
-        return process?.StandardOutput.ReadToEnd() ?? string.Empty;
+        using var client = HttpHelper.Create(timeout: TimeSpan.FromSeconds(10));
+        client.DefaultRequestHeaders.Accept.ParseAdd("application/rdap+json");
+        client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+
+        using var response = await client.GetAsync(url);
+        return await response.Content.ReadAsStringAsync();
     }
 
     private void ParseElement(JsonElement element, StringBuilder sb)
@@ -181,11 +200,28 @@ public partial class DnsViewModel : ObservableObject
         if (TypeNS) types.Add(QueryType.NS);
         if (TypeTXT) types.Add(QueryType.TXT);
         if (TypeCNAME) types.Add(QueryType.CNAME);
+        if (TypeSOA) types.Add(QueryType.SOA);
+        if (TypeSRV) types.Add(QueryType.SRV);
+        if (TypeCAA) types.Add(QueryType.CAA);
+        if (TypePTR) types.Add(QueryType.PTR);
         return types;
     }
 
+    [RelayCommand]
+    private async Task CopyResult()
+    {
+        if (string.IsNullOrWhiteSpace(LogText)) return;
+        await ClipboardHelper.SetTextAsync(LogText);
+    }
+
+    private readonly StringBuilder _logBuilder = new();
+
     private void UpdateLog(string msg)
     {
-        Dispatcher.UIThread.Post(() => LogText += msg);
+        Dispatcher.UIThread.Post(() =>
+        {
+            _logBuilder.Append(msg);
+            LogText = TextLimit.Cap(_logBuilder.ToString());
+        });
     }
 }

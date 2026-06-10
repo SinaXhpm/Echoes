@@ -1,8 +1,12 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Echoes.Helpers;
 using Renci.SshNet;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -30,6 +34,15 @@ public partial class SshViewModel : ObservableObject
     [ObservableProperty] private string _tunnelHost = "127.0.0.1";
     [ObservableProperty] private string _tunnelStatus = "Tunnel: Offline";
 
+    public ObservableCollection<string> HostHistory => HistoryService.Instance.Get("ssh.host");
+    public ObservableCollection<string> UserHistory => HistoryService.Instance.Get("ssh.user");
+
+    public SshViewModel()
+    {
+        if (HistoryService.Instance.Last("ssh.host") is { } h) Host = h;
+        if (HistoryService.Instance.Last("ssh.user") is { } u) Username = u;
+    }
+
     private readonly List<string> _history = new();
     private int _historyIndex = -1;
     private SshClient? _client;
@@ -37,11 +50,20 @@ public partial class SshViewModel : ObservableObject
     private ForwardedPortDynamic? _dynamicForward;
     private CancellationTokenSource? _readerCts = new();
 
+    private readonly string _knownHostsPath = AppStorage.UserPath("known_hosts.txt");
+    private Dictionary<string, string>? _knownHosts;
+
     [RelayCommand]
     private async Task ToggleConnect()
     {
         if (IsConnected) { StopSsh(); return; }
         if (string.IsNullOrWhiteSpace(Host) || string.IsNullOrWhiteSpace(Username)) return;
+
+        HistoryService.Instance.Add("ssh.host", Host);
+        HistoryService.Instance.Add("ssh.user", Username);
+
+        string hostId = $"{Host}:{Port}";
+        string? hostKeyError = null;
 
         await Task.Run(() =>
         {
@@ -53,6 +75,36 @@ public partial class SshViewModel : ObservableObject
                     : new ConnectionInfo(Host, Port, Username, authMethod);
 
                 _client = new SshClient(connInfo);
+
+                // Host-key verification (trust-on-first-use, then pin). Rejects key changes (MITM).
+                _client.HostKeyReceived += (s, e) =>
+                {
+                    string fp = Convert.ToHexString(SHA256.HashData(e.HostKey));
+                    var known = LoadKnownHosts();
+                    if (known.TryGetValue(hostId, out var stored))
+                    {
+                        if (stored == fp)
+                        {
+                            e.CanTrust = true;
+                        }
+                        else
+                        {
+                            e.CanTrust = false;
+                            hostKeyError =
+                                $"# ⚠ HOST KEY MISMATCH for {hostId}\n" +
+                                $"#   expected: SHA256:{stored}\n" +
+                                $"#   received: SHA256:{fp}\n" +
+                                "#   Possible MITM — connection refused.\n" +
+                                "#   If the host key legitimately changed, remove its line from known_hosts.txt.\n";
+                        }
+                    }
+                    else
+                    {
+                        e.CanTrust = true;          // trust on first use
+                        SaveKnownHost(hostId, fp);
+                    }
+                };
+
                 _client.Connect();
 
                 if (EnableSocksTunnel)
@@ -72,7 +124,7 @@ public partial class SshViewModel : ObservableObject
             }
             catch (Exception ex)
             {
-                AppendToTerminal($"# Connection Error: {ex.Message}\n");
+                AppendToTerminal(hostKeyError ?? $"# Connection Error: {ex.Message}\n");
                 StopSsh();
             }
         });
@@ -109,7 +161,7 @@ public partial class SshViewModel : ObservableObject
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             TerminalOutput += text;
-            if (TerminalOutput.Length > 30000)
+            if (TerminalOutput.Length > 40000)   // trim less often to avoid O(n) churn on every read
             {
                 TerminalOutput = TerminalOutput[^30000..];
             }
@@ -161,6 +213,29 @@ public partial class SshViewModel : ObservableObject
             _historyIndex = _history.Count;
             CommandInput = string.Empty;
         }
+    }
+
+    private Dictionary<string, string> LoadKnownHosts()
+    {
+        if (_knownHosts != null) return _knownHosts;
+        _knownHosts = new Dictionary<string, string>();
+        try
+        {
+            if (File.Exists(_knownHostsPath))
+                foreach (var line in File.ReadAllLines(_knownHostsPath))
+                {
+                    var parts = line.Split(' ', 2);
+                    if (parts.Length == 2) _knownHosts[parts[0].Trim()] = parts[1].Trim();
+                }
+        }
+        catch { }
+        return _knownHosts;
+    }
+
+    private void SaveKnownHost(string host, string fp)
+    {
+        LoadKnownHosts()[host] = fp;
+        try { File.AppendAllText(_knownHostsPath, $"{host} {fp}\n"); } catch { }
     }
 
     private void StopSsh()

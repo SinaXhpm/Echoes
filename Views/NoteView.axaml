@@ -22,39 +22,75 @@
         </Border>
 
         <Grid IsVisible="{Binding !IsLocked}">
-            <Grid RowDefinitions="Auto, *" IsVisible="{Binding !IsEditing}">
-                <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto" Margin="0,0,0,8">
+            <Grid RowDefinitions="Auto, Auto, *" IsVisible="{Binding !IsEditing}">
+                <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto, Auto" Margin="0,0,0,8">
                     <TextBlock Grid.Column="0" Text="NOTES" FontSize="14" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-                    <Button Grid.Column="1" Command="{Binding LockAppCommand}" Content="LOCK" Background="#CCFF3333" 
+                    <TextBlock Grid.Column="1" Text="{Binding FilteredNotes.Count, StringFormat='{}{0} item(s)'}" FontSize="10"
+                               Foreground="White" Opacity="0.4" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <Button Grid.Column="2" Command="{Binding LockAppCommand}" Content="LOCK" Background="#CCFF3333"
                             Foreground="White" FontSize="10" FontWeight="Bold" Padding="10,5" Margin="0,0,8,0"/>
-                    <Button Grid.Column="2" Command="{Binding AddNoteCommand}" Content="+ NEW" Background="#42B883" 
+                    <Button Grid.Column="3" Command="{Binding AddNoteCommand}" Content="+ NEW" Background="#42B883"
                             Foreground="White" FontWeight="Bold" FontSize="10" Padding="10,5"/>
                 </Grid>
 
-                <ListBox Grid.Row="1" ItemsSource="{Binding Notes}" Background="#40000000" 
-                         BorderBrush="#35FFFFFF" BorderThickness="1" CornerRadius="4">
-                    <ListBox.Styles>
-                        <Style Selector="ListBoxItem">
-                            <Setter Property="Padding" Value="0"/>
-                            <Setter Property="MinHeight" Value="30"/>
-                        </Style>
-                    </ListBox.Styles>
-                    <ListBox.ItemTemplate>
-                        <DataTemplate x:DataType="vm:NoteItem">
-                            <Grid ColumnDefinitions="*, Auto" Height="30">
-                                <Button Grid.Column="0" Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).OpenNoteCommand}"
-                                        CommandParameter="{Binding}" Background="Transparent" 
-                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="10,0">
-                                    <TextBlock Text="{Binding Title}" FontSize="12" Foreground="White" 
-                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                </Button>
-                                <Button Grid.Column="1" Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).DeleteNoteCommand}"
-                                        CommandParameter="{Binding}" Content="DEL" FontSize="10" Background="#20FF0000" 
-                                        Foreground="#FF7777" Padding="8,4" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                            </Grid>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                <TextBox Grid.Row="1" Text="{Binding SearchQuery}" Watermark="Search titles &amp; content..."
+                         Height="30" FontSize="11.5" VerticalContentAlignment="Center" Margin="0,0,0,8"
+                         Foreground="White" Background="#20000000" BorderBrush="#45FFFFFF"/>
+
+                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <ListBox ItemsSource="{Binding FilteredNotes}" Background="Transparent" BorderThickness="0" Padding="0">
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0"/>
+                                <Setter Property="MinHeight" Value="0"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                            </Style>
+                            <Style Selector="ListBoxItem Button#DelBtn">
+                                <Setter Property="Opacity" Value="0"/>
+                            </Style>
+                            <Style Selector="ListBoxItem:pointerover Button#DelBtn">
+                                <Setter Property="Opacity" Value="1"/>
+                            </Style>
+                            <Style Selector="ListBoxItem:pointerover Border#Card">
+                                <Setter Property="Background" Value="#33FFFFFF"/>
+                                <Setter Property="BorderBrush" Value="#6042B883"/>
+                            </Style>
+                        </ListBox.Styles>
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:NoteItem">
+                                <Panel Width="162" Height="84" Margin="4">
+                                    <Button Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).OpenNoteCommand}"
+                                            CommandParameter="{Binding}" Padding="0"
+                                            HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                            Background="Transparent" BorderThickness="0">
+                                        <Border Name="Card" Background="#1EFFFFFF" BorderBrush="#30FFFFFF" BorderThickness="1"
+                                                CornerRadius="6" Padding="10,8">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="12" Foreground="White"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Content}" FontSize="9.5" Foreground="#88FFFFFF"
+                                                           TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" Margin="0,5,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Button>
+                                    <Button Name="DelBtn" Content="✕"
+                                            Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).DeleteNoteCommand}"
+                                            CommandParameter="{Binding}"
+                                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,4,0"
+                                            FontSize="10" FontWeight="Bold" Width="20" Height="20" Padding="0"
+                                            Background="#40FF3333" Foreground="White" BorderThickness="0" CornerRadius="10"/>
+                                </Panel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </ScrollViewer>
             </Grid>
 
             <Grid RowDefinitions="Auto, *" IsVisible="{Binding IsEditing}">
