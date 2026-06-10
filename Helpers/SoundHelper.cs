@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -7,6 +7,14 @@ namespace Echoes.Helpers;
 
 public static class SoundHelper
 {
+    private static readonly (string File, string Args)[] LinuxPlayers =
+    {
+        ("paplay", "/usr/share/sounds/freedesktop/stereo/message-new-instant.oga"),
+        ("pw-play", "/usr/share/sounds/freedesktop/stereo/message-new-instant.oga"),
+        ("canberra-gtk-play", "-i message-new-instant"),
+        ("aplay", "-q /usr/share/sounds/alsa/Front_Center.wav")
+    };
+
     public static void PlayNotify(bool isSuccess)
     {
         Task.Run(() =>
@@ -19,11 +27,15 @@ public static class SoundHelper
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    Process.Start("afplay", "/System/Library/Sounds/Tink.aiff");
+                    TryStart("afplay", "/System/Library/Sounds/Tink.aiff");
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
-                    Process.Start("paplay", "/usr/share/sounds/freedesktop/stereo/message-new-instant.oga");
+                    foreach (var (file, args) in LinuxPlayers)
+                    {
+                        if (TryStart(file, args)) return;
+                    }
+                    Console.Write("\a");
                 }
             }
             catch
@@ -31,5 +43,27 @@ public static class SoundHelper
                 Console.Write("\a");
             }
         });
+    }
+
+    private static bool TryStart(string file, string args)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = file,
+                Arguments = args,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            using var process = Process.Start(psi);
+            return process != null;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

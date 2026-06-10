@@ -8,19 +8,21 @@
     <Grid RowDefinitions="Auto, Auto, *, Auto" Margin="12">
         
         <Grid Grid.Row="0" ColumnDefinitions="*, 100" Margin="0,0,0,12">
-            <TextBox Grid.Column="0"
+            <AutoCompleteBox Grid.Column="0"
                      Text="{Binding TargetHost}"
+                     ItemsSource="{Binding TargetHostHistory}"
+                     FilterMode="ContainsOrdinal"
+                     MinimumPrefixLength="0"
                      Watermark="Enter Host or IP (e.g. 8.8.8.8)"
                      FontSize="12" Height="34"
-                     VerticalContentAlignment="Center"
                      Foreground="White"
                      Background="#25000000"
                      BorderBrush="#60FFFFFF"
                      Margin="0,0,8,0">
-                <TextBox.KeyBindings>
+                <AutoCompleteBox.KeyBindings>
                     <KeyBinding Gesture="Enter" Command="{Binding TogglePingCommand}" />
-                </TextBox.KeyBindings>
-            </TextBox>
+                </AutoCompleteBox.KeyBindings>
+            </AutoCompleteBox>
 
             <Button Grid.Column="1"
                     Command="{Binding TogglePingCommand}"
@@ -92,6 +94,11 @@
                 </ListBox.ItemsPanel>
             </ListBox>
         </Border>
+
+        <Button Grid.Row="2" Command="{Binding CopyLogCommand}" Content="COPY"
+                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,16,0"
+                FontSize="9" FontWeight="Bold" Padding="8,3"
+                Background="#3042B883" Foreground="#FFFFFF" BorderThickness="0"/>
 
         <Border Grid.Row="3" Margin="0,12,0,0" Padding="10,6" Background="#2AFFFFFF" CornerRadius="4" BorderThickness="1" BorderBrush="#50FFFFFF">
             <TextBlock Text="{Binding StatsSummary}" FontSize="11.5" FontFamily="Consolas" Foreground="White" FontWeight="Medium"/>

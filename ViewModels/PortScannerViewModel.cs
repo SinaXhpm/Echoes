@@ -24,6 +24,19 @@ public partial class PortScannerViewModel : ObservableObject
     [ObservableProperty] private bool _repeat = false;
     [ObservableProperty] private int _repeatInterval = 5;
     [ObservableProperty] private ObservableCollection<PortResult> _results = new();
+    [ObservableProperty] private string _statusMessage = string.Empty;
+
+    private const int MaxHosts = 65536;
+    private const int MaxConcurrency = 100;
+
+    public ObservableCollection<string> TargetHistory => Helpers.HistoryService.Instance.Get("portscan.target");
+    public ObservableCollection<string> PortHistory => Helpers.HistoryService.Instance.Get("portscan.ports");
+
+    public PortScannerViewModel()
+    {
+        if (Helpers.HistoryService.Instance.Last("portscan.target") is { } t) TargetInput = t;
+        if (Helpers.HistoryService.Instance.Last("portscan.ports") is { } p) PortInput = p;
+    }
 
     private CancellationTokenSource? _cts;
     private readonly List<Socket> _activeSockets = new();
@@ -79,35 +92,37 @@ public partial class PortScannerViewModel : ObservableObject
 
         if (ips.Count == 0 || ports.Count == 0) return;
 
+        Helpers.HistoryService.Instance.Add("portscan.target", TargetInput);
+        Helpers.HistoryService.Instance.Add("portscan.ports", PortInput);
+
+        StatusMessage = ips.Count >= MaxHosts
+            ? $"⚠ Target range capped at {MaxHosts:N0} hosts × {ports.Count} ports"
+            : $"Scanning {ips.Count} host(s) × {ports.Count} port(s)";
+
         try
         {
             IsScanning = true;
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
 
+            var options = new ParallelOptions { MaxDegreeOfParallelism = MaxConcurrency, CancellationToken = token };
+
             do
             {
                 Results.Clear();
-                foreach (var ip in ips)
+
+                // Lazily stream (ip, port) pairs so we never materialize a huge task list.
+                var targets = ips.SelectMany(ip => ports.Select(port => (ip, port)));
+
+                try
                 {
-                    if (token.IsCancellationRequested) break;
-                    var tasks = new List<Task>();
-
-                    foreach (var port in ports)
+                    await Parallel.ForEachAsync(targets, options, async (t, ct) =>
                     {
-                        if (token.IsCancellationRequested) break;
-
-                        if (UseTcp) tasks.Add(ScanTcp(ip, port, token));
-                        if (UseUdp) tasks.Add(ScanUdp(ip, port, token));
-
-                        if (tasks.Count >= 20)
-                        {
-                            await Task.WhenAll(tasks);
-                            tasks.Clear();
-                        }
-                    }
-                    if (tasks.Count > 0) await Task.WhenAll(tasks);
+                        if (UseTcp) await ScanTcp(t.ip, t.port, ct);
+                        if (UseUdp) await ScanUdp(t.ip, t.port, ct);
+                    });
                 }
+                catch (OperationCanceledException) { break; }
 
                 if (Repeat && !token.IsCancellationRequested)
                 {
@@ -180,10 +195,32 @@ public partial class PortScannerViewModel : ObservableObject
 
         try
         {
-            byte[] data = new byte[] { 0x00 };
-            await socket.SendToAsync(data, SocketFlags.None, new IPEndPoint(IPAddress.Parse(ip), port));
-            result.Status = "SENT";
+            // A connected UDP socket surfaces ICMP "port unreachable" as a socket error,
+            // which is how we distinguish CLOSED from OPEN|FILTERED.
+            await socket.ConnectAsync(new IPEndPoint(IPAddress.Parse(ip), port), ct);
+            await socket.SendAsync(UdpProbe(port), SocketFlags.None, ct);
+
+            using var recvCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            recvCts.CancelAfter(TimeoutMs);
+
+            try
+            {
+                var buffer = new byte[512];
+                await socket.ReceiveAsync(buffer, SocketFlags.None, recvCts.Token);
+                result.Status = "OPEN";                 // got a reply
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                result.Status = "OPEN|FILTERED";        // no reply, no ICMP error
+            }
         }
+        catch (SocketException ex) when (
+            ex.SocketErrorCode == SocketError.ConnectionReset ||
+            ex.SocketErrorCode == SocketError.ConnectionRefused)
+        {
+            result.Status = "CLOSED";                   // ICMP port unreachable
+        }
+        catch (OperationCanceledException) { return; }
         catch { result.Status = "FILTERED"; }
         finally
         {
@@ -195,11 +232,23 @@ public partial class PortScannerViewModel : ObservableObject
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                if (result.Status == "SENT") Results.Insert(0, result);
+                if (result.Status == "OPEN") Results.Insert(0, result);
                 else Results.Add(result);
             });
         }
     }
+
+    private static byte[] UdpProbe(int port) => port switch
+    {
+        // Minimal DNS A-query for "google.com" — elicits a reply from real DNS servers.
+        53 => new byte[]
+        {
+            0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x06, (byte)'g', (byte)'o', (byte)'o', (byte)'g', (byte)'l', (byte)'e',
+            0x03, (byte)'c', (byte)'o', (byte)'m', 0x00, 0x00, 0x01, 0x00, 0x01
+        },
+        _ => new byte[] { 0x00, 0x00, 0x00, 0x00 }
+    };
 
     private List<string> ParseIPs(string input)
     {
@@ -220,29 +269,61 @@ public partial class PortScannerViewModel : ObservableObject
         return list.Distinct().ToList();
     }
 
-    private List<string> GetIpsFromRange(string range)
+    private static List<string> GetIpsFromRange(string range)
     {
         var parts = range.Split('-');
-        uint start = BitConverter.ToUInt32(IPAddress.Parse(parts[0].Trim()).GetAddressBytes().Reverse().ToArray(), 0);
-        uint end = BitConverter.ToUInt32(IPAddress.Parse(parts[1].Trim()).GetAddressBytes().Reverse().ToArray(), 0);
+        if (parts.Length != 2 || !IPAddress.TryParse(parts[0].Trim(), out var startIp))
+            return new List<string>();
+
+        uint start = IpToUint(startIp);
+        string endStr = parts[1].Trim();
+        uint end;
+
+        if (IPAddress.TryParse(endStr, out var endIp))
+            end = IpToUint(endIp);
+        else if (byte.TryParse(endStr, out byte lastOctet))     // shorthand: 192.168.1.10-20
+            end = (start & 0xFFFFFF00u) | lastOctet;
+        else
+            return new List<string>();
+
+        return ExpandRange(start, end);
+    }
+
+    private static List<string> GetIpsFromCidr(string cidr)
+    {
+        var parts = cidr.Split('/');
+        if (parts.Length != 2 || !IPAddress.TryParse(parts[0].Trim(), out var ipAddr)
+            || !int.TryParse(parts[1].Trim(), out int prefix) || prefix < 0 || prefix > 32)
+            return new List<string>();
+
+        uint ip = IpToUint(ipAddr);
+        uint mask = prefix == 0 ? 0u : uint.MaxValue << (32 - prefix);   // /0 must be 0, not 0xFFFFFFFF
+        return ExpandRange(ip & mask, ip | ~mask);
+    }
+
+    private static List<string> ExpandRange(uint start, uint end)
+    {
         var ips = new List<string>();
-        for (uint i = start; i <= end; i++)
-            ips.Add(new IPAddress(BitConverter.GetBytes(i).Reverse().ToArray()).ToString());
+        if (end < start) return ips;
+
+        long count = Math.Min((long)end - start + 1, MaxHosts);   // hard cap to avoid OOM
+        uint cur = start;
+        for (long k = 0; k < count; k++)
+        {
+            ips.Add(UintToIp(cur));
+            cur++;
+        }
         return ips;
     }
 
-    private List<string> GetIpsFromCidr(string cidr)
+    private static uint IpToUint(IPAddress ip)
     {
-        var parts = cidr.Split('/');
-        uint ipAsUint = BitConverter.ToUInt32(IPAddress.Parse(parts[0]).GetAddressBytes().Reverse().ToArray(), 0);
-        uint maskAsUint = uint.MaxValue << (32 - int.Parse(parts[1]));
-        uint start = ipAsUint & maskAsUint;
-        uint end = ipAsUint | ~maskAsUint;
-        var ips = new List<string>();
-        for (uint i = start; i <= end; i++)
-            ips.Add(new IPAddress(BitConverter.GetBytes(i).Reverse().ToArray()).ToString());
-        return ips;
+        byte[] b = ip.GetAddressBytes();
+        return ((uint)b[0] << 24) | ((uint)b[1] << 16) | ((uint)b[2] << 8) | b[3];
     }
+
+    private static string UintToIp(uint v)
+        => $"{(v >> 24) & 0xFF}.{(v >> 16) & 0xFF}.{(v >> 8) & 0xFF}.{v & 0xFF}";
 
     private List<int> ParsePorts(string input)
     {

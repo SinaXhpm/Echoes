@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Keep the assembly name "Echoes" so existing avares://Echoes/... URIs resolve. -->
+    <AssemblyName>Echoes</AssemblyName>
+    <RootNamespace>Echoes.Android</RootNamespace>
+
+    <ApplicationId>com.sinaxhpm.echoes</ApplicationId>
+    <ApplicationVersion>2</ApplicationVersion>
+    <ApplicationDisplayVersion>0.2.6</ApplicationDisplayVersion>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.0.2" />
+    <PackageReference Include="Avalonia.Android" Version="12.0.2" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.2" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.2" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="DnsClient" Version="1.8.0" />
+    <PackageReference Include="SSH.NET" Version="2025.1.0" />
+  </ItemGroup>
+
+  <!-- Shared source from the desktop project (Program.cs / app.manifest are desktop-only and excluded). -->
+  <ItemGroup>
+    <Compile Include="..\App.axaml.cs" Link="App.axaml.cs" />
+    <Compile Include="..\ViewLocator.cs" Link="ViewLocator.cs" />
+    <Compile Include="..\ViewModels\**\*.cs" Link="ViewModels\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Views\**\*.cs" Link="Views\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Helpers\**\*.cs" Link="Helpers\%(RecursiveDir)%(Filename)%(Extension)" />
+
+    <AvaloniaXaml Include="..\App.axaml" Link="App.axaml" />
+    <AvaloniaXaml Include="..\Views\**\*.axaml" Link="Views\%(RecursiveDir)%(Filename)%(Extension)" />
+
+    <AvaloniaResource Include="..\Assets\**" Link="Assets\%(RecursiveDir)%(Filename)%(Extension)" />
+    <AvaloniaResource Remove="..\Assets\echoes.ico" />
+  </ItemGroup>
+</Project>

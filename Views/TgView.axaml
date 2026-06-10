@@ -56,10 +56,10 @@
                       BorderBrush="#45FFFFFF"
                       Margin="0,0,8,0"/>
             
-            <TextBox Grid.Column="1"
+            <AutoCompleteBox Grid.Column="1"
                      Text="{Binding ProxyAddress}"
+                     ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                      Height="34" FontSize="12"
-                     VerticalContentAlignment="Center"
                      Foreground="White"
                      Background="#25000000"
                      BorderBrush="#45FFFFFF"
@@ -87,7 +87,9 @@
                 <TextBox Text="{Binding ResponseLog}"
                          IsReadOnly="True"
                          AcceptsReturn="True"
-                         TextWrapping="Wrap"
+                         TextWrapping="NoWrap"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
                          FontFamily="Cascadia Code,Consolas,Monospace"
                          Background="Transparent"
                          Foreground="#00FF99"

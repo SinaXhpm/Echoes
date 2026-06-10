@@ -85,8 +85,10 @@
             </StackPanel>
         </WrapPanel>
 
-        <Grid Grid.Row="2" RowDefinitions="Auto, *">
-            <Grid Grid.Row="0" ColumnDefinitions="1.5*, 80, 80, *" Margin="12,0,28,10">
+        <Grid Grid.Row="2" RowDefinitions="Auto, Auto, *">
+            <TextBlock Grid.Row="0" Text="{Binding StatusMessage}" FontSize="10" Foreground="#42B883"
+                       Opacity="0.85" Margin="12,0,0,6" IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+            <Grid Grid.Row="1" ColumnDefinitions="1.5*, 80, 80, *" Margin="12,0,28,10">
                 <Button Grid.Column="0" Command="{Binding SortByCommand}" CommandParameter="IP" Content="IP ADDRESS" 
                         Background="Transparent" BorderThickness="0" FontSize="10.5" Foreground="White" FontWeight="Bold" Opacity="0.9" HorizontalAlignment="Left" Padding="0"/>
                 <Button Grid.Column="1" Command="{Binding SortByCommand}" CommandParameter="Port" Content="PORT" 
@@ -96,7 +98,7 @@
                 <TextBlock Grid.Column="3" Text="STATUS" FontSize="10.5" Foreground="White" FontWeight="Bold" Opacity="0.9" HorizontalAlignment="Right" VerticalAlignment="Center"/>
             </Grid>
 
-            <ListBox Grid.Row="1" ItemsSource="{Binding Results}" Background="#40000000" BorderBrush="#35FFFFFF" BorderThickness="1" CornerRadius="4" Padding="0">
+            <ListBox Grid.Row="2" ItemsSource="{Binding Results}" Background="#40000000" BorderBrush="#35FFFFFF" BorderThickness="1" CornerRadius="4" Padding="0">
                 <ListBox.Styles>
                     <Style Selector="ListBoxItem">
                         <Setter Property="Padding" Value="0"/>

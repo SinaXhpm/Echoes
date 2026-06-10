@@ -15,10 +15,12 @@
 
             <Border Grid.Column="1" Background="#10000000" CornerRadius="4" Padding="12" BorderBrush="#20FFFFFF" BorderThickness="1" VerticalAlignment="Stretch">
                 <Grid RowDefinitions="Auto, *">
-                    <UniformGrid Grid.Row="0" Columns="3" Margin="0,0,0,10">
+                    <UniformGrid Grid.Row="0" Columns="4" Margin="0,0,0,10">
                         <CheckBox IsChecked="{Binding CheckPing}" Content="PING" FontSize="9" Padding="4,0,0,0" HorizontalAlignment="Center"/>
                         <CheckBox IsChecked="{Binding CheckTcp}" Content="TCP" FontSize="9" Padding="4,0,0,0" HorizontalAlignment="Center"/>
                         <CheckBox IsChecked="{Binding CheckHttp}" Content="HTTP" FontSize="9" Padding="4,0,0,0" HorizontalAlignment="Center"/>
+                        <CheckBox IsChecked="{Binding AlertSound}" Content="SND" FontSize="9" Padding="4,0,0,0" HorizontalAlignment="Center"
+                                  ToolTip.Tip="Beep when a target goes up or down"/>
                     </UniformGrid>
 
                     <Grid Grid.Row="1" ColumnDefinitions="Auto, *, Auto" VerticalAlignment="Bottom">
@@ -60,18 +62,19 @@
             </Border>
         </Grid>
 
-        <Grid Grid.Row="1" ColumnDefinitions="2*, 1*, 1*, 1.2*, 0.8*" Margin="15,0,15,10">
+        <Grid Grid.Row="1" ColumnDefinitions="2*, 1*, 1*, 1.2*, 0.9*, 0.7*" Margin="15,0,15,10">
             <TextBlock Grid.Column="0" Text="ADDRESS" FontSize="10" FontWeight="Bold" Opacity="0.3"/>
             <TextBlock Grid.Column="1" Text="PING" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Center"/>
             <TextBlock Grid.Column="2" Text="TCP" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Center"/>
             <TextBlock Grid.Column="3" Text="HTTP" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Center"/>
-            <TextBlock Grid.Column="4" Text="FAILS" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Right"/>
+            <TextBlock Grid.Column="4" Text="UPTIME" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Center"/>
+            <TextBlock Grid.Column="5" Text="FAILS" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Right"/>
         </Grid>
 
         <ListBox Grid.Row="2" ItemsSource="{Binding Targets}" Background="Transparent" Padding="0">
             <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:MonitorTarget">
-                    <Border CornerRadius="3" Margin="0,1" Padding="12,7" Classes.success="{Binding IsSuccess}" Classes.failed="{Binding !IsSuccess}">
+                    <Border CornerRadius="3" Margin="0,1" Padding="12,6" Classes.success="{Binding IsSuccess}" Classes.failed="{Binding !IsSuccess}">
                         <Border.Styles>
                             <Style Selector="Border">
                                 <Setter Property="Background" Value="#05FFFFFF"/>
@@ -83,12 +86,16 @@
                                 <Setter Property="Background" Value="#10FF4444"/>
                             </Style>
                         </Border.Styles>
-                        <Grid ColumnDefinitions="2*, 1*, 1*, 1.2*, 0.8*">
-                            <TextBlock Grid.Column="0" Text="{Binding Address}" FontSize="11.5" Foreground="White" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                        <Grid ColumnDefinitions="2*, 1*, 1*, 1.2*, 0.9*, 0.7*">
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Address}" FontSize="11.5" Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding History}" FontSize="9" Foreground="#42B883" FontFamily="Consolas" Margin="0,1,0,0"/>
+                            </StackPanel>
                             <TextBlock Grid.Column="1" Text="{Binding PingStatus}" FontSize="10.5" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7"/>
                             <TextBlock Grid.Column="2" Text="{Binding TcpStatus}" FontSize="10.5" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7"/>
                             <TextBlock Grid.Column="3" Text="{Binding HttpStatus}" FontSize="10.5" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                            <TextBlock Grid.Column="4" Text="{Binding FailedCount}" FontSize="11" Foreground="#FF6666" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
+                            <TextBlock Grid.Column="4" Text="{Binding Uptime}" FontSize="10.5" Foreground="#7FE0C0" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="5" Text="{Binding FailedCount}" FontSize="11" Foreground="#FF6666" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
                         </Grid>
                     </Border>
                 </DataTemplate>
