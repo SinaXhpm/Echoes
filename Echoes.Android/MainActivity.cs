@@ -1,5 +1,5 @@
-using Android.App;
-using Android.Content.PM;
+using global::Android.App;
+using global::Android.Content.PM;
 using Avalonia;
 using Avalonia.Android;
 

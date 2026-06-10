@@ -112,6 +112,8 @@ jobs:
 
   android:
     runs-on: ubuntu-latest
+    # Experimental head — never block the desktop release if the APK build fails.
+    continue-on-error: true
     steps:
     - uses: actions/checkout@v4
 
