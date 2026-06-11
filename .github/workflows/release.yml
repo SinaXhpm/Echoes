@@ -131,11 +131,18 @@ jobs:
     - name: Install Android workload
       run: dotnet workload install android
 
-    # Release config, signed with the SDK debug key (AndroidKeyStore=false) so the
-    # APK is installable without a release keystore secret. Replace with a proper
-    # keystore + signing secrets for a Play-Store / production build.
-    - name: Build APK (Release, debug-signed)
-      run: dotnet build Echoes.Android/Echoes.Android.csproj -c Release -f net10.0-android -p:AndroidKeyStore=false
+    - name: Decode release keystore
+      run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/echoes-release.keystore"
+
+    # Release config, signed with the production keystore (from repo secrets).
+    - name: Build APK (Release, signed)
+      run: >
+        dotnet build Echoes.Android/Echoes.Android.csproj -c Release -f net10.0-android
+        -p:AndroidKeyStore=true
+        -p:AndroidSigningKeyStore="$RUNNER_TEMP/echoes-release.keystore"
+        -p:AndroidSigningStorePass='${{ secrets.ANDROID_KEYSTORE_PASSWORD }}'
+        -p:AndroidSigningKeyAlias='${{ secrets.ANDROID_KEY_ALIAS }}'
+        -p:AndroidSigningKeyPass='${{ secrets.ANDROID_KEY_PASSWORD }}'
 
     - name: Collect APK
       run: |
