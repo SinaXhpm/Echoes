@@ -3,7 +3,8 @@
     <OutputType>Exe</OutputType>
     <!-- Avalonia.Android 12.x ships only for net10.0-android; the desktop head stays net8.0. -->
     <TargetFramework>net10.0-android</TargetFramework>
-    <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+    <!-- Avalonia 12's androidx.lifecycle dependency requires API 23+. -->
+    <SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 
