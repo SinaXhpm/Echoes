@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.CurlView"
              x:DataType="vm:CurlViewModel">
 
@@ -127,7 +128,8 @@
             </Grid>
 
             <Grid ColumnDefinitions="*, Auto, Auto, Auto">
-                <Border Grid.Column="0" Background="#2AFFFFFF" CornerRadius="4" Padding="8,0" BorderThickness="1" BorderBrush="#50FFFFFF">
+                <Border Grid.Column="0" Background="#2AFFFFFF" CornerRadius="4" Padding="8,0" BorderThickness="1" BorderBrush="#50FFFFFF"
+                        IsVisible="{x:Static helpers:AppPlatform.IsDesktop}">
                     <Grid ColumnDefinitions="Auto, *">
                         <TextBlock Grid.Column="0" Text="flags &gt; " Foreground="White" FontWeight="Bold"
                                    VerticalAlignment="Center" FontSize="12" FontFamily="Consolas"/>

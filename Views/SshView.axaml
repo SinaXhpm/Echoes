@@ -31,39 +31,39 @@
 
 	<Grid RowDefinitions="Auto, Auto, *, Auto" Margin="15">
 
-		<Grid Grid.Row="0" ColumnDefinitions="2*, 12, 45, 12, 1*, 12, 1*, 12, 105" Margin="0,0,0,15">
+		<StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,15">
 
-			<Grid Grid.Column="0" RowDefinitions="Auto, Auto">
+			<Grid RowDefinitions="Auto, Auto">
 				<TextBlock Grid.Row="0" Text="REMOTE HOST" FontSize="9" FontWeight="Black" Opacity="0.4" Margin="0,0,0,4"/>
-				<AutoCompleteBox Grid.Row="1" Text="{Binding Host}" ItemsSource="{Binding HostHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0" Watermark="1.1.1.1" Height="30" FontSize="11" Background="#12000000"/>
+				<AutoCompleteBox Grid.Row="1" Text="{Binding Host}" ItemsSource="{Binding HostHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0" Watermark="1.1.1.1" FontSize="11" Background="#12000000"/>
 			</Grid>
 
-			<Grid Grid.Column="2" RowDefinitions="Auto, Auto">
-				<TextBlock Grid.Row="0" Text="PORT" FontSize="9" FontWeight="Black" Opacity="0.4" Margin="0,0,0,4" HorizontalAlignment="Center"/>
-				<TextBox Grid.Row="1"
-						 Text="{Binding Port}"
-						 Height="30"
-						 FontSize="11"
-						 Padding="0"
-						 MinWidth="0"
-						 VerticalContentAlignment="Center"
-						 HorizontalContentAlignment="Center"
-						 Background="#12000000"/>
+			<Grid ColumnDefinitions="90, *">
+				<Grid Grid.Column="0" RowDefinitions="Auto, Auto" Margin="0,0,10,0">
+					<TextBlock Grid.Row="0" Text="PORT" FontSize="9" FontWeight="Black" Opacity="0.4" Margin="0,0,0,4"/>
+					<TextBox Grid.Row="1"
+							 Text="{Binding Port}"
+							 FontSize="11"
+							 VerticalContentAlignment="Center"
+							 HorizontalContentAlignment="Center"
+							 Background="#12000000"/>
+				</Grid>
+
+				<Grid Grid.Column="1" RowDefinitions="Auto, Auto">
+					<TextBlock Grid.Row="0" Text="USERNAME" FontSize="9" FontWeight="Black" Opacity="0.4" Margin="0,0,0,4"/>
+					<AutoCompleteBox Grid.Row="1" Text="{Binding Username}" ItemsSource="{Binding UserHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0" Watermark="root" FontSize="11" Background="#12000000"/>
+				</Grid>
 			</Grid>
 
-			<Grid Grid.Column="4" RowDefinitions="Auto, Auto">
-				<TextBlock Grid.Row="0" Text="USERNAME" FontSize="9" FontWeight="Black" Opacity="0.4" Margin="0,0,0,4"/>
-				<AutoCompleteBox Grid.Row="1" Text="{Binding Username}" ItemsSource="{Binding UserHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0" Watermark="root" Height="30" FontSize="11" Background="#12000000"/>
-			</Grid>
+			<Grid ColumnDefinitions="*, 110">
+				<Grid Grid.Column="0" RowDefinitions="Auto, Auto" Margin="0,0,10,0">
+					<TextBlock Grid.Row="0" Text="PASSWORD" FontSize="9" FontWeight="Black" Opacity="0.4" Margin="0,0,0,4"/>
+					<TextBox Grid.Row="1" Text="{Binding Password}" PasswordChar="*" FontSize="11" VerticalContentAlignment="Center" Background="#12000000"/>
+				</Grid>
 
-			<Grid Grid.Column="6" RowDefinitions="Auto, Auto">
-				<TextBlock Grid.Row="0" Text="PASSWORD" FontSize="9" FontWeight="Black" Opacity="0.4" Margin="0,0,0,4"/>
-				<TextBox Grid.Row="1" Text="{Binding Password}" PasswordChar="*" Height="30" FontSize="11" VerticalContentAlignment="Center" Background="#12000000"/>
-			</Grid>
-
-			<Button Grid.Column="8"
+			<Button Grid.Column="1"
 					Command="{Binding ToggleConnectCommand}"
-					Height="30"
+					Height="38"
 					VerticalAlignment="Bottom"
 					HorizontalAlignment="Stretch"
 					HorizontalContentAlignment="Center"
@@ -109,7 +109,8 @@
 							   HorizontalAlignment="Center"/>
 				</Panel>
 			</Button>
-		</Grid>
+			</Grid>
+		</StackPanel>
 
 		<Grid Grid.Row="1" ColumnDefinitions="*, 15, *" Margin="0,0,0,15">
 
