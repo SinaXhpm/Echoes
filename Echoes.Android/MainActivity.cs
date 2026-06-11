@@ -9,7 +9,7 @@ namespace Echoes.Android;
 // (see MainApplication / Application.cs).
 [Activity(
     Label = "Echoes",
-    Theme = "@android:style/Theme.DeviceDefault.NoActionBar",
+    Theme = "@style/MyTheme.NoActionBar",
     MainLauncher = true,
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
 public class MainActivity : AvaloniaMainActivity
