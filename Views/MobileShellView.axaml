@@ -1,0 +1,118 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             xmlns:views="using:Echoes.Views"
+             x:Class="Echoes.Views.MobileShellView"
+             x:DataType="vm:MainViewModel"
+             Background="#1e1e1e">
+
+	<UserControl.Styles>
+		<!-- Phase 1 mobile shell: bump touch targets / font sizes for the embedded
+		     desktop tool views. (Per-tool layouts are reworked in phase 2.) -->
+		<Style Selector="AutoCompleteBox">
+			<Setter Property="MinHeight" Value="44"/>
+			<Setter Property="FontSize" Value="14"/>
+		</Style>
+		<Style Selector="TextBox">
+			<Setter Property="MinHeight" Value="44"/>
+			<Setter Property="FontSize" Value="14"/>
+		</Style>
+		<Style Selector="Button">
+			<Setter Property="MinHeight" Value="42"/>
+		</Style>
+		<Style Selector="ComboBox">
+			<Setter Property="MinHeight" Value="42"/>
+		</Style>
+		<Style Selector="CheckBox">
+			<Setter Property="MinHeight" Value="36"/>
+		</Style>
+	</UserControl.Styles>
+
+	<SplitView x:Name="Split"
+			   DisplayMode="Overlay"
+			   OpenPaneLength="240"
+			   PaneBackground="#181818"
+			   IsPaneOpen="False">
+
+		<!-- Drawer: tool list -->
+		<SplitView.Pane>
+			<DockPanel Margin="0,10,0,0">
+				<TextBlock DockPanel.Dock="Top"
+						   Text="ECHOES"
+						   FontSize="18" FontWeight="Black" Foreground="White"
+						   Opacity="0.9" Margin="18,4,0,12"/>
+				<ListBox x:Name="Nav"
+						 SelectedIndex="0"
+						 SelectionChanged="Nav_SelectionChanged"
+						 Background="Transparent"
+						 BorderThickness="0">
+					<ListBox.Styles>
+						<Style Selector="ListBoxItem">
+							<Setter Property="FontSize" Value="14"/>
+							<Setter Property="FontWeight" Value="SemiBold"/>
+							<Setter Property="Foreground" Value="#B0FFFFFF"/>
+							<Setter Property="Padding" Value="18,12"/>
+							<Setter Property="MinHeight" Value="46"/>
+						</Style>
+						<Style Selector="ListBoxItem:selected">
+							<Setter Property="Foreground" Value="White"/>
+						</Style>
+					</ListBox.Styles>
+					<ListBoxItem>PING</ListBoxItem>
+					<ListBoxItem>DNS</ListBoxItem>
+					<ListBoxItem>SCANNER</ListBoxItem>
+					<ListBoxItem>IP INFO</ListBoxItem>
+					<ListBoxItem>NIC</ListBoxItem>
+					<ListBoxItem>CURL</ListBoxItem>
+					<ListBoxItem>TELEGRAM</ListBoxItem>
+					<ListBoxItem>MONITOR</ListBoxItem>
+					<ListBoxItem>SSH</ListBoxItem>
+					<ListBoxItem>STRING LAB</ListBoxItem>
+					<ListBoxItem>NOTES</ListBoxItem>
+				</ListBox>
+			</DockPanel>
+		</SplitView.Pane>
+
+		<!-- Content -->
+		<SplitView.Content>
+			<Grid RowDefinitions="Auto,*">
+
+				<!-- Top app bar (no window chrome on mobile) -->
+				<Grid Grid.Row="0" Height="54" Background="#181818" ColumnDefinitions="Auto,*">
+					<Button Grid.Column="0"
+							x:Name="MenuButton"
+							Click="TogglePane"
+							Background="Transparent" BorderThickness="0"
+							Width="54" Height="54"
+							FontSize="22" Foreground="White"
+							Content="&#9776;"/>
+					<TextBlock Grid.Column="1"
+							   VerticalAlignment="Center"
+							   FontSize="15" FontWeight="Bold" Foreground="White" Opacity="0.85"
+							   Text="{Binding #Nav.SelectedItem, Converter={x:Static views:ListBoxItemContentConverter.Instance}}"/>
+				</Grid>
+
+				<!-- Only the selected tool is shown; no desktop tab strip -->
+				<Carousel Grid.Row="1" x:Name="Pages"
+						  SelectedIndex="{Binding #Nav.SelectedIndex}"
+						  PageTransition="{x:Null}">
+					<views:PingView DataContext="{Binding PingVM}"/>
+					<views:DnsView DataContext="{Binding DnsVM}"/>
+					<views:PortScannerView DataContext="{Binding PortScannerVM}"/>
+					<views:IpInfoView DataContext="{Binding IpInfoVM}"/>
+					<views:NetworkInfoView DataContext="{Binding NetworkVM}"/>
+					<views:CurlView DataContext="{Binding CurlVM}"/>
+					<views:TgView>
+						<views:TgView.DataContext>
+							<vm:TgViewModel/>
+						</views:TgView.DataContext>
+					</views:TgView>
+					<views:MonitorView DataContext="{Binding MonitorVM}"/>
+					<views:SshView DataContext="{Binding SshVM}"/>
+					<views:StringLabView DataContext="{Binding StringTool}"/>
+					<views:NoteView DataContext="{Binding NoteVM}"/>
+				</Carousel>
+			</Grid>
+		</SplitView.Content>
+	</SplitView>
+</UserControl>

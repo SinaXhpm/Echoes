@@ -24,8 +24,9 @@ public partial class App : Avalonia.Application
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
         {
-            // Mobile / single-view heads (e.g. Android) host the shared MainView directly.
-            singleView.MainView = new MainView { DataContext = viewModel };
+            // Mobile / single-view heads (e.g. Android) get the touch-friendly shell
+            // (drawer nav + single tool at a time) over the same shared ViewModels.
+            singleView.MainView = new MobileShellView { DataContext = viewModel };
         }
 
         base.OnFrameworkInitializationCompleted();
