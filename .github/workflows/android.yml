@@ -37,8 +37,11 @@ jobs:
     - name: Install Android workload
       run: dotnet workload install android
 
-    - name: Build APK (Debug, debug-signed)
-      run: dotnet build Echoes.Android/Echoes.Android.csproj -c Debug -f net10.0-android
+    # EmbedAssembliesIntoApk=true disables Fast Deployment so the Debug APK is a
+    # standalone, adb-installable artifact (otherwise managed assemblies are absent
+    # and the app aborts with "No assemblies found ... Fast Deployment").
+    - name: Build APK (Debug, debug-signed, standalone)
+      run: dotnet build Echoes.Android/Echoes.Android.csproj -c Debug -f net10.0-android -p:EmbedAssembliesIntoApk=true
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
