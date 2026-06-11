@@ -363,3 +363,9 @@ MigrationBackup/
 FodyWeavers.xsd
 /build-all.ps1
 /stash/logos
+
+# Never commit signing material
+*.keystore
+*.jks
+keystore.b64.txt
+
