@@ -35,6 +35,16 @@
 			<Setter Property="Height" Value="26"/>
 			<Setter Property="FontSize" Value="10"/>
 		</Style>
+		<!-- Vertical I/O layout: buttons flow in a wrap row (auto width) between input and result. -->
+		<Style Selector="WrapPanel.btns &gt; Button">
+			<Setter Property="HorizontalAlignment" Value="Left"/>
+			<Setter Property="MinWidth" Value="96"/>
+			<Setter Property="Margin" Value="0,0,5,5"/>
+		</Style>
+		<Style Selector="WrapPanel.btns &gt; CheckBox">
+			<Setter Property="Margin" Value="0,0,12,5"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
 	</UserControl.Styles>
 
 	<Grid RowDefinitions="*, Auto" Margin="10,0,10,10">
@@ -45,38 +55,38 @@
 				<TabControl Background="Transparent" Padding="0,4,0,0">
 
 					<TabItem Header="BASE64">
-						<Grid ColumnDefinitions="*, 110, *" Margin="0,2,0,0">
-							<TextBox Grid.Column="0" Text="{Binding B64Input, Mode=TwoWay}" Watermark="Input..."/>
-							<StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5" Margin="8,0">
+						<Grid RowDefinitions="*, Auto, *" Margin="0,2,0,0">
+							<TextBox Grid.Row="0" Text="{Binding B64Input, Mode=TwoWay}" Watermark="Input..."/>
+							<WrapPanel Grid.Row="1" Classes="btns" Margin="0,6">
 								<Button Command="{Binding B64ActionCommand}" CommandParameter="enc" Content="ENCODE ➔" Background="#27AE60"/>
 								<Button Command="{Binding B64ActionCommand}" CommandParameter="dec" Content="DECODE ➔" Background="#2980B9"/>
 								<Button Command="{Binding ClearCommand}" CommandParameter="b64" Content="CLEAR" Background="#33FFFFFF"/>
-							</StackPanel>
-							<TextBox Grid.Column="2" Text="{Binding B64Output}" IsReadOnly="True" Watermark="Result..."/>
+							</WrapPanel>
+							<TextBox Grid.Row="2" Text="{Binding B64Output}" IsReadOnly="True" Watermark="Result..."/>
 						</Grid>
 					</TabItem>
 
 					<TabItem Header="URL">
-						<Grid ColumnDefinitions="*, 110, *" Margin="0,2,0,0">
-							<TextBox Grid.Column="0" Text="{Binding UrlInput, Mode=TwoWay}" Watermark="URL..."/>
-							<StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5" Margin="8,0">
+						<Grid RowDefinitions="*, Auto, *" Margin="0,2,0,0">
+							<TextBox Grid.Row="0" Text="{Binding UrlInput, Mode=TwoWay}" Watermark="URL..."/>
+							<WrapPanel Grid.Row="1" Classes="btns" Margin="0,6">
 								<Button Command="{Binding UrlActionCommand}" CommandParameter="enc" Content="ENCODE ➔" Background="#27AE60"/>
 								<Button Command="{Binding UrlActionCommand}" CommandParameter="dec" Content="DECODE ➔" Background="#2980B9"/>
 								<Button Command="{Binding ClearCommand}" CommandParameter="url" Content="CLEAR" Background="#33FFFFFF"/>
-							</StackPanel>
-							<TextBox Grid.Column="2" Text="{Binding UrlOutput}" IsReadOnly="True" Watermark="Result..."/>
+							</WrapPanel>
+							<TextBox Grid.Row="2" Text="{Binding UrlOutput}" IsReadOnly="True" Watermark="Result..."/>
 						</Grid>
 					</TabItem>
 
 					<TabItem Header="HASH">
-						<Grid ColumnDefinitions="*, 110, *" Margin="0,2,0,0">
-							<TextBox Grid.Column="0" Text="{Binding HashInput, Mode=TwoWay}" Watermark="Text..."/>
-							<StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5" Margin="8,0">
+						<Grid RowDefinitions="*, Auto, *" Margin="0,2,0,0">
+							<TextBox Grid.Row="0" Text="{Binding HashInput, Mode=TwoWay}" Watermark="Text..."/>
+							<WrapPanel Grid.Row="1" Classes="btns" Margin="0,6">
 								<Button Command="{Binding HashActionCommand}" CommandParameter="md5" Content="MD5" Background="#8E44AD"/>
 								<Button Command="{Binding HashActionCommand}" CommandParameter="sha256" Content="SHA256" Background="#D35400"/>
 								<Button Command="{Binding ClearCommand}" CommandParameter="hash" Content="CLEAR" Background="#33FFFFFF"/>
-							</StackPanel>
-							<TextBox Grid.Column="2" Text="{Binding HashOutput}" IsReadOnly="True" Watermark="Hash..." FontFamily="Cascadia Code"/>
+							</WrapPanel>
+							<TextBox Grid.Row="2" Text="{Binding HashOutput}" IsReadOnly="True" Watermark="Hash..." FontFamily="Cascadia Code"/>
 						</Grid>
 					</TabItem>
 
@@ -135,15 +145,15 @@
 								<Button Grid.Column="1" Command="{Binding ReplaceRegexCommand}" Content="REPLACE" Background="#2980B9"/>
 							</Grid>
 
-							<Grid Grid.Row="2" ColumnDefinitions="*, 110, *">
-								<TextBox Grid.Column="0" Text="{Binding RegexInput, Mode=TwoWay}" Watermark="Text to search..."/>
-								<StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5" Margin="8,0">
+							<Grid Grid.Row="2" RowDefinitions="*, Auto, *">
+								<TextBox Grid.Row="0" Text="{Binding RegexInput, Mode=TwoWay}" Watermark="Text to search..."/>
+								<WrapPanel Grid.Row="1" Classes="btns" Margin="0,6">
 									<Button Command="{Binding RunRegexCommand}" Content="MATCH ➔" Background="#27AE60"/>
 									<CheckBox IsChecked="{Binding RegexIgnoreCase}" Content="Ignore Case" FontSize="10" Foreground="White" MinHeight="0"/>
 									<CheckBox IsChecked="{Binding RegexMultiline}" Content="Multiline" FontSize="10" Foreground="White" MinHeight="0"/>
-									<Button Command="{Binding ClearCommand}" CommandParameter="regex" Content="CLEAR" Background="#33FFFFFF" Margin="0,4,0,0"/>
-								</StackPanel>
-								<TextBox Grid.Column="2" Text="{Binding RegexOutput}" IsReadOnly="True" Watermark="Result / Matches..." FontFamily="Cascadia Code,Consolas"/>
+									<Button Command="{Binding ClearCommand}" CommandParameter="regex" Content="CLEAR" Background="#33FFFFFF"/>
+								</WrapPanel>
+								<TextBox Grid.Row="2" Text="{Binding RegexOutput}" IsReadOnly="True" Watermark="Result / Matches..." FontFamily="Cascadia Code,Consolas"/>
 							</Grid>
 						</Grid>
 					</TabItem>
@@ -155,41 +165,39 @@
 								<TextBlock Text="{Binding WordCount, StringFormat='WORDS: \{0\}'}" FontSize="10"/>
 								<TextBlock Text="{Binding LineCount, StringFormat='LINES: \{0\}'}" FontSize="10"/>
 							</StackPanel>
-							<Grid Grid.Row="1" ColumnDefinitions="*, 110">
-								<TextBox Grid.Column="0" Text="{Binding EditInput, Mode=TwoWay}" Watermark="Edit text here..."/>
-								<StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4" Margin="8,0">
+							<Grid Grid.Row="1" RowDefinitions="*, Auto">
+								<TextBox Grid.Row="0" Text="{Binding EditInput, Mode=TwoWay}" Watermark="Edit text here..."/>
+								<WrapPanel Grid.Row="1" Classes="btns" Margin="0,6,0,0">
 									<Button Command="{Binding EditActionCommand}" CommandParameter="sort" Content="SORT A-Z" Background="#2E4053"/>
 									<Button Command="{Binding EditActionCommand}" CommandParameter="unique" Content="DISTINCT" Background="#2E4053"/>
 									<Button Command="{Binding EditActionCommand}" CommandParameter="trim" Content="TRIM" Background="#2E4053"/>
 									<Button Command="{Binding EditActionCommand}" CommandParameter="clean" Content="CLEAN UP" Background="#2E4053"/>
 									<Button Command="{Binding EditActionCommand}" CommandParameter="upper" Content="UPPER" Background="#5D6D7E"/>
 									<Button Command="{Binding EditActionCommand}" CommandParameter="lower" Content="lower" Background="#5D6D7E"/>
-									<Button Command="{Binding ClearCommand}" CommandParameter="edit" Content="CLEAR" Background="#33FFFFFF" Margin="0,4,0,0"/>
-								</StackPanel>
+									<Button Command="{Binding ClearCommand}" CommandParameter="edit" Content="CLEAR" Background="#33FFFFFF"/>
+								</WrapPanel>
 							</Grid>
 						</Grid>
 					</TabItem>
 
 					<TabItem Header="CASE">
-						<Grid ColumnDefinitions="*, 130, *" Margin="0,2,0,0">
-							<TextBox Grid.Column="0" Text="{Binding CaseInput, Mode=TwoWay}" Watermark="Input text..." Margin="0,0,8,0"/>
-							<ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
-								<StackPanel Spacing="4" Margin="0,0,8,0">
-									<Button Command="{Binding CaseActionCommand}" CommandParameter="upper" Content="UPPER" Background="#2E4053"/>
-									<Button Command="{Binding CaseActionCommand}" CommandParameter="lower" Content="lower" Background="#2E4053"/>
-									<Button Command="{Binding CaseActionCommand}" CommandParameter="title" Content="Title Case" Background="#2E4053"/>
-									<Button Command="{Binding CaseActionCommand}" CommandParameter="sentence" Content="Sentence" Background="#2E4053"/>
-									<Button Command="{Binding CaseActionCommand}" CommandParameter="camel" Content="camelCase" Background="#5D6D7E"/>
-									<Button Command="{Binding CaseActionCommand}" CommandParameter="pascal" Content="PascalCase" Background="#5D6D7E"/>
-									<Button Command="{Binding CaseActionCommand}" CommandParameter="snake" Content="snake_case" Background="#5D6D7E"/>
-									<Button Command="{Binding CaseActionCommand}" CommandParameter="kebab" Content="kebab-case" Background="#5D6D7E"/>
-									<Button Command="{Binding CaseActionCommand}" CommandParameter="constant" Content="CONSTANT" Background="#5D6D7E"/>
-									<Button Command="{Binding CaseActionCommand}" CommandParameter="slug" Content="slugify" Background="#16A085"/>
-									<Button Command="{Binding CaseActionCommand}" CommandParameter="reverse" Content="Reverse" Background="#16A085"/>
-									<Button Command="{Binding ClearCommand}" CommandParameter="case" Content="CLEAR" Background="#33FFFFFF"/>
-								</StackPanel>
-							</ScrollViewer>
-							<TextBox Grid.Column="2" Text="{Binding CaseOutput}" IsReadOnly="True" Watermark="Result..."/>
+						<Grid RowDefinitions="*, Auto, *" Margin="0,2,0,0">
+							<TextBox Grid.Row="0" Text="{Binding CaseInput, Mode=TwoWay}" Watermark="Input text..."/>
+							<WrapPanel Grid.Row="1" Classes="btns" Margin="0,6">
+								<Button Command="{Binding CaseActionCommand}" CommandParameter="upper" Content="UPPER" Background="#2E4053"/>
+								<Button Command="{Binding CaseActionCommand}" CommandParameter="lower" Content="lower" Background="#2E4053"/>
+								<Button Command="{Binding CaseActionCommand}" CommandParameter="title" Content="Title Case" Background="#2E4053"/>
+								<Button Command="{Binding CaseActionCommand}" CommandParameter="sentence" Content="Sentence" Background="#2E4053"/>
+								<Button Command="{Binding CaseActionCommand}" CommandParameter="camel" Content="camelCase" Background="#5D6D7E"/>
+								<Button Command="{Binding CaseActionCommand}" CommandParameter="pascal" Content="PascalCase" Background="#5D6D7E"/>
+								<Button Command="{Binding CaseActionCommand}" CommandParameter="snake" Content="snake_case" Background="#5D6D7E"/>
+								<Button Command="{Binding CaseActionCommand}" CommandParameter="kebab" Content="kebab-case" Background="#5D6D7E"/>
+								<Button Command="{Binding CaseActionCommand}" CommandParameter="constant" Content="CONSTANT" Background="#5D6D7E"/>
+								<Button Command="{Binding CaseActionCommand}" CommandParameter="slug" Content="slugify" Background="#16A085"/>
+								<Button Command="{Binding CaseActionCommand}" CommandParameter="reverse" Content="Reverse" Background="#16A085"/>
+								<Button Command="{Binding ClearCommand}" CommandParameter="case" Content="CLEAR" Background="#33FFFFFF"/>
+							</WrapPanel>
+							<TextBox Grid.Row="2" Text="{Binding CaseOutput}" IsReadOnly="True" Watermark="Result..."/>
 						</Grid>
 					</TabItem>
 
@@ -215,28 +223,28 @@
 				<TabControl Background="Transparent" Padding="0,4,0,0">
 
 					<TabItem Header="JSON LAB">
-						<Grid ColumnDefinitions="*, 110, *" Margin="0,2,0,0">
-							<TextBox Grid.Column="0" Text="{Binding JsonInput, Mode=TwoWay}" Watermark="Paste JSON here..."/>
-							<StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5" Margin="8,0">
+						<Grid RowDefinitions="*, Auto, *" Margin="0,2,0,0">
+							<TextBox Grid.Row="0" Text="{Binding JsonInput, Mode=TwoWay}" Watermark="Paste JSON here..."/>
+							<WrapPanel Grid.Row="1" Classes="btns" Margin="0,6">
 								<Button Command="{Binding JsonActionCommand}" CommandParameter="format" Content="BEAUTIFY" Background="#27AE60"/>
 								<Button Command="{Binding JsonActionCommand}" CommandParameter="minify" Content="MINIFY" Background="#2980B9"/>
 								<Button Command="{Binding ClearCommand}" CommandParameter="json" Content="CLEAR" Background="#33FFFFFF"/>
-							</StackPanel>
-							<TextBox Grid.Column="2" Text="{Binding JsonOutput}" IsReadOnly="True" Watermark="Result..." FontFamily="Cascadia Code,Consolas"/>
+							</WrapPanel>
+							<TextBox Grid.Row="2" Text="{Binding JsonOutput}" IsReadOnly="True" Watermark="Result..." FontFamily="Cascadia Code,Consolas"/>
 						</Grid>
 					</TabItem>
 
 					<TabItem Header="CONVERT">
-						<Grid ColumnDefinitions="*, 130, *" Margin="0,2,0,0">
-							<TextBox Grid.Column="0" Text="{Binding ConvertInput, Mode=TwoWay}" Watermark="Paste JSON / YAML / CSV..." Margin="0,0,8,0" FontFamily="Cascadia Code,Consolas"/>
-							<StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5" Margin="0,0,8,0">
+						<Grid RowDefinitions="*, Auto, *" Margin="0,2,0,0">
+							<TextBox Grid.Row="0" Text="{Binding ConvertInput, Mode=TwoWay}" Watermark="Paste JSON / YAML / CSV..." FontFamily="Cascadia Code,Consolas"/>
+							<WrapPanel Grid.Row="1" Classes="btns" Margin="0,6">
 								<Button Command="{Binding ConvertActionCommand}" CommandParameter="json2yaml" Content="JSON → YAML" Background="#27AE60"/>
 								<Button Command="{Binding ConvertActionCommand}" CommandParameter="yaml2json" Content="YAML → JSON" Background="#2980B9"/>
 								<Button Command="{Binding ConvertActionCommand}" CommandParameter="json2csv" Content="JSON → CSV" Background="#27AE60"/>
 								<Button Command="{Binding ConvertActionCommand}" CommandParameter="csv2json" Content="CSV → JSON" Background="#2980B9"/>
-								<Button Command="{Binding ClearCommand}" CommandParameter="convert" Content="CLEAR" Background="#33FFFFFF" Margin="0,4,0,0"/>
-							</StackPanel>
-							<TextBox Grid.Column="2" Text="{Binding ConvertOutput}" IsReadOnly="True" Watermark="Result..." FontFamily="Cascadia Code,Consolas"/>
+								<Button Command="{Binding ClearCommand}" CommandParameter="convert" Content="CLEAR" Background="#33FFFFFF"/>
+							</WrapPanel>
+							<TextBox Grid.Row="2" Text="{Binding ConvertOutput}" IsReadOnly="True" Watermark="Result..." FontFamily="Cascadia Code,Consolas"/>
 						</Grid>
 					</TabItem>
 
@@ -297,8 +305,8 @@
 					</TabItem>
 
 					<TabItem Header="GENERATE">
-						<Grid ColumnDefinitions="170, *" Margin="0,2,0,0">
-							<StackPanel Grid.Column="0" Spacing="5" Margin="0,0,8,0">
+						<Grid RowDefinitions="Auto, *" Margin="0,2,0,0">
+							<StackPanel Grid.Row="0" Spacing="5" Margin="0,0,0,6">
 								<Grid ColumnDefinitions="*, *">
 									<StackPanel Grid.Column="0" Margin="0,0,4,0">
 										<TextBlock Text="LENGTH" FontSize="9" Opacity="0.5"/>
@@ -309,15 +317,17 @@
 										<TextBox Text="{Binding GenerateCount}" AcceptsReturn="False"/>
 									</StackPanel>
 								</Grid>
-								<Button Command="{Binding GenerateCommand}" CommandParameter="uuid" Content="UUID" Background="#8E44AD"/>
-								<Button Command="{Binding GenerateCommand}" CommandParameter="password" Content="PASSWORD" Background="#27AE60"/>
-								<Button Command="{Binding GenerateCommand}" CommandParameter="alnum" Content="ALPHANUMERIC" Background="#27AE60"/>
-								<Button Command="{Binding GenerateCommand}" CommandParameter="hex" Content="HEX TOKEN" Background="#2980B9"/>
-								<Button Command="{Binding GenerateCommand}" CommandParameter="base64" Content="BASE64 TOKEN" Background="#2980B9"/>
-								<Button Command="{Binding GenerateCommand}" CommandParameter="pin" Content="PIN" Background="#D35400"/>
-								<Button Command="{Binding ClearCommand}" CommandParameter="gen" Content="CLEAR" Background="#33FFFFFF"/>
+								<WrapPanel Classes="btns" Margin="0,2,0,0">
+									<Button Command="{Binding GenerateCommand}" CommandParameter="uuid" Content="UUID" Background="#8E44AD"/>
+									<Button Command="{Binding GenerateCommand}" CommandParameter="password" Content="PASSWORD" Background="#27AE60"/>
+									<Button Command="{Binding GenerateCommand}" CommandParameter="alnum" Content="ALPHANUMERIC" Background="#27AE60"/>
+									<Button Command="{Binding GenerateCommand}" CommandParameter="hex" Content="HEX TOKEN" Background="#2980B9"/>
+									<Button Command="{Binding GenerateCommand}" CommandParameter="base64" Content="BASE64 TOKEN" Background="#2980B9"/>
+									<Button Command="{Binding GenerateCommand}" CommandParameter="pin" Content="PIN" Background="#D35400"/>
+									<Button Command="{Binding ClearCommand}" CommandParameter="gen" Content="CLEAR" Background="#33FFFFFF"/>
+								</WrapPanel>
 							</StackPanel>
-							<TextBox Grid.Column="1" Text="{Binding GenerateOutput}" IsReadOnly="True" Watermark="Generated values..." FontFamily="Cascadia Code,Consolas"/>
+							<TextBox Grid.Row="1" Text="{Binding GenerateOutput}" IsReadOnly="True" Watermark="Generated values..." FontFamily="Cascadia Code,Consolas"/>
 						</Grid>
 					</TabItem>
 
