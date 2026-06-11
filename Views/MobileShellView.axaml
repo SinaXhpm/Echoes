@@ -19,6 +19,8 @@
 		</Style>
 		<Style Selector="Button">
 			<Setter Property="MinHeight" Value="42"/>
+			<Setter Property="HorizontalContentAlignment" Value="Center"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
 		</Style>
 		<Style Selector="ComboBox">
 			<Setter Property="MinHeight" Value="42"/>
@@ -62,7 +64,6 @@
 					<ListBoxItem>DNS</ListBoxItem>
 					<ListBoxItem>SCANNER</ListBoxItem>
 					<ListBoxItem>IP INFO</ListBoxItem>
-					<ListBoxItem>NIC</ListBoxItem>
 					<ListBoxItem>CURL</ListBoxItem>
 					<ListBoxItem>TELEGRAM</ListBoxItem>
 					<ListBoxItem>MONITOR</ListBoxItem>
@@ -100,7 +101,6 @@
 					<views:DnsView DataContext="{Binding DnsVM}"/>
 					<views:PortScannerView DataContext="{Binding PortScannerVM}"/>
 					<views:IpInfoView DataContext="{Binding IpInfoVM}"/>
-					<views:NetworkInfoView DataContext="{Binding NetworkVM}"/>
 					<views:CurlView DataContext="{Binding CurlVM}"/>
 					<views:TgView>
 						<views:TgView.DataContext>

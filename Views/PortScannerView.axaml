@@ -6,27 +6,27 @@
 
     <Grid RowDefinitions="Auto, Auto, *" Margin="12">
         
-        <Grid Grid.Row="0" ColumnDefinitions="*, 200, Auto" Margin="0,0,0,12">
-            <StackPanel Grid.Column="0" Margin="0,0,10,0">
+        <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,12">
+            <StackPanel>
                 <TextBlock Text="TARGETS" FontSize="10" FontWeight="Bold" Foreground="White" Opacity="0.9" Margin="2,0,0,5"/>
-                <TextBox Text="{Binding TargetInput}" AcceptsReturn="True" Height="54" 
-                         FontSize="12" Watermark="IP/Range/CIDR (e.g. 192.168.1.1/24)" 
+                <TextBox Text="{Binding TargetInput}" AcceptsReturn="True" Height="54"
+                         FontSize="12" Watermark="IP/Range/CIDR (e.g. 192.168.1.1/24)"
                          VerticalContentAlignment="Top" Padding="8,5"
                          Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="1" Margin="0,0,10,0">
+            <StackPanel>
                 <TextBlock Text="PORTS" FontSize="10" FontWeight="Bold" Foreground="White" Opacity="0.9" Margin="2,0,0,5"/>
-                <TextBox Text="{Binding PortInput}" AcceptsReturn="True" Height="54" 
-                         FontSize="12" Watermark="80, 443, 8080-8090" 
+                <TextBox Text="{Binding PortInput}" AcceptsReturn="True" Height="54"
+                         FontSize="12" Watermark="80, 443, 8080-8090"
                          VerticalContentAlignment="Top" Padding="8,5"
                          Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="2" VerticalAlignment="Bottom" Spacing="6">
-                <Button Command="{Binding ToggleScanCommand}"
+            <Grid ColumnDefinitions="*, *">
+                <Button Grid.Column="0" Command="{Binding ToggleScanCommand}"
                         Classes.active="{Binding IsScanning}"
-                        Width="105" Height="34"
+                        HorizontalAlignment="Stretch" Margin="0,0,5,0" Height="38"
                         HorizontalContentAlignment="Center"
                         VerticalContentAlignment="Center">
                     <Button.Styles>
@@ -59,13 +59,13 @@
                     </Panel>
                 </Button>
 
-                <Button Click="Export_Click"
+                <Button Grid.Column="1" Click="Export_Click"
                         Content="EXPORT CSV"
                         Background="#2E86C1" Foreground="White" FontWeight="Bold"
-                        Width="105" Height="26" FontSize="10.5"
+                        HorizontalAlignment="Stretch" Margin="5,0,0,0" Height="38" FontSize="10.5"
                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
-            </StackPanel>
-        </Grid>
+            </Grid>
+        </StackPanel>
 
         <WrapPanel Grid.Row="1" Margin="2,0,0,12" VerticalAlignment="Center">
             <CheckBox IsChecked="{Binding UseTcp}" Content="TCP" FontSize="11.5" Foreground="White" FontWeight="Bold" Margin="0,0,18,0"/>
