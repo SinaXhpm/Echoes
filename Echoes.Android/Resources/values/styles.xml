@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Avalonia 12's AvaloniaActivity is an AppCompatActivity, so it requires an
+       AppCompat (or descendant) theme. A plain @android:style/Theme.* crashes at
+       onCreate with "You need to use a Theme.AppCompat theme". -->
+  <style name="MyTheme.NoActionBar" parent="Theme.AppCompat.NoActionBar">
+    <item name="android:windowNoTitle">true</item>
+    <item name="android:windowActionBar">false</item>
+  </style>
+</resources>
