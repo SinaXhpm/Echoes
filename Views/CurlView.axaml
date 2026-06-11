@@ -15,28 +15,31 @@
 
     <Grid RowDefinitions="Auto, *, Auto" Margin="12">
         
-        <Grid Grid.Row="0" ColumnDefinitions="86, *, 130, 90" Margin="0,0,0,12">
+        <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,12">
+          <Grid ColumnDefinitions="Auto, *">
             <ComboBox Grid.Column="0" ItemsSource="{Binding HttpMethods}" SelectedItem="{Binding HttpMethod}"
-                      Height="34" FontSize="12" HorizontalAlignment="Stretch" Margin="0,0,8,0"
+                      MinWidth="86" FontSize="12" HorizontalAlignment="Stretch" Margin="0,0,8,0"
                       Foreground="White" Background="#25000000"/>
 
             <AutoCompleteBox Grid.Column="1" Text="{Binding Url}"
                      ItemsSource="{Binding UrlHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                      Watermark="Target URL (https://...)"
-                     Height="34" FontSize="12"
-                     Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Margin="0,0,8,0">
+                     FontSize="12"
+                     Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF">
                 <AutoCompleteBox.KeyBindings>
                     <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}" />
                 </AutoCompleteBox.KeyBindings>
             </AutoCompleteBox>
+          </Grid>
 
-            <TextBox Grid.Column="2" Text="{Binding OverrideIp}" Watermark="Override IP..."
-                     Height="34" FontSize="12" VerticalContentAlignment="Center"
+          <Grid ColumnDefinitions="*, 90">
+            <TextBox Grid.Column="0" Text="{Binding OverrideIp}" Watermark="Override IP..."
+                     FontSize="12" VerticalContentAlignment="Center"
                      Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Margin="0,0,8,0"/>
 
-            <Button Grid.Column="3"
+            <Button Grid.Column="1"
                     Command="{Binding ToggleCurlCommand}"
-                    Height="34" HorizontalAlignment="Stretch"
+                    HorizontalAlignment="Stretch"
                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                     Classes.active="{Binding IsWorking}">
                 <Button.Styles>
@@ -62,7 +65,8 @@
                     <TextBlock Text="STOP" IsVisible="{Binding IsWorking}" FontSize="12"/>
                 </Panel>
             </Button>
-        </Grid>
+          </Grid>
+        </StackPanel>
 
         <TabControl Grid.Row="1" Padding="0,4,0,0">
             <TabControl.Styles>

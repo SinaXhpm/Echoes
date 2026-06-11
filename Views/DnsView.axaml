@@ -4,57 +4,55 @@
              x:Class="Echoes.Views.DnsView"
              x:DataType="vm:DnsViewModel">
 
-    <Grid RowDefinitions="165, *" Margin="15">
-        <Grid Grid.Row="0" ColumnDefinitions="*, 240" Margin="0,0,0,15">
-            <Grid Grid.Column="0" RowDefinitions="Auto, Auto, *" Margin="0,0,15,0">
-                <StackPanel Grid.Row="0" Margin="0,0,0,10">
-                    <TextBlock Text="TARGET DOMAIN" FontSize="10" FontWeight="Bold" Opacity="0.4" Margin="5,0,0,5"/>
-                    <AutoCompleteBox Text="{Binding DomainName}" Height="32" Watermark="example.com"
-                             ItemsSource="{Binding DomainHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                             Background="#10000000" BorderBrush="#30FFFFFF">
-                        <AutoCompleteBox.KeyBindings>
-                            <KeyBinding Command="{Binding RunLookupCommand}" Gesture="Enter"/>
-                        </AutoCompleteBox.KeyBindings>
-                    </AutoCompleteBox>
-                </StackPanel>
+    <Grid RowDefinitions="Auto, *" Margin="15">
+        <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,15">
+            <StackPanel>
+                <TextBlock Text="TARGET DOMAIN" FontSize="10" FontWeight="Bold" Opacity="0.4" Margin="5,0,0,5"/>
+                <AutoCompleteBox Text="{Binding DomainName}" Watermark="example.com"
+                         ItemsSource="{Binding DomainHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         Background="#10000000" BorderBrush="#30FFFFFF">
+                    <AutoCompleteBox.KeyBindings>
+                        <KeyBinding Command="{Binding RunLookupCommand}" Gesture="Enter"/>
+                    </AutoCompleteBox.KeyBindings>
+                </AutoCompleteBox>
+            </StackPanel>
 
-                <WrapPanel Grid.Row="1" Margin="0,0,0,10">
-                    <WrapPanel.Styles>
-                        <Style Selector="CheckBox">
-                            <Setter Property="FontSize" Value="10"/>
-                            <Setter Property="MinWidth" Value="0"/>
-                            <Setter Property="Margin" Value="0,0,12,4"/>
-                        </Style>
-                    </WrapPanel.Styles>
-                    <CheckBox IsChecked="{Binding TypeA}" Content="A"/>
-                    <CheckBox IsChecked="{Binding TypeAAAA}" Content="AAAA"/>
-                    <CheckBox IsChecked="{Binding TypeMX}" Content="MX"/>
-                    <CheckBox IsChecked="{Binding TypeNS}" Content="NS"/>
-                    <CheckBox IsChecked="{Binding TypeTXT}" Content="TXT"/>
-                    <CheckBox IsChecked="{Binding TypeCNAME}" Content="CNAME"/>
-                    <CheckBox IsChecked="{Binding TypeSOA}" Content="SOA"/>
-                    <CheckBox IsChecked="{Binding TypeSRV}" Content="SRV"/>
-                    <CheckBox IsChecked="{Binding TypeCAA}" Content="CAA"/>
-                    <CheckBox IsChecked="{Binding TypePTR}" Content="PTR"/>
-                </WrapPanel>
+            <WrapPanel>
+                <WrapPanel.Styles>
+                    <Style Selector="CheckBox">
+                        <Setter Property="FontSize" Value="11"/>
+                        <Setter Property="MinWidth" Value="0"/>
+                        <Setter Property="Margin" Value="0,0,14,4"/>
+                    </Style>
+                </WrapPanel.Styles>
+                <CheckBox IsChecked="{Binding TypeA}" Content="A"/>
+                <CheckBox IsChecked="{Binding TypeAAAA}" Content="AAAA"/>
+                <CheckBox IsChecked="{Binding TypeMX}" Content="MX"/>
+                <CheckBox IsChecked="{Binding TypeNS}" Content="NS"/>
+                <CheckBox IsChecked="{Binding TypeTXT}" Content="TXT"/>
+                <CheckBox IsChecked="{Binding TypeCNAME}" Content="CNAME"/>
+                <CheckBox IsChecked="{Binding TypeSOA}" Content="SOA"/>
+                <CheckBox IsChecked="{Binding TypeSRV}" Content="SRV"/>
+                <CheckBox IsChecked="{Binding TypeCAA}" Content="CAA"/>
+                <CheckBox IsChecked="{Binding TypePTR}" Content="PTR"/>
+            </WrapPanel>
 
-                <Grid Grid.Row="2" ColumnDefinitions="*, *" VerticalAlignment="Bottom">
-                    <Button Grid.Column="0" Command="{Binding RunWhoisCommand}" Content="WHOIS" Margin="0,0,5,0" Height="32" 
-                            Background="#2E86C1" Foreground="White" FontSize="11" FontWeight="Bold" 
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                    <Button Grid.Column="1" Command="{Binding RunLookupCommand}" Content="LOOKUP" Margin="5,0,0,0" Height="32" 
-                            Background="#42B883" Foreground="White" FontSize="11" FontWeight="Bold" 
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                </Grid>
+            <Grid ColumnDefinitions="*, *">
+                <Button Grid.Column="0" Command="{Binding RunWhoisCommand}" Content="WHOIS" Margin="0,0,5,0"
+                        Background="#2E86C1" Foreground="White" FontSize="11" FontWeight="Bold"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                <Button Grid.Column="1" Command="{Binding RunLookupCommand}" Content="LOOKUP" Margin="5,0,0,0"
+                        Background="#42B883" Foreground="White" FontSize="11" FontWeight="Bold"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
             </Grid>
 
-            <Grid Grid.Column="1" RowDefinitions="Auto, *">
-                <TextBlock Grid.Row="0" Text="DNS RESOLVERS" FontSize="10" FontWeight="Bold" Opacity="0.4" Margin="5,0,0,5"/>
-                <TextBox Grid.Row="1" Text="{Binding DnsServersText}" AcceptsReturn="True" FontSize="11" 
-                         FontFamily="Cascadia Code,Consolas" Background="#10000000" BorderBrush="#30FFFFFF" 
-                         Padding="8" VerticalAlignment="Stretch"/>
-            </Grid>
-        </Grid>
+            <StackPanel>
+                <TextBlock Text="DNS RESOLVERS" FontSize="10" FontWeight="Bold" Opacity="0.4" Margin="5,0,0,5"/>
+                <TextBox Text="{Binding DnsServersText}" AcceptsReturn="True" FontSize="11" Height="70"
+                         FontFamily="Cascadia Code,Consolas" Background="#10000000" BorderBrush="#30FFFFFF"
+                         Padding="8"/>
+            </StackPanel>
+        </StackPanel>
 
         <Grid Grid.Row="1">
             <TextBox Text="{Binding LogText}" IsReadOnly="True" AcceptsReturn="True"
