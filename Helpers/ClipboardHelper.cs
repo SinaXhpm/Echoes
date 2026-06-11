@@ -10,7 +10,7 @@ public static class ClipboardHelper
     public static async Task SetTextAsync(string? text)
     {
         if (string.IsNullOrEmpty(text)) return;
-        var clipboard = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)
+        var clipboard = (Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)
             ?.MainWindow?.Clipboard;
         if (clipboard != null) await clipboard.SetTextAsync(text);
     }

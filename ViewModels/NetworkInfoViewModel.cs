@@ -40,7 +40,7 @@ public partial class NetworkInfoViewModel : ObservableObject
     {
         if (string.IsNullOrEmpty(text) || text == "---") return;
 
-        var clipboard = Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+        var clipboard = Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
                         ? desktop.MainWindow?.Clipboard
                         : null;
 
