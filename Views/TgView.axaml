@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.TgView"
              x:DataType="vm:TgViewModel">
 
@@ -66,9 +67,10 @@
                      Watermark="Proxy (e.g. http://127.0.0.1:1080)"/>
         </Grid>
 
-        <Grid Grid.Row="2" ColumnDefinitions="*, *">
-            <Border Grid.Column="0" Margin="0,0,8,0" 
-                    Background="#30000000" CornerRadius="4" 
+        <!-- Desktop: params | result side by side. Mobile: stacked (params over result). -->
+        <Grid Grid.Row="2" ColumnDefinitions="*, *" IsVisible="{x:Static helpers:AppPlatform.IsDesktop}">
+            <Border Grid.Column="0" Margin="0,0,8,0"
+                    Background="#30000000" CornerRadius="4"
                     BorderThickness="1" BorderBrush="#35FFFFFF">
                 <TextBox Text="{Binding CustomParameters}"
                          AcceptsReturn="True"
@@ -81,8 +83,41 @@
                          Padding="12"/>
             </Border>
 
-            <Border Grid.Column="1" 
-                    Background="#40000000" CornerRadius="4" 
+            <Border Grid.Column="1"
+                    Background="#40000000" CornerRadius="4"
+                    BorderThickness="1" BorderBrush="#35FFFFFF">
+                <TextBox Text="{Binding ResponseLog}"
+                         IsReadOnly="True"
+                         AcceptsReturn="True"
+                         TextWrapping="NoWrap"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         FontFamily="Cascadia Code,Consolas,Monospace"
+                         Background="Transparent"
+                         Foreground="#00FF99"
+                         FontSize="11.5"
+                         BorderThickness="0"
+                         Padding="12"/>
+            </Border>
+        </Grid>
+
+        <Grid Grid.Row="2" RowDefinitions="*, *" IsVisible="{x:Static helpers:AppPlatform.IsMobile}">
+            <Border Grid.Row="0" Margin="0,0,0,8"
+                    Background="#30000000" CornerRadius="4"
+                    BorderThickness="1" BorderBrush="#35FFFFFF">
+                <TextBox Text="{Binding CustomParameters}"
+                         AcceptsReturn="True"
+                         Watermark="Method Parameters (key=value)"
+                         FontFamily="Cascadia Code,Consolas,Monospace"
+                         FontSize="11.5"
+                         Foreground="#FFFFFF"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Padding="12"/>
+            </Border>
+
+            <Border Grid.Row="1"
+                    Background="#40000000" CornerRadius="4"
                     BorderThickness="1" BorderBrush="#35FFFFFF">
                 <TextBox Text="{Binding ResponseLog}"
                          IsReadOnly="True"
