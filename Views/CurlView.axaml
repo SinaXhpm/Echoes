@@ -17,50 +17,28 @@
     <Grid RowDefinitions="Auto, *, Auto" Margin="12">
         
         <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,12">
-          <Grid ColumnDefinitions="Auto, *">
-            <ComboBox Grid.Column="0" ItemsSource="{Binding HttpMethods}" SelectedItem="{Binding HttpMethod}"
-                      MinWidth="86" FontSize="12" HorizontalAlignment="Stretch" Margin="0,0,8,0"
-                      Foreground="White" Background="#25000000"/>
+          <AutoCompleteBox Classes="field" Text="{Binding Url}"
+                   ItemsSource="{Binding UrlHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                   Watermark="Target URL (https://...)">
+              <AutoCompleteBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}" />
+              </AutoCompleteBox.KeyBindings>
+          </AutoCompleteBox>
 
-            <AutoCompleteBox Grid.Column="1" Text="{Binding Url}"
-                     ItemsSource="{Binding UrlHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                     Watermark="Target URL (https://...)"
-                     FontSize="12"
-                     Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF">
-                <AutoCompleteBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}" />
-                </AutoCompleteBox.KeyBindings>
-            </AutoCompleteBox>
-          </Grid>
+          <Grid ColumnDefinitions="Auto, *, 90">
+            <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding HttpMethods}" SelectedItem="{Binding HttpMethod}"
+                      MinWidth="90" HorizontalAlignment="Stretch" Margin="0,0,8,0"/>
 
-          <Grid ColumnDefinitions="*, 90">
-            <TextBox Grid.Column="0" Text="{Binding OverrideIp}" Watermark="Override IP..."
-                     FontSize="12" VerticalContentAlignment="Center"
-                     Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Margin="0,0,8,0"/>
+            <TextBox Grid.Column="1" Classes="field" Text="{Binding OverrideIp}" Watermark="Override IP (optional)" Margin="0,0,8,0">
+                <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}"/>
+                </TextBox.KeyBindings>
+            </TextBox>
 
-            <Button Grid.Column="1"
+            <Button Grid.Column="2" Classes="toggle"
                     Command="{Binding ToggleCurlCommand}"
                     HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                     Classes.active="{Binding IsWorking}">
-                <Button.Styles>
-                    <Style Selector="Button">
-                        <Setter Property="Background" Value="#42B883"/>
-                        <Setter Property="Foreground" Value="White"/>
-                        <Setter Property="FontWeight" Value="Bold"/>
-                    </Style>
-                    <Style Selector="Button.active">
-                        <Setter Property="Background" Value="#FF3333"/>
-                    </Style>
-                    <Style Selector="Button:pointerover /template/ ContentPresenter">
-                        <Setter Property="Background" Value="#52C893"/>
-                        <Setter Property="Foreground" Value="White"/>
-                    </Style>
-                    <Style Selector="Button.active:pointerover /template/ ContentPresenter">
-                        <Setter Property="Background" Value="#FF5555"/>
-                        <Setter Property="Foreground" Value="White"/>
-                    </Style>
-                </Button.Styles>
                 <Panel>
                     <TextBlock Text="RUN" IsVisible="{Binding !IsWorking}" FontSize="12"/>
                     <TextBlock Text="STOP" IsVisible="{Binding IsWorking}" FontSize="12"/>
@@ -83,28 +61,28 @@
             </TabControl.Styles>
 
             <TabItem Header="LOGS">
-                <Border Background="#40000000" CornerRadius="4" BorderThickness="1" BorderBrush="#35FFFFFF">
+                <Border Classes="card output">
                     <TextBox Text="{Binding FullLog}" IsReadOnly="True" AcceptsReturn="True"
                              Foreground="#FFFFFF" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
                 </Border>
             </TabItem>
 
             <TabItem Header="RAW BODY">
-                <Border Background="#40000000" CornerRadius="4" BorderThickness="1" BorderBrush="#35FFFFFF">
+                <Border Classes="card output">
                     <TextBox Text="{Binding RawBody}" IsReadOnly="True" AcceptsReturn="True"
                              Foreground="#00FF99" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
                 </Border>
             </TabItem>
 
             <TabItem Header="HEADERS">
-                <Border Background="#40000000" CornerRadius="4" BorderThickness="1" BorderBrush="#35FFFFFF">
+                <Border Classes="card output">
                     <TextBox Text="{Binding HeadersLog}" IsReadOnly="True" AcceptsReturn="True"
                              Foreground="#FFEA00" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
                 </Border>
             </TabItem>
 
             <TabItem Header="SSL INFO">
-                <Border Background="#40000000" CornerRadius="4" BorderThickness="1" BorderBrush="#35FFFFFF">
+                <Border Classes="card output">
                     <TextBox Text="{Binding SslLog}" IsReadOnly="True" AcceptsReturn="True"
                              Foreground="#55CCFF" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
                 </Border>
@@ -114,17 +92,11 @@
         <StackPanel Grid.Row="2" Margin="0,12,0,0">
             
             <Grid ColumnDefinitions="*, 120, 120" IsVisible="{Binding #ProxyToggle.IsChecked}" Margin="0,0,0,10">
-                <AutoCompleteBox Grid.Column="0" Text="{Binding Proxy}"
+                <AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Proxy}"
                          ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                         Watermark="Proxy (IP:Port)"
-                         Height="32" FontSize="12"
-                         Foreground="White" Background="#25000000" BorderBrush="#45FFFFFF" Margin="0,0,6,0"/>
-                <TextBox Grid.Column="1" Text="{Binding ProxyUser}" Watermark="User" 
-                         Height="32" FontSize="12" VerticalContentAlignment="Center" 
-                         Foreground="White" Background="#25000000" BorderBrush="#45FFFFFF" Margin="0,0,6,0"/>
-                <TextBox Grid.Column="2" Text="{Binding ProxyPass}" Watermark="Pass" PasswordChar="*" 
-                         Height="32" FontSize="12" VerticalContentAlignment="Center" 
-                         Foreground="White" Background="#25000000" BorderBrush="#45FFFFFF"/>
+                         Watermark="Proxy (IP:Port)" Margin="0,0,6,0"/>
+                <TextBox Grid.Column="1" Classes="field" Text="{Binding ProxyUser}" Watermark="User" Margin="0,0,6,0"/>
+                <TextBox Grid.Column="2" Classes="field" Text="{Binding ProxyPass}" Watermark="Pass" PasswordChar="*"/>
             </Grid>
 
             <Grid ColumnDefinitions="*, Auto, Auto, Auto">

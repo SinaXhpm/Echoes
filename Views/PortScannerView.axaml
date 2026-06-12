@@ -7,63 +7,34 @@
     <Grid RowDefinitions="Auto, Auto, *" Margin="12">
         
         <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,12">
-            <StackPanel>
-                <TextBlock Text="TARGETS" FontSize="10" FontWeight="Bold" Foreground="White" Opacity="0.9" Margin="2,0,0,5"/>
-                <TextBox Text="{Binding TargetInput}" AcceptsReturn="True" Height="54"
-                         FontSize="12" Watermark="IP/Range/CIDR (e.g. 192.168.1.1/24)"
-                         VerticalContentAlignment="Top" Padding="8,5"
-                         Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF"/>
-            </StackPanel>
-
-            <StackPanel>
-                <TextBlock Text="PORTS" FontSize="10" FontWeight="Bold" Foreground="White" Opacity="0.9" Margin="2,0,0,5"/>
-                <TextBox Text="{Binding PortInput}" AcceptsReturn="True" Height="54"
-                         FontSize="12" Watermark="80, 443, 8080-8090"
-                         VerticalContentAlignment="Top" Padding="8,5"
-                         Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF"/>
-            </StackPanel>
+            <Grid ColumnDefinitions="*, *">
+                <StackPanel Grid.Column="0" Margin="0,0,5,0">
+                    <TextBlock Classes="fieldLabel" Text="TARGETS"/>
+                    <TextBox Classes="field multiline" Text="{Binding TargetInput}" AcceptsReturn="True" Height="66"
+                             KeyDown="Input_KeyDown"
+                             Watermark="IP/Range/CIDR (Enter=Scan, Shift+Enter=newline)"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                    <TextBlock Classes="fieldLabel" Text="PORTS"/>
+                    <TextBox Classes="field multiline" Text="{Binding PortInput}" AcceptsReturn="True" Height="66"
+                             KeyDown="Input_KeyDown"
+                             Watermark="80, 443, 8080-8090"/>
+                </StackPanel>
+            </Grid>
 
             <Grid ColumnDefinitions="*, *">
-                <Button Grid.Column="0" Command="{Binding ToggleScanCommand}"
+                <Button Grid.Column="0" Classes="toggle" Command="{Binding ToggleScanCommand}"
                         Classes.active="{Binding IsScanning}"
-                        HorizontalAlignment="Stretch" Margin="0,0,5,0" Height="38"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center">
-                    <Button.Styles>
-                        <Style Selector="Button">
-                            <Setter Property="Background" Value="#42B883"/>
-                            <Setter Property="Foreground" Value="White"/>
-                            <Setter Property="FontWeight" Value="Bold"/>
-                            <Setter Property="Transitions">
-                                <Transitions>
-                                    <BrushTransition Property="Background" Duration="0:0:0.2"/>
-                                </Transitions>
-                            </Setter>
-                        </Style>
-                        <Style Selector="Button.active">
-                            <Setter Property="Background" Value="#FF3333"/>
-                        </Style>
-                        <Style Selector="Button:pointerover /template/ ContentPresenter">
-                            <Setter Property="Background" Value="#52C893"/>
-                            <Setter Property="Foreground" Value="White"/>
-                        </Style>
-                        <Style Selector="Button.active:pointerover /template/ ContentPresenter">
-                            <Setter Property="Background" Value="#FF5555"/>
-                            <Setter Property="Foreground" Value="White"/>
-                        </Style>
-                    </Button.Styles>
-
+                        HorizontalAlignment="Stretch" Margin="0,0,5,0">
                     <Panel>
                         <TextBlock Text="START" IsVisible="{Binding !IsScanning}" FontSize="12"/>
                         <TextBlock Text="STOP" IsVisible="{Binding IsScanning}" FontSize="12"/>
                     </Panel>
                 </Button>
 
-                <Button Grid.Column="1" Click="Export_Click"
-                        Content="EXPORT CSV"
-                        Background="#2E86C1" Foreground="White" FontWeight="Bold"
-                        HorizontalAlignment="Stretch" Margin="5,0,0,0" Height="38" FontSize="10.5"
-                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+                <Button Grid.Column="1" Classes="secondary" Click="Export_Click"
+                        Content="EXPORT CSV" FontSize="10.5"
+                        HorizontalAlignment="Stretch" Margin="5,0,0,0"/>
             </Grid>
         </StackPanel>
 
@@ -74,13 +45,15 @@
             
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,18,0">
                 <TextBlock Text="Interval:" FontSize="10.5" Foreground="White" Opacity="0.7" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <NumericUpDown Value="{Binding RepeatInterval}" Minimum="1" Width="105" Height="30" FontSize="11.5" 
+                <NumericUpDown Value="{Binding RepeatInterval}" Minimum="1" ShowButtonSpinner="False" Width="62" Height="30" FontSize="11.5"
+                               HorizontalContentAlignment="Center" CornerRadius="6"
                                Foreground="White" Background="#25000000" BorderBrush="#50FFFFFF"/>
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="Timeout:" FontSize="10.5" Foreground="White" Opacity="0.7" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <NumericUpDown Value="{Binding TimeoutMs}" Minimum="100" Increment="100" Width="115" Height="30" FontSize="11.5"
+                <NumericUpDown Value="{Binding TimeoutMs}" Minimum="100" Increment="100" ShowButtonSpinner="False" Width="70" Height="30" FontSize="11.5"
+                               HorizontalContentAlignment="Center" CornerRadius="6"
                                Foreground="White" Background="#25000000" BorderBrush="#50FFFFFF"/>
             </StackPanel>
         </WrapPanel>
@@ -98,7 +71,7 @@
                 <TextBlock Grid.Column="3" Text="STATUS" FontSize="10.5" Foreground="White" FontWeight="Bold" Opacity="0.9" HorizontalAlignment="Right" VerticalAlignment="Center"/>
             </Grid>
 
-            <ListBox Grid.Row="2" ItemsSource="{Binding Results}" Background="#40000000" BorderBrush="#35FFFFFF" BorderThickness="1" CornerRadius="4" Padding="0">
+            <ListBox Grid.Row="2" ItemsSource="{Binding Results}" Background="#33000000" BorderBrush="#2EFFFFFF" BorderThickness="1" CornerRadius="10" Padding="0">
                 <ListBox.Styles>
                     <Style Selector="ListBoxItem">
                         <Setter Property="Padding" Value="0"/>

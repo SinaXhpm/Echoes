@@ -9,5 +9,6 @@
       <Setter Property="FontSize" Value="11"/>
       <Setter Property="Padding" Value="15,5"/>
     </Style>
+    <StyleInclude Source="avares://Echoes/Styles/AppStyles.axaml"/>
   </Application.Styles>
 </Application>

@@ -19,9 +19,20 @@
 		<Style Selector="TextBox">
 			<Setter Property="AcceptsReturn" Value="True"/>
 			<Setter Property="TextWrapping" Value="Wrap"/>
-			<Setter Property="Background" Value="#08FFFFFF"/>
-			<Setter Property="BorderBrush" Value="#15FFFFFF"/>
+			<Setter Property="Background" Value="#1A000000"/>
+			<Setter Property="BorderBrush" Value="#33FFFFFF"/>
+			<Setter Property="CaretBrush" Value="#42B883"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Padding" Value="8"/>
 			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="Transitions">
+				<Transitions>
+					<BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+				</Transitions>
+			</Setter>
+		</Style>
+		<Style Selector="TextBox:focus">
+			<Setter Property="BorderBrush" Value="#42B883"/>
 		</Style>
 		<!-- Read-only outputs: keep columns aligned and scroll instead of wrapping/lagging -->
 		<Style Selector="TextBox[IsReadOnly=True]">
@@ -32,7 +43,10 @@
 		<Style Selector="Button">
 			<Setter Property="HorizontalAlignment" Value="Stretch"/>
 			<Setter Property="HorizontalContentAlignment" Value="Center"/>
-			<Setter Property="Height" Value="26"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="CornerRadius" Value="7"/>
+			<Setter Property="Height" Value="28"/>
 			<Setter Property="FontSize" Value="10"/>
 		</Style>
 		<!-- Vertical I/O layout: buttons flow in a wrap row (auto width) between input and result. -->
@@ -336,7 +350,7 @@
 
 		</TabControl>
 
-		<Border Grid.Row="1" Background="#40FF4444" BorderBrush="#80FF4444" BorderThickness="1" CornerRadius="4" Margin="0,10,0,0" Padding="10" IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+		<Border Grid.Row="1" Background="#40FF4444" BorderBrush="#80FF4444" BorderThickness="1" CornerRadius="8" Margin="0,10,0,0" Padding="10" IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
 			<TextBlock Text="{Binding ErrorMessage}" Foreground="#FFFF4444" FontSize="11" FontWeight="Bold" TextWrapping="Wrap"/>
 		</Border>
 	</Grid>

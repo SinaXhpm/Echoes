@@ -8,54 +8,22 @@
     <Grid RowDefinitions="Auto, Auto, *, Auto" Margin="12">
         
         <Grid Grid.Row="0" ColumnDefinitions="*, 100" Margin="0,0,0,12">
-            <AutoCompleteBox Grid.Column="0"
+            <AutoCompleteBox Grid.Column="0" Classes="field"
                      Text="{Binding TargetHost}"
                      ItemsSource="{Binding TargetHostHistory}"
                      FilterMode="ContainsOrdinal"
                      MinimumPrefixLength="0"
                      Watermark="Enter Host or IP (e.g. 8.8.8.8)"
-                     FontSize="12" Height="34"
-                     Foreground="White"
-                     Background="#25000000"
-                     BorderBrush="#60FFFFFF"
                      Margin="0,0,8,0">
                 <AutoCompleteBox.KeyBindings>
                     <KeyBinding Gesture="Enter" Command="{Binding TogglePingCommand}" />
                 </AutoCompleteBox.KeyBindings>
             </AutoCompleteBox>
 
-            <Button Grid.Column="1"
+            <Button Grid.Column="1" Classes="toggle"
                     Command="{Binding TogglePingCommand}"
-                    Height="34" HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Center"
-                    VerticalContentAlignment="Center"
-                    Classes.active="{Binding IsPinging}"> 
-                <Button.Styles>
-                    <Style Selector="Button">
-                        <Setter Property="Background" Value="#42B883"/>
-                        <Setter Property="Foreground" Value="White"/>
-                        <Setter Property="FontWeight" Value="Bold"/>
-                        <Setter Property="Transitions">
-                            <Transitions>
-                                <BrushTransition Property="Background" Duration="0:0:0.2"/>
-                            </Transitions>
-                        </Setter>
-                    </Style>
-
-                    <Style Selector="Button.active">
-                        <Setter Property="Background" Value="#FF3333"/>
-                    </Style>
-
-                    <Style Selector="Button:pointerover /template/ ContentPresenter">
-                        <Setter Property="Background" Value="#52C893"/>
-                        <Setter Property="Foreground" Value="White"/>
-                    </Style>
-                    <Style Selector="Button.active:pointerover /template/ ContentPresenter">
-                        <Setter Property="Background" Value="#FF5555"/>
-                        <Setter Property="Foreground" Value="White"/>
-                    </Style>
-                </Button.Styles>
-
+                    HorizontalAlignment="Stretch"
+                    Classes.active="{Binding IsPinging}">
                 <Panel>
                     <TextBlock Text="START" IsVisible="{Binding !IsPinging}" FontSize="12"/>
                     <TextBlock Text="STOP" IsVisible="{Binding IsPinging}" FontSize="12"/>
@@ -69,7 +37,7 @@
             <CheckBox IsChecked="{Binding NotifyOffline}" Content="Alert Offline" FontSize="11.5" Foreground="White" FontWeight="SemiBold"/>
         </StackPanel>
 
-        <Border Grid.Row="2" Background="#40000000" CornerRadius="4" BorderThickness="1" BorderBrush="#35FFFFFF">
+        <Border Grid.Row="2" Classes="card output">
             <ListBox Name="LogList"
                      ItemsSource="{Binding LogItems}"
                      Background="Transparent"
@@ -95,12 +63,11 @@
             </ListBox>
         </Border>
 
-        <Button Grid.Row="2" Command="{Binding CopyLogCommand}" Content="COPY"
-                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,16,0"
-                FontSize="9" FontWeight="Bold" Padding="8,3"
-                Background="#3042B883" Foreground="#FFFFFF" BorderThickness="0"/>
+        <Button Grid.Row="2" Classes="ghost" Command="{Binding CopyLogCommand}" Content="COPY"
+                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,14,0"
+                Height="26" FontSize="9" Padding="10,0"/>
 
-        <Border Grid.Row="3" Margin="0,12,0,0" Padding="10,6" Background="#2AFFFFFF" CornerRadius="4" BorderThickness="1" BorderBrush="#50FFFFFF">
+        <Border Grid.Row="3" Margin="0,12,0,0" Padding="10,6" Background="#2AFFFFFF" CornerRadius="8" BorderThickness="1" BorderBrush="#40FFFFFF">
             <TextBlock Text="{Binding StatsSummary}" FontSize="11.5" FontFamily="Consolas" Foreground="White" FontWeight="Medium"/>
         </Border>
     </Grid>

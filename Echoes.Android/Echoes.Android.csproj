@@ -13,8 +13,8 @@
     <RootNamespace>Echoes.Android</RootNamespace>
 
     <ApplicationId>com.sinaxhpm.echoes</ApplicationId>
-    <ApplicationVersion>2</ApplicationVersion>
-    <ApplicationDisplayVersion>0.2.6</ApplicationDisplayVersion>
+    <ApplicationVersion>3</ApplicationVersion>
+    <ApplicationDisplayVersion>0.2.7</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
   </PropertyGroup>
 
@@ -38,6 +38,7 @@
 
     <AvaloniaXaml Include="..\App.axaml" Link="App.axaml" />
     <AvaloniaXaml Include="..\Views\**\*.axaml" Link="Views\%(RecursiveDir)%(Filename)%(Extension)" />
+    <AvaloniaXaml Include="..\Styles\**\*.axaml" Link="Styles\%(RecursiveDir)%(Filename)%(Extension)" />
 
     <AvaloniaResource Include="..\Assets\**" Link="Assets\%(RecursiveDir)%(Filename)%(Extension)" />
     <AvaloniaResource Remove="..\Assets\echoes.ico" />

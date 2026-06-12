@@ -5,132 +5,211 @@
              x:Class="Echoes.Views.TgView"
              x:DataType="vm:TgViewModel">
 
-    <Grid RowDefinitions="Auto, Auto, *" Margin="12">
+    <UserControl.Styles>
+        <!-- Lightweight, static styling — no loop animations or shaders -->
+        <Style Selector="TextBox.tgField">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CaretBrush" Value="#2AABEE"/>
+            <Setter Property="Background" Value="#1A000000"/>
+            <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="TextBox.tgField:focus">
+            <Setter Property="BorderBrush" Value="#2AABEE"/>
+        </Style>
 
-        <Grid Grid.Row="0" ColumnDefinitions="*, 105" Margin="0,0,0,12">
-            <TextBox Text="{Binding BotToken}"
-                     Watermark="Bot Token (e.g. 123456:ABC-DEF)"
-                     Height="34" FontSize="12"
-                     VerticalContentAlignment="Center"
-                     Foreground="White"
-                     Background="#25000000" 
-                     BorderBrush="#60FFFFFF"
-                     PasswordChar="*">
-                <TextBox.KeyBindings>
-                    <KeyBinding Command="{Binding ExecuteTgCommand}" Gesture="Enter"/>
-                </TextBox.KeyBindings>
-            </TextBox>
-            
+        <Style Selector="ComboBox.tgField">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#1A000000"/>
+            <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style Selector="AutoCompleteBox.tgField TextBox">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CaretBrush" Value="#2AABEE"/>
+            <Setter Property="Background" Value="#1A000000"/>
+            <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="10,0"/>
+        </Style>
+
+        <Style Selector="TextBlock.fieldLabel">
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="FontWeight" Value="Black"/>
+            <Setter Property="Opacity" Value="0.45"/>
+            <Setter Property="Margin" Value="2,0,0,5"/>
+        </Style>
+
+        <Style Selector="TextBlock.cardHeader">
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="FontWeight" Value="Black"/>
+            <Setter Property="Foreground" Value="#2AABEE"/>
+            <Setter Property="Opacity" Value="0.85"/>
+            <Setter Property="Margin" Value="12,8,0,0"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto, Auto, *" Margin="14">
+
+        <!-- Token + execute -->
+        <Grid Grid.Row="0" ColumnDefinitions="*, 118" Margin="0,0,0,12">
+            <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                <TextBlock Classes="fieldLabel" Text="BOT TOKEN"/>
+                <TextBox Classes="tgField"
+                         Text="{Binding BotToken}"
+                         Watermark="123456:ABC-DEF1234ghIkl..."
+                         PasswordChar="●">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Command="{Binding ExecuteTgCommand}" Gesture="Enter"/>
+                    </TextBox.KeyBindings>
+                </TextBox>
+            </StackPanel>
+
             <Button Grid.Column="1"
                     Content="EXECUTE"
                     Command="{Binding ExecuteTgCommand}"
                     IsDefault="True"
                     IsEnabled="{Binding !IsBusy}"
-                    Height="34" HorizontalAlignment="Stretch"
-                    Margin="8,0,0,0"
-                    Background="#42B883"
+                    Height="38" VerticalAlignment="Bottom"
+                    HorizontalAlignment="Stretch"
                     Foreground="White"
-                    FontSize="12"
-                    FontWeight="Bold"
+                    FontSize="12" FontWeight="Bold"
+                    CornerRadius="8"
                     HorizontalContentAlignment="Center"
                     VerticalContentAlignment="Center">
+                <Button.Background>
+                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                        <GradientStop Color="#2AABEE" Offset="0"/>
+                        <GradientStop Color="#1C8AC0" Offset="1"/>
+                    </LinearGradientBrush>
+                </Button.Background>
                 <Button.Styles>
                     <Style Selector="Button:pointerover /template/ ContentPresenter">
-                        <Setter Property="Background" Value="#52C893"/>
+                        <Setter Property="Background" Value="#34B9FB"/>
                         <Setter Property="Foreground" Value="White"/>
                     </Style>
                     <Style Selector="Button:disabled /template/ ContentPresenter">
-                        <Setter Property="Background" Value="#2D4D3D"/>
-                        <Setter Property="Opacity" Value="0.6"/>
+                        <Setter Property="Background" Value="#2A4A5C"/>
+                        <Setter Property="Opacity" Value="0.55"/>
                     </Style>
                 </Button.Styles>
             </Button>
         </Grid>
 
-        <Grid Grid.Row="1" ColumnDefinitions="*, *" Margin="0,0,0,12">
-            <ComboBox Grid.Column="0"
-                      ItemsSource="{Binding AvailableMethods}"
-                      SelectedItem="{Binding SelectedMethod}"
-                      HorizontalAlignment="Stretch"
-                      Height="34" FontSize="11.5"
-                      Background="#25000000"
-                      BorderBrush="#45FFFFFF"
-                      Margin="0,0,8,0"/>
-            
-            <AutoCompleteBox Grid.Column="1"
-                     Text="{Binding ProxyAddress}"
-                     ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                     Height="34" FontSize="12"
-                     Foreground="White"
-                     Background="#25000000"
-                     BorderBrush="#45FFFFFF"
-                     Watermark="Proxy (e.g. http://127.0.0.1:1080)"/>
+        <!-- Method + proxy -->
+        <Grid Grid.Row="1" ColumnDefinitions="*, *" Margin="0,0,0,14">
+            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                <TextBlock Classes="fieldLabel" Text="METHOD"/>
+                <ComboBox Classes="tgField"
+                          ItemsSource="{Binding AvailableMethods}"
+                          SelectedItem="{Binding SelectedMethod}"
+                          HorizontalAlignment="Stretch"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                <TextBlock Classes="fieldLabel" Text="PROXY (OPTIONAL)"/>
+                <AutoCompleteBox Classes="tgField"
+                         Text="{Binding ProxyAddress}"
+                         ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         Watermark="http://127.0.0.1:1080"/>
+            </StackPanel>
         </Grid>
 
-        <!-- Desktop: params | result side by side. Mobile: stacked (params over result). -->
+        <!-- Desktop: params | result side by side. Mobile: stacked. -->
         <Grid Grid.Row="2" ColumnDefinitions="*, *" IsVisible="{x:Static helpers:AppPlatform.IsDesktop}">
             <Border Grid.Column="0" Margin="0,0,8,0"
-                    Background="#30000000" CornerRadius="4"
-                    BorderThickness="1" BorderBrush="#35FFFFFF">
-                <TextBox Text="{Binding CustomParameters}"
-                         AcceptsReturn="True"
-                         Watermark="Method Parameters (key=value)"
-                         FontFamily="Cascadia Code,Consolas,Monospace"
-                         FontSize="11.5"
-                         Foreground="#FFFFFF"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         Padding="12"/>
+                    Background="#26000000" CornerRadius="10"
+                    BorderThickness="1" BorderBrush="#2EFFFFFF">
+                <Grid RowDefinitions="Auto, *">
+                    <TextBlock Grid.Row="0" Classes="cardHeader" Text="PARAMETERS"/>
+                    <TextBox Grid.Row="1" Text="{Binding CustomParameters}"
+                             AcceptsReturn="True"
+                             Watermark="key=value&#x0a;chat_id=123&#x0a;text=Hello"
+                             FontFamily="Cascadia Code,Consolas,Monospace"
+                             FontSize="11.5"
+                             Foreground="#FFFFFF"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="12,8,12,12"/>
+                </Grid>
             </Border>
 
             <Border Grid.Column="1"
-                    Background="#40000000" CornerRadius="4"
-                    BorderThickness="1" BorderBrush="#35FFFFFF">
-                <TextBox Text="{Binding ResponseLog}"
-                         IsReadOnly="True"
-                         AcceptsReturn="True"
-                         TextWrapping="NoWrap"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto"
-                         FontFamily="Cascadia Code,Consolas,Monospace"
-                         Background="Transparent"
-                         Foreground="#00FF99"
-                         FontSize="11.5"
-                         BorderThickness="0"
-                         Padding="12"/>
+                    Background="#33000000" CornerRadius="10"
+                    BorderThickness="1" BorderBrush="#2EFFFFFF">
+                <Grid RowDefinitions="Auto, *">
+                    <TextBlock Grid.Row="0" Classes="cardHeader" Text="RESPONSE" Foreground="#00FF99"/>
+                    <TextBox Grid.Row="1" Text="{Binding ResponseLog}"
+                             IsReadOnly="True"
+                             AcceptsReturn="True"
+                             TextWrapping="NoWrap"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             FontFamily="Cascadia Code,Consolas,Monospace"
+                             Background="Transparent"
+                             Foreground="#00FF99"
+                             FontSize="11.5"
+                             BorderThickness="0"
+                             Padding="12,8,12,12"/>
+                </Grid>
             </Border>
         </Grid>
 
         <Grid Grid.Row="2" RowDefinitions="*, *" IsVisible="{x:Static helpers:AppPlatform.IsMobile}">
             <Border Grid.Row="0" Margin="0,0,0,8"
-                    Background="#30000000" CornerRadius="4"
-                    BorderThickness="1" BorderBrush="#35FFFFFF">
-                <TextBox Text="{Binding CustomParameters}"
-                         AcceptsReturn="True"
-                         Watermark="Method Parameters (key=value)"
-                         FontFamily="Cascadia Code,Consolas,Monospace"
-                         FontSize="11.5"
-                         Foreground="#FFFFFF"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         Padding="12"/>
+                    Background="#26000000" CornerRadius="10"
+                    BorderThickness="1" BorderBrush="#2EFFFFFF">
+                <Grid RowDefinitions="Auto, *">
+                    <TextBlock Grid.Row="0" Classes="cardHeader" Text="PARAMETERS"/>
+                    <TextBox Grid.Row="1" Text="{Binding CustomParameters}"
+                             AcceptsReturn="True"
+                             Watermark="key=value&#x0a;chat_id=123&#x0a;text=Hello"
+                             FontFamily="Cascadia Code,Consolas,Monospace"
+                             FontSize="11.5"
+                             Foreground="#FFFFFF"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="12,8,12,12"/>
+                </Grid>
             </Border>
 
             <Border Grid.Row="1"
-                    Background="#40000000" CornerRadius="4"
-                    BorderThickness="1" BorderBrush="#35FFFFFF">
-                <TextBox Text="{Binding ResponseLog}"
-                         IsReadOnly="True"
-                         AcceptsReturn="True"
-                         TextWrapping="NoWrap"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto"
-                         FontFamily="Cascadia Code,Consolas,Monospace"
-                         Background="Transparent"
-                         Foreground="#00FF99"
-                         FontSize="11.5"
-                         BorderThickness="0"
-                         Padding="12"/>
+                    Background="#33000000" CornerRadius="10"
+                    BorderThickness="1" BorderBrush="#2EFFFFFF">
+                <Grid RowDefinitions="Auto, *">
+                    <TextBlock Grid.Row="0" Classes="cardHeader" Text="RESPONSE" Foreground="#00FF99"/>
+                    <TextBox Grid.Row="1" Text="{Binding ResponseLog}"
+                             IsReadOnly="True"
+                             AcceptsReturn="True"
+                             TextWrapping="NoWrap"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             FontFamily="Cascadia Code,Consolas,Monospace"
+                             Background="Transparent"
+                             Foreground="#00FF99"
+                             FontSize="11.5"
+                             BorderThickness="0"
+                             Padding="12,8,12,12"/>
+                </Grid>
             </Border>
         </Grid>
 
