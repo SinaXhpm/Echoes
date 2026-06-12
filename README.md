@@ -1,64 +1,55 @@
 # Echoes 🛰️
-> *Small utilities for network, API, and string tasks;
+> Small utilities for network, API, and string tasks — in one app.
 
 [GitHub Repository](https://github.com/SinaXhpm/Echoes) | [Telegram](https://t.me/the_pink_palace)
 
 https://github.com/user-attachments/assets/a4364c4b-e79f-4680-bef9-605c7a9c8915
 
 
-## 🚀 Installation & Usage
+## Install
 
-Choose the package that fits your OS from the **[Releases](https://github.com/SinaXhpm/Echoes/releases)** section:
+Download the file for your platform from the **[Releases](https://github.com/SinaXhpm/Echoes/releases)** page:
 
-| OS | Recommended Format | Installation |
+| Platform | File | How to install |
 | :--- | :--- | :--- |
 | **Windows** | `.zip` | Extract and run `Echoes.exe` |
-| **macOS** | `.dmg` | Mount and drag `Echoes.app` to Applications |
-| **Linux (Universal)** | `.AppImage` | Make executable (`chmod +x`) and run |
-| **Debian/Ubuntu** | `.deb` | Install via `sudo dpkg -i echoes.deb` |
+| **macOS** | `.dmg` | Open it and drag `Echoes.app` to Applications |
+| **Linux** | `.AppImage` | `chmod +x` then run |
+| **Debian/Ubuntu** | `.deb` | `sudo dpkg -i echoes.deb` |
+| **Android** | `.apk` | Allow "install from unknown sources", then open the APK (needs Android 6.0+) |
 
-> **Note:** Echoes is powered by **Native AOT**, meaning it's a zero-dependency standalone binary. You don't need to install .NET or any other runtime to use it.
---
+The desktop builds are self-contained (Native AOT) — no .NET runtime needed.
 
 ## Features
 
-### 📡 Network & Shell
-- **Ping & Traceroute:** Real-time ICMP pinging with packet loss statistics and hop-by-hop route tracing.
-- **Port Scanner:** TCP and UDP scanning supporting IP ranges, CIDR notation, and CSV export.
-- **SSH Terminal:** Integrated terminal with ANSI-color support, command history, and **SOCKS5 proxy connection/tunneling**.
-- **DNS & WHOIS:** Multi-record DNS querying (A, MX, TXT, etc.) via custom servers and RDAP domain lookups.
-- **NIC Explorer**: Detailed view of network adapters including IPv4, IPv6, MAC addresses, and operational status.
+### Network
+- **Ping & Traceroute** — live ICMP ping with packet-loss stats and hop-by-hop tracing.
+- **Port Scanner** — TCP/UDP scan for single IPs, ranges, and CIDR; export to CSV.
+- **SSH Terminal** — terminal with ANSI colors, command history, and SOCKS5 proxy/tunneling.
+- **DNS & WHOIS** — query DNS records (A, MX, TXT, …) via custom resolvers, plus RDAP domain lookups.
+- **NIC Explorer** — network adapters with IPv4/IPv6, MAC, and status (desktop only).
 
-### 🌐 Web & API
-- **cURL Client:** GUI for cURL supporting **HTTP/SOCKS proxies**, custom flags, IP Override (Resolve), and detailed logging.
-- **Telegram Bot Tester:** GUI for Bot API methods with **real-time verbose logging** directly from memory (no temp files).
-- **SSL Inspector:** Extracts TLS certificate details (cross-platform) including Subject, Issuer, Validity, and Key Size.
-- **IP Intelligence:** Public IP detection and GeoIP lookup with **smart SOCKS5/HTTP auto-detection** based on port.
-- **Service Monitor:** Automated uptime and latency tracking for URLs and hosts.
+### Web & API
+- **cURL Client** — a GUI for requests with HTTP/SOCKS proxy, IP override, and full logging.
+- **Telegram Bot Tester** — call Bot API methods and see the raw verbose response.
+- **SSL Inspector** — read a site's TLS certificate (subject, issuer, validity, key, chain).
+- **IP Info** — your public IP and GeoIP lookup, with SOCKS5/HTTP proxy support.
+- **Service Monitor** — track uptime and latency for a list of hosts/URLs.
 
-### 🔐 Security & Productivity
-- **Encrypted Notes:** Secure local storage for sensitive snippets, protected by **AES-256 (PBKDF2)** and a **Master Key**. Fully optimized for **Native AOT** using JSON Source Generators.
-The Notes feature uses a one-way encryption flow. If the Master Key is lost, the data in notes.dat cannot be recovered. Echoes does not store your Master Key for security reasons.
-### 🧪 String & JSON Lab
-- **JSON Surgeon:** Advanced formatter that automatically repairs missing quotes and trailing commas.
-- **Regex Engine:** Pattern testing and data extraction (IPs, Emails, URLs) from bulk text.
-- **Encoders & Hashes:** Base64, URL encoding, and cryptographic hashing (MD5, SHA256).
-- **Text Processing:** Tools for sorting, filtering unique lines, and character/word/line counting.
+### Tools
+- **Encrypted Notes** — local notes encrypted with AES-256 + a master key. The key is never stored; if you lose it, the notes can't be recovered.
+- **String Lab** — Base64/URL encoding, hashing (MD5/SHA256), regex testing, JSON format/minify, case conversion, text cleanup, and token generators.
 
-## Technical Specifications
-- **Inspiration:** Artistically inspired by the track **"Echoes" by Pink Floyd**.
-- **AI-Assisted Development:** This project was developed entirely with the assistance of **Gemini**.
-- **The Story:** These are simply utilities I needed for my daily tasks; this project started primarily for my personal use.
-- **Framework:** Built with **Avalonia UI** and **.NET 8**.
-- **Performance:** Optimized for **Native AOT** for instant startup and low memory usage.
-- **Code Style:** Strict **no-comment** architecture for clean, self-documenting logic.
+## Android notes
+The Android app runs the same UI. A few desktop features don't work inside the Android sandbox: the real `curl` engine (use the built-in .NET engine instead), notification sounds, and NIC Explorer. Everything else (ping, SSH, DNS, IP info, scanner, monitor, cURL via .NET) works.
 
-## ⚠️ Platform Note
-While I provide builds for **Windows, macOS, and Linux**, please note that I primarily develop and test on **Windows**. You might encounter "experimental" behavior or minor bugs on non-Windows devices.
+## Built with
+- **Avalonia UI** + **.NET 8** (Android head on .NET 10).
+- **Native AOT** on desktop for fast startup and low memory use.
+- Developed with AI assistance. Named after *"Echoes"* by Pink Floyd.
 
-## Getting Started
-1. Download the latest standalone executable for your OS from the [Releases](https://github.com/SinaXhpm/Echoes/releases) section.
-2. Run the application; no installation or .NET runtime is required.
+## Note
+Primary development and testing is on **Windows**. macOS, Linux, and Android builds may have minor rough edges.
 
 ## License
-Distributed under the **MIT License**.
+MIT.
