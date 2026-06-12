@@ -1,10 +1,20 @@
-# Echoes 🛰️
-> Small utilities for network, API, and string tasks — in one app.
+# Echoes 🛰️ — Cross-Platform Network & Developer Toolkit
+
+> A free, open-source network and developer toolkit for **Windows, macOS, Linux, and Android** — ping, port scanner, SSH, DNS/WHOIS, cURL, IP/GeoIP, service monitor, encrypted notes, and string/JSON tools, all in one app.
+
+[![License: MIT](https://img.shields.io/github/license/SinaXhpm/Echoes)](https://github.com/SinaXhpm/Echoes/blob/master/LICENSE)
+![Platforms: Windows, macOS, Linux, Android](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android-blue)
+[![Latest release](https://img.shields.io/github/v/release/SinaXhpm/Echoes)](https://github.com/SinaXhpm/Echoes/releases)
+[![Downloads](https://img.shields.io/github/downloads/SinaXhpm/Echoes/total)](https://github.com/SinaXhpm/Echoes/releases)
 
 [GitHub Repository](https://github.com/SinaXhpm/Echoes) | [Telegram](https://t.me/the_pink_palace)
 
 https://github.com/user-attachments/assets/a4364c4b-e79f-4680-bef9-605c7a9c8915
 
+
+## About
+
+**Echoes** is a single desktop and mobile app that bundles the network and developer utilities you reach for every day — pinging hosts, scanning ports, connecting over SSH, looking up DNS/WHOIS and IP/GeoIP data, sending HTTP requests, monitoring uptime, keeping encrypted notes, and transforming text/JSON. It runs on Windows, macOS, Linux, and Android from one codebase, works offline, and stores your data locally (no accounts, no telemetry). The desktop builds are zero-dependency Native AOT binaries — nothing to install.
 
 ## Install
 
@@ -30,7 +40,7 @@ The desktop builds are self-contained (Native AOT) — no .NET runtime needed.
 - **NIC Explorer** — network adapters with IPv4/IPv6, MAC, and status (desktop only).
 
 ### Web & API
-- **cURL Client** — a GUI for requests with HTTP/SOCKS proxy, IP override, and full logging.
+- **cURL Client** — a GUI for HTTP requests with HTTP/SOCKS proxy, IP override, and full logging.
 - **Telegram Bot Tester** — call Bot API methods and see the raw verbose response.
 - **SSL Inspector** — read a site's TLS certificate (subject, issuer, validity, key, chain).
 - **IP Info** — your public IP and GeoIP lookup, with SOCKS5/HTTP proxy support.
@@ -41,15 +51,43 @@ The desktop builds are self-contained (Native AOT) — no .NET runtime needed.
 - **String Lab** — Base64/URL encoding, hashing (MD5/SHA256), regex testing, JSON format/minify, case conversion, text cleanup, and token generators.
 
 ## Android notes
+
 The Android app runs the same UI. A few desktop features don't work inside the Android sandbox: the real `curl` engine (use the built-in .NET engine instead), notification sounds, and NIC Explorer. Everything else (ping, SSH, DNS, IP info, scanner, monitor, cURL via .NET) works.
 
+## FAQ
+
+**What is Echoes?**
+A free, open-source, all-in-one network and developer toolkit (ping, port scanner, SSH, DNS, cURL, IP info, uptime monitor, encrypted notes, string/JSON tools) for Windows, macOS, Linux, and Android.
+
+**Is it free and open source?**
+Yes — MIT licensed and free to use.
+
+**Which platforms are supported?**
+Windows, macOS, Linux, and Android. One app, one codebase.
+
+**Do I need to install .NET or any runtime?**
+No. The desktop versions are self-contained Native AOT binaries. Just download and run.
+
+**Does it collect data or need an account?**
+No. It runs locally, has no telemetry, and notes are encrypted on your device.
+
+**Is it a good alternative to using separate ping/nmap/ssh/curl tools?**
+It puts the common everyday tasks of those tools into one cross-platform GUI. For deep, specialized work the dedicated CLIs still go further.
+
 ## Built with
+
 - **Avalonia UI** + **.NET 8** (Android head on .NET 10).
 - **Native AOT** on desktop for fast startup and low memory use.
 - Developed with AI assistance. Named after *"Echoes"* by Pink Floyd.
 
 ## Note
+
 Primary development and testing is on **Windows**. macOS, Linux, and Android builds may have minor rough edges.
 
 ## License
+
 MIT.
+
+---
+
+**Keywords:** network toolkit, network utility, network scanner, ping tool, traceroute, port scanner, TCP/UDP scanner, SSH client, SSH terminal, DNS lookup, WHOIS, cURL GUI, HTTP client, IP lookup, GeoIP, public IP, uptime monitor, latency monitor, SSL/TLS certificate inspector, encrypted notes, AES-256, Base64, regex tester, JSON formatter, hashing tool, cross-platform, Windows, macOS, Linux, Android, Avalonia UI, .NET, Native AOT, open source, free.
