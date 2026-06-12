@@ -9,14 +9,13 @@
                 Width="300" Padding="20" Background="#30000000" CornerRadius="8" BorderBrush="#60FFFFFF" BorderThickness="1">
             <StackPanel Spacing="12">
                 <TextBlock Text="ENCRYPTED STORAGE" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" Foreground="White"/>
-                <TextBox Text="{Binding MasterKey}" PasswordChar="*" Watermark="Master Key..." 
-                         FontSize="12" Height="32" VerticalContentAlignment="Center" Background="#20000000" BorderBrush="#60FFFFFF">
+                <TextBox Classes="field" Text="{Binding MasterKey}" PasswordChar="*" Watermark="Master Key...">
                     <TextBox.KeyBindings>
                         <KeyBinding Command="{Binding UnlockCommand}" Gesture="Enter"/>
                     </TextBox.KeyBindings>
                 </TextBox>
-                <Button Command="{Binding UnlockCommand}" Content="UNLOCK" FontSize="12" FontWeight="Bold" 
-                        Height="32" Background="#42B883" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                <Button Classes="primary" Command="{Binding UnlockCommand}" Content="UNLOCK"
+                        HorizontalAlignment="Stretch"/>
                 <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF4444" FontSize="10" HorizontalAlignment="Center"/>
             </StackPanel>
         </Border>
@@ -33,9 +32,8 @@
                             Foreground="White" FontWeight="Bold" FontSize="10" Padding="10,5"/>
                 </Grid>
 
-                <TextBox Grid.Row="1" Text="{Binding SearchQuery}" Watermark="Search titles &amp; content..."
-                         Height="30" FontSize="11.5" VerticalContentAlignment="Center" Margin="0,0,0,8"
-                         Foreground="White" Background="#20000000" BorderBrush="#45FFFFFF"/>
+                <TextBox Grid.Row="1" Classes="field" Text="{Binding SearchQuery}" Watermark="Search titles &amp; content..."
+                         Height="34" FontSize="11.5" Margin="0,0,0,8"/>
 
                 <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <ListBox ItemsSource="{Binding FilteredNotes}" Background="Transparent" BorderThickness="0" Padding="0">
@@ -95,13 +93,12 @@
 
             <Grid RowDefinitions="Auto, *" IsVisible="{Binding IsEditing}">
                 <Grid Grid.Row="0" ColumnDefinitions="Auto, *" Margin="0,0,0,10">
-                    <Button Grid.Column="0" Command="{Binding BackToListCommand}" Content="← DONE" Background="#2E86C1" 
-                            Foreground="White" FontSize="11" FontWeight="Bold" Padding="12,6" Margin="0,0,10,0"/>
-                    <TextBox Grid.Column="1" Text="{Binding SelectedNote.Title, FallbackValue=''}" FontSize="12" FontWeight="Bold" 
-                             Foreground="White" Background="#25000000" BorderBrush="#60FFFFFF" Height="32" VerticalContentAlignment="Center"/>
+                    <Button Grid.Column="0" Classes="secondary" Command="{Binding BackToListCommand}" Content="← DONE"
+                            FontSize="11" Padding="12,0" Margin="0,0,10,0"/>
+                    <TextBox Grid.Column="1" Classes="field" Text="{Binding SelectedNote.Title, FallbackValue=''}" FontWeight="Bold"/>
                 </Grid>
 
-                <Border Grid.Row="1" Background="#40000000" CornerRadius="4" BorderBrush="#35FFFFFF" BorderThickness="1">
+                <Border Grid.Row="1" Classes="card output">
                     <TextBox TextWrapping="Wrap" Text="{Binding SelectedNote.Content, FallbackValue=''}" AcceptsReturn="True" FontSize="12" 
                              Foreground="#FFFFFF" Background="Transparent" BorderThickness="0"
                              FontFamily="Cascadia Code,Consolas" Watermark="Type your note here..." Padding="10"/>

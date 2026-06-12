@@ -1,5 +1,6 @@
 ﻿using Avalonia.Controls;
-using System.Collections.Specialized;
+using Avalonia.Input;
+using Echoes.ViewModels;
 
 namespace Echoes.Views;
 
@@ -8,13 +9,15 @@ public partial class MonitorView : UserControl
     public MonitorView()
     {
         InitializeComponent();
-        //var list = this.FindControl<ListBox>("MonitorList");
-        //if (list != null)
-        //{
-        //    ((INotifyCollectionChanged)list.Items).CollectionChanged += (s, e) =>
-        //    {
-        //        if (e.Action == NotifyCollectionChangedAction.Add) list.ScrollIntoView(list.Items.Count - 1);
-        //    };
-        //}
+    }
+
+    // Enter starts/stops monitoring; Shift+Enter inserts a newline (multi-target input).
+    private void Input_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.None && DataContext is MonitorViewModel vm)
+        {
+            vm.ToggleMonitorCommand.Execute(null);
+            e.Handled = true;
+        }
     }
 }

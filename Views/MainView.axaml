@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
              xmlns:views="using:Echoes.Views"
+             xmlns:chrome="using:Avalonia.Controls.Chrome"
              x:Class="Echoes.Views.MainView"
              x:DataType="vm:MainViewModel"
              Background="#1e1e1e">
@@ -9,15 +10,18 @@
 	<Panel>
 		<Grid RowDefinitions="Auto, *, Auto">
 
-			<StackPanel Grid.Row="0" Orientation="Horizontal" Margin="15,12,15,5" Spacing="8">
-				<Border Width="80" IsVisible="{Binding IsMac}"/>
-				<TextBlock Text="Echoes"
-						   FontSize="20"
-						   FontWeight="Black"
-						   Foreground="White"
-						   Opacity="0.9"
-						   LetterSpacing="-0.5"/>
-			</StackPanel>
+			<Border Grid.Row="0" Background="Transparent"
+					chrome:WindowDecorationProperties.ElementRole="TitleBar">
+				<StackPanel Orientation="Horizontal" Margin="15,12,15,5" Spacing="8">
+					<Border Width="80" IsVisible="{Binding IsMac}"/>
+					<TextBlock Text="Echoes"
+							   FontSize="20"
+							   FontWeight="Black"
+							   Foreground="White"
+							   Opacity="0.9"
+							   LetterSpacing="-0.5"/>
+				</StackPanel>
+			</Border>
 
 			<TabControl Grid.Row="1" Margin="8,0,8,4" TabStripPlacement="Left">
 				<TabControl.Styles>
@@ -34,13 +38,40 @@
 						<Setter Property="HorizontalContentAlignment" Value="Left"/>
 						<Setter Property="VerticalContentAlignment" Value="Center"/>
 					</Style>
-					<Style Selector="TabItem:pointerover">
-						<Setter Property="Background" Value="#12FFFFFF"/>
+
+					<!-- Paint our own background on the template root so the theme's
+					     default hover/selected brushes don't override it. -->
+					<Style Selector="TabItem /template/ Border#PART_LayoutRoot">
+						<Setter Property="Background" Value="Transparent"/>
+						<Setter Property="CornerRadius" Value="6"/>
+						<Setter Property="Transitions">
+							<Transitions>
+								<BrushTransition Property="Background" Duration="0:0:0.12"/>
+							</Transitions>
+						</Setter>
 					</Style>
-					<Style Selector="TabItem:selected">
-						<Setter Property="Foreground" Value="White"/>
+
+					<!-- Hover (non-selected): clear, brighter fill + brighter text -->
+					<Style Selector="TabItem:pointerover /template/ Border#PART_LayoutRoot">
+						<Setter Property="Background" Value="#1FFFFFFF"/>
+					</Style>
+					<Style Selector="TabItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+						<Setter Property="Foreground" Value="#E6FFFFFF"/>
+					</Style>
+
+					<!-- Selected: green tint + white text -->
+					<Style Selector="TabItem:selected /template/ Border#PART_LayoutRoot">
 						<Setter Property="Background" Value="#2142B883"/>
 					</Style>
+					<Style Selector="TabItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+						<Setter Property="Foreground" Value="White"/>
+					</Style>
+
+					<!-- Selected + hover: brighter green so it stays distinguishable -->
+					<Style Selector="TabItem:selected:pointerover /template/ Border#PART_LayoutRoot">
+						<Setter Property="Background" Value="#3342B883"/>
+					</Style>
+
 					<Style Selector="TabItem:selected /template/ Border#PART_SelectedPipe">
 						<Setter Property="IsVisible" Value="False"/>
 					</Style>
@@ -52,7 +83,7 @@
 				<TabItem Header="IP INFO"><views:IpInfoView DataContext="{Binding IpInfoVM}"/></TabItem>
 				<TabItem Header="NIC"><views:NetworkInfoView DataContext="{Binding NetworkVM}"/></TabItem>
 				<TabItem Header="CURL"><views:CurlView DataContext="{Binding CurlVM}"/></TabItem>
-				<TabItem Header="TELEGRAM">
+				<TabItem Header="TELEGRAM BOT">
 					<views:TgView>
 						<views:TgView.DataContext>
 							<vm:TgViewModel/>
