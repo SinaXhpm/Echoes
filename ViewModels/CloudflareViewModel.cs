@@ -95,41 +95,26 @@ public partial class CloudflareViewModel : ObservableObject
         EditPriority = value.Priority;
     }
 
-    private static string CredPath => AppStorage.UserPath("cloudflare.dat");
-
     private void LoadCreds()
     {
-        try
-        {
-            if (!System.IO.File.Exists(CredPath)) return;
-            var node = JsonNode.Parse(System.IO.File.ReadAllText(CredPath));
-            if (node == null) return;
-            UseApiToken = node["useToken"]?.GetValue<bool>() ?? true;
-            ApiToken = node["token"]?.GetValue<string>() ?? string.Empty;
-            ApiEmail = node["email"]?.GetValue<string>() ?? string.Empty;
-            ApiKey = node["key"]?.GetValue<string>() ?? string.Empty;
-            UseProxy = node["useProxy"]?.GetValue<bool>() ?? false;
-            ProxyAddress = node["proxy"]?.GetValue<string>() ?? string.Empty;
-        }
-        catch { }
+        var ps = ProfileService.Instance;
+        UseApiToken = ps.GetBool("cf.useToken", true);
+        ApiToken = ps.GetSetting("cf.token") ?? string.Empty;
+        ApiEmail = ps.GetSetting("cf.email") ?? string.Empty;
+        ApiKey = ps.GetSetting("cf.key") ?? string.Empty;
+        UseProxy = ps.GetBool("cf.useProxy", false);
+        ProxyAddress = ps.GetSetting("cf.proxy") ?? string.Empty;
     }
 
     private void SaveCreds()
     {
-        try
-        {
-            var o = new JsonObject
-            {
-                ["useToken"] = UseApiToken,
-                ["token"] = ApiToken,
-                ["email"] = ApiEmail,
-                ["key"] = ApiKey,
-                ["useProxy"] = UseProxy,
-                ["proxy"] = ProxyAddress
-            };
-            System.IO.File.WriteAllText(CredPath, o.ToJsonString());
-        }
-        catch { }
+        var ps = ProfileService.Instance;
+        ps.SetBool("cf.useToken", UseApiToken);
+        ps.SetSetting("cf.token", ApiToken);
+        ps.SetSetting("cf.email", ApiEmail);
+        ps.SetSetting("cf.key", ApiKey);
+        ps.SetBool("cf.useProxy", UseProxy);
+        ps.SetSetting("cf.proxy", ProxyAddress);
     }
 
     private void ClearEditFields()
