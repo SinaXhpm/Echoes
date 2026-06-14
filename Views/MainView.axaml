@@ -129,16 +129,19 @@
 					</Button>
 
 					<Button Grid.Column="2"
-							Command="{Binding OpenGitHubCommand}"
+							Command="{Binding OpenReleasesCommand}"
 							IsVisible="{Binding IsUpdateAvailable}"
 							Background="Transparent"
 							BorderThickness="0"
 							Padding="10,0"
 							Cursor="Hand"
-							VerticalAlignment="Stretch">
+							VerticalAlignment="Stretch"
+							ToolTip.Tip="{Binding LatestVersion, StringFormat='Version {0} is available — click to download'}">
 						<StackPanel Orientation="Horizontal" Spacing="6">
 							<Ellipse Width="5" Height="5" Fill="#FF9D00" VerticalAlignment="Center"/>
-							<TextBlock Text="UPDATE AVAILABLE" FontSize="8" FontWeight="Black" Foreground="#FF9D00" VerticalAlignment="Center"/>
+							<TextBlock FontSize="8" FontWeight="Black" Foreground="#FF9D00" VerticalAlignment="Center">
+								<Run Text="UPDATE TO v"/><Run Text="{Binding LatestVersion}"/>
+							</TextBlock>
 						</StackPanel>
 					</Button>
 				</Grid>
