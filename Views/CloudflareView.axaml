@@ -34,12 +34,13 @@
         </StackPanel>
 
         <!-- Zone selector + load -->
-        <Grid Grid.Row="1" ColumnDefinitions="120, *, 90" Margin="0,0,0,8">
-            <Button Grid.Column="0" Classes="primary" Content="LOAD ZONES" Command="{Binding LoadZonesCommand}" IsEnabled="{Binding !IsBusy}"/>
-            <ComboBox Grid.Column="1" Classes="field" ItemsSource="{Binding Zones}" SelectedItem="{Binding SelectedZone}"
-                      PlaceholderText="Select a domain (zone)" HorizontalAlignment="Stretch" Margin="6,0,6,0"/>
+        <Grid Grid.Row="1" ColumnDefinitions="*, Auto, Auto" Margin="0,0,0,8">
+            <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding Zones}" SelectedItem="{Binding SelectedZone}"
+                      PlaceholderText="Select a domain (zone)" HorizontalAlignment="Stretch" Margin="0,0,6,0"/>
+            <Button Grid.Column="1" Classes="primary" Content="LOAD ZONES" Command="{Binding LoadZonesCommand}"
+                    IsEnabled="{Binding !IsBusy}" Padding="14,0" Margin="0,0,6,0"/>
             <Button Grid.Column="2" Classes="secondary" Content="RELOAD" Command="{Binding ReloadRecordsCommand}"
-                    IsEnabled="{Binding !IsBusy}"/>
+                    IsEnabled="{Binding !IsBusy}" Padding="14,0"/>
         </Grid>
 
         <!-- Records header + actions -->
