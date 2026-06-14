@@ -1,11 +1,10 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Echoes.Helpers;
 using System;
 using System.Diagnostics;
-using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace Echoes.ViewModels;
@@ -38,6 +37,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _currentVersion;
     [ObservableProperty] private string _latestVersion;
     [ObservableProperty] private bool _isUpdateAvailable;
+    [ObservableProperty] private string _latestReleaseUrl = "https://github.com/SinaXhpm/Echoes/releases";
     public static bool IsMac => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
     public MainViewModel()
     {
@@ -46,67 +46,55 @@ public partial class MainViewModel : ObservableObject
         _latestVersion = _currentVersion;
     }
 
+    // Uses the GitHub Releases API (the latest published release) as the single source
+    // of truth — no hand-maintained version.json to keep in sync.
     public async Task CheckForUpdatesAsync()
     {
         try
         {
-            using var client = new HttpClient();
+            using var client = HttpHelper.Create(timeout: TimeSpan.FromSeconds(10));
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
 
-            var url = "https://raw.githubusercontent.com/SinaXhpm/Echoes/refs/heads/master/version.json";
-            var response = await client.GetStringAsync(url);
-            var data = JsonSerializer.Deserialize(response, VersionDataContext.Default.VersionData);
+            var json = await client.GetStringAsync("https://api.github.com/repos/SinaXhpm/Echoes/releases/latest");
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
 
-            if (data != null)
-            {
+            string tag = root.TryGetProperty("tag_name", out var t) ? t.GetString() ?? string.Empty : string.Empty;
+            if (string.IsNullOrWhiteSpace(tag)) return;
 
-                LatestVersion = data.version;
+            if (root.TryGetProperty("html_url", out var u) && u.GetString() is { Length: > 0 } htmlUrl)
+                LatestReleaseUrl = htmlUrl;
 
-                var current = new Version(CurrentVersion);
-                var latest = new Version(LatestVersion);
+            string clean = tag.TrimStart('v', 'V').Trim();
+            LatestVersion = clean;
 
-                if (latest > current)
-                {
-                    IsUpdateAvailable = true;
-                }
-            }
+            if (Version.TryParse(clean, out var latest) && Version.TryParse(CurrentVersion, out var current))
+                IsUpdateAvailable = latest > current;
         }
         catch
         {
         }
     }
-    [RelayCommand]
-    private void OpenGitHub()
-    {
-        string url = "https://github.com/SinaXhpm/Echoes";
 
+    [RelayCommand]
+    private void OpenGitHub() => OpenUrl("https://github.com/SinaXhpm/Echoes");
+
+    [RelayCommand]
+    private void OpenReleases() => OpenUrl(LatestReleaseUrl);
+
+    private static void OpenUrl(string url)
+    {
         try
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
                 Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-            }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
                 Process.Start("xdg-open", url);
-            }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
                 Process.Start("open", url);
-            }
         }
         catch
         {
-
         }
     }
-}
-
-public class VersionData
-{
-    public string version { get; set; } = string.Empty;
-}
-
-[JsonSerializable(typeof(VersionData))]
-internal partial class VersionDataContext : JsonSerializerContext
-{
 }
