@@ -50,8 +50,6 @@ public partial class SshViewModel : ObservableObject
     private ForwardedPortDynamic? _dynamicForward;
     private CancellationTokenSource? _readerCts = new();
 
-    private readonly string _knownHostsPath = AppStorage.UserPath("known_hosts.txt");
-    private Dictionary<string, string>? _knownHosts;
 
     [RelayCommand]
     private async Task ToggleConnect()
@@ -80,8 +78,8 @@ public partial class SshViewModel : ObservableObject
                 _client.HostKeyReceived += (s, e) =>
                 {
                     string fp = Convert.ToHexString(SHA256.HashData(e.HostKey));
-                    var known = LoadKnownHosts();
-                    if (known.TryGetValue(hostId, out var stored))
+                    var stored = ProfileService.Instance.GetKnownHost(hostId);
+                    if (stored != null)
                     {
                         if (stored == fp)
                         {
@@ -95,13 +93,13 @@ public partial class SshViewModel : ObservableObject
                                 $"#   expected: SHA256:{stored}\n" +
                                 $"#   received: SHA256:{fp}\n" +
                                 "#   Possible MITM — connection refused.\n" +
-                                "#   If the host key legitimately changed, remove its line from known_hosts.txt.\n";
+                                "#   If the host key legitimately changed, remove its pin from the Echoes profile and reconnect.\n";
                         }
                     }
                     else
                     {
                         e.CanTrust = true;          // trust on first use
-                        SaveKnownHost(hostId, fp);
+                        ProfileService.Instance.SetKnownHost(hostId, fp);
                     }
                 };
 
@@ -213,29 +211,6 @@ public partial class SshViewModel : ObservableObject
             _historyIndex = _history.Count;
             CommandInput = string.Empty;
         }
-    }
-
-    private Dictionary<string, string> LoadKnownHosts()
-    {
-        if (_knownHosts != null) return _knownHosts;
-        _knownHosts = new Dictionary<string, string>();
-        try
-        {
-            if (File.Exists(_knownHostsPath))
-                foreach (var line in File.ReadAllLines(_knownHostsPath))
-                {
-                    var parts = line.Split(' ', 2);
-                    if (parts.Length == 2) _knownHosts[parts[0].Trim()] = parts[1].Trim();
-                }
-        }
-        catch { }
-        return _knownHosts;
-    }
-
-    private void SaveKnownHost(string host, string fp)
-    {
-        LoadKnownHosts()[host] = fp;
-        try { File.AppendAllText(_knownHostsPath, $"{host} {fp}\n"); } catch { }
     }
 
     private void StopSsh()

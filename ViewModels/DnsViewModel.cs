@@ -34,8 +34,6 @@ public partial class DnsViewModel : ObservableObject
     [ObservableProperty] private bool _typeCAA;
     [ObservableProperty] private bool _typePTR;
 
-    private readonly string _storagePath = AppStorage.ResolvePath("dns_settings.txt");
-
     public ObservableCollection<string> DomainHistory => HistoryService.Instance.Get("dns.domain");
 
     public DnsViewModel()
@@ -46,11 +44,7 @@ public partial class DnsViewModel : ObservableObject
 
     private void LoadServers()
     {
-        try
-        {
-            if (File.Exists(_storagePath)) DnsServersText = File.ReadAllText(_storagePath);
-        }
-        catch { }
+        DnsServersText = ProfileService.Instance.GetSetting("dns.servers") ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(DnsServersText))
         {
@@ -60,9 +54,7 @@ public partial class DnsViewModel : ObservableObject
     }
 
     private void SaveServers()
-    {
-        try { File.WriteAllText(_storagePath, DnsServersText); } catch { }
-    }
+        => ProfileService.Instance.SetSetting("dns.servers", DnsServersText);
 
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task RunLookup()
