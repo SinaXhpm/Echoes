@@ -50,6 +50,7 @@ public partial class CloudflareViewModel : ObservableObject
     [ObservableProperty] private string _proxyPass = string.Empty;
 
     [ObservableProperty] private bool _isBusy;
+    [ObservableProperty] private bool _isEditorOpen;
     [ObservableProperty] private string _statusMessage = "Enter your Cloudflare credentials and load your zones.";
 
     public ObservableCollection<CfZone> Zones { get; } = new();
@@ -71,7 +72,9 @@ public partial class CloudflareViewModel : ObservableObject
 
     public CloudflareViewModel()
     {
-        if (HistoryService.Instance.Last("cf.proxy") is { } p) ProxyAddress = p;
+        LoadCreds();
+        if (string.IsNullOrWhiteSpace(ProxyAddress) && HistoryService.Instance.Last("cf.proxy") is { } p)
+            ProxyAddress = p;
     }
 
     partial void OnSelectedZoneChanged(CfZone? value)
@@ -79,6 +82,7 @@ public partial class CloudflareViewModel : ObservableObject
         if (value != null) _ = LoadRecords(value);
     }
 
+    // Selecting a record only stages its values; the editor opens via ADD/EDIT.
     partial void OnSelectedRecordChanged(CfRecord? value)
     {
         if (value == null) return;
@@ -90,6 +94,64 @@ public partial class CloudflareViewModel : ObservableObject
         EditProxied = value.Proxied;
         EditPriority = value.Priority;
     }
+
+    private static string CredPath => AppStorage.UserPath("cloudflare.dat");
+
+    private void LoadCreds()
+    {
+        try
+        {
+            if (!System.IO.File.Exists(CredPath)) return;
+            var node = JsonNode.Parse(System.IO.File.ReadAllText(CredPath));
+            if (node == null) return;
+            UseApiToken = node["useToken"]?.GetValue<bool>() ?? true;
+            ApiToken = node["token"]?.GetValue<string>() ?? string.Empty;
+            ApiEmail = node["email"]?.GetValue<string>() ?? string.Empty;
+            ApiKey = node["key"]?.GetValue<string>() ?? string.Empty;
+            UseProxy = node["useProxy"]?.GetValue<bool>() ?? false;
+            ProxyAddress = node["proxy"]?.GetValue<string>() ?? string.Empty;
+        }
+        catch { }
+    }
+
+    private void SaveCreds()
+    {
+        try
+        {
+            var o = new JsonObject
+            {
+                ["useToken"] = UseApiToken,
+                ["token"] = ApiToken,
+                ["email"] = ApiEmail,
+                ["key"] = ApiKey,
+                ["useProxy"] = UseProxy,
+                ["proxy"] = ProxyAddress
+            };
+            System.IO.File.WriteAllText(CredPath, o.ToJsonString());
+        }
+        catch { }
+    }
+
+    private void ClearEditFields()
+    {
+        EditRecordId = string.Empty;
+        EditType = "A";
+        EditName = string.Empty;
+        EditContent = string.Empty;
+        EditTtl = 1;
+        EditPriority = 10;
+        EditProxied = false;
+    }
+
+    [RelayCommand]
+    private void EditSelected()
+    {
+        if (SelectedRecord == null) { StatusMessage = "Select a record first, then press EDIT."; return; }
+        IsEditorOpen = true;
+    }
+
+    [RelayCommand]
+    private void CancelEdit() => IsEditorOpen = false;
 
     private bool ValidateAuth()
     {
@@ -171,6 +233,7 @@ public partial class CloudflareViewModel : ObservableObject
                 page++;
             } while (page <= totalPages);
 
+            SaveCreds();
             StatusMessage = $"Loaded {Zones.Count} zone(s). Pick a domain to see its records.";
         }
         catch (Exception ex) { StatusMessage = "Error: " + ex.Message; }
@@ -232,13 +295,8 @@ public partial class CloudflareViewModel : ObservableObject
     private void NewRecord()
     {
         SelectedRecord = null;
-        EditRecordId = string.Empty;
-        EditType = "A";
-        EditName = string.Empty;
-        EditContent = string.Empty;
-        EditTtl = 1;
-        EditPriority = 10;
-        EditProxied = false;
+        ClearEditFields();
+        IsEditorOpen = true;
         StatusMessage = "New record — fill the fields and press SAVE.";
     }
 
@@ -274,6 +332,7 @@ public partial class CloudflareViewModel : ObservableObject
             if (doc.RootElement.TryGetProperty("success", out var ok) && ok.GetBoolean())
             {
                 StatusMessage = creating ? "Record created." : "Record updated.";
+                IsEditorOpen = false;
                 await LoadRecords(SelectedZone);
             }
             else StatusMessage = "Error: " + FirstError(doc.RootElement);
@@ -298,7 +357,8 @@ public partial class CloudflareViewModel : ObservableObject
             if (doc.RootElement.TryGetProperty("success", out var ok) && ok.GetBoolean())
             {
                 StatusMessage = "Record deleted.";
-                NewRecord();
+                ClearEditFields();
+                IsEditorOpen = false;
                 await LoadRecords(SelectedZone);
             }
             else StatusMessage = "Error: " + FirstError(doc.RootElement);

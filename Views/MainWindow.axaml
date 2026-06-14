@@ -6,7 +6,7 @@
         x:DataType="vm:MainViewModel"
         Icon="avares://Echoes/Assets/logo.png"
         Title=""
-        Width="842"
+        Width="742"
         Height="565"
         WindowStartupLocation="CenterScreen"
         Background="#1e1e1e"
