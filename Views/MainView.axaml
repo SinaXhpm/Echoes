@@ -91,6 +91,7 @@
 					</views:TgView>
 				</TabItem>
 				<TabItem Header="MONITOR"><views:MonitorView DataContext="{Binding MonitorVM}"/></TabItem>
+				<TabItem Header="CLOUDFLARE"><views:CloudflareView DataContext="{Binding CloudflareVM}"/></TabItem>
 				<TabItem Header="SSH"><views:SshView DataContext="{Binding SshVM}"/></TabItem>
 				<TabItem Header="STRING LAB"><views:StringLabView DataContext="{Binding StringTool}"/></TabItem>
 				<TabItem Header="NOTES"><views:NoteView DataContext="{Binding NoteVM}"/></TabItem>

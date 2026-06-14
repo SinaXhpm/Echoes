@@ -22,6 +22,7 @@ public partial class MainViewModel : ObservableObject
     private MonitorViewModel? _monitorVM;
     private NetworkInfoViewModel? _networkVM;
     private NoteViewModel? _noteVM;
+    private CloudflareViewModel? _cloudflareVM;
     public PingViewModel PingVM => _pingVM ??= new();
     public DnsViewModel DnsVM => _dnsVM ??= new();
     public CurlViewModel CurlVM => _curlVM ??= new();
@@ -32,6 +33,7 @@ public partial class MainViewModel : ObservableObject
     public MonitorViewModel MonitorVM => _monitorVM ??= new();
     public NetworkInfoViewModel NetworkVM => _networkVM ??= new();
     public NoteViewModel NoteVM => _noteVM ??= new();
+    public CloudflareViewModel CloudflareVM => _cloudflareVM ??= new();
 
     [ObservableProperty] private string _currentVersion;
     [ObservableProperty] private string _latestVersion;
