@@ -45,9 +45,27 @@ public partial class IpInfoViewModel : ObservableObject
     [ObservableProperty] private string _subnetInput = "192.168.1.0/24";
     [ObservableProperty] private string _subnetOutput = string.Empty;
 
+    private bool _loaded;
+    private static readonly System.Collections.Generic.HashSet<string> PersistProps = new()
+    { "UseProxy", "ProxyAddress", "ProxyUser", "ProxyPass" };
+
     public IpInfoViewModel()
     {
-        if (HistoryService.Instance.Last("ip.proxy") is { } p) ProxyAddress = p;
+        var ps = ProfileService.Instance;
+        UseProxy = ps.GetBool("ip.useProxy");
+        ProxyAddress = ps.GetSetting("ip.proxyAddr") ?? (HistoryService.Instance.Last("ip.proxy") ?? string.Empty);
+        ProxyUser = ps.GetSetting("ip.proxyUser") ?? string.Empty;
+        ProxyPass = ps.GetSetting("ip.proxyPass") ?? string.Empty;
+        _loaded = true;
+    }
+
+    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (_loaded && e.PropertyName is { } n && PersistProps.Contains(n))
+            ProfileService.Instance.SetMany(
+                ("ip.useProxy", UseProxy ? "true" : "false"), ("ip.proxyAddr", ProxyAddress),
+                ("ip.proxyUser", ProxyUser), ("ip.proxyPass", ProxyPass));
     }
 
     [RelayCommand]

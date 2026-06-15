@@ -33,10 +33,29 @@ public partial class TgViewModel : ObservableObject
 
     public ObservableCollection<string> ProxyHistory => HistoryService.Instance.Get("tg.proxy");
 
+    private bool _loaded;
+    // NOTE: BotToken is intentionally NOT persisted (sensitive).
+    private static readonly HashSet<string> PersistProps = new()
+    { "SelectedMethod", "ProxyAddress", "CustomParameters" };
+
     public TgViewModel()
     {
-        UpdateTemplate();
-        if (HistoryService.Instance.Last("tg.proxy") is { } p) ProxyAddress = p;
+        var ps = ProfileService.Instance;
+        ps.Remove("tg.token");   // purge any token saved by an earlier build
+        SelectedMethod = ps.GetSetting("tg.method") ?? "getMe";
+        var savedParams = ps.GetSetting("tg.params");
+        if (!string.IsNullOrEmpty(savedParams)) CustomParameters = savedParams; else UpdateTemplate();
+        ProxyAddress = ps.GetSetting("tg.proxy") ?? (HistoryService.Instance.Last("tg.proxy") ?? string.Empty);
+        _loaded = true;
+    }
+
+    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (_loaded && e.PropertyName is { } n && PersistProps.Contains(n))
+            ProfileService.Instance.SetMany(
+                ("tg.method", SelectedMethod),
+                ("tg.params", CustomParameters), ("tg.proxy", ProxyAddress));
     }
 
     partial void OnSelectedMethodChanged(string value) => UpdateTemplate();

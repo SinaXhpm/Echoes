@@ -43,6 +43,7 @@ public partial class CurlViewModel : ObservableObject
 
     [ObservableProperty] private bool _useDotNetEngine;
     [ObservableProperty] private string _httpMethod = "GET";
+    [ObservableProperty] private bool _useProxy;
 
     public List<string> HttpMethods { get; } = new() { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS" };
 
@@ -51,10 +52,35 @@ public partial class CurlViewModel : ObservableObject
     public ObservableCollection<string> UrlHistory => HistoryService.Instance.Get("curl.url");
     public ObservableCollection<string> ProxyHistory => HistoryService.Instance.Get("curl.proxy");
 
+    private bool _loaded;
+    private static readonly System.Collections.Generic.HashSet<string> PersistProps = new()
+    { "Url", "OverrideIp", "Proxy", "ProxyUser", "ProxyPass", "CustomFlags", "SkipSslVerify", "UseDotNetEngine", "HttpMethod", "UseProxy" };
+
     public CurlViewModel()
     {
-        if (HistoryService.Instance.Last("curl.url") is { } u) Url = u;
-        if (HistoryService.Instance.Last("curl.proxy") is { } p) Proxy = p;
+        var ps = Echoes.Helpers.ProfileService.Instance;
+        Url = ps.GetSetting("curl.url") ?? (HistoryService.Instance.Last("curl.url") ?? "https://");
+        OverrideIp = ps.GetSetting("curl.overrideIp") ?? string.Empty;
+        Proxy = ps.GetSetting("curl.proxy") ?? (HistoryService.Instance.Last("curl.proxy") ?? string.Empty);
+        ProxyUser = ps.GetSetting("curl.proxyUser") ?? string.Empty;
+        ProxyPass = ps.GetSetting("curl.proxyPass") ?? string.Empty;
+        CustomFlags = ps.GetSetting("curl.flags") ?? string.Empty;
+        SkipSslVerify = ps.GetBool("curl.skipSsl");
+        UseDotNetEngine = ps.GetBool("curl.useDotNet");
+        HttpMethod = ps.GetSetting("curl.method") ?? "GET";
+        UseProxy = ps.GetBool("curl.useProxy");
+        _loaded = true;
+    }
+
+    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (_loaded && e.PropertyName is { } n && PersistProps.Contains(n))
+            Echoes.Helpers.ProfileService.Instance.SetMany(
+                ("curl.url", Url), ("curl.overrideIp", OverrideIp), ("curl.proxy", Proxy),
+                ("curl.proxyUser", ProxyUser), ("curl.proxyPass", ProxyPass), ("curl.flags", CustomFlags),
+                ("curl.skipSsl", SkipSslVerify ? "true" : "false"), ("curl.useDotNet", UseDotNetEngine ? "true" : "false"),
+                ("curl.method", HttpMethod), ("curl.useProxy", UseProxy ? "true" : "false"));
     }
 
     partial void OnUrlChanged(string value) => UpdateCommand();
