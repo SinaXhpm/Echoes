@@ -72,9 +72,19 @@ public sealed class ProfileService
     // ---------- Simple settings ----------
     public string? GetSetting(string key) => _settings.TryGetValue(key, out var v) ? v : null;
     public void SetSetting(string key, string? value) { _settings[key] = value ?? string.Empty; Save(); }
+    public void Remove(string key) { if (_settings.Remove(key)) Save(); }
     public bool GetBool(string key, bool def = false)
         => _settings.TryGetValue(key, out var v) && bool.TryParse(v, out var b) ? b : def;
     public void SetBool(string key, bool value) => SetSetting(key, value ? "true" : "false");
+    public int GetInt(string key, int def = 0)
+        => _settings.TryGetValue(key, out var v) && int.TryParse(v, out var i) ? i : def;
+
+    // Set several settings and write the file once (avoids one write per field).
+    public void SetMany(params (string key, string? value)[] items)
+    {
+        foreach (var (k, v) in items) _settings[k] = v ?? string.Empty;
+        Save();
+    }
 
     // ---------- SSH known hosts (trust-on-first-use pins) ----------
     public string? GetKnownHost(string host) => _knownHosts.TryGetValue(host, out var v) ? v : null;

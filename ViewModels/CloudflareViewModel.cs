@@ -70,11 +70,22 @@ public partial class CloudflareViewModel : ObservableObject
 
     public ObservableCollection<string> ProxyHistory => HistoryService.Instance.Get("cf.proxy");
 
+    private bool _loaded;
+    private static readonly System.Collections.Generic.HashSet<string> PersistProps = new()
+    { "UseApiToken", "ApiToken", "ApiEmail", "ApiKey", "UseProxy", "ProxyAddress", "ProxyUser", "ProxyPass" };
+
     public CloudflareViewModel()
     {
         LoadCreds();
         if (string.IsNullOrWhiteSpace(ProxyAddress) && HistoryService.Instance.Last("cf.proxy") is { } p)
             ProxyAddress = p;
+        _loaded = true;
+    }
+
+    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (_loaded && e.PropertyName is { } n && PersistProps.Contains(n)) SaveCreds();
     }
 
     partial void OnSelectedZoneChanged(CfZone? value)
@@ -104,18 +115,16 @@ public partial class CloudflareViewModel : ObservableObject
         ApiKey = ps.GetSetting("cf.key") ?? string.Empty;
         UseProxy = ps.GetBool("cf.useProxy", false);
         ProxyAddress = ps.GetSetting("cf.proxy") ?? string.Empty;
+        ProxyUser = ps.GetSetting("cf.proxyUser") ?? string.Empty;
+        ProxyPass = ps.GetSetting("cf.proxyPass") ?? string.Empty;
     }
 
     private void SaveCreds()
-    {
-        var ps = ProfileService.Instance;
-        ps.SetBool("cf.useToken", UseApiToken);
-        ps.SetSetting("cf.token", ApiToken);
-        ps.SetSetting("cf.email", ApiEmail);
-        ps.SetSetting("cf.key", ApiKey);
-        ps.SetBool("cf.useProxy", UseProxy);
-        ps.SetSetting("cf.proxy", ProxyAddress);
-    }
+        => ProfileService.Instance.SetMany(
+            ("cf.useToken", UseApiToken ? "true" : "false"), ("cf.token", ApiToken),
+            ("cf.email", ApiEmail), ("cf.key", ApiKey),
+            ("cf.useProxy", UseProxy ? "true" : "false"), ("cf.proxy", ProxyAddress),
+            ("cf.proxyUser", ProxyUser), ("cf.proxyPass", ProxyPass));
 
     private void ClearEditFields()
     {

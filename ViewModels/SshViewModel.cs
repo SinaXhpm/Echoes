@@ -37,10 +37,36 @@ public partial class SshViewModel : ObservableObject
     public ObservableCollection<string> HostHistory => HistoryService.Instance.Get("ssh.host");
     public ObservableCollection<string> UserHistory => HistoryService.Instance.Get("ssh.user");
 
+    private bool _loaded;
+    // NOTE: Password is intentionally NOT persisted (sensitive).
+    private static readonly HashSet<string> PersistProps = new()
+    { "Host", "Port", "Username", "ConnectViaProxy", "ProxyInHost", "ProxyInPort",
+      "EnableSocksTunnel", "TunnelHost", "TunnelPort" };
+
     public SshViewModel()
     {
-        if (HistoryService.Instance.Last("ssh.host") is { } h) Host = h;
-        if (HistoryService.Instance.Last("ssh.user") is { } u) Username = u;
+        var ps = ProfileService.Instance;
+        ps.Remove("ssh.pass");   // purge any password saved by an earlier build
+        Host = ps.GetSetting("ssh.host") ?? (HistoryService.Instance.Last("ssh.host") ?? string.Empty);
+        Port = ps.GetInt("ssh.port", 22);
+        Username = ps.GetSetting("ssh.user") ?? (HistoryService.Instance.Last("ssh.user") ?? "root");
+        ConnectViaProxy = ps.GetBool("ssh.inEnabled");
+        ProxyInHost = ps.GetSetting("ssh.inHost") ?? "127.0.0.1";
+        ProxyInPort = ps.GetInt("ssh.inPort", 1080);
+        EnableSocksTunnel = ps.GetBool("ssh.outEnabled");
+        TunnelHost = ps.GetSetting("ssh.outHost") ?? "127.0.0.1";
+        TunnelPort = ps.GetInt("ssh.outPort", 8080);
+        _loaded = true;
+    }
+
+    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (_loaded && e.PropertyName is { } n && PersistProps.Contains(n))
+            ProfileService.Instance.SetMany(
+                ("ssh.host", Host), ("ssh.port", Port.ToString()), ("ssh.user", Username),
+                ("ssh.inEnabled", ConnectViaProxy ? "true" : "false"), ("ssh.inHost", ProxyInHost), ("ssh.inPort", ProxyInPort.ToString()),
+                ("ssh.outEnabled", EnableSocksTunnel ? "true" : "false"), ("ssh.outHost", TunnelHost), ("ssh.outPort", TunnelPort.ToString()));
     }
 
     private readonly List<string> _history = new();

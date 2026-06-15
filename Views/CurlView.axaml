@@ -116,7 +116,7 @@
                               MinWidth="0" Margin="15,0,0,0" VerticalAlignment="Center"
                               ToolTip.Tip="Engine: system curl binary, or built-in .NET HttpClient (no curl needed)"/>
 
-                <CheckBox Name="ProxyToggle" Grid.Column="2" Content="Proxy" FontSize="11.5"
+                <CheckBox Name="ProxyToggle" Grid.Column="2" IsChecked="{Binding UseProxy}" Content="Proxy" FontSize="11.5"
                           Foreground="White" FontWeight="SemiBold" MinHeight="0" Margin="15,0,0,0" VerticalAlignment="Center"/>
                 <CheckBox IsChecked="{Binding SkipSslVerify}" Grid.Column="3" Content="Insecure" FontSize="11.5"
                           Foreground="White" FontWeight="SemiBold" MinHeight="0" Margin="15,0,0,0" VerticalAlignment="Center"/>
