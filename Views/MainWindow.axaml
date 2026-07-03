@@ -6,10 +6,10 @@
         x:DataType="vm:MainViewModel"
         Icon="avares://Echoes/Assets/logo.png"
         Title=""
-        Width="670"
+        Width="690"
         Height="480"
         WindowStartupLocation="CenterScreen"
-        Background="#1e1e1e"
+        Background="#0F1012"
         ExtendClientAreaToDecorationsHint="True"
         WindowDecorations="Full"
         ExtendClientAreaTitleBarHeightHint="-1">

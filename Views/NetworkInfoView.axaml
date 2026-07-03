@@ -2,93 +2,142 @@
 			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 			 xmlns:vm="using:Echoes.ViewModels"
 			 x:Class="Echoes.Views.NetworkInfoView"
-			 x:DataType="vm:NetworkInfoViewModel">
+			 x:DataType="vm:NetworkInfoViewModel"
+			 Background="#0F1012">
 	<UserControl.Styles>
 		<Style Selector="Button.refresh-btn">
 			<Setter Property="Background" Value="Transparent"/>
-			<Setter Property="BorderBrush" Value="#3342B883"/>
+			<Setter Property="BorderBrush" Value="#2042B883"/>
 			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="CornerRadius" Value="7"/>
+			<Setter Property="CornerRadius" Value="6"/>
 			<Setter Property="Padding" Value="12,6"/>
 			<Setter Property="Transitions">
 				<Transitions>
-					<BrushTransition Property="Background" Duration="0:0:0.2"/>
-					<BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
-					<TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.1"/>
+					<BrushTransition Property="Background" Duration="0:0:0.15"/>
+					<BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
 				</Transitions>
 			</Setter>
 		</Style>
-
-		<Style Selector="Button.refresh-btn:pointerover">
-			<Setter Property="Background" Value="#1542B883"/>
+		<Style Selector="Button.refresh-btn:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="#1E3A2B"/>
 			<Setter Property="BorderBrush" Value="#42B883"/>
-			<Setter Property="RenderTransform" Value="scale(1.05)"/>
 		</Style>
 
-		<Style Selector="Button.refresh-btn:pressed">
-			<Setter Property="RenderTransform" Value="scale(0.95)"/>
+		<!-- per-card copy-all glyph -->
+		<Style Selector="Button.copy-btn">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Padding" Value="4"/>
+			<Setter Property="CornerRadius" Value="4"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="Button.copy-btn:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="#20222A"/>
+		</Style>
+
+		<!-- selectable, copyable field values -->
+		<Style Selector="SelectableTextBlock.val">
+			<Setter Property="FontFamily" Value="Cascadia Code,Consolas"/>
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="Foreground" Value="#ECECEF"/>
+			<Setter Property="SelectionBrush" Value="#3042B883"/>
 		</Style>
 	</UserControl.Styles>
-	<Grid RowDefinitions="Auto, *">
-		<Button Grid.Row="0"
-				Classes="refresh-btn"
-				Command="{Binding RefreshCommand}"
-				Margin="15,10"
-				HorizontalAlignment="Right"
-				VerticalAlignment="Center">
-			<StackPanel Orientation="Horizontal" Spacing="8">
-				<Path Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"
-					  Fill="#42B883"
-					  Width="14"
-					  Height="14"
-					  Stretch="Uniform"/>
-				<TextBlock Text="REFRESH ADAPTERS"
-						   FontSize="11"
-						   FontWeight="SemiBold"
-						   LetterSpacing="1"
-						   Foreground="#42B883"
-						   VerticalAlignment="Center"/>
+
+	<Grid RowDefinitions="Auto, *" Margin="14,12">
+		<!-- Header: title + refresh -->
+		<Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
+			<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+				<TextBlock Text="NETWORK ADAPTERS" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
+				<TextBlock Text="Select any value to copy · click ⧉ to copy the whole adapter" FontSize="10" Foreground="#9E9FA8"/>
 			</StackPanel>
-		</Button>
+
+			<Button Grid.Column="1" Classes="refresh-btn" Command="{Binding RefreshCommand}" VerticalAlignment="Center">
+				<StackPanel Orientation="Horizontal" Spacing="8">
+					<Path Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"
+						  Fill="#42B883" Width="14" Height="14" Stretch="Uniform"/>
+					<TextBlock Text="REFRESH" FontSize="11" FontWeight="SemiBold" LetterSpacing="1" Foreground="#42B883" VerticalAlignment="Center"/>
+				</StackPanel>
+			</Button>
+		</Grid>
 
 		<ScrollViewer Grid.Row="1">
 			<ItemsControl ItemsSource="{Binding Adapters}">
 				<ItemsControl.ItemTemplate>
-					<DataTemplate>
-						<Border Background="#22000000" CornerRadius="8" Margin="10,3" Padding="10"
-								BorderBrush="#2EFFFFFF" BorderThickness="1">
-							<Grid ColumnDefinitions="*, 2*">
-								<StackPanel Grid.Column="0" VerticalAlignment="Center">
-									<TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="#42B883" FontSize="13"/>
-									<TextBlock Text="{Binding Model}" Foreground="Gray" FontSize="10" TextWrapping="NoWrap"/>
-									<TextBlock Text="{Binding Status}" Foreground="#7FE0C0" FontSize="10" Opacity="0.8"/>
-								</StackPanel>
+					<DataTemplate x:DataType="vm:NetworkAdapterInfo">
+						<Border Classes="card" Margin="0,0,0,10" Padding="16,13">
+							<StackPanel Spacing="11">
 
-								<UniformGrid Grid.Column="1" Columns="2">
-									<StackPanel Margin="5,0">
-										<TextBlock Text="IPv4" FontSize="9" Foreground="#555"/>
-										<StackPanel Orientation="Horizontal" Spacing="5">
-											<TextBlock Text="{Binding IPv4}" FontSize="12" Foreground="White"/>
-											<Button Command="{Binding ((vm:NetworkInfoViewModel)DataContext).CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-													CommandParameter="{Binding IPv4}"
-													Background="Transparent" BorderThickness="0" Padding="2" Cursor="Hand">
-												<Path Data="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
-													  Fill="#444" Width="10" Height="10" Stretch="Uniform"/>
-											</Button>
-										</StackPanel>
+								<!-- Header: name + type + status + speed + copy -->
+								<Grid ColumnDefinitions="*, Auto">
+									<StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+										<TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="#42B883" FontSize="14" VerticalAlignment="Center"/>
+										<Border Background="#24262E" CornerRadius="4" Padding="7,2" VerticalAlignment="Center">
+											<TextBlock Text="{Binding Type}" Foreground="#C7C8CF" FontSize="9.5" FontWeight="SemiBold" LetterSpacing="0.5"/>
+										</Border>
+										<Border Background="#1E3A2B" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" IsVisible="{Binding IsUp}">
+											<TextBlock Text="UP" Foreground="#4FCB97" FontSize="9.5" FontWeight="Bold"/>
+										</Border>
+										<Border Background="#2A2126" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" IsVisible="{Binding !IsUp}">
+											<TextBlock Text="DOWN" Foreground="#C08088" FontSize="9.5" FontWeight="Bold"/>
+										</Border>
 									</StackPanel>
 
-									<StackPanel Margin="5,0">
-										<TextBlock Text="MAC" FontSize="9" Foreground="#555"/>
-										<TextBlock Text="{Binding MacAddress}" FontSize="12" Foreground="#CCC"/>
+									<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+										<TextBlock Text="{Binding Speed}" Foreground="#9E9FA8" FontSize="10.5"
+												   FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center"/>
+										<Button Classes="copy-btn"
+												Command="{Binding ((vm:NetworkInfoViewModel)DataContext).CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+												CommandParameter="{Binding Summary}" ToolTip.Tip="Copy all fields">
+											<Path Data="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
+												  Fill="#9E9FA8" Width="13" Height="13" Stretch="Uniform"/>
+										</Button>
+									</StackPanel>
+								</Grid>
+
+								<TextBlock Text="{Binding Model}" Foreground="#8A8B93" FontSize="10.5" TextWrapping="Wrap"/>
+
+								<Border Height="1" Background="#22242B"/>
+
+								<!-- Values: label + selectable value, using the full row width -->
+								<Grid ColumnDefinitions="*,*" ColumnSpacing="18" RowSpacing="10">
+									<Grid.RowDefinitions>
+										<RowDefinition Height="Auto"/>
+										<RowDefinition Height="Auto"/>
+										<RowDefinition Height="Auto"/>
+										<RowDefinition Height="Auto"/>
+									</Grid.RowDefinitions>
+
+									<StackPanel Grid.Row="0" Grid.Column="0" Spacing="2">
+										<TextBlock Classes="fieldLabel" Text="IPV4"/>
+										<SelectableTextBlock Classes="val" Text="{Binding IPv4}"/>
+									</StackPanel>
+									<StackPanel Grid.Row="0" Grid.Column="1" Spacing="2">
+										<TextBlock Classes="fieldLabel" Text="MAC"/>
+										<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding MacAddress}"/>
 									</StackPanel>
 
-									<StackPanel Margin="5,2">
-										<TextBlock Text="Gateway" FontSize="9" Foreground="#555"/>
-										<TextBlock Text="{Binding Gateway}" FontSize="11" Foreground="#CCC"/>
+									<StackPanel Grid.Row="1" Grid.Column="0" Spacing="2">
+										<TextBlock Classes="fieldLabel" Text="SUBNET"/>
+										<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding Subnet}"/>
 									</StackPanel>
-								</UniformGrid>
-							</Grid>
+									<StackPanel Grid.Row="1" Grid.Column="1" Spacing="2">
+										<TextBlock Classes="fieldLabel" Text="GATEWAY"/>
+										<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding Gateway}"/>
+									</StackPanel>
+
+									<StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Spacing="2">
+										<TextBlock Classes="fieldLabel" Text="IPV6"/>
+										<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding IPv6}" TextWrapping="Wrap"/>
+									</StackPanel>
+
+									<StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Spacing="2">
+										<TextBlock Classes="fieldLabel" Text="DNS SERVERS"/>
+										<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding Dns}" TextWrapping="Wrap"/>
+									</StackPanel>
+								</Grid>
+							</StackPanel>
 						</Border>
 					</DataTemplate>
 				</ItemsControl.ItemTemplate>

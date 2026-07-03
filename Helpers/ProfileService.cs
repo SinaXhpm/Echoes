@@ -28,23 +28,29 @@ public sealed class ProfileService
     private ProfileService() => Load();
 
     // ---------- Input history ----------
+    // Assumes _gate is already held.
+    private ObservableCollection<string> GetHistoryLocked(string key)
+    {
+        if (!_history.TryGetValue(key, out var list))
+        {
+            list = new ObservableCollection<string>();
+            _history[key] = list;
+        }
+        return list;
+    }
+
     public ObservableCollection<string> GetHistory(string key)
     {
-        lock (_gate)
-        {
-            if (!_history.TryGetValue(key, out var list))
-            {
-                list = new ObservableCollection<string>();
-                _history[key] = list;
-            }
-            return list;
-        }
+        lock (_gate) { return GetHistoryLocked(key); }
     }
 
     public string? LastHistory(string key)
     {
-        var list = GetHistory(key);
-        return list.Count > 0 ? list[0] : null;
+        lock (_gate)
+        {
+            var list = GetHistoryLocked(key);
+            return list.Count > 0 ? list[0] : null;
+        }
     }
 
     public void AddHistory(string key, string? value)
@@ -52,17 +58,40 @@ public sealed class ProfileService
         if (string.IsNullOrWhiteSpace(value)) return;
         value = Sanitize(value.Trim());
 
-        var list = GetHistory(key);
-        int existing = -1;
-        for (int i = 0; i < list.Count; i++)
-            if (string.Equals(list[i], value, StringComparison.Ordinal)) { existing = i; break; }
+        lock (_gate)
+        {
+            var list = GetHistoryLocked(key);
+            int existing = -1;
+            for (int i = 0; i < list.Count; i++)
+                if (string.Equals(list[i], value, StringComparison.Ordinal)) { existing = i; break; }
 
-        if (existing == 0) return;
-        if (existing > 0) list.RemoveAt(existing);
-        list.Insert(0, value);
-        while (list.Count > MaxPerKey) list.RemoveAt(list.Count - 1);
+            if (existing == 0) return;
+            if (existing > 0) list.RemoveAt(existing);
+            list.Insert(0, value);
+            while (list.Count > MaxPerKey) list.RemoveAt(list.Count - 1);
 
-        Save();
+            Save();
+        }
+    }
+
+    // Snapshot of every non-empty history list (key → values), for the History tab.
+    public IReadOnlyList<(string Key, IReadOnlyList<string> Values)> AllHistory()
+    {
+        lock (_gate)
+            return _history
+                .Where(kv => kv.Value.Count > 0)
+                .Select(kv => (kv.Key, (IReadOnlyList<string>)kv.Value.ToList()))
+                .ToList();
+    }
+
+    // Wipe all input history (empties the live UI-bound lists too), then persist.
+    public void ClearAllHistory()
+    {
+        lock (_gate)
+        {
+            foreach (var list in _history.Values) list.Clear();
+            Save();
+        }
     }
 
     // Strip credentials embedded in a URL (scheme://user:pass@host) before persisting.
@@ -70,25 +99,49 @@ public sealed class ProfileService
         => System.Text.RegularExpressions.Regex.Replace(value, @"(://)[^/@\s]+@", "$1");
 
     // ---------- Simple settings ----------
-    public string? GetSetting(string key) => _settings.TryGetValue(key, out var v) ? v : null;
-    public void SetSetting(string key, string? value) { _settings[key] = value ?? string.Empty; Save(); }
-    public void Remove(string key) { if (_settings.Remove(key)) Save(); }
+    // Every accessor holds _gate: mutators can run off the UI thread (SSH TOFU pin on a
+    // background thread, debounced persistence), racing Save()'s enumeration of the stores.
+    public string? GetSetting(string key)
+    {
+        lock (_gate) { return _settings.TryGetValue(key, out var v) ? v : null; }
+    }
+    public void SetSetting(string key, string? value)
+    {
+        lock (_gate) { _settings[key] = value ?? string.Empty; Save(); }
+    }
+    public void Remove(string key)
+    {
+        lock (_gate) { if (_settings.Remove(key)) Save(); }
+    }
     public bool GetBool(string key, bool def = false)
-        => _settings.TryGetValue(key, out var v) && bool.TryParse(v, out var b) ? b : def;
+    {
+        lock (_gate) { return _settings.TryGetValue(key, out var v) && bool.TryParse(v, out var b) ? b : def; }
+    }
     public void SetBool(string key, bool value) => SetSetting(key, value ? "true" : "false");
     public int GetInt(string key, int def = 0)
-        => _settings.TryGetValue(key, out var v) && int.TryParse(v, out var i) ? i : def;
+    {
+        lock (_gate) { return _settings.TryGetValue(key, out var v) && int.TryParse(v, out var i) ? i : def; }
+    }
 
     // Set several settings and write the file once (avoids one write per field).
     public void SetMany(params (string key, string? value)[] items)
     {
-        foreach (var (k, v) in items) _settings[k] = v ?? string.Empty;
-        Save();
+        lock (_gate)
+        {
+            foreach (var (k, v) in items) _settings[k] = v ?? string.Empty;
+            Save();
+        }
     }
 
     // ---------- SSH known hosts (trust-on-first-use pins) ----------
-    public string? GetKnownHost(string host) => _knownHosts.TryGetValue(host, out var v) ? v : null;
-    public void SetKnownHost(string host, string fingerprint) { _knownHosts[host] = fingerprint; Save(); }
+    public string? GetKnownHost(string host)
+    {
+        lock (_gate) { return _knownHosts.TryGetValue(host, out var v) ? v : null; }
+    }
+    public void SetKnownHost(string host, string fingerprint)
+    {
+        lock (_gate) { _knownHosts[host] = fingerprint; Save(); }
+    }
 
     // ---------- Persistence ----------
     private void Load()
@@ -101,7 +154,16 @@ public sealed class ProfileService
                 return;
             }
         }
-        catch { }
+        catch
+        {
+            // Corrupt/unreadable profile: keep a copy as .corrupt.bak instead of silently
+            // discarding it, then fall through so the app still starts (fresh state).
+            try
+            {
+                if (File.Exists(_path)) File.Copy(_path, _path + ".corrupt.bak", overwrite: true);
+            }
+            catch { }
+        }
         MigrateLegacy();
     }
 
@@ -134,7 +196,9 @@ public sealed class ProfileService
                 foreach (var kv in _history)
                 {
                     var arr = new JsonArray();
-                    foreach (var v in kv.Value) arr.Add(v);
+                    // Cast to JsonNode so the non-generic Add(JsonNode?) is chosen (AOT-safe;
+                    // the generic Add<T> is RequiresDynamicCode).
+                    foreach (var v in kv.Value) arr.Add((JsonNode?)v);
                     history[kv.Key] = arr;
                 }
                 var settings = new JsonObject();
@@ -143,7 +207,14 @@ public sealed class ProfileService
                 foreach (var kv in _knownHosts) hosts[kv.Key] = kv.Value;
 
                 var root = new JsonObject { ["history"] = history, ["settings"] = settings, ["knownHosts"] = hosts };
-                File.WriteAllText(_path, root.ToJsonString());
+
+                // Atomic write: serialize to a temp file in the same directory, then swap it in.
+                // A crash / power loss mid-write can never leave the profile truncated, and the
+                // whole method is inside _gate so two writers can't race the same path.
+                var tmp = _path + ".tmp";
+                File.WriteAllText(tmp, root.ToJsonString());
+                if (File.Exists(_path)) File.Replace(tmp, _path, null);
+                else File.Move(tmp, _path);
             }
         }
         catch { }

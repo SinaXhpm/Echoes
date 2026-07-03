@@ -37,6 +37,9 @@ public partial class MonitorViewModel : ObservableObject
     private CancellationTokenSource? _cts;
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(3) };
 
+    private const int MaxTargets = 256;           // cap the watch list so a big paste can't fan out unbounded
+    private const int MaxConcurrentChecks = 50;   // per-cycle concurrency (each target still does ping+tcp+http)
+
     [ObservableProperty] private string _inputAddresses = "google.com\n1.1.1.1:53\nhttps://api.ipify.org";
     [ObservableProperty] private int _interval = 2;
     [ObservableProperty] private bool _isMonitoring;
@@ -68,12 +71,27 @@ public partial class MonitorViewModel : ObservableObject
         IsMonitoring = true;
         _cts = new CancellationTokenSource();
 
+        // Keep the process alive while monitoring so an Android background switch doesn't
+        // silently freeze the checks (no-op on desktop).
+        Helpers.BackgroundGuard.Acquire("Monitoring targets");
+
         try
         {
             while (!_cts.Token.IsCancellationRequested)
             {
-                var tasks = Targets.Select(t => UpdateTargetStatus(t, _cts.Token));
-                await Task.WhenAll(tasks);
+                // Throttle: at most MaxConcurrentChecks targets probed at once, so a large watch
+                // list can't spawn thousands of concurrent sockets and exhaust ports/handles.
+                using (var gate = new SemaphoreSlim(MaxConcurrentChecks))
+                {
+                    var token = _cts.Token;
+                    var tasks = Targets.Select(async t =>
+                    {
+                        await gate.WaitAsync(token);
+                        try { await UpdateTargetStatus(t, token); }
+                        finally { gate.Release(); }
+                    });
+                    await Task.WhenAll(tasks);
+                }
 
                 await Task.Delay(Math.Max(1, Interval) * 1000, _cts.Token);
             }
@@ -85,6 +103,7 @@ public partial class MonitorViewModel : ObservableObject
             IsMonitoring = false;
             _cts?.Dispose();
             _cts = null;
+            Helpers.BackgroundGuard.Release();
         }
     }
 
@@ -95,6 +114,7 @@ public partial class MonitorViewModel : ObservableObject
 
         foreach (var line in lines.Select(l => l.Trim()))
         {
+            if (Targets.Count >= MaxTargets) break;   // cap the watch list
             var target = new MonitorTarget { Address = line };
             if (line.StartsWith("http"))
             {
@@ -188,9 +208,15 @@ public partial class MonitorViewModel : ObservableObject
         try
         {
             using var client = new TcpClient();
-            var connectTask = client.ConnectAsync(host, port, ct).AsTask();
-            var delayTask = Task.Delay(2000, ct);
-            if (await Task.WhenAny(connectTask, delayTask) == connectTask)
+            // Linked CTS so the loser is cancelled (no orphaned timer / no unobserved connect fault).
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var connectTask = client.ConnectAsync(host, port, linked.Token).AsTask();
+            _ = connectTask.ContinueWith(static t => { _ = t.Exception; },
+                CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+            var delayTask = Task.Delay(2000, linked.Token);
+            var winner = await Task.WhenAny(connectTask, delayTask);
+            linked.Cancel();
+            if (winner == connectTask && !connectTask.IsFaulted)
             {
                 sw.Stop();
                 return $"{sw.ElapsedMilliseconds}ms";

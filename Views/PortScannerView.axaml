@@ -1,102 +1,170 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.PortScannerView"
              x:DataType="vm:PortScannerViewModel">
 
-    <Grid RowDefinitions="Auto, Auto, *" Margin="12">
-        
-        <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,12">
-            <Grid ColumnDefinitions="*, *">
-                <StackPanel Grid.Column="0" Margin="0,0,5,0">
+    <UserControl.Styles>
+        <!-- sortable column header -->
+        <Style Selector="Button.colhead">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#9E9FA8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.colhead:pointerover /template/ ContentPresenter">
+            <Setter Property="Foreground" Value="#42B883"/>
+        </Style>
+        <!-- status pill -->
+        <Style Selector="Border.pill">
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="8,2"/>
+            <Setter Property="MinWidth" Value="62"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto, *" Margin="14">
+
+        <!-- ===== CONTROLS ===== -->
+        <Border Grid.Row="0" Classes="card" Padding="12" Margin="0,0,0,10">
+            <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto"
+                  helpers:Responsive.BreakWidth="560" ColumnSpacing="12" RowSpacing="12">
+                <Grid.Styles>
+                    <!-- wide: targets | controls side-by-side; narrow (phone): controls drop below -->
+                    <Style Selector="Grid.wide > StackPanel#ScanControls">
+                        <Setter Property="Grid.Row" Value="0"/>
+                        <Setter Property="Grid.Column" Value="1"/>
+                        <Setter Property="Width" Value="296"/>
+                    </Style>
+                    <Style Selector="Grid.narrow > StackPanel#ScanControls">
+                        <Setter Property="Grid.Row" Value="1"/>
+                        <Setter Property="Grid.Column" Value="0"/>
+                        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                    </Style>
+                </Grid.Styles>
+
+                <!-- Left: target list — tall, since ports no longer needs the height -->
+                <StackPanel Grid.Row="0" Grid.Column="0">
                     <TextBlock Classes="fieldLabel" Text="TARGETS"/>
-                    <TextBox Classes="field multiline" Text="{Binding TargetInput}" AcceptsReturn="True" Height="66"
+                    <TextBox Classes="field multiline" Text="{Binding TargetInput}" AcceptsReturn="True" Height="180"
                              KeyDown="Input_KeyDown"
-                             Watermark="IP/Range/CIDR (Enter=Scan, Shift+Enter=newline)"/>
+                             Watermark="IP / Range / CIDR — one per line&#x0a;(Enter = scan, Shift+Enter = newline)"/>
                 </StackPanel>
-                <StackPanel Grid.Column="1" Margin="5,0,0,0">
-                    <TextBlock Classes="fieldLabel" Text="PORTS"/>
-                    <TextBox Classes="field multiline" Text="{Binding PortInput}" AcceptsReturn="True" Height="66"
-                             KeyDown="Input_KeyDown"
-                             Watermark="80, 443, 8080-8090"/>
+
+                <!-- Right: ports (preset + custom in ONE box) then options then actions.
+                     Drops beneath the targets box below the Responsive break. -->
+                <StackPanel x:Name="ScanControls" Spacing="10">
+                    <StackPanel>
+                        <TextBlock Classes="fieldLabel" Text="PORTS"/>
+                        <AutoCompleteBox Classes="field" Text="{Binding PortInput}"
+                                         ItemsSource="{Binding PortPresets}"
+                                         ValueMemberBinding="{Binding Ports}"
+                                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                         Watermark="preset ▾ or custom (80,443,1-1024)">
+                            <AutoCompleteBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PortPreset">
+                                    <Grid ColumnDefinitions="96, *">
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="11.5" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Ports}" Foreground="#9E9FA8" FontSize="10"
+                                                   FontFamily="Cascadia Code,Consolas" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </AutoCompleteBox.ItemTemplate>
+                            <AutoCompleteBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding ToggleScanCommand}"/>
+                            </AutoCompleteBox.KeyBindings>
+                        </AutoCompleteBox>
+                    </StackPanel>
+
+                    <WrapPanel>
+                        <CheckBox IsChecked="{Binding UseTcp}" Content="TCP" FontSize="11.5" FontWeight="SemiBold" Foreground="#C7C8CF" Margin="0,0,18,0"/>
+                        <CheckBox IsChecked="{Binding UseUdp}" Content="UDP" FontSize="11.5" FontWeight="SemiBold" Foreground="#C7C8CF" Margin="0,0,18,0"/>
+                        <CheckBox IsChecked="{Binding Repeat}" Content="REPEAT" FontSize="11.5" FontWeight="SemiBold" Foreground="#C7C8CF"/>
+                    </WrapPanel>
+
+                    <Grid ColumnDefinitions="Auto, *, Auto, *">
+                        <TextBlock Grid.Column="0" Text="Interval" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <NumericUpDown Grid.Column="1" Value="{Binding RepeatInterval}" Minimum="1" ShowButtonSpinner="False" Height="30" FontSize="11.5"
+                                       HorizontalContentAlignment="Center" CornerRadius="6" Margin="0,0,10,0"
+                                       Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
+                        <TextBlock Grid.Column="2" Text="Timeout" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <NumericUpDown Grid.Column="3" Value="{Binding TimeoutMs}" Minimum="100" Increment="100" ShowButtonSpinner="False" Height="30" FontSize="11.5"
+                                       HorizontalContentAlignment="Center" CornerRadius="6"
+                                       Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*, *" ColumnSpacing="8">
+                        <Button Grid.Column="0" Classes="toggle" Command="{Binding ToggleScanCommand}"
+                                Classes.active="{Binding IsScanning}" HorizontalAlignment="Stretch">
+                            <Panel>
+                                <TextBlock Text="START" IsVisible="{Binding !IsScanning}" FontSize="12"/>
+                                <TextBlock Text="STOP" IsVisible="{Binding IsScanning}" FontSize="12"/>
+                            </Panel>
+                        </Button>
+                        <Button Grid.Column="1" Classes="secondary" Click="Export_Click"
+                                Content="EXPORT CSV" FontSize="11" HorizontalAlignment="Stretch"/>
+                    </Grid>
                 </StackPanel>
             </Grid>
+        </Border>
 
-            <Grid ColumnDefinitions="*, *">
-                <Button Grid.Column="0" Classes="toggle" Command="{Binding ToggleScanCommand}"
-                        Classes.active="{Binding IsScanning}"
-                        HorizontalAlignment="Stretch" Margin="0,0,5,0">
-                    <Panel>
-                        <TextBlock Text="START" IsVisible="{Binding !IsScanning}" FontSize="12"/>
-                        <TextBlock Text="STOP" IsVisible="{Binding IsScanning}" FontSize="12"/>
-                    </Panel>
-                </Button>
+        <!-- ===== RESULTS ===== -->
+        <Grid Grid.Row="1" RowDefinitions="Auto, Auto, *">
 
-                <Button Grid.Column="1" Classes="secondary" Click="Export_Click"
-                        Content="EXPORT CSV" FontSize="10.5"
-                        HorizontalAlignment="Stretch" Margin="5,0,0,0"/>
-            </Grid>
-        </StackPanel>
-
-        <WrapPanel Grid.Row="1" Margin="2,0,0,12" VerticalAlignment="Center">
-            <CheckBox IsChecked="{Binding UseTcp}" Content="TCP" FontSize="11.5" Foreground="White" FontWeight="Bold" Margin="0,0,18,0"/>
-            <CheckBox IsChecked="{Binding UseUdp}" Content="UDP" FontSize="11.5" Foreground="White" FontWeight="Bold" Margin="0,0,18,0"/>
-            <CheckBox IsChecked="{Binding Repeat}" Content="REPEAT" FontSize="11.5" Foreground="White" FontWeight="Bold" Margin="0,0,18,0"/>
-            
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,18,0">
-                <TextBlock Text="Interval:" FontSize="10.5" Foreground="White" Opacity="0.7" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <NumericUpDown Value="{Binding RepeatInterval}" Minimum="1" ShowButtonSpinner="False" Width="62" Height="30" FontSize="11.5"
-                               HorizontalContentAlignment="Center" CornerRadius="6"
-                               Foreground="White" Background="#25000000" BorderBrush="#50FFFFFF"/>
-            </StackPanel>
-
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Timeout:" FontSize="10.5" Foreground="White" Opacity="0.7" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <NumericUpDown Value="{Binding TimeoutMs}" Minimum="100" Increment="100" ShowButtonSpinner="False" Width="70" Height="30" FontSize="11.5"
-                               HorizontalContentAlignment="Center" CornerRadius="6"
-                               Foreground="White" Background="#25000000" BorderBrush="#50FFFFFF"/>
-            </StackPanel>
-        </WrapPanel>
-
-        <Grid Grid.Row="2" RowDefinitions="Auto, Auto, *">
-            <TextBlock Grid.Row="0" Text="{Binding StatusMessage}" FontSize="10" Foreground="#42B883"
-                       Opacity="0.85" Margin="12,0,0,6" IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-            <Grid Grid.Row="1" ColumnDefinitions="1.5*, 80, 80, *" Margin="12,0,28,10">
-                <Button Grid.Column="0" Command="{Binding SortByCommand}" CommandParameter="IP" Content="IP ADDRESS" 
-                        Background="Transparent" BorderThickness="0" FontSize="10.5" Foreground="White" FontWeight="Bold" Opacity="0.9" HorizontalAlignment="Left" Padding="0"/>
-                <Button Grid.Column="1" Command="{Binding SortByCommand}" CommandParameter="Port" Content="PORT" 
-                        Background="Transparent" BorderThickness="0" FontSize="10.5" Foreground="White" FontWeight="Bold" Opacity="0.9" Padding="0"/>
-                <Button Grid.Column="2" Command="{Binding SortByCommand}" CommandParameter="Protocol" Content="PROTO" 
-                        Background="Transparent" BorderThickness="0" FontSize="10.5" Foreground="White" FontWeight="Bold" Opacity="0.9" Padding="0"/>
-                <TextBlock Grid.Column="3" Text="STATUS" FontSize="10.5" Foreground="White" FontWeight="Bold" Opacity="0.9" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+            <!-- results header: count chip + live status -->
+            <Grid Grid.Row="0" ColumnDefinitions="Auto, *" Margin="2,0,2,8">
+                <Border Grid.Column="0" Background="#191A1F" BorderBrush="#2A2C33" BorderThickness="1" CornerRadius="5" Padding="9,3">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="RESULTS" FontSize="9.5" FontWeight="Bold" Foreground="#9E9FA8" VerticalAlignment="Center" LetterSpacing="0.5"/>
+                        <TextBlock Text="{Binding Results.Count}" FontSize="11" FontWeight="Bold" Foreground="#42B883"
+                                   FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+                <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" FontSize="10.5" Foreground="#42B883"
+                           FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center" Margin="10,0,0,0"
+                           TextTrimming="CharacterEllipsis"
+                           IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
             </Grid>
 
-            <ListBox Grid.Row="2" ItemsSource="{Binding Results}" Background="#33000000" BorderBrush="#2EFFFFFF" BorderThickness="1" CornerRadius="10" Padding="0">
+            <!-- sortable column headers -->
+            <Grid Grid.Row="1" ColumnDefinitions="1.5*, 80, 80, *" Margin="14,0,14,6">
+                <Button Grid.Column="0" Classes="colhead" Command="{Binding SortByCommand}" CommandParameter="IP" Content="IP ADDRESS" HorizontalAlignment="Left"/>
+                <Button Grid.Column="1" Classes="colhead" Command="{Binding SortByCommand}" CommandParameter="Port" Content="PORT"/>
+                <Button Grid.Column="2" Classes="colhead" Command="{Binding SortByCommand}" CommandParameter="Protocol" Content="PROTO"/>
+                <Button Grid.Column="3" Classes="colhead" Command="{Binding SortByCommand}" CommandParameter="Status" Content="STATUS" HorizontalAlignment="Right"/>
+            </Grid>
+
+            <ListBox Grid.Row="2" ItemsSource="{Binding Results}" Background="#121317" BorderBrush="#2A2C33" BorderThickness="1" CornerRadius="8" Padding="0">
                 <ListBox.Styles>
                     <Style Selector="ListBoxItem">
                         <Setter Property="Padding" Value="0"/>
                         <Setter Property="Margin" Value="0,1"/>
-                        <Setter Property="MinHeight" Value="30"/>
+                        <Setter Property="MinHeight" Value="32"/>
                     </Style>
                     <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
-                        <Setter Property="Background" Value="#25FFFFFF"/>
+                        <Setter Property="Background" Value="#1E2027"/>
                     </Style>
                 </ListBox.Styles>
                 <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="vm:PortResult">
-                        <Border CornerRadius="3" Margin="4,1" Padding="10,5">
+                        <Border CornerRadius="4" Margin="4,1" Padding="10,6">
                             <Border.Styles>
                                 <Style Selector="Border">
-                                    <Setter Property="Background" Value="#18FFFFFF"/>
+                                    <Setter Property="Background" Value="#191A1F"/>
                                 </Style>
                                 <Style Selector="Border[Tag=OPEN]">
-                                    <Setter Property="Background" Value="#4527AE60"/>
+                                    <Setter Property="Background" Value="#16311F"/>
                                 </Style>
                                 <Style Selector="Border[Tag=CLOSED]">
-                                    <Setter Property="Background" Value="#45C0392B"/>
+                                    <Setter Property="Background" Value="#2C1B1D"/>
                                 </Style>
                                 <Style Selector="Border[Tag=REJECT]">
-                                    <Setter Property="Background" Value="#45C0392B"/>
+                                    <Setter Property="Background" Value="#2C1B1D"/>
                                 </Style>
                             </Border.Styles>
                             <Border.Tag>
@@ -104,11 +172,31 @@
                             </Border.Tag>
 
                             <Grid ColumnDefinitions="1.5*, 80, 80, *">
-                                <TextBlock Grid.Column="0" Text="{Binding IP}" FontSize="11.5" Foreground="White" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                                <TextBlock Grid.Column="1" Text="{Binding Port}" FontSize="11.5" Foreground="White" Opacity="1.0" VerticalAlignment="Center"/>
-                                <TextBlock Grid.Column="2" Text="{Binding Protocol}" FontSize="10.5" Foreground="White" VerticalAlignment="Center" Opacity="0.7"/>
-                                <TextBlock Grid.Column="3" Text="{Binding Status}" FontSize="11.5" FontWeight="Heavy" 
-                                           HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                <SelectableTextBlock Grid.Column="0" Text="{Binding IP}" FontSize="11.5" FontFamily="Cascadia Code,Consolas"
+                                                     Foreground="#ECECEF" VerticalAlignment="Center" FontWeight="SemiBold"
+                                                     SelectionBrush="#3042B883"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Port}" FontSize="11.5" FontFamily="Cascadia Code,Consolas" Foreground="#C7C8CF" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="{Binding Protocol}" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center"/>
+
+                                <Border Grid.Column="3" Classes="pill" VerticalAlignment="Center">
+                                    <Border.Styles>
+                                        <Style Selector="Border">
+                                            <Setter Property="Background" Value="#242089"/>
+                                        </Style>
+                                        <Style Selector="Border[Tag=OPEN]">
+                                            <Setter Property="Background" Value="#1E3A2B"/>
+                                        </Style>
+                                        <Style Selector="Border[Tag=CLOSED]">
+                                            <Setter Property="Background" Value="#3A2124"/>
+                                        </Style>
+                                        <Style Selector="Border[Tag=REJECT]">
+                                            <Setter Property="Background" Value="#3A2124"/>
+                                        </Style>
+                                    </Border.Styles>
+                                    <Border.Tag><Binding Path="Status"/></Border.Tag>
+                                    <TextBlock Text="{Binding Status}" FontSize="10.5" FontWeight="Bold" Foreground="#ECECEF"
+                                               HorizontalAlignment="Center"/>
+                                </Border>
                             </Grid>
                         </Border>
                     </DataTemplate>
