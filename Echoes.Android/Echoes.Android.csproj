@@ -13,8 +13,8 @@
     <RootNamespace>Echoes.Android</RootNamespace>
 
     <ApplicationId>com.sinaxhpm.echoes</ApplicationId>
-    <ApplicationVersion>4</ApplicationVersion>
-    <ApplicationDisplayVersion>0.2.8</ApplicationDisplayVersion>
+    <ApplicationVersion>5</ApplicationVersion>
+    <ApplicationDisplayVersion>0.3.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
   </PropertyGroup>
 

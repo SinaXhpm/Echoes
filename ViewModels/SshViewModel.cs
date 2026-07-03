@@ -59,14 +59,29 @@ public partial class SshViewModel : ObservableObject
         _loaded = true;
     }
 
+    private CancellationTokenSource? _persistCts;
+
     protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
         if (_loaded && e.PropertyName is { } n && PersistProps.Contains(n))
+            SchedulePersist();
+    }
+
+    // Typing into Host/User/… raises PropertyChanged per keystroke; debounce so we don't
+    // re-serialize + rewrite the whole profile file on the UI thread on every character.
+    private void SchedulePersist()
+    {
+        _persistCts?.Cancel();
+        var cts = _persistCts = new CancellationTokenSource();
+        _ = Task.Delay(600, cts.Token).ContinueWith(t =>
+        {
+            if (t.IsCanceled) return;
             ProfileService.Instance.SetMany(
                 ("ssh.host", Host), ("ssh.port", Port.ToString()), ("ssh.user", Username),
                 ("ssh.inEnabled", ConnectViaProxy ? "true" : "false"), ("ssh.inHost", ProxyInHost), ("ssh.inPort", ProxyInPort.ToString()),
                 ("ssh.outEnabled", EnableSocksTunnel ? "true" : "false"), ("ssh.outHost", TunnelHost), ("ssh.outPort", TunnelPort.ToString()));
+        }, TaskScheduler.Default);
     }
 
     private readonly List<string> _history = new();
@@ -136,12 +151,12 @@ public partial class SshViewModel : ObservableObject
                     _dynamicForward = new ForwardedPortDynamic(TunnelHost, (uint)TunnelPort);
                     _client.AddForwardedPort(_dynamicForward);
                     _dynamicForward.Start();
-                    TunnelStatus = $"SOCKS5 Proxy: {TunnelHost}:{TunnelPort}";
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => TunnelStatus = $"SOCKS5 Proxy: {TunnelHost}:{TunnelPort}");
                 }
 
                 _shellStream = _client.CreateShellStream("vt100", 80, 24, 800, 600, 1024);
 
-                IsConnected = true;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => IsConnected = true);
 
                 _readerCts = new CancellationTokenSource();
                 _ = Task.Run(() => ReadFromStream(_readerCts.Token));
@@ -250,8 +265,12 @@ public partial class SshViewModel : ObservableObject
             _client?.Dispose();
         }
         catch { }
-        IsConnected = false;
-        TunnelStatus = "Tunnel: Offline";
+        // StopSsh may run on a background thread (connect-failure path); marshal bound state.
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            IsConnected = false;
+            TunnelStatus = "Tunnel: Offline";
+        });
         AppendToTerminal("\n# Disconnected.\n");
     }
 }

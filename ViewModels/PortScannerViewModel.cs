@@ -28,6 +28,21 @@ public partial class PortScannerViewModel : ObservableObject
 
     private const int MaxHosts = 65536;
     private const int MaxConcurrency = 100;
+    private const int MaxResults = 5000;   // bound the bound-collection so huge ranges can't OOM the UI
+
+    // Add a result to the bound collection, keeping OPEN rows (newest on top) and capping the
+    // rest so a hosts×ports scan can't grow the collection without limit. UI-thread only.
+    private void AddResult(PortResult result)
+    {
+        if (result.Status.StartsWith("OPEN", StringComparison.Ordinal))
+            Results.Insert(0, result);
+        else if (Results.Count < MaxResults)
+            Results.Add(result);
+
+        // Trim overflow from the tail (non-OPEN rows accumulate there).
+        while (Results.Count > MaxResults)
+            Results.RemoveAt(Results.Count - 1);
+    }
 
     public ObservableCollection<string> TargetHistory => Helpers.HistoryService.Instance.Get("portscan.target");
     public ObservableCollection<string> PortHistory => Helpers.HistoryService.Instance.Get("portscan.ports");
@@ -37,6 +52,19 @@ public partial class PortScannerViewModel : ObservableObject
         if (Helpers.HistoryService.Instance.Last("portscan.target") is { } t) TargetInput = t;
         if (Helpers.HistoryService.Instance.Last("portscan.ports") is { } p) PortInput = p;
     }
+
+    // Common ready-made port sets shown as suggestions in the PORTS box; the box stays fully
+    // editable so custom comma/range input works too. (Bound via AutoCompleteBox ValueMemberBinding.)
+    public IReadOnlyList<PortPreset> PortPresets { get; } = new PortPreset[]
+    {
+        new("Top 20",        "21,22,23,25,53,80,110,139,143,443,445,993,995,1723,3306,3389,5900,8080"),
+        new("Web",           "80,443,8080,8443,8000,8888"),
+        new("Common 1-1024", "1-1024"),
+        new("Full 1-65535",  "1-65535"),
+        new("Database",      "1433,1521,3306,5432,6379,27017,9200"),
+        new("Mail",          "25,110,143,465,587,993,995"),
+        new("Remote/Admin",  "22,23,3389,5900,5985,5986"),
+    };
 
     private CancellationTokenSource? _cts;
     private readonly List<Socket> _activeSockets = new();
@@ -105,6 +133,10 @@ public partial class PortScannerViewModel : ObservableObject
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
 
+            // Keep the process alive for the duration of the scan so backgrounding the
+            // Android app doesn't kill an in-flight sweep (no-op on desktop).
+            Helpers.BackgroundGuard.Acquire("Scanning ports");
+
             var options = new ParallelOptions { MaxDegreeOfParallelism = MaxConcurrency, CancellationToken = token };
 
             do
@@ -137,6 +169,7 @@ public partial class PortScannerViewModel : ObservableObject
             IsScanning = false;
             _cts?.Dispose();
             _cts = null;
+            Helpers.BackgroundGuard.Release();
 
             lock (_activeSockets)
             {
@@ -155,10 +188,19 @@ public partial class PortScannerViewModel : ObservableObject
 
         try
         {
-            var connectTask = socket.ConnectAsync(new IPEndPoint(IPAddress.Parse(ip), port), ct).AsTask();
-            var delayTask = Task.Delay(TimeoutMs, ct);
+            // Linked CTS so completing/timing-out one side cancels the other — no orphaned
+            // Task.Delay timer when connect wins, no leaked pending connect when the timeout wins.
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var connectTask = socket.ConnectAsync(new IPEndPoint(IPAddress.Parse(ip), port), linked.Token).AsTask();
+            // Observe a late connect fault so it never surfaces as an UnobservedTaskException.
+            _ = connectTask.ContinueWith(static t => { _ = t.Exception; },
+                CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
 
-            if (await Task.WhenAny(connectTask, delayTask) == connectTask && socket.Connected)
+            var delayTask = Task.Delay(TimeoutMs, linked.Token);
+            var winner = await Task.WhenAny(connectTask, delayTask);
+            linked.Cancel();
+
+            if (winner == connectTask && !connectTask.IsFaulted && socket.Connected)
             {
                 result.Status = "OPEN";
             }
@@ -176,13 +218,7 @@ public partial class PortScannerViewModel : ObservableObject
         }
 
         if (!ct.IsCancellationRequested)
-        {
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                if (result.Status == "OPEN") Results.Insert(0, result);
-                else Results.Add(result);
-            });
-        }
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => AddResult(result));
     }
 
     private async Task ScanUdp(string ip, int port, CancellationToken ct)
@@ -229,13 +265,7 @@ public partial class PortScannerViewModel : ObservableObject
         }
 
         if (!ct.IsCancellationRequested)
-        {
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                if (result.Status == "OPEN") Results.Insert(0, result);
-                else Results.Add(result);
-            });
-        }
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => AddResult(result));
     }
 
     private static byte[] UdpProbe(int port) => port switch
@@ -368,3 +398,5 @@ public class PortResult
     public string Protocol { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
 }
+
+public sealed record PortPreset(string Name, string Ports);

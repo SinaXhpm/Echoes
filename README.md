@@ -1,6 +1,6 @@
 # Echoes 🛰️ — Cross-Platform Network & Developer Toolkit
 
-> A free, open-source network and developer toolkit for **Windows, macOS, Linux, and Android** — ping, port scanner, SSH, DNS/WHOIS, cURL, IP/GeoIP, service monitor, encrypted notes, and string/JSON tools, all in one app.
+> A free, open-source network and developer toolkit for **Windows, macOS, Linux, and Android** — ping, port scanner, SSH, DNS/WHOIS, cURL, IP/GeoIP, service monitor, encrypted notes & backup, and string/JSON tools, all in one app.
 
 [![License: MIT](https://img.shields.io/github/license/SinaXhpm/Echoes)](https://github.com/SinaXhpm/Echoes/blob/master/LICENSE)
 ![Platforms: Windows, macOS, Linux, Android](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android-blue)
@@ -14,7 +14,7 @@
 
 ## About
 
-**Echoes** is a single desktop and mobile app that bundles the network and developer utilities you reach for every day — pinging hosts, scanning ports, connecting over SSH, looking up DNS/WHOIS and IP/GeoIP data, sending HTTP requests, monitoring uptime, keeping encrypted notes, and transforming text/JSON. It runs on Windows, macOS, Linux, and Android from one codebase, works offline, and stores your data locally (no accounts, no telemetry). The desktop builds are zero-dependency Native AOT binaries — nothing to install.
+**Echoes** is a single desktop and mobile app that bundles the network and developer utilities you reach for every day — pinging hosts, scanning ports, connecting over SSH, looking up DNS/WHOIS and IP/GeoIP data, sending HTTP requests, monitoring uptime, keeping encrypted notes and backups, and transforming text/JSON. It runs on Windows, macOS, Linux, and Android from one codebase, works offline, and stores your data locally (no accounts, no telemetry). The desktop builds are zero-dependency Native AOT binaries — nothing to install.
 
 ## Screenshots
 
@@ -43,7 +43,7 @@ The desktop builds are self-contained (Native AOT) — no .NET runtime needed.
 - **Ping & Traceroute** — live ICMP ping with packet-loss stats and hop-by-hop tracing.
 - **Port Scanner** — TCP/UDP scan for single IPs, ranges, and CIDR; export to CSV.
 - **SSH Terminal** — terminal with ANSI colors, command history, and SOCKS5 proxy/tunneling.
-- **DNS & WHOIS** — query DNS records (A, MX, TXT, …) via custom resolvers, plus RDAP domain lookups.
+- **DNS & WHOIS** — query DNS records (A, AAAA, MX, TXT, …) via custom resolvers with a multi-select type picker, plus RDAP domain lookups; paste a full URL and it extracts the host automatically.
 - **NIC Explorer** — network adapters with IPv4/IPv6, MAC, and status (desktop only).
 
 ### Web & API
@@ -55,11 +55,15 @@ The desktop builds are self-contained (Native AOT) — no .NET runtime needed.
 
 ### Tools
 - **Encrypted Notes** — local notes encrypted with AES-256 + a master key. The key is never stored; if you lose it, the notes can't be recovered.
+- **Encrypted Backup** — export everything (profiles, settings, and notes) to one password-protected file (PBKDF2 + AES-256-GCM) and restore it on another machine. Fully offline — no account, no cloud.
+- **Input History** — the History tab remembers recent hosts, targets, and URLs per tool so you can re-run them in a click.
 - **String Lab** — Base64/URL encoding, hashing (MD5/SHA256), regex testing, JSON format/minify, case conversion, text cleanup, and token generators.
 
 ## Android notes
 
-The Android app runs the same UI. A few desktop features don't work inside the Android sandbox: the real `curl` engine (use the built-in .NET engine instead), notification sounds, and NIC Explorer. Everything else (ping, SSH, DNS, IP info, scanner, monitor, cURL via .NET) works.
+The Android app runs the same UI, adapted for touch: a drawer-based layout that reflows to fit phone screens. Long-running tools (**Service Monitor** and **Port Scanner**) keep running when the app is in the background via a foreground service, so a scan or uptime check isn't cut off when you switch away.
+
+A few desktop features don't work inside the Android sandbox: the real `curl` engine (use the built-in .NET engine instead), notification sounds, and NIC Explorer. Everything else (ping, SSH, DNS, IP info, scanner, monitor, cURL via .NET) works.
 
 ## FAQ
 
@@ -97,4 +101,4 @@ MIT.
 
 ---
 
-**Keywords:** network toolkit, network utility, network scanner, ping tool, traceroute, port scanner, TCP/UDP scanner, SSH client, SSH terminal, DNS lookup, WHOIS, cURL GUI, HTTP client, IP lookup, GeoIP, public IP, uptime monitor, latency monitor, SSL/TLS certificate inspector, encrypted notes, AES-256, Base64, regex tester, JSON formatter, hashing tool, cross-platform, Windows, macOS, Linux, Android, Avalonia UI, .NET, Native AOT, open source, free.
+**Keywords:** network toolkit, network utility, network scanner, ping tool, traceroute, port scanner, TCP/UDP scanner, SSH client, SSH terminal, DNS lookup, WHOIS, cURL GUI, HTTP client, IP lookup, GeoIP, public IP, uptime monitor, latency monitor, SSL/TLS certificate inspector, encrypted notes, encrypted backup, AES-256, Base64, regex tester, JSON formatter, hashing tool, cross-platform, Windows, macOS, Linux, Android, Avalonia UI, .NET, Native AOT, open source, free.

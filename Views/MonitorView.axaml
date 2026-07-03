@@ -1,87 +1,108 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.MonitorView"
              x:DataType="vm:MonitorViewModel">
 
-    <Grid RowDefinitions="Auto, Auto, *" Margin="15">
-        <Grid Grid.Row="0" ColumnDefinitions="*, 232" Margin="0,0,0,10">
-            <StackPanel Grid.Column="0" Margin="0,0,10,0">
+    <Grid RowDefinitions="Auto, Auto, *" Margin="14">
+        <Grid Grid.Row="0" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto"
+              helpers:Responsive.BreakWidth="520" ColumnSpacing="10" RowSpacing="10" Margin="0,0,0,10">
+            <Grid.Styles>
+                <!-- wide: targets | checks side-by-side; narrow (phone): checks drop below -->
+                <Style Selector="Grid.wide > StackPanel#MonChecks">
+                    <Setter Property="Grid.Row" Value="0"/>
+                    <Setter Property="Grid.Column" Value="1"/>
+                    <Setter Property="Width" Value="244"/>
+                </Style>
+                <Style Selector="Grid.narrow > StackPanel#MonChecks">
+                    <Setter Property="Grid.Row" Value="1"/>
+                    <Setter Property="Grid.Column" Value="0"/>
+                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                </Style>
+            </Grid.Styles>
+
+            <StackPanel Grid.Row="0" Grid.Column="0">
                 <TextBlock Classes="fieldLabel" Text="TARGETS"/>
-                <TextBox Classes="field multiline" Text="{Binding InputAddresses}" AcceptsReturn="True" FontSize="12" Height="92"
+                <TextBox Classes="field multiline" Text="{Binding InputAddresses}" AcceptsReturn="True" FontSize="12" Height="124"
+                         FontFamily="Cascadia Code,Consolas"
                          KeyDown="Input_KeyDown"
                          Watermark="IP/URL per line (Enter=Start, Shift+Enter=newline)"/>
             </StackPanel>
 
-            <Border Grid.Column="1" Background="#18000000" CornerRadius="8" Padding="12" BorderBrush="#22FFFFFF" BorderThickness="1"
-                    VerticalAlignment="Bottom">
-                <StackPanel Spacing="9">
-                    <UniformGrid Columns="2" Rows="2">
-                        <UniformGrid.Styles>
-                            <Style Selector="CheckBox">
-                                <Setter Property="FontSize" Value="10.5"/>
-                                <Setter Property="MinHeight" Value="0"/>
-                                <Setter Property="Margin" Value="0,0,0,4"/>
-                            </Style>
-                        </UniformGrid.Styles>
-                        <CheckBox IsChecked="{Binding CheckPing}" Content="PING"/>
-                        <CheckBox IsChecked="{Binding CheckTcp}" Content="TCP"/>
-                        <CheckBox IsChecked="{Binding CheckHttp}" Content="HTTP"/>
-                        <CheckBox IsChecked="{Binding AlertSound}" Content="SND"
-                                  ToolTip.Tip="Beep when a target goes up or down"/>
-                    </UniformGrid>
+            <StackPanel x:Name="MonChecks">
+                <TextBlock Classes="fieldLabel" Text="CHECKS"/>
+                <Border Classes="card" Padding="12" Height="124">
+                    <Grid RowDefinitions="Auto, *, Auto">
+                        <UniformGrid Grid.Row="0" Columns="2" Rows="2">
+                            <UniformGrid.Styles>
+                                <Style Selector="CheckBox">
+                                    <Setter Property="FontSize" Value="11"/>
+                                    <Setter Property="MinHeight" Value="0"/>
+                                    <Setter Property="Margin" Value="0,0,0,4"/>
+                                </Style>
+                            </UniformGrid.Styles>
+                            <CheckBox IsChecked="{Binding CheckPing}" Content="PING"/>
+                            <CheckBox IsChecked="{Binding CheckTcp}" Content="TCP"/>
+                            <CheckBox IsChecked="{Binding CheckHttp}" Content="HTTP"/>
+                            <CheckBox IsChecked="{Binding AlertSound}" Content="SND"
+                                      ToolTip.Tip="Beep when a target goes up or down"/>
+                        </UniformGrid>
 
-                    <Grid ColumnDefinitions="Auto, *, 92">
-                        <TextBlock Grid.Column="0" Text="INT(S)" VerticalAlignment="Center" FontSize="9" FontWeight="Bold" Opacity="0.45" Margin="0,0,6,0"/>
-                        <TextBox Grid.Column="1" Text="{Binding Interval}" Height="30" Padding="6,0" FontSize="11"
-                                 VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
-                                 Background="#1A000000" BorderBrush="#33FFFFFF" CornerRadius="6" Margin="0,0,8,0"/>
-                        <Button Grid.Column="2" Classes="toggle" Command="{Binding ToggleMonitorCommand}" Height="30"
-                                Classes.active="{Binding IsMonitoring}">
-                            <Panel>
-                                <TextBlock Text="START" IsVisible="{Binding !IsMonitoring}" FontSize="10" FontWeight="Black"/>
-                                <TextBlock Text="STOP" IsVisible="{Binding IsMonitoring}" FontSize="10" FontWeight="Black"/>
-                            </Panel>
-                        </Button>
+                        <Grid Grid.Row="2" ColumnDefinitions="Auto, *, 92">
+                            <TextBlock Grid.Column="0" Text="INT(S)" VerticalAlignment="Center" FontSize="9" FontWeight="Bold" Foreground="#9E9FA8" Margin="0,0,6,0"/>
+                            <TextBox Grid.Column="1" Classes="field" Text="{Binding Interval}" FontSize="11"
+                                     HorizontalContentAlignment="Center" Margin="0,0,8,0"/>
+                            <Button Grid.Column="2" Classes="toggle" Command="{Binding ToggleMonitorCommand}"
+                                    Classes.active="{Binding IsMonitoring}">
+                                <Panel>
+                                    <TextBlock Text="START" IsVisible="{Binding !IsMonitoring}" FontSize="10" FontWeight="Black"/>
+                                    <TextBlock Text="STOP" IsVisible="{Binding IsMonitoring}" FontSize="10" FontWeight="Black"/>
+                                </Panel>
+                            </Button>
+                        </Grid>
                     </Grid>
-                </StackPanel>
-            </Border>
+                </Border>
+            </StackPanel>
         </Grid>
 
-        <Grid Grid.Row="1" ColumnDefinitions="2*, 1*, 1*, 1.2*, 0.9*, 0.7*" Margin="15,0,15,10">
-            <TextBlock Grid.Column="0" Text="ADDRESS" FontSize="10" FontWeight="Bold" Opacity="0.3"/>
-            <TextBlock Grid.Column="1" Text="PING" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Center"/>
-            <TextBlock Grid.Column="2" Text="TCP" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Center"/>
-            <TextBlock Grid.Column="3" Text="HTTP" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Center"/>
-            <TextBlock Grid.Column="4" Text="UPTIME" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Center"/>
-            <TextBlock Grid.Column="5" Text="FAILS" FontSize="10" FontWeight="Bold" Opacity="0.3" HorizontalAlignment="Right"/>
+        <Grid Grid.Row="1" ColumnDefinitions="2*, 1*, 1*, 1.2*, 0.9*, 0.7*" Margin="12,0,12,8">
+            <TextBlock Grid.Column="0" Text="ADDRESS" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8"/>
+            <TextBlock Grid.Column="1" Text="PING" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center"/>
+            <TextBlock Grid.Column="2" Text="TCP" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center"/>
+            <TextBlock Grid.Column="3" Text="HTTP" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center"/>
+            <TextBlock Grid.Column="4" Text="UPTIME" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center"/>
+            <TextBlock Grid.Column="5" Text="FAILS" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Right"/>
         </Grid>
 
         <ListBox Grid.Row="2" ItemsSource="{Binding Targets}" Background="Transparent" Padding="0">
             <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:MonitorTarget">
-                    <Border CornerRadius="3" Margin="0,1" Padding="12,6" Classes.success="{Binding IsSuccess}" Classes.failed="{Binding !IsSuccess}">
+                    <Border CornerRadius="6" Margin="0,2" Padding="12,7" BorderThickness="1" Classes.success="{Binding IsSuccess}" Classes.failed="{Binding !IsSuccess}">
                         <Border.Styles>
                             <Style Selector="Border">
-                                <Setter Property="Background" Value="#05FFFFFF"/>
+                                <Setter Property="Background" Value="#191A1F"/>
+                                <Setter Property="BorderBrush" Value="#2F3139"/>
                             </Style>
                             <Style Selector="Border.success">
-                                <Setter Property="Background" Value="#1042B883"/>
+                                <Setter Property="Background" Value="#2042B883"/>
+                                <Setter Property="BorderBrush" Value="#2042B883"/>
                             </Style>
                             <Style Selector="Border.failed">
-                                <Setter Property="Background" Value="#10FF4444"/>
+                                <Setter Property="Background" Value="#20E5484D"/>
+                                <Setter Property="BorderBrush" Value="#20E5484D"/>
                             </Style>
                         </Border.Styles>
                         <Grid ColumnDefinitions="2*, 1*, 1*, 1.2*, 0.9*, 0.7*">
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Address}" FontSize="11.5" Foreground="White" TextTrimming="CharacterEllipsis"/>
-                                <TextBlock Text="{Binding History}" FontSize="9" Foreground="#42B883" FontFamily="Consolas" Margin="0,1,0,0"/>
+                                <TextBlock Text="{Binding Address}" FontSize="11.5" Foreground="#ECECEF" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding History}" FontSize="9" Foreground="#42B883" FontFamily="Cascadia Code,Consolas" Margin="0,2,0,0"/>
                             </StackPanel>
-                            <TextBlock Grid.Column="1" Text="{Binding PingStatus}" FontSize="10.5" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7"/>
-                            <TextBlock Grid.Column="2" Text="{Binding TcpStatus}" FontSize="10.5" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7"/>
-                            <TextBlock Grid.Column="3" Text="{Binding HttpStatus}" FontSize="10.5" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                            <TextBlock Grid.Column="4" Text="{Binding Uptime}" FontSize="10.5" Foreground="#7FE0C0" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                            <TextBlock Grid.Column="5" Text="{Binding FailedCount}" FontSize="11" Foreground="#FF6666" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
+                            <TextBlock Grid.Column="1" Text="{Binding PingStatus}" FontSize="10.5" Foreground="#C7C8CF" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" Text="{Binding TcpStatus}" FontSize="10.5" Foreground="#C7C8CF" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="3" Text="{Binding HttpStatus}" FontSize="10.5" Foreground="#ECECEF" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="4" Text="{Binding Uptime}" FontSize="10.5" Foreground="#4FCB97" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="5" Text="{Binding FailedCount}" FontSize="11" Foreground="#E5484D" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
                         </Grid>
                     </Border>
                 </DataTemplate>

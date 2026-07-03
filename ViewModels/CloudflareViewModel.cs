@@ -33,21 +33,38 @@ public class CfRecord
     public string ProxiedText => Proxied ? "proxied" : "dns-only";
 }
 
-public partial class CloudflareViewModel : ObservableObject
+/// <summary>A named Cloudflare connection profile: one set of credentials + its proxy.</summary>
+public partial class CfProfile : ObservableObject
 {
-    private const string Api = "https://api.cloudflare.com/client/v4";
-
+    [ObservableProperty] private string _name = "Profile";
     // Auth — true: API Token (Bearer); false: Global API Key + email
     [ObservableProperty] private bool _useApiToken = true;
     [ObservableProperty] private string _apiToken = string.Empty;
     [ObservableProperty] private string _apiEmail = string.Empty;
     [ObservableProperty] private string _apiKey = string.Empty;
-
-    // Proxy (for every request)
+    // Proxy (per profile)
     [ObservableProperty] private bool _useProxy;
     [ObservableProperty] private string _proxyAddress = string.Empty;
     [ObservableProperty] private string _proxyUser = string.Empty;
     [ObservableProperty] private string _proxyPass = string.Empty;
+
+    public override string ToString() => string.IsNullOrWhiteSpace(Name) ? "(unnamed)" : Name;
+}
+
+public partial class CloudflareViewModel : ObservableObject
+{
+    private const string Api = "https://api.cloudflare.com/client/v4";
+
+    // Named profiles you can switch between; the active one drives every request.
+    public ObservableCollection<CfProfile> Profiles { get; } = new();
+    [ObservableProperty] private CfProfile? _selectedProfile;
+
+    // Master-password lock (mirrors the Notes tab). Profiles live in an encrypted vault.
+    [ObservableProperty] private bool _isLocked = true;
+    [ObservableProperty] private string _masterKey = string.Empty;
+    [ObservableProperty] private string _unlockError = string.Empty;
+    [ObservableProperty] private bool _hasVault;        // true: vault exists → "Unlock"; false: first run → "Set password"
+    private string _master = string.Empty;              // active password, kept while unlocked to re-encrypt on save
 
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _isEditorOpen;
@@ -70,22 +87,159 @@ public partial class CloudflareViewModel : ObservableObject
 
     public ObservableCollection<string> ProxyHistory => HistoryService.Instance.Get("cf.proxy");
 
-    private bool _loaded;
-    private static readonly System.Collections.Generic.HashSet<string> PersistProps = new()
-    { "UseApiToken", "ApiToken", "ApiEmail", "ApiKey", "UseProxy", "ProxyAddress", "ProxyUser", "ProxyPass" };
-
     public CloudflareViewModel()
     {
-        LoadCreds();
-        if (string.IsNullOrWhiteSpace(ProxyAddress) && HistoryService.Instance.Last("cf.proxy") is { } p)
-            ProxyAddress = p;
-        _loaded = true;
+        HasVault = !string.IsNullOrEmpty(ProfileService.Instance.GetSetting("cf.vault"));
+        Profiles.CollectionChanged += (_, e) =>
+        {
+            if (e.NewItems != null) foreach (CfProfile p in e.NewItems) p.PropertyChanged += OnProfileEdited;
+            if (e.OldItems != null) foreach (CfProfile p in e.OldItems) p.PropertyChanged -= OnProfileEdited;
+            if (!IsLocked) SaveProfiles();
+        };
+
+        // Share one master password with Notes + Sync: auto-unlock if the app is already open.
+        MasterSession.Changed += OnMasterSessionChanged;
+        if (MasterSession.IsSet) TryUnlock(MasterSession.Password, silent: true);
     }
 
-    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    private void OnMasterSessionChanged()
     {
-        base.OnPropertyChanged(e);
-        if (_loaded && e.PropertyName is { } n && PersistProps.Contains(n)) SaveCreds();
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (MasterSession.IsSet && IsLocked) TryUnlock(MasterSession.Password, silent: true);
+            else if (!MasterSession.IsSet && !IsLocked) LockInternal();  // session wiped → follow it
+        });
+    }
+
+    // Any edit to a profile's fields (token, proxy, name...) persists the whole vault.
+    // Debounced: each save runs PBKDF2 (200k) + AES-GCM + a file write, so persisting on every
+    // keystroke would lag typing and hammer the disk. Discrete actions below save immediately.
+    private void OnProfileEdited(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (!IsLocked) SchedulePersist();
+    }
+
+    private System.Threading.CancellationTokenSource? _saveCts;
+
+    private void SchedulePersist()
+    {
+        if (IsLocked || string.IsNullOrEmpty(_master)) return;
+        _saveCts?.Cancel();
+        var cts = _saveCts = new System.Threading.CancellationTokenSource();
+        _ = Task.Delay(450, cts.Token).ContinueWith(t =>
+        {
+            if (!t.IsCanceled) Avalonia.Threading.Dispatcher.UIThread.Post(SaveProfiles);
+        }, TaskScheduler.Default);
+    }
+
+    // Flush a pending debounced edit — called on app shutdown so a just-typed change is never lost.
+    public void FlushPendingSave()
+    {
+        _saveCts?.Cancel();
+        if (!IsLocked) SaveProfiles();
+    }
+
+    partial void OnSelectedProfileChanged(CfProfile? value)
+    {
+        if (!IsLocked) SaveProfiles();   // persist the active selection
+    }
+
+    // ---------- Lock / unlock ----------
+    [RelayCommand]
+    private void Unlock() => TryUnlock(MasterKey, silent: false);
+
+    // Attempt to unlock the vault. silent=true suppresses the error text and leaves any current
+    // state untouched on failure (used by the shared-session auto-unlock — a wrong password there
+    // just means Cloudflare uses a different master, so we quietly keep showing the manual prompt).
+    private bool TryUnlock(string password, bool silent)
+    {
+        if (string.IsNullOrWhiteSpace(password)) { if (!silent) UnlockError = "Enter a master password."; return false; }
+
+        var ps = ProfileService.Instance;
+        var vault = ps.GetSetting("cf.vault");
+
+        // Decrypt/validate BEFORE mutating any state so a bad password is a no-op.
+        string? vaultJson = null;
+        if (!string.IsNullOrEmpty(vault))
+        {
+            if (!MasterVault.TryDecrypt(vault, password, out vaultJson))
+            { if (!silent) UnlockError = "Wrong master password."; return false; }
+        }
+
+        Profiles.Clear();   // IsLocked still true → no save
+
+        if (vaultJson != null)
+        {
+            LoadProfilesFromJson(vaultJson, legacyDeviceEncrypted: false);
+        }
+        else
+        {
+            // First run: this password becomes the master. Migrate any pre-vault profiles.
+            var legacy = ps.GetSetting("cf.profiles");
+            if (!string.IsNullOrEmpty(legacy)) LoadProfilesFromJson(legacy, legacyDeviceEncrypted: true);
+            else MigrateLegacySingle(ps);
+        }
+
+        if (Profiles.Count == 0) Profiles.Add(new CfProfile { Name = "Default" });
+        // Profiles are already subscribed to OnProfileEdited via Profiles.CollectionChanged as
+        // they're added above — no second subscription (that caused double saves per edit).
+
+        _master = password;
+        int idx = ps.GetInt("cf.activeIndex", 0);
+        SelectedProfile = Profiles[System.Math.Clamp(idx, 0, Profiles.Count - 1)];
+
+        IsLocked = false;
+        HasVault = true;
+        UnlockError = string.Empty;
+        MasterKey = string.Empty;       // don't keep it in the bound textbox
+        SaveProfiles();                 // writes the (now encrypted) vault; drops legacy copies
+        StatusMessage = "Unlocked. Load your zones.";
+        MasterSession.Set(password);    // let Notes / Sync ride the same credential
+        return true;
+    }
+
+    // User pressed LOCK: lock this tab AND drop the shared session so Notes/Sync re-lock too.
+    [RelayCommand]
+    private void LockApp()
+    {
+        LockInternal();
+        MasterSession.Clear();
+    }
+
+    private void LockInternal()
+    {
+        if (!IsLocked) SaveProfiles();
+        foreach (var p in Profiles) p.PropertyChanged -= OnProfileEdited;
+        Profiles.Clear();
+        Zones.Clear();
+        Records.Clear();
+        SelectedProfile = null;
+        _master = string.Empty;
+        IsLocked = true;
+        IsEditorOpen = false;
+        StatusMessage = "Locked.";
+    }
+
+    // ---------- Profile management ----------
+    [RelayCommand]
+    private void AddProfile()
+    {
+        if (IsLocked) return;
+        var p = new CfProfile { Name = $"Profile {Profiles.Count + 1}" };
+        Profiles.Add(p);
+        SelectedProfile = p;
+        StatusMessage = "New profile added — fill in its credentials.";
+    }
+
+    [RelayCommand]
+    private void DeleteProfile()
+    {
+        if (IsLocked || SelectedProfile == null) return;
+        int idx = Profiles.IndexOf(SelectedProfile);
+        Profiles.Remove(SelectedProfile);
+        if (Profiles.Count == 0) Profiles.Add(new CfProfile { Name = "Default" });
+        SelectedProfile = Profiles[System.Math.Clamp(idx, 0, Profiles.Count - 1)];
+        StatusMessage = "Profile deleted.";
     }
 
     partial void OnSelectedZoneChanged(CfZone? value)
@@ -106,25 +260,92 @@ public partial class CloudflareViewModel : ObservableObject
         EditPriority = value.Priority;
     }
 
-    private void LoadCreds()
+    // Populate Profiles from a JSON array. legacyDeviceEncrypted = the old cf.profiles format
+    // whose secret fields were device-key encrypted (SecretProtector); the vault format stores
+    // them plaintext-inside-the-encrypted-blob.
+    private void LoadProfilesFromJson(string json, bool legacyDeviceEncrypted)
     {
-        var ps = ProfileService.Instance;
-        UseApiToken = ps.GetBool("cf.useToken", true);
-        ApiToken = ps.GetSetting("cf.token") ?? string.Empty;
-        ApiEmail = ps.GetSetting("cf.email") ?? string.Empty;
-        ApiKey = ps.GetSetting("cf.key") ?? string.Empty;
-        UseProxy = ps.GetBool("cf.useProxy", false);
-        ProxyAddress = ps.GetSetting("cf.proxy") ?? string.Empty;
-        ProxyUser = ps.GetSetting("cf.proxyUser") ?? string.Empty;
-        ProxyPass = ps.GetSetting("cf.proxyPass") ?? string.Empty;
+        if (JsonNode.Parse(json) is not JsonArray arr) return;
+        foreach (var n in arr)
+        {
+            if (n is not JsonObject o) continue;
+            string token = (string?)o["token"] ?? string.Empty;
+            string key = (string?)o["key"] ?? string.Empty;
+            string ppass = (string?)o["proxyPass"] ?? string.Empty;
+            if (legacyDeviceEncrypted)
+            {
+                token = SecretProtector.Unprotect(token);
+                key = SecretProtector.Unprotect(key);
+                ppass = SecretProtector.Unprotect(ppass);
+            }
+            Profiles.Add(new CfProfile
+            {
+                Name = (string?)o["name"] ?? "Profile",
+                UseApiToken = (bool?)o["useToken"] ?? true,
+                ApiToken = token,
+                ApiEmail = (string?)o["email"] ?? string.Empty,
+                ApiKey = key,
+                UseProxy = (bool?)o["useProxy"] ?? false,
+                ProxyAddress = (string?)o["proxy"] ?? string.Empty,
+                ProxyUser = (string?)o["proxyUser"] ?? string.Empty,
+                ProxyPass = ppass
+            });
+        }
     }
 
-    private void SaveCreds()
-        => ProfileService.Instance.SetMany(
-            ("cf.useToken", UseApiToken ? "true" : "false"), ("cf.token", ApiToken),
-            ("cf.email", ApiEmail), ("cf.key", ApiKey),
-            ("cf.useProxy", UseProxy ? "true" : "false"), ("cf.proxy", ProxyAddress),
-            ("cf.proxyUser", ProxyUser), ("cf.proxyPass", ProxyPass));
+    // Very old format: a single credential set stored as flat cf.* settings.
+    private void MigrateLegacySingle(ProfileService ps)
+    {
+        bool any = !string.IsNullOrEmpty(ps.GetSetting("cf.token"))
+                || !string.IsNullOrEmpty(ps.GetSetting("cf.key"))
+                || !string.IsNullOrEmpty(ps.GetSetting("cf.email"));
+        if (!any) return;
+        Profiles.Add(new CfProfile
+        {
+            Name = "Default",
+            UseApiToken = ps.GetBool("cf.useToken", true),
+            ApiToken = ps.GetSetting("cf.token") ?? string.Empty,
+            ApiEmail = ps.GetSetting("cf.email") ?? string.Empty,
+            ApiKey = ps.GetSetting("cf.key") ?? string.Empty,
+            UseProxy = ps.GetBool("cf.useProxy", false),
+            ProxyAddress = ps.GetSetting("cf.proxy") ?? string.Empty,
+            ProxyUser = ps.GetSetting("cf.proxyUser") ?? string.Empty,
+            ProxyPass = ps.GetSetting("cf.proxyPass") ?? string.Empty
+        });
+    }
+
+    private void SaveProfiles()
+    {
+        if (IsLocked || string.IsNullOrEmpty(_master)) return;
+
+        var arr = new JsonArray();
+        foreach (var p in Profiles)
+            // Cast to JsonNode so the non-generic Add(JsonNode?) is chosen (AOT-safe;
+            // the generic Add<T> is RequiresDynamicCode).
+            arr.Add((JsonNode)new JsonObject
+            {
+                ["name"] = p.Name,
+                ["useToken"] = p.UseApiToken,
+                ["token"] = p.ApiToken,        // plaintext inside the master-encrypted vault
+                ["email"] = p.ApiEmail,
+                ["key"] = p.ApiKey,
+                ["useProxy"] = p.UseProxy,
+                ["proxy"] = p.ProxyAddress,
+                ["proxyUser"] = p.ProxyUser,
+                ["proxyPass"] = p.ProxyPass
+            });
+
+        int idx = SelectedProfile != null ? Profiles.IndexOf(SelectedProfile) : 0;
+        var ps = ProfileService.Instance;
+        ps.SetMany(
+            ("cf.vault", MasterVault.Encrypt(arr.ToJsonString(), _master)),
+            ("cf.activeIndex", idx.ToString()));
+
+        // Drop any pre-vault copies so secrets no longer linger unencrypted.
+        foreach (var k in new[] { "cf.profiles", "cf.token", "cf.key", "cf.email",
+                                  "cf.useToken", "cf.useProxy", "cf.proxy", "cf.proxyUser", "cf.proxyPass" })
+            ps.Remove(k);
+    }
 
     private void ClearEditFields()
     {
@@ -149,11 +370,13 @@ public partial class CloudflareViewModel : ObservableObject
 
     private bool ValidateAuth()
     {
-        if (UseApiToken)
+        var p = SelectedProfile;
+        if (p == null) { StatusMessage = "Add a profile first."; return false; }
+        if (p.UseApiToken)
         {
-            if (string.IsNullOrWhiteSpace(ApiToken)) { StatusMessage = "Enter an API token."; return false; }
+            if (string.IsNullOrWhiteSpace(p.ApiToken)) { StatusMessage = "Enter an API token."; return false; }
         }
-        else if (string.IsNullOrWhiteSpace(ApiEmail) || string.IsNullOrWhiteSpace(ApiKey))
+        else if (string.IsNullOrWhiteSpace(p.ApiEmail) || string.IsNullOrWhiteSpace(p.ApiKey))
         {
             StatusMessage = "Enter your account email and Global API key."; return false;
         }
@@ -162,29 +385,35 @@ public partial class CloudflareViewModel : ObservableObject
 
     private HttpClient CreateClient()
     {
-        string? proxy = UseProxy && !string.IsNullOrWhiteSpace(ProxyAddress) ? ProxyAddress : null;
+        var p = SelectedProfile ?? new CfProfile();
+        string? proxy = p.UseProxy && !string.IsNullOrWhiteSpace(p.ProxyAddress) ? p.ProxyAddress : null;
         if (proxy != null) HistoryService.Instance.Add("cf.proxy", proxy);
 
-        var c = HttpHelper.Create(proxy, ProxyUser, ProxyPass, timeout: TimeSpan.FromSeconds(25));
+        var c = HttpHelper.Create(proxy, p.ProxyUser, p.ProxyPass, timeout: TimeSpan.FromSeconds(25));
         c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-        if (UseApiToken)
-            c.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", "Bearer " + ApiToken.Trim());
+        if (p.UseApiToken)
+            c.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", "Bearer " + p.ApiToken.Trim());
         else
         {
-            c.DefaultRequestHeaders.TryAddWithoutValidation("X-Auth-Email", ApiEmail.Trim());
-            c.DefaultRequestHeaders.TryAddWithoutValidation("X-Auth-Key", ApiKey.Trim());
+            c.DefaultRequestHeaders.TryAddWithoutValidation("X-Auth-Email", p.ApiEmail.Trim());
+            c.DefaultRequestHeaders.TryAddWithoutValidation("X-Auth-Key", p.ApiKey.Trim());
         }
         return c;
     }
 
     private static string FirstError(JsonElement root)
     {
-        if (root.TryGetProperty("errors", out var errs) && errs.ValueKind == JsonValueKind.Array && errs.GetArrayLength() > 0)
+        if (root.ValueKind == JsonValueKind.Object &&
+            root.TryGetProperty("errors", out var errs) && errs.ValueKind == JsonValueKind.Array && errs.GetArrayLength() > 0)
         {
-            var e0 = errs[0];
-            string msg = e0.TryGetProperty("message", out var m) ? m.GetString() ?? "" : "";
-            int code = e0.TryGetProperty("code", out var cc) && cc.ValueKind == JsonValueKind.Number ? cc.GetInt32() : 0;
-            return code != 0 ? $"{msg} (code {code})" : msg;
+            var msgs = new System.Collections.Generic.List<string>();
+            foreach (var e in errs.EnumerateArray())
+            {
+                string msg = e.TryGetProperty("message", out var m) ? m.GetString() ?? "" : "";
+                int code = e.TryGetProperty("code", out var cc) && cc.ValueKind == JsonValueKind.Number ? cc.GetInt32() : 0;
+                if (!string.IsNullOrWhiteSpace(msg)) msgs.Add(code != 0 ? $"{msg} (code {code})" : msg);
+            }
+            if (msgs.Count > 0) return string.Join("; ", msgs);
         }
         return "request failed";
     }
@@ -209,7 +438,7 @@ public partial class CloudflareViewModel : ObservableObject
                 var root = doc.RootElement;
                 if (!root.TryGetProperty("success", out var ok) || !ok.GetBoolean())
                 {
-                    StatusMessage = "Error: " + FirstError(root);
+                    StatusMessage = $"Error (HTTP {(int)resp.StatusCode}): {FirstError(root)}";
                     IsBusy = false;
                     return;
                 }
@@ -227,8 +456,11 @@ public partial class CloudflareViewModel : ObservableObject
                 page++;
             } while (page <= totalPages);
 
-            SaveCreds();
-            StatusMessage = $"Loaded {Zones.Count} zone(s). Pick a domain to see its records.";
+            SaveProfiles();
+            StatusMessage = Zones.Count > 0
+                ? $"Loaded {Zones.Count} zone(s). Pick a domain to see its records."
+                : "0 zones. The token works but can't list zones — it needs the Zone → Zone → Read "
+                  + "permission, with Zone Resources set to include your zones (All zones, or the specific ones).";
         }
         catch (Exception ex) { StatusMessage = "Error: " + ex.Message; }
         IsBusy = false;
@@ -257,7 +489,11 @@ public partial class CloudflareViewModel : ObservableObject
                 var root = doc.RootElement;
                 if (!root.TryGetProperty("success", out var ok) || !ok.GetBoolean())
                 {
-                    StatusMessage = "Error: " + FirstError(root);
+                    string err = FirstError(root);
+                    // 10000/9109 here = the token can list zones but lacks DNS access on this zone.
+                    if (err.Contains("10000") || err.Contains("9109"))
+                        err += " — the token needs the Zone → DNS → Edit (or Read) permission for this zone.";
+                    StatusMessage = $"Error (HTTP {(int)resp.StatusCode}): {err}";
                     IsBusy = false;
                     return;
                 }

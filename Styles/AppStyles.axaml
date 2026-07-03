@@ -2,28 +2,38 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ============================================================
-         Echoes shared design system. Lightweight: static brushes,
-         rounded corners, a single cheap focus-accent transition.
-         No shaders, no looping animations.
-         Accent = app green #42B883.
-         Opt-in via Classes="..." so existing controls are untouched.
+         Echoes design system — v2.1, dense "dev-tool" aesthetic
+         (Linear/Raycast-inspired), tuned for HIGH CONTRAST on dark so
+         every input/border reads clearly. Flat solid surfaces, visible
+         hairline borders, tight radii. Accent = #42B883.
+         No shaders, no looping animations (one cheap focus transition).
+
+         Palette:
+           bg base      #0F1012
+           surface      #191A1F   (cards)
+           surface-2    #121317   (output / inset)
+           input        #1D1E25   (clearly lighter than bg)
+           border       #3B3D47   (VISIBLE hairline)
+           border-hover #4C4E59
+           text         #ECECEF
+           text-muted   #9E9FA8
+           accent       #42B883  (hover #55C795)
+           danger       #E5484D
          ============================================================ -->
 
     <!-- Field label (small caps tag above an input) -->
     <Style Selector="TextBlock.fieldLabel">
-        <Setter Property="FontSize" Value="9"/>
-        <Setter Property="FontWeight" Value="Black"/>
-        <Setter Property="Foreground" Value="White"/>
-        <Setter Property="Opacity" Value="0.45"/>
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="#9E9FA8"/>
         <Setter Property="Margin" Value="2,0,0,5"/>
     </Style>
 
     <!-- Card header (accent label inside a card) -->
     <Style Selector="TextBlock.cardHeader">
-        <Setter Property="FontSize" Value="9"/>
-        <Setter Property="FontWeight" Value="Black"/>
-        <Setter Property="Foreground" Value="#42B883"/>
-        <Setter Property="Opacity" Value="0.9"/>
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="#4FCB97"/>
         <Setter Property="Margin" Value="12,8,0,0"/>
     </Style>
 
@@ -31,12 +41,12 @@
     <Style Selector="TextBox.field">
         <Setter Property="Height" Value="32"/>
         <Setter Property="FontSize" Value="12"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Foreground" Value="#ECECEF"/>
         <Setter Property="CaretBrush" Value="#42B883"/>
-        <Setter Property="Background" Value="#1A000000"/>
-        <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+        <Setter Property="Background" Value="#1D1E25"/>
+        <Setter Property="BorderBrush" Value="#3B3D47"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="CornerRadius" Value="6"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Padding" Value="10,0"/>
         <Setter Property="Transitions">
@@ -45,10 +55,13 @@
             </Transitions>
         </Setter>
     </Style>
+    <Style Selector="TextBox.field:pointerover">
+        <Setter Property="BorderBrush" Value="#4C4E59"/>
+    </Style>
     <Style Selector="TextBox.field:focus">
         <Setter Property="BorderBrush" Value="#42B883"/>
     </Style>
-    <!-- multi-line variant: top-aligned text -->
+    <!-- multi-line variant (textarea): top-aligned text, same visible border -->
     <Style Selector="TextBox.field.multiline">
         <Setter Property="Height" Value="NaN"/>
         <Setter Property="VerticalContentAlignment" Value="Top"/>
@@ -62,14 +75,17 @@
     <Style Selector="AutoCompleteBox.field /template/ TextBox">
         <Setter Property="Height" Value="32"/>
         <Setter Property="FontSize" Value="12"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Foreground" Value="#ECECEF"/>
         <Setter Property="CaretBrush" Value="#42B883"/>
-        <Setter Property="Background" Value="#1A000000"/>
-        <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+        <Setter Property="Background" Value="#1D1E25"/>
+        <Setter Property="BorderBrush" Value="#3B3D47"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="CornerRadius" Value="6"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Padding" Value="10,0"/>
+    </Style>
+    <Style Selector="AutoCompleteBox.field:pointerover /template/ TextBox">
+        <Setter Property="BorderBrush" Value="#4C4E59"/>
     </Style>
     <Style Selector="AutoCompleteBox.field:focus-within /template/ TextBox">
         <Setter Property="BorderBrush" Value="#42B883"/>
@@ -79,116 +95,121 @@
     <Style Selector="ComboBox.field">
         <Setter Property="Height" Value="32"/>
         <Setter Property="FontSize" Value="12"/>
-        <Setter Property="Foreground" Value="White"/>
-        <Setter Property="Background" Value="#1A000000"/>
-        <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+        <Setter Property="Foreground" Value="#ECECEF"/>
+        <Setter Property="Background" Value="#1D1E25"/>
+        <Setter Property="BorderBrush" Value="#3B3D47"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="CornerRadius" Value="6"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="ComboBox.field:pointerover">
+        <Setter Property="BorderBrush" Value="#4C4E59"/>
     </Style>
 
     <!-- Card container -->
     <Style Selector="Border.card">
-        <Setter Property="Background" Value="#26000000"/>
-        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Background" Value="#191A1F"/>
+        <Setter Property="CornerRadius" Value="8"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="BorderBrush" Value="#2EFFFFFF"/>
+        <Setter Property="BorderBrush" Value="#2F3139"/>
     </Style>
-    <!-- darker output card -->
+    <!-- darker output card (inset) -->
     <Style Selector="Border.card.output">
-        <Setter Property="Background" Value="#33000000"/>
+        <Setter Property="Background" Value="#121317"/>
+        <Setter Property="BorderBrush" Value="#2A2C33"/>
     </Style>
 
-    <!-- Primary action button (green gradient) -->
+    <!-- Primary action button (solid accent, flat) -->
     <Style Selector="Button.primary">
-        <Setter Property="Height" Value="34"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Foreground" Value="#08130D"/>
         <Setter Property="FontSize" Value="12"/>
-        <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="CornerRadius" Value="6"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
-        <Setter Property="Background">
-            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
-                <GradientStop Color="#4FCB97" Offset="0"/>
-                <GradientStop Color="#2E9468" Offset="1"/>
-            </LinearGradientBrush>
-        </Setter>
+        <Setter Property="Background" Value="#42B883"/>
     </Style>
     <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="#52C893"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Background" Value="#55C795"/>
+        <Setter Property="Foreground" Value="#08130D"/>
     </Style>
     <Style Selector="Button.primary:disabled /template/ ContentPresenter">
-        <Setter Property="Background" Value="#2D4D3D"/>
-        <Setter Property="Opacity" Value="0.55"/>
+        <Setter Property="Background" Value="#2A3B33"/>
+        <Setter Property="Foreground" Value="#7C8A83"/>
     </Style>
 
-    <!-- Secondary action button (blue gradient) -->
+    <!-- Secondary action button (neutral elevated, visible border) -->
     <Style Selector="Button.secondary">
-        <Setter Property="Height" Value="34"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Foreground" Value="#E6E7EC"/>
         <Setter Property="FontSize" Value="12"/>
-        <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="CornerRadius" Value="6"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
-        <Setter Property="Background">
-            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
-                <GradientStop Color="#3AA0DC" Offset="0"/>
-                <GradientStop Color="#246FA8" Offset="1"/>
-            </LinearGradientBrush>
-        </Setter>
+        <Setter Property="Background" Value="#24262E"/>
+        <Setter Property="BorderBrush" Value="#3B3D47"/>
+        <Setter Property="BorderThickness" Value="1"/>
     </Style>
     <Style Selector="Button.secondary:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="#3FAEEC"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Background" Value="#30323B"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
     </Style>
 
-    <!-- Toggle action button (START green / STOP red). Pair with Classes.active="{Binding ...}" -->
+    <!-- Toggle action button (START accent / STOP red). Pair with Classes.active="{Binding ...}" -->
     <Style Selector="Button.toggle">
-        <Setter Property="Height" Value="34"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Foreground" Value="#08130D"/>
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="CornerRadius" Value="6"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Background" Value="#42B883"/>
         <Setter Property="Transitions">
             <Transitions>
-                <BrushTransition Property="Background" Duration="0:0:0.2"/>
+                <BrushTransition Property="Background" Duration="0:0:0.18"/>
             </Transitions>
         </Setter>
     </Style>
     <Style Selector="Button.toggle:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="#52C893"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Background" Value="#55C795"/>
+        <Setter Property="Foreground" Value="#08130D"/>
     </Style>
     <Style Selector="Button.toggle.active">
-        <Setter Property="Background" Value="#EA4444"/>
+        <Setter Property="Background" Value="#E5484D"/>
+        <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.toggle.active /template/ ContentPresenter">
+        <Setter Property="Foreground" Value="White"/>
     </Style>
     <Style Selector="Button.toggle.active:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="#FF5555"/>
+        <Setter Property="Background" Value="#F05056"/>
         <Setter Property="Foreground" Value="White"/>
     </Style>
 
-    <!-- Secondary / ghost button -->
+    <!-- Ghost button (subtle surface, visible border) -->
     <Style Selector="Button.ghost">
-        <Setter Property="Height" Value="34"/>
-        <Setter Property="Foreground" Value="#D0FFFFFF"/>
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Foreground" Value="#C7C8CF"/>
         <Setter Property="FontSize" Value="11"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="CornerRadius" Value="7"/>
-        <Setter Property="Background" Value="#16FFFFFF"/>
-        <Setter Property="BorderBrush" Value="#28FFFFFF"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Background" Value="#20222A"/>
+        <Setter Property="BorderBrush" Value="#3B3D47"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
     <Style Selector="Button.ghost:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="#26FFFFFF"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Background" Value="#2C2E37"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+    </Style>
+
+    <!-- CheckBox — visible box on dark -->
+    <Style Selector="CheckBox">
+        <Setter Property="Foreground" Value="#D7D8DE"/>
     </Style>
 
 </Styles>

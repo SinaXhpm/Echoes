@@ -4,32 +4,38 @@
              x:Class="Echoes.Views.IpInfoView"
              x:DataType="vm:IpInfoViewModel">
 
-    <TabControl Padding="0,6,0,0" Margin="10,0,10,8">
+    <TabControl Padding="0,6,0,0" Margin="12,0,12,10">
         <TabControl.Styles>
             <Style Selector="TabItem">
                 <Setter Property="FontSize" Value="11.5"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
                 <Setter Property="MinHeight" Value="30"/>
                 <Setter Property="Padding" Value="14,0"/>
-                <Setter Property="Foreground" Value="#999999"/>
+                <Setter Property="Foreground" Value="#9E9FA8"/>
             </Style>
             <Style Selector="TabItem:selected">
-                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Foreground" Value="#ECECEF"/>
+            </Style>
+            <Style Selector="TabItem:pointerover /template/ ContentPresenter">
+                <Setter Property="TextElement.Foreground" Value="#C7C8CF"/>
             </Style>
         </TabControl.Styles>
 
         <TabItem Header="LOOKUP">
-            <Grid RowDefinitions="Auto, Auto, *" Margin="0,4,0,0">
-                <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,12">
-                    <AutoCompleteBox Classes="field" Text="{Binding TargetIp}" Watermark="Lookup IP (Empty for My IP)..."
+            <Grid RowDefinitions="Auto, Auto, *" Margin="0,6,0,0">
+                <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                    <TextBlock Classes="fieldLabel" Text="TARGET IP / HOST"/>
+                    <AutoCompleteBox Classes="field" Text="{Binding TargetIp}" Watermark="Lookup IP (empty for My IP)..."
+                             FontFamily="Cascadia Code,Consolas"
                              ItemsSource="{Binding TargetHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0">
                         <AutoCompleteBox.KeyBindings>
                             <KeyBinding Gesture="Enter" Command="{Binding LookupIpCommand}" />
                         </AutoCompleteBox.KeyBindings>
                     </AutoCompleteBox>
 
-                    <Grid ColumnDefinitions="Auto, *, *">
+                    <Grid ColumnDefinitions="Auto, *, *" Margin="0,10,0,0">
                         <CheckBox Grid.Column="0" IsChecked="{Binding UseProxy}" Name="ProxyToggle"
-                                  Content="Proxy" FontSize="11.5" Foreground="White" FontWeight="SemiBold"
+                                  Content="Proxy" FontSize="11.5" Foreground="#ECECEF" FontWeight="SemiBold"
                                   VerticalAlignment="Center" Margin="0,0,12,0"/>
 
                         <Button Grid.Column="1" Classes="primary" Command="{Binding LookupIpCommand}" Content="LOOKUP"
@@ -42,11 +48,15 @@
                     </Grid>
                 </StackPanel>
 
-                <StackPanel Grid.Row="1" Spacing="8" Margin="2,0,0,15" IsVisible="{Binding UseProxy}">
+                <StackPanel Grid.Row="1" Spacing="8" Margin="0,0,0,14" IsVisible="{Binding UseProxy}">
+                    <TextBlock Classes="fieldLabel" Text="PROXY"/>
                     <AutoCompleteBox Classes="field" Text="{Binding ProxyAddress}" Watermark="Host:Port (127.0.0.1:8080)"
+                             FontFamily="Cascadia Code,Consolas"
                              ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"/>
-                    <TextBox Classes="field" Text="{Binding ProxyUser}" Watermark="User (Optional)"/>
-                    <TextBox Classes="field" Text="{Binding ProxyPass}" Watermark="Pass (Optional)" PasswordChar="*"/>
+                    <Grid ColumnDefinitions="*, *">
+                        <TextBox Grid.Column="0" Classes="field" Text="{Binding ProxyUser}" Watermark="User (optional)" Margin="0,0,4,0"/>
+                        <TextBox Grid.Column="1" Classes="field" Text="{Binding ProxyPass}" Watermark="Pass (optional)" PasswordChar="*" Margin="4,0,0,0"/>
+                    </Grid>
                 </StackPanel>
 
                 <Grid Grid.Row="2">
@@ -54,44 +64,47 @@
                         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                             <SelectableTextBlock Text="{Binding RawResult}"
                                                  FontFamily="Cascadia Code,Consolas"
-                                                 FontSize="11.5" Foreground="#00FF99"
+                                                 FontSize="11.5" Foreground="#4FCB97"
                                                  Margin="12" LineHeight="20"/>
                         </ScrollViewer>
                     </Border>
                     <Button Classes="ghost" Command="{Binding CopyResultCommand}" Content="COPY"
-                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,18,0"
-                            Height="26" FontSize="9" Padding="10,0"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,10,0"
+                            Height="24" FontSize="10" Padding="10,0"
                             IsVisible="{Binding RawResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                 </Grid>
             </Grid>
         </TabItem>
 
         <TabItem Header="SUBNET / CIDR">
-            <Grid RowDefinitions="Auto, *" Margin="0,4,0,0">
-                <Grid Grid.Row="0" ColumnDefinitions="*, 90" Margin="0,0,0,10">
-                    <TextBox Grid.Column="0" Classes="field" Text="{Binding SubnetInput}" AcceptsReturn="False"
-                             Watermark="192.168.1.0/24"
-                             FontFamily="Cascadia Code,Consolas" Margin="0,0,8,0">
-                        <TextBox.KeyBindings>
-                            <KeyBinding Gesture="Enter" Command="{Binding RunSubnetCommand}"/>
-                        </TextBox.KeyBindings>
-                    </TextBox>
-                    <Button Grid.Column="1" Classes="primary" Command="{Binding RunSubnetCommand}" Content="CALC"
-                            HorizontalAlignment="Stretch"/>
-                </Grid>
+            <Grid RowDefinitions="Auto, *" Margin="0,6,0,0">
+                <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                    <TextBlock Classes="fieldLabel" Text="CIDR / SUBNET"/>
+                    <Grid ColumnDefinitions="*, 90">
+                        <TextBox Grid.Column="0" Classes="field" Text="{Binding SubnetInput}" AcceptsReturn="False"
+                                 Watermark="192.168.1.0/24"
+                                 FontFamily="Cascadia Code,Consolas" Margin="0,0,8,0">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding RunSubnetCommand}"/>
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                        <Button Grid.Column="1" Classes="primary" Command="{Binding RunSubnetCommand}" Content="CALC"
+                                HorizontalAlignment="Stretch"/>
+                    </Grid>
+                </StackPanel>
 
                 <Grid Grid.Row="1">
                     <Border Classes="card output">
                         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                             <SelectableTextBlock Text="{Binding SubnetOutput}"
                                                  FontFamily="Cascadia Code,Consolas"
-                                                 FontSize="12" Foreground="#00FF99"
+                                                 FontSize="12" Foreground="#4FCB97"
                                                  Margin="12" LineHeight="20"/>
                         </ScrollViewer>
                     </Border>
                     <Button Classes="ghost" Command="{Binding CopySubnetCommand}" Content="COPY"
-                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,18,0"
-                            Height="26" FontSize="9" Padding="10,0"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,10,0"
+                            Height="24" FontSize="10" Padding="10,0"
                             IsVisible="{Binding SubnetOutput, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                 </Grid>
             </Grid>

@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             x:Class="Echoes.Views.HistoryView"
+             x:DataType="vm:HistoryViewModel"
+             Background="#0F1012">
+
+    <UserControl.Styles>
+        <Style Selector="Button.copy-btn">
+            <Setter Property="Background" Value="#2A2C33"/>
+            <Setter Property="Foreground" Value="#C7C8CF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.copy-btn:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#3A3D47"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.val">
+            <Setter Property="FontFamily" Value="Cascadia Code,Consolas"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#ECECEF"/>
+            <Setter Property="SelectionBrush" Value="#3042B883"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto, *" Margin="14,12">
+
+        <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto" Margin="0,0,0,10">
+            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                <TextBlock Text="HISTORY" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
+                <TextBlock FontSize="10" Foreground="#9E9FA8">
+                    <Run Text="Recent inputs across every tool ·"/><Run Text="{Binding TotalCount}"/><Run Text=" entries"/>
+                </TextBlock>
+            </StackPanel>
+            <Button Grid.Column="1" Classes="secondary" Command="{Binding ReloadCommand}" Content="REFRESH"
+                    FontSize="11" Margin="0,0,8,0"/>
+            <Button Grid.Column="2" Command="{Binding ClearAllCommand}" Content="CLEAR ALL"
+                    Background="#E5484D" Foreground="#ECECEF" FontSize="10" FontWeight="Bold" Padding="12,6" CornerRadius="6"/>
+        </Grid>
+
+        <TextBlock Grid.Row="1" IsVisible="{Binding !HasItems}" Text="No history yet — run a few tools and your recent inputs show up here."
+                   Foreground="#6E6F78" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+        <ScrollViewer Grid.Row="1" IsVisible="{Binding HasItems}" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Groups}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:HistoryGroup">
+                        <Border Classes="card" Margin="0,0,0,8" Padding="12,10">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <TextBlock Grid.Column="0" Text="{Binding Title}" FontWeight="Bold" Foreground="#42B883" FontSize="12"/>
+                                    <Border Grid.Column="1" Background="#24262E" CornerRadius="4" Padding="6,1">
+                                        <TextBlock Text="{Binding Count}" Foreground="#9E9FA8" FontSize="10" FontFamily="Cascadia Code,Consolas"/>
+                                    </Border>
+                                </Grid>
+                                <Border Height="1" Background="#22242B"/>
+                                <ItemsControl ItemsSource="{Binding Items}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String">
+                                            <Grid ColumnDefinitions="*, Auto" Margin="0,0,0,4">
+                                                <SelectableTextBlock Grid.Column="0" Classes="val" Text="{Binding}"
+                                                                     Foreground="#C7C8CF" TextWrapping="Wrap" Margin="0,0,8,0"/>
+                                                <Button Grid.Column="1" Classes="copy-btn" Content="⧉"
+                                                        Command="{Binding ((vm:HistoryViewModel)DataContext).CopyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}" ToolTip.Tip="Copy"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

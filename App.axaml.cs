@@ -21,6 +21,7 @@ public partial class App : Avalonia.Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = new MainWindow { DataContext = viewModel };
+            desktop.ShutdownRequested += (_, _) => viewModel.FlushOnExit();
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
         {

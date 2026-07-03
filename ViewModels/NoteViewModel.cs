@@ -20,6 +20,11 @@ public class NoteItem : ObservableObject
 
     private string _content = string.Empty;
     public string Content { get => _content; set => SetProperty(ref _content, value); }
+
+    // UI-only: when true, the card shows the "Delete? ✓ ✗" confirmation overlay. Not persisted.
+    private bool _pendingDelete;
+    [JsonIgnore]
+    public bool PendingDelete { get => _pendingDelete; set => SetProperty(ref _pendingDelete, value); }
 }
 
 public class NotePackage
@@ -57,6 +62,23 @@ public partial class NoteViewModel : ObservableObject
 
     private bool _isAuthenticated = false;
 
+    public NoteViewModel()
+    {
+        // Share one master password with Cloudflare + Sync: if the app is already unlocked
+        // elsewhere, open silently with the same credential.
+        MasterSession.Changed += OnMasterSessionChanged;
+        if (MasterSession.IsSet) TryUnlock(MasterSession.Password, silent: true);
+    }
+
+    private void OnMasterSessionChanged()
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (MasterSession.IsSet && IsLocked) TryUnlock(MasterSession.Password, silent: true);
+            else if (!MasterSession.IsSet && !IsLocked) LockInternal();  // session wiped → follow it
+        });
+    }
+
     partial void OnNotesChanged(ObservableCollection<NoteItem> value) => ApplyFilter();
     partial void OnSearchQueryChanged(string value) => ApplyFilter();
 
@@ -71,32 +93,40 @@ public partial class NoteViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void Unlock()
+    private void Unlock() => TryUnlock(MasterKey, silent: false);
+
+    // Attempt to unlock with the given password. silent=true suppresses error text (used for the
+    // shared-session auto-unlock, where a mismatch just leaves the manual prompt showing).
+    private bool TryUnlock(string password, bool silent)
     {
-        if (string.IsNullOrWhiteSpace(MasterKey))
+        if (string.IsNullOrWhiteSpace(password))
         {
-            ErrorMessage = "Enter a Master Key.";
-            return;
+            if (!silent) ErrorMessage = "Enter a Master Key.";
+            return false;
         }
 
         if (!File.Exists(_filePath))
         {
+            // First run: this password becomes the master.
+            MasterKey = password;
             _isAuthenticated = true;
             IsLocked = false;
             Notes = new ObservableCollection<NoteItem>();
             ErrorMessage = string.Empty;
             SaveNotes();
-            return;
+            MasterSession.Set(password);
+            return true;
         }
 
         try
         {
             byte[] data = File.ReadAllBytes(_filePath);
-            string decrypted = Decrypt(data, MasterKey, out bool legacy);
+            string decrypted = Decrypt(data, password, out bool legacy);
             var package = JsonSerializer.Deserialize(decrypted, NotePackageContext.Default.NotePackage);
 
             if (package != null && package.AuthTag == "ECHOES_VERIFIED_V1")
             {
+                MasterKey = password;
                 Notes = new ObservableCollection<NoteItem>(package.Notes);
                 _isAuthenticated = true;
                 IsLocked = false;
@@ -104,16 +134,19 @@ public partial class NoteViewModel : ObservableObject
 
                 // Migrate an old AES-CBC file to the authenticated AES-GCM format.
                 if (legacy) SaveNotes();
+
+                MasterSession.Set(password);   // let Cloudflare / Sync ride the same credential
+                return true;
             }
-            else
-            {
-                ErrorMessage = "Decryption failed. Wrong key?";
-            }
+
+            if (!silent) ErrorMessage = "Decryption failed. Wrong key?";
+            return false;
         }
         catch (Exception ex)
         {
             _isAuthenticated = false;
-            ErrorMessage = "Error: " + ex.Message;
+            if (!silent) ErrorMessage = "Error: " + ex.Message;
+            return false;
         }
     }
 
@@ -236,6 +269,19 @@ public partial class NoteViewModel : ObservableObject
         ApplyFilter();   // reflect any title/content edits in the (possibly filtered) list
     }
 
+    // First click: arm the inline confirmation on this card (and disarm any other).
+    [RelayCommand]
+    private void RequestDeleteNote(NoteItem note)
+    {
+        if (IsLocked) return;
+        foreach (var n in Notes) n.PendingDelete = false;
+        note.PendingDelete = true;
+    }
+
+    [RelayCommand]
+    private void CancelDeleteNote(NoteItem note) => note.PendingDelete = false;
+
+    // Second click (the ✓): actually remove the note.
     [RelayCommand]
     private void DeleteNote(NoteItem note)
     {
@@ -246,8 +292,15 @@ public partial class NoteViewModel : ObservableObject
         if (SelectedNote == note) BackToList();
     }
 
+    // User pressed LOCK: lock this tab AND drop the shared session so Cloudflare/Sync re-lock too.
     [RelayCommand]
     private void LockApp()
+    {
+        LockInternal();
+        MasterSession.Clear();
+    }
+
+    private void LockInternal()
     {
         if (!IsLocked && _isAuthenticated) SaveNotes();
         Notes.Clear();

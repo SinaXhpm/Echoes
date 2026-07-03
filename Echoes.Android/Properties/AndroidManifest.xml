@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="2" android:versionName="0.2.6">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="5" android:versionName="0.3.0">
 	<uses-sdk android:minSdkVersion="23" android:targetSdkVersion="34" />
 	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+	<!-- Keep Monitor / Scanner running when the app is backgrounded (foreground service + wake lock). -->
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+	<uses-permission android:name="android.permission.WAKE_LOCK" />
 	<application android:label="Echoes" android:icon="@mipmap/icon" android:roundIcon="@mipmap/icon" android:allowBackup="true" android:supportsRtl="true" />
 </manifest>

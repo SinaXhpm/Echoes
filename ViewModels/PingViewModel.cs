@@ -34,7 +34,6 @@ public partial class PingViewModel : ObservableObject
     private bool? _lastStatus;
     private long _sent;
     private long _received;
-    private List<long> _times = new();
 
     [RelayCommand]
     private void TogglePing()
@@ -49,6 +48,8 @@ public partial class PingViewModel : ObservableObject
 
     private void Start()
     {
+        // Accept a pasted URL / "host:port" / "user@host" and reduce it to the bare host.
+        TargetHost = HostExtractor.Extract(TargetHost);
         if (string.IsNullOrWhiteSpace(TargetHost)) return;
 
         HistoryService.Instance.Add("ping.host", TargetHost);
@@ -57,7 +58,6 @@ public partial class PingViewModel : ObservableObject
 
         _sent = 0;
         _received = 0;
-        _times.Clear();
         Dispatcher.UIThread.Invoke(() => LogItems.Clear());
         StatsSummary = "Packets: Sent = 0, Received = 0, Lost = 0";
 
@@ -143,7 +143,6 @@ public partial class PingViewModel : ObservableObject
             if (r.Success)
             {
                 _received++;
-                _times.Add(r.RoundtripMs);
                 string ttl = r.Ttl >= 0 ? r.Ttl.ToString() : "?";
                 UpdateLog($"{bytes} bytes from {r.Address}: icmp_seq={seq} ttl={ttl} time={r.RoundtripMs} ms");
             }
@@ -199,7 +198,9 @@ public partial class PingViewModel : ObservableObject
     {
         long lost = _sent - _received;
         double lossPercent = _sent > 0 ? ((double)lost / _sent) * 100 : 0;
-        StatsSummary = $"Packets: Sent = {_sent}, Received = {_received}, Lost = {lost} ({lossPercent:F0}% loss)";
+        var text = $"Packets: Sent = {_sent}, Received = {_received}, Lost = {lost} ({lossPercent:F0}% loss)";
+        // StatsSummary is data-bound; this runs from the background ping loop, so marshal it.
+        Dispatcher.UIThread.Post(() => StatsSummary = text);
     }
 
     private void HandleAlerts(bool current)
@@ -222,8 +223,7 @@ public partial class PingViewModel : ObservableObject
     private static bool IsPermissionError(Exception e)
     {
         if (e is System.Net.Sockets.SocketException s &&
-            (s.SocketErrorCode == System.Net.Sockets.SocketError.AccessDenied ||
-             s.SocketErrorCode == System.Net.Sockets.SocketError.SocketError))
+            s.SocketErrorCode == System.Net.Sockets.SocketError.AccessDenied)
             return true;
 
         var msg = e.Message;

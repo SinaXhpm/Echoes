@@ -25,17 +25,21 @@
               </AutoCompleteBox.KeyBindings>
           </AutoCompleteBox>
 
-          <Grid ColumnDefinitions="Auto, *, 90">
+          <Grid ColumnDefinitions="Auto, *, 150, 90">
             <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding HttpMethods}" SelectedItem="{Binding HttpMethod}"
                       MinWidth="90" HorizontalAlignment="Stretch" Margin="0,0,8,0"/>
 
-            <TextBox Grid.Column="1" Classes="field" Text="{Binding OverrideIp}" Watermark="Override IP (optional)" Margin="0,0,8,0">
+            <ComboBox Grid.Column="1" Classes="field" ItemsSource="{Binding Interfaces}" SelectedItem="{Binding SelectedInterface}"
+                      HorizontalAlignment="Stretch" Margin="0,0,8,0"
+                      ToolTip.Tip="Outgoing network interface (binds the source IP). Auto = let the OS route."/>
+
+            <TextBox Grid.Column="2" Classes="field" Text="{Binding OverrideIp}" Watermark="Override IP" Margin="0,0,8,0">
                 <TextBox.KeyBindings>
                     <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}"/>
                 </TextBox.KeyBindings>
             </TextBox>
 
-            <Button Grid.Column="2" Classes="toggle"
+            <Button Grid.Column="3" Classes="toggle"
                     Command="{Binding ToggleCurlCommand}"
                     HorizontalAlignment="Stretch"
                     Classes.active="{Binding IsWorking}">
@@ -53,24 +57,30 @@
                     <Setter Property="FontSize" Value="11.5"/>
                     <Setter Property="MinHeight" Value="32"/>
                     <Setter Property="Padding" Value="14,0"/>
-                    <Setter Property="Foreground" Value="#999999"/>
+                    <Setter Property="Foreground" Value="#9E9FA8"/>
                 </Style>
                 <Style Selector="TabItem:selected">
-                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="Foreground" Value="#ECECEF"/>
                 </Style>
             </TabControl.Styles>
 
             <TabItem Header="LOGS">
                 <Border Classes="card output">
                     <TextBox Text="{Binding FullLog}" IsReadOnly="True" AcceptsReturn="True"
-                             Foreground="#FFFFFF" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
+                             Foreground="#ECECEF" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
                 </Border>
             </TabItem>
 
             <TabItem Header="RAW BODY">
                 <Border Classes="card output">
-                    <TextBox Text="{Binding RawBody}" IsReadOnly="True" AcceptsReturn="True"
-                             Foreground="#00FF99" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
+                    <Grid RowDefinitions="Auto, *">
+                        <CheckBox Grid.Row="0" IsChecked="{Binding WrapRawBody}" Content="Wrap" FontSize="11"
+                                  Foreground="#9E9FA8" FontWeight="SemiBold" MinHeight="0"
+                                  HorizontalAlignment="Right" Margin="0,0,2,4"/>
+                        <TextBox Grid.Row="1" Text="{Binding RawBody}" IsReadOnly="True" AcceptsReturn="True"
+                                 TextWrapping="{Binding RawBodyWrapping}"
+                                 Foreground="#4FCB97" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
+                    </Grid>
                 </Border>
             </TabItem>
 
@@ -100,13 +110,13 @@
             </Grid>
 
             <Grid ColumnDefinitions="*, Auto, Auto, Auto">
-                <Border Grid.Column="0" Background="#2AFFFFFF" CornerRadius="4" Padding="8,0" BorderThickness="1" BorderBrush="#50FFFFFF"
+                <Border Grid.Column="0" Background="#1D1E25" CornerRadius="6" Padding="8,0" BorderThickness="1" BorderBrush="#3B3D47"
                         IsVisible="{x:Static helpers:AppPlatform.IsDesktop}">
                     <Grid ColumnDefinitions="Auto, *">
-                        <TextBlock Grid.Column="0" Text="flags &gt; " Foreground="White" FontWeight="Bold"
+                        <TextBlock Grid.Column="0" Text="flags &gt; " Foreground="#42B883" FontWeight="Bold"
                                    VerticalAlignment="Center" FontSize="12" FontFamily="Consolas"/>
                         <TextBox Grid.Column="1" Text="{Binding CustomFlags}" Watermark="curl-style flags (-H, -d, -x, --resolve...)"
-                                 FontSize="12" BorderThickness="0" Background="Transparent" Foreground="White"
+                                 FontSize="12" BorderThickness="0" Background="Transparent" Foreground="#ECECEF"
                                  FontFamily="Cascadia Code,Consolas" VerticalContentAlignment="Center" Height="30"/>
                     </Grid>
                 </Border>
@@ -117,9 +127,9 @@
                               ToolTip.Tip="Engine: system curl binary, or built-in .NET HttpClient (no curl needed)"/>
 
                 <CheckBox Name="ProxyToggle" Grid.Column="2" IsChecked="{Binding UseProxy}" Content="Proxy" FontSize="11.5"
-                          Foreground="White" FontWeight="SemiBold" MinHeight="0" Margin="15,0,0,0" VerticalAlignment="Center"/>
+                          Foreground="#C7C8CF" FontWeight="SemiBold" MinHeight="0" Margin="15,0,0,0" VerticalAlignment="Center"/>
                 <CheckBox IsChecked="{Binding SkipSslVerify}" Grid.Column="3" Content="Insecure" FontSize="11.5"
-                          Foreground="White" FontWeight="SemiBold" MinHeight="0" Margin="15,0,0,0" VerticalAlignment="Center"/>
+                          Foreground="#C7C8CF" FontWeight="SemiBold" MinHeight="0" Margin="15,0,0,0" VerticalAlignment="Center"/>
             </Grid>
         </StackPanel>
 

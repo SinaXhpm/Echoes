@@ -71,6 +71,9 @@
 					<ListBoxItem>SSH</ListBoxItem>
 					<ListBoxItem>STRING LAB</ListBoxItem>
 					<ListBoxItem>NOTES</ListBoxItem>
+					<ListBoxItem>NIC</ListBoxItem>
+					<ListBoxItem>BACKUP</ListBoxItem>
+					<ListBoxItem>HISTORY</ListBoxItem>
 				</ListBox>
 			</DockPanel>
 		</SplitView.Pane>
@@ -113,6 +116,9 @@
 					<views:SshView DataContext="{Binding SshVM}"/>
 					<views:StringLabView DataContext="{Binding StringTool}"/>
 					<views:NoteView DataContext="{Binding NoteVM}"/>
+					<views:NetworkInfoView DataContext="{Binding NetworkVM}"/>
+					<views:BackupView DataContext="{Binding BackupVM}"/>
+					<views:HistoryView DataContext="{Binding HistoryVM}"/>
 				</Carousel>
 			</Grid>
 		</SplitView.Content>

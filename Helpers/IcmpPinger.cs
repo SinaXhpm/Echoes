@@ -166,9 +166,7 @@ public static class IcmpPinger
 
     private static bool IsPermissionError(Exception e)
     {
-        if (e is SocketException s &&
-            (s.SocketErrorCode == SocketError.AccessDenied ||
-             s.SocketErrorCode == SocketError.SocketError))
+        if (e is SocketException s && s.SocketErrorCode == SocketError.AccessDenied)
             return true;
 
         var msg = e.Message;
