@@ -14,7 +14,7 @@ namespace Echoes.Android;
 /// matching &lt;service&gt; entry (with android:foregroundServiceType="dataSync") into the merged
 /// manifest, so only the permissions need to live in AndroidManifest.xml.
 /// </summary>
-[Service(Exported = false, ForegroundServiceType = Android.Content.PM.ForegroundService.TypeDataSync)]
+[Service(Exported = false, ForegroundServiceType = global::Android.Content.PM.ForegroundService.TypeDataSync)]
 public class KeepAliveService : Service
 {
     public const string ExtraReason = "reason";
@@ -35,7 +35,7 @@ public class KeepAliveService : Service
 
         // API 34+ requires the FGS type to be passed to StartForeground and to match the manifest.
         if (OperatingSystem.IsAndroidVersionAtLeast(34))
-            StartForeground(NotificationId, notification, Android.Content.PM.ForegroundService.TypeDataSync);
+            StartForeground(NotificationId, notification, global::Android.Content.PM.ForegroundService.TypeDataSync);
         else
             StartForeground(NotificationId, notification);
 
@@ -96,7 +96,7 @@ public class KeepAliveService : Service
         return builder
             .SetContentTitle("Echoes")
             .SetContentText(reason)
-            .SetSmallIcon(Android.Resource.Drawable.StatNotifySync)
+            .SetSmallIcon(global::Android.Resource.Drawable.StatNotifySync)
             .SetOngoing(true)
             .Build();
     }
