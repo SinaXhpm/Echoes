@@ -1,7 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
-             xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.DnsView"
              x:DataType="vm:DnsViewModel">
 
@@ -9,36 +8,14 @@
     <Grid RowDefinitions="Auto, *" RowSpacing="10" Margin="15">
 
         <Border Grid.Row="0" Classes="card" Padding="14,12">
-            <StackPanel Spacing="12">
+            <!-- Two columns: compact query controls on the LEFT, the RESOLVERS box on the
+                 RIGHT stretched to the full card height. MaxWidth keeps it sane on a wide desktop. -->
+            <Grid ColumnDefinitions="*, 150" ColumnSpacing="12" MaxWidth="520">
 
-                <!-- Domain field + actions. On a wide pane they share one line; below the
-                     Responsive break (phone / narrow window) the actions drop to their own
-                     full-width row so the domain box never gets crushed. -->
-                <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto"
-                      helpers:Responsive.BreakWidth="480" ColumnSpacing="8" RowSpacing="10">
-                    <Grid.Styles>
-                        <!-- wide: actions ride on the domain's line, laid out horizontally.
-                             narrow: they drop to their own row and stack vertically (each
-                             full-width) so three controls never fight for one cramped line. -->
-                        <Style Selector="Grid.wide > StackPanel#DnsActions">
-                            <Setter Property="Grid.Row" Value="0"/>
-                            <Setter Property="Grid.Column" Value="1"/>
-                            <Setter Property="Orientation" Value="Horizontal"/>
-                            <Setter Property="VerticalAlignment" Value="Bottom"/>
-                        </Style>
-                        <Style Selector="Grid.narrow > StackPanel#DnsActions">
-                            <Setter Property="Grid.Row" Value="1"/>
-                            <Setter Property="Grid.Column" Value="0"/>
-                            <Setter Property="Orientation" Value="Vertical"/>
-                            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-                        </Style>
-                        <!-- fixed picker width only makes sense on the wide (one-line) layout -->
-                        <Style Selector="Grid.wide StackPanel#RecTypes">
-                            <Setter Property="Width" Value="124"/>
-                        </Style>
-                    </Grid.Styles>
+                <!-- LEFT: domain + record-types + WHOIS + LOOKUP, stacked and compact -->
+                <StackPanel Grid.Column="0" Spacing="8" VerticalAlignment="Top">
 
-                    <StackPanel Grid.Row="0" Grid.Column="0">
+                    <StackPanel>
                         <TextBlock Classes="fieldLabel" Text="TARGET DOMAIN"/>
                         <AutoCompleteBox Classes="field" x:Name="DomainBox" Text="{Binding DomainName}" Watermark="example.com"
                                  ItemsSource="{Binding DomainHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0">
@@ -48,85 +25,81 @@
                         </AutoCompleteBox>
                     </StackPanel>
 
-                    <!-- Actions group (record-types picker + WHOIS + LOOKUP/STOP). Repositioned
-                         and re-oriented as a unit by the Responsive styles above. -->
-                    <StackPanel x:Name="DnsActions" Spacing="8">
+                    <!-- RECORD TYPES → compact multi-select dropdown (expands via its flyout) -->
+                    <StackPanel>
+                        <TextBlock Classes="fieldLabel" Text="RECORD TYPES"/>
+                        <DropDownButton HorizontalAlignment="Stretch" Height="34" Padding="10,0"
+                                        Background="#1D1E25" BorderBrush="#3B3D47" BorderThickness="1" CornerRadius="6"
+                                        Foreground="#ECECEF">
+                            <TextBlock Text="{Binding SelectedTypesSummary}" FontSize="11.5" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <DropDownButton.Flyout>
+                                <Flyout Placement="Bottom">
+                                    <Border Background="#191A1F" CornerRadius="6" Padding="12,10" MinWidth="210">
+                                        <StackPanel Spacing="6">
+                                            <TextBlock Text="RECORD TYPES" Classes="fieldLabel" Margin="0,0,0,2"/>
+                                            <UniformGrid Columns="2">
+                                                <UniformGrid.Styles>
+                                                    <Style Selector="CheckBox">
+                                                        <Setter Property="FontSize" Value="12"/>
+                                                        <Setter Property="MinHeight" Value="28"/>
+                                                        <Setter Property="Padding" Value="6,0,0,0"/>
+                                                    </Style>
+                                                </UniformGrid.Styles>
+                                                <CheckBox IsChecked="{Binding TypeA}" Content="A"/>
+                                                <CheckBox IsChecked="{Binding TypeAAAA}" Content="AAAA"/>
+                                                <CheckBox IsChecked="{Binding TypeCNAME}" Content="CNAME"/>
+                                                <CheckBox IsChecked="{Binding TypeMX}" Content="MX"/>
+                                                <CheckBox IsChecked="{Binding TypeTXT}" Content="TXT"/>
+                                                <CheckBox IsChecked="{Binding TypeNS}" Content="NS"/>
+                                                <CheckBox IsChecked="{Binding TypeSOA}" Content="SOA"/>
+                                                <CheckBox IsChecked="{Binding TypeSRV}" Content="SRV"/>
+                                                <CheckBox IsChecked="{Binding TypeCAA}" Content="CAA"/>
+                                                <CheckBox IsChecked="{Binding TypePTR}" Content="PTR"/>
+                                            </UniformGrid>
+                                        </StackPanel>
+                                    </Border>
+                                </Flyout>
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                    </StackPanel>
 
-                        <!-- RECORD TYPES → compact multi-select dropdown (frees the vertical space
-                             the old 2-row checkbox grid used, so RESOLVERS below can be taller) -->
-                        <StackPanel x:Name="RecTypes">
-                            <TextBlock Classes="fieldLabel" Text="RECORD TYPES"/>
-                            <DropDownButton HorizontalAlignment="Stretch" Height="34" Padding="10,0"
-                                            Background="#1D1E25" BorderBrush="#3B3D47" BorderThickness="1" CornerRadius="6"
-                                            Foreground="#ECECEF">
-                                <TextBlock Text="{Binding SelectedTypesSummary}" FontSize="11.5" VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"/>
-                                <DropDownButton.Flyout>
-                                    <Flyout Placement="Bottom">
-                                        <Border Background="#191A1F" CornerRadius="6" Padding="12,10" MinWidth="210">
-                                            <StackPanel Spacing="6">
-                                                <TextBlock Text="RECORD TYPES" Classes="fieldLabel" Margin="0,0,0,2"/>
-                                                <UniformGrid Columns="2">
-                                                    <UniformGrid.Styles>
-                                                        <Style Selector="CheckBox">
-                                                            <Setter Property="FontSize" Value="12"/>
-                                                            <Setter Property="MinHeight" Value="28"/>
-                                                            <Setter Property="Padding" Value="6,0,0,0"/>
-                                                        </Style>
-                                                    </UniformGrid.Styles>
-                                                    <CheckBox IsChecked="{Binding TypeA}" Content="A"/>
-                                                    <CheckBox IsChecked="{Binding TypeAAAA}" Content="AAAA"/>
-                                                    <CheckBox IsChecked="{Binding TypeCNAME}" Content="CNAME"/>
-                                                    <CheckBox IsChecked="{Binding TypeMX}" Content="MX"/>
-                                                    <CheckBox IsChecked="{Binding TypeTXT}" Content="TXT"/>
-                                                    <CheckBox IsChecked="{Binding TypeNS}" Content="NS"/>
-                                                    <CheckBox IsChecked="{Binding TypeSOA}" Content="SOA"/>
-                                                    <CheckBox IsChecked="{Binding TypeSRV}" Content="SRV"/>
-                                                    <CheckBox IsChecked="{Binding TypeCAA}" Content="CAA"/>
-                                                    <CheckBox IsChecked="{Binding TypePTR}" Content="PTR"/>
-                                                </UniformGrid>
-                                            </StackPanel>
-                                        </Border>
-                                    </Flyout>
-                                </DropDownButton.Flyout>
-                            </DropDownButton>
-                        </StackPanel>
+                    <!-- WHOIS then LOOKUP/STOP, each full left-column width -->
+                    <Button x:Name="WhoisBtn" Classes="secondary" Command="{Binding RunWhoisCommand}" Content="WHOIS"
+                            IsEnabled="{Binding !IsWorking}" Height="34" HorizontalAlignment="Stretch"/>
+                    <Panel x:Name="LookupHost">
+                        <Button Classes="primary" Command="{Binding RunLookupCommand}" Content="LOOKUP"
+                                Height="34" HorizontalAlignment="Stretch" IsVisible="{Binding !IsWorking}"/>
+                        <Button Classes="toggle active" Command="{Binding StopCommand}" Content="STOP"
+                                Height="34" HorizontalAlignment="Stretch" IsVisible="{Binding IsWorking}"/>
+                    </Panel>
+                </StackPanel>
 
-                        <Button x:Name="WhoisBtn" Classes="secondary" Command="{Binding RunWhoisCommand}" Content="WHOIS"
-                                IsEnabled="{Binding !IsWorking}" MinWidth="78" Height="34" VerticalAlignment="Bottom"/>
-                        <!-- LOOKUP flips to a red STOP while a lookup/WHOIS is running -->
-                        <Panel x:Name="LookupHost" MinWidth="110" VerticalAlignment="Bottom">
-                            <Button Classes="primary" Command="{Binding RunLookupCommand}" Content="LOOKUP"
-                                    Height="34" HorizontalAlignment="Stretch" IsVisible="{Binding !IsWorking}"/>
-                            <Button Classes="toggle active" Command="{Binding StopCommand}" Content="STOP"
-                                    Height="34" HorizontalAlignment="Stretch" IsVisible="{Binding IsWorking}"/>
-                        </Panel>
+                <!-- RIGHT: resolvers box (fills remaining height) with the result Wrap + Copy
+                     controls tucked underneath, which trims the resolvers height a little. -->
+                <Grid Grid.Column="1" RowDefinitions="Auto, *, Auto">
+                    <TextBlock Grid.Row="0" Classes="fieldLabel" Text="RESOLVERS"/>
+                    <TextBox Grid.Row="1" Classes="field multiline" Text="{Binding DnsServersText}" AcceptsReturn="True" FontSize="11.5"
+                             VerticalAlignment="Stretch" FontFamily="Cascadia Code,Consolas"
+                             Watermark="one&#x0a;per&#x0a;line"/>
+                    <StackPanel Grid.Row="2" Spacing="6" Margin="0,8,0,0">
+                        <CheckBox IsChecked="{Binding WrapResult}" Content="Wrap result" FontSize="10.5" FontWeight="SemiBold"
+                                  Foreground="#9E9FA8" MinHeight="0" IsVisible="{Binding !ShowRecords}"/>
+                        <Button Classes="ghost" Command="{Binding CopyResultCommand}" Content="COPY ALL"
+                                Height="28" FontSize="9.5" HorizontalAlignment="Stretch"/>
                     </StackPanel>
                 </Grid>
-
-                <!-- 2) Resolvers — full width, now tall (uses the space freed by the dropdown) -->
-                <StackPanel>
-                    <TextBlock Classes="fieldLabel" Text="DNS RESOLVERS (one per line)"/>
-                    <TextBox Classes="field multiline" Text="{Binding DnsServersText}" AcceptsReturn="True" FontSize="11.5"
-                             Height="96" FontFamily="Cascadia Code,Consolas"/>
-                </StackPanel>
-            </StackPanel>
+            </Grid>
         </Border>
 
-        <!-- 3) Results — header bar (count + result actions) over the output card -->
+        <!-- Results — header bar (count + result actions) over the output card -->
         <Grid Grid.Row="1" RowDefinitions="Auto, *" RowSpacing="6">
-            <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto" Margin="2,0">
+            <Grid Grid.Row="0" ColumnDefinitions="*" Margin="2,0">
                 <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="10" Foreground="#9E9FA8"
                            IsVisible="{Binding ShowRecords}"
                            Text="{Binding Records.Count, StringFormat='{}{0} record(s)'}"/>
                 <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="10" FontWeight="SemiBold" Foreground="#9E9FA8"
                            IsVisible="{Binding !ShowRecords}" Text="WHOIS / RDAP"/>
-
-                <CheckBox Grid.Column="1" IsChecked="{Binding WrapResult}" Content="Wrap" FontSize="10" FontWeight="SemiBold"
-                          Foreground="#9E9FA8" MinHeight="0" VerticalAlignment="Center" Margin="0,0,10,0"
-                          IsVisible="{Binding !ShowRecords}"/>
-                <Button Grid.Column="2" Classes="ghost" Command="{Binding CopyResultCommand}" Content="COPY ALL"
-                        Height="28" FontSize="9" Padding="14,0" VerticalAlignment="Center"/>
             </Grid>
 
             <Border Grid.Row="1" Classes="card output">
@@ -162,16 +135,19 @@
                                                         <Style Selector="Button:pointerover /template/ ContentPresenter">
                                                             <Setter Property="Background" Value="#33353E"/>
                                                         </Style>
+                                                        <Style Selector="Button Border.pg">
+                                                            <Setter Property="BorderBrush" Value="#C7C8CF"/>
+                                                        </Style>
                                                         <Style Selector="Button:pointerover Border.pg">
                                                             <Setter Property="BorderBrush" Value="#FFFFFF"/>
                                                         </Style>
                                                     </Button.Styles>
                                                     <Grid Width="13" Height="13">
                                                         <Border Classes="pg" Width="8" Height="9" CornerRadius="2"
-                                                                BorderBrush="#C7C8CF" BorderThickness="1.2"
+                                                                BorderThickness="1.2"
                                                                 HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
                                                         <Border Classes="pg" Width="8" Height="9" CornerRadius="2"
-                                                                BorderBrush="#C7C8CF" BorderThickness="1.2" Background="#2A2C33"
+                                                                BorderThickness="1.2" Background="#2A2C33"
                                                                 HorizontalAlignment="Right" VerticalAlignment="Top"/>
                                                     </Grid>
                                                 </Button>

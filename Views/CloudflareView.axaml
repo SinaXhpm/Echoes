@@ -6,9 +6,9 @@
 
     <Panel>
 
-      <!-- Lock screen (master password) -->
-      <Border IsVisible="{Binding IsLocked}" VerticalAlignment="Center" HorizontalAlignment="Center"
-              Width="340" Padding="20" Background="#191A1F" CornerRadius="8" BorderBrush="#2F3139" BorderThickness="1">
+      <!-- Lock screen (master password). MaxWidth (not fixed Width) so it fits a narrow phone. -->
+      <Border IsVisible="{Binding IsLocked}" VerticalAlignment="Center" HorizontalAlignment="Stretch"
+              MaxWidth="340" Margin="16,0" Padding="20" Background="#191A1F" CornerRadius="8" BorderBrush="#2F3139" BorderThickness="1">
           <StackPanel Spacing="12">
               <TextBlock Text="CLOUDFLARE — ENCRYPTED" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#ECECEF"/>
               <TextBlock IsVisible="{Binding HasVault}" TextWrapping="Wrap" TextAlignment="Center" FontSize="10" Foreground="#9E9FA8"

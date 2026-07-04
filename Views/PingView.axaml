@@ -31,11 +31,12 @@
             </Button>
         </Grid>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="18" Margin="2,0,0,10">
-            <CheckBox IsChecked="{Binding IsTraceRoute}" Content="Trace Route" FontSize="12" FontWeight="SemiBold"/>
-            <CheckBox IsChecked="{Binding NotifyOnline}" Content="Alert Online" FontSize="12" FontWeight="SemiBold"/>
-            <CheckBox IsChecked="{Binding NotifyOffline}" Content="Alert Offline" FontSize="12" FontWeight="SemiBold"/>
-        </StackPanel>
+        <!-- WrapPanel so the third checkbox drops to a second line instead of clipping on a phone -->
+        <WrapPanel Grid.Row="1" Margin="2,0,0,10">
+            <CheckBox IsChecked="{Binding IsTraceRoute}" Content="Trace Route" FontSize="12" FontWeight="SemiBold" Margin="0,0,18,4"/>
+            <CheckBox IsChecked="{Binding NotifyOnline}" Content="Alert Online" FontSize="12" FontWeight="SemiBold" Margin="0,0,18,4"/>
+            <CheckBox IsChecked="{Binding NotifyOffline}" Content="Alert Offline" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        </WrapPanel>
 
         <Border Grid.Row="2" Classes="card output">
             <ListBox Name="LogList"
@@ -73,7 +74,8 @@
                        FontSize="11.5"
                        FontFamily="Cascadia Code,Consolas,Monospace"
                        Foreground="#C7C8CF"
-                       FontWeight="Medium"/>
+                       FontWeight="Medium"
+                       TextWrapping="Wrap"/>
         </Border>
     </Grid>
 </UserControl>

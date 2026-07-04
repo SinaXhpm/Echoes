@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
 			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 			 xmlns:vm="using:Echoes.ViewModels"
+			 xmlns:helpers="using:Echoes.Helpers"
 			 x:Class="Echoes.Views.SshView"
 			 x:DataType="vm:SshViewModel">
 
@@ -52,19 +53,37 @@
 				</TextBox>
 			</Grid>
 
-			<Grid ColumnDefinitions="*, *, 110">
-				<AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Username}" ItemsSource="{Binding UserHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0" Watermark="Username" Margin="0,0,8,0">
-					<AutoCompleteBox.KeyBindings>
-						<KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
-					</AutoCompleteBox.KeyBindings>
-				</AutoCompleteBox>
-				<TextBox Grid.Column="1" Classes="field" Text="{Binding Password}" PasswordChar="*" Watermark="Password" Margin="0,0,8,0">
-					<TextBox.KeyBindings>
-						<KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
-					</TextBox.KeyBindings>
-				</TextBox>
+			<!-- username+password | CONNECT. One line when wide; CONNECT drops to a full-width
+			     row under the credentials below the Responsive break (phone). -->
+			<Grid helpers:Responsive.BreakWidth="430" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto"
+				  ColumnSpacing="8" RowSpacing="8">
+				<Grid.Styles>
+					<Style Selector="Grid.wide > Button#SshConnect">
+						<Setter Property="Grid.Row" Value="0"/>
+						<Setter Property="Grid.Column" Value="1"/>
+						<Setter Property="Width" Value="110"/>
+					</Style>
+					<Style Selector="Grid.narrow > Button#SshConnect">
+						<Setter Property="Grid.Row" Value="1"/>
+						<Setter Property="Grid.Column" Value="0"/>
+						<Setter Property="HorizontalAlignment" Value="Stretch"/>
+					</Style>
+				</Grid.Styles>
 
-				<Button Grid.Column="2" Classes="toggle"
+				<Grid Grid.Row="0" Grid.Column="0" ColumnDefinitions="*, *" ColumnSpacing="8">
+					<AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Username}" ItemsSource="{Binding UserHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0" Watermark="Username">
+						<AutoCompleteBox.KeyBindings>
+							<KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
+						</AutoCompleteBox.KeyBindings>
+					</AutoCompleteBox>
+					<TextBox Grid.Column="1" Classes="field" Text="{Binding Password}" PasswordChar="*" Watermark="Password">
+						<TextBox.KeyBindings>
+							<KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
+						</TextBox.KeyBindings>
+					</TextBox>
+				</Grid>
+
+				<Button x:Name="SshConnect" Classes="toggle"
 						Command="{Binding ToggleConnectCommand}"
 						HorizontalAlignment="Stretch"
 						Classes.active="{Binding IsConnected}">
@@ -76,9 +95,25 @@
 			</Grid>
 		</StackPanel>
 
-		<Grid Grid.Row="1" ColumnDefinitions="*, 12, *" Margin="0,0,0,10">
+		<!-- INBOUND | OUTBOUND cards side by side when wide; stacked on a phone. -->
+		<Grid Grid.Row="1" helpers:Responsive.BreakWidth="430" ColumnDefinitions="*, *" RowDefinitions="Auto, Auto"
+			  ColumnSpacing="12" RowSpacing="10" Margin="0,0,0,10">
+			<Grid.Styles>
+				<Style Selector="Grid.wide > Border#SshIn">
+					<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+				</Style>
+				<Style Selector="Grid.narrow > Border#SshIn">
+					<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+				</Style>
+				<Style Selector="Grid.wide > Border#SshOut">
+					<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+				</Style>
+				<Style Selector="Grid.narrow > Border#SshOut">
+					<Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+				</Style>
+			</Grid.Styles>
 
-			<Border Grid.Column="0" Classes="card" Padding="8,5">
+			<Border x:Name="SshIn" Classes="card" Padding="8,5">
 				<Grid ColumnDefinitions="Auto, 8, *, 5, 40">
 					<CheckBox Grid.Column="0" IsChecked="{Binding ConnectViaProxy}" Margin="0">
 						<TextBlock Text="INBOUND" FontSize="9" FontWeight="Bold" Foreground="#9E9FA8"/>
@@ -95,7 +130,7 @@
 				</Grid>
 			</Border>
 
-			<Border Grid.Column="2" Classes="card" Padding="8,5">
+			<Border x:Name="SshOut" Classes="card" Padding="8,5">
 				<Grid ColumnDefinitions="Auto, 8, *, 5, 40, Auto">
 					<CheckBox Grid.Column="0" IsChecked="{Binding EnableSocksTunnel}" Margin="0">
 						<TextBlock Text="OUTBOUND" FontSize="9" FontWeight="Bold" Foreground="#9E9FA8"/>

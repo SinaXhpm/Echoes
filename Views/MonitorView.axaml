@@ -5,108 +5,149 @@
              x:Class="Echoes.Views.MonitorView"
              x:DataType="vm:MonitorViewModel">
 
-    <Grid RowDefinitions="Auto, Auto, *" Margin="14">
-        <Grid Grid.Row="0" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto"
-              helpers:Responsive.BreakWidth="520" ColumnSpacing="10" RowSpacing="10" Margin="0,0,0,10">
-            <Grid.Styles>
-                <!-- wide: targets | checks side-by-side; narrow (phone): checks drop below -->
-                <Style Selector="Grid.wide > StackPanel#MonChecks">
-                    <Setter Property="Grid.Row" Value="0"/>
-                    <Setter Property="Grid.Column" Value="1"/>
-                    <Setter Property="Width" Value="244"/>
+    <Grid Margin="14">
+        <TabControl>
+            <TabControl.Styles>
+                <Style Selector="TabItem">
+                    <Setter Property="FontSize" Value="12"/>
+                    <Setter Property="MinHeight" Value="34"/>
+                    <Setter Property="Padding" Value="16,0"/>
+                    <Setter Property="Foreground" Value="#9E9FA8"/>
                 </Style>
-                <Style Selector="Grid.narrow > StackPanel#MonChecks">
-                    <Setter Property="Grid.Row" Value="1"/>
-                    <Setter Property="Grid.Column" Value="0"/>
-                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                <Style Selector="TabItem:selected">
+                    <Setter Property="Foreground" Value="#ECECEF"/>
                 </Style>
-            </Grid.Styles>
+            </TabControl.Styles>
 
-            <StackPanel Grid.Row="0" Grid.Column="0">
-                <TextBlock Classes="fieldLabel" Text="TARGETS"/>
-                <TextBox Classes="field multiline" Text="{Binding InputAddresses}" AcceptsReturn="True" FontSize="12" Height="124"
-                         FontFamily="Cascadia Code,Consolas"
-                         KeyDown="Input_KeyDown"
-                         Watermark="IP/URL per line (Enter=Start, Shift+Enter=newline)"/>
-            </StackPanel>
+            <!-- ============ SETUP ============ -->
+            <TabItem Header="SETUP">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <!-- MaxWidth keeps the form a sensible width on a wide desktop; it fills a phone. -->
+                    <StackPanel Spacing="14" Margin="0,12,0,4" MaxWidth="560">
 
-            <StackPanel x:Name="MonChecks">
-                <TextBlock Classes="fieldLabel" Text="CHECKS"/>
-                <Border Classes="card" Padding="12" Height="124">
-                    <Grid RowDefinitions="Auto, *, Auto">
-                        <UniformGrid Grid.Row="0" Columns="2" Rows="2">
-                            <UniformGrid.Styles>
-                                <Style Selector="CheckBox">
-                                    <Setter Property="FontSize" Value="11"/>
-                                    <Setter Property="MinHeight" Value="0"/>
-                                    <Setter Property="Margin" Value="0,0,0,4"/>
-                                </Style>
-                            </UniformGrid.Styles>
-                            <CheckBox IsChecked="{Binding CheckPing}" Content="PING"/>
-                            <CheckBox IsChecked="{Binding CheckTcp}" Content="TCP"/>
-                            <CheckBox IsChecked="{Binding CheckHttp}" Content="HTTP"/>
-                            <CheckBox IsChecked="{Binding AlertSound}" Content="SND"
-                                      ToolTip.Tip="Beep when a target goes up or down"/>
-                        </UniformGrid>
+                        <!-- TARGETS -->
+                        <StackPanel Spacing="4">
+                            <TextBlock Classes="fieldLabel" Text="TARGETS"/>
+                            <TextBox Classes="field multiline" Text="{Binding InputAddresses}" AcceptsReturn="True" FontSize="12" Height="120"
+                                     FontFamily="Cascadia Code,Consolas"
+                                     KeyDown="Input_KeyDown"
+                                     Watermark="host · host:port · https://url — one per line&#x0a;(Enter = Start, Shift+Enter = newline)"/>
+                        </StackPanel>
 
-                        <Grid Grid.Row="2" ColumnDefinitions="Auto, *, 92">
-                            <TextBlock Grid.Column="0" Text="INT(S)" VerticalAlignment="Center" FontSize="9" FontWeight="Bold" Foreground="#9E9FA8" Margin="0,0,6,0"/>
-                            <TextBox Grid.Column="1" Classes="field" Text="{Binding Interval}" FontSize="11"
-                                     HorizontalContentAlignment="Center" Margin="0,0,8,0"/>
-                            <Button Grid.Column="2" Classes="toggle" Command="{Binding ToggleMonitorCommand}"
-                                    Classes.active="{Binding IsMonitoring}">
-                                <Panel>
-                                    <TextBlock Text="START" IsVisible="{Binding !IsMonitoring}" FontSize="10" FontWeight="Black"/>
-                                    <TextBlock Text="STOP" IsVisible="{Binding IsMonitoring}" FontSize="10" FontWeight="Black"/>
-                                </Panel>
-                            </Button>
+                        <!-- CHECKS: what to probe on each target -->
+                        <StackPanel Spacing="4">
+                            <TextBlock Classes="fieldLabel" Text="CHECKS"/>
+                            <Border Classes="card" Padding="14,10">
+                                <WrapPanel>
+                                    <WrapPanel.Styles>
+                                        <Style Selector="CheckBox">
+                                            <Setter Property="FontSize" Value="12.5"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                            <Setter Property="Margin" Value="0,0,26,0"/>
+                                        </Style>
+                                    </WrapPanel.Styles>
+                                    <CheckBox IsChecked="{Binding CheckPing}" Content="Ping" ToolTip.Tip="ICMP echo round-trip"/>
+                                    <CheckBox IsChecked="{Binding CheckTcp}" Content="TCP" ToolTip.Tip="TCP connect to the port (default 80, or use host:port)"/>
+                                    <CheckBox IsChecked="{Binding CheckHttp}" Content="HTTP" Margin="0" ToolTip.Tip="HTTP GET — status code + latency"/>
+                                </WrapPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- OPTIONS: cadence, per-check timeout, alerting -->
+                        <StackPanel Spacing="4">
+                            <TextBlock Classes="fieldLabel" Text="OPTIONS"/>
+                            <Border Classes="card" Padding="14,12">
+                                <StackPanel Spacing="12">
+                                    <WrapPanel>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
+                                            <TextBlock Text="Interval" FontSize="11.5" Foreground="#C7C8CF" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBox Classes="field" Text="{Binding Interval}" Width="58" HorizontalContentAlignment="Center"/>
+                                            <TextBlock Text="sec" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="Timeout" FontSize="11.5" Foreground="#C7C8CF" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBox Classes="field" Text="{Binding TimeoutMs}" Width="74" HorizontalContentAlignment="Center"/>
+                                            <TextBlock Text="ms" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                        </StackPanel>
+                                    </WrapPanel>
+                                    <CheckBox IsChecked="{Binding AlertSound}" FontSize="12" Foreground="#C7C8CF"
+                                              Content="Sound alert when a target goes up or down"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- START -->
+                        <Button Classes="toggle" Command="{Binding ToggleMonitorCommand}" Classes.active="{Binding IsMonitoring}"
+                                Height="42" HorizontalAlignment="Stretch">
+                            <Panel>
+                                <TextBlock Text="START MONITORING" IsVisible="{Binding !IsMonitoring}" FontSize="12" FontWeight="Black" LetterSpacing="0.5"/>
+                                <TextBlock Text="STOP" IsVisible="{Binding IsMonitoring}" FontSize="12" FontWeight="Black" LetterSpacing="0.5"/>
+                            </Panel>
+                        </Button>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ============ STATUS ============ -->
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock Text="STATUS" VerticalAlignment="Center"/>
+                        <Border CornerRadius="9" Background="#2042B883" Padding="8,2" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Targets.Count}" FontSize="10" FontWeight="Bold" Foreground="#42B883"/>
+                        </Border>
+                    </StackPanel>
+                </TabItem.Header>
+
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,10,0,0">
+                    <Grid MinWidth="520" RowDefinitions="Auto, *">
+                        <Grid Grid.Row="0" ColumnDefinitions="2*, 1*, 1*, 1.2*, 0.9*, 0.7*" Margin="12,0,12,8">
+                            <TextBlock Grid.Column="0" Text="ADDRESS" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8"/>
+                            <TextBlock Grid.Column="1" Text="PING" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" Text="TCP" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center"/>
+                            <TextBlock Grid.Column="3" Text="HTTP" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center"/>
+                            <TextBlock Grid.Column="4" Text="UPTIME" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center"/>
+                            <TextBlock Grid.Column="5" Text="FAILS" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Right"/>
                         </Grid>
+
+                        <ListBox Grid.Row="1" ItemsSource="{Binding Targets}" Background="Transparent" Padding="0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:MonitorTarget">
+                                    <Border CornerRadius="6" Margin="0,2" Padding="12,7" BorderThickness="1" Classes.success="{Binding IsSuccess}" Classes.failed="{Binding !IsSuccess}">
+                                        <Border.Styles>
+                                            <Style Selector="Border">
+                                                <Setter Property="Background" Value="#191A1F"/>
+                                                <Setter Property="BorderBrush" Value="#2F3139"/>
+                                            </Style>
+                                            <Style Selector="Border.success">
+                                                <Setter Property="Background" Value="#2042B883"/>
+                                                <Setter Property="BorderBrush" Value="#2042B883"/>
+                                            </Style>
+                                            <Style Selector="Border.failed">
+                                                <Setter Property="Background" Value="#20E5484D"/>
+                                                <Setter Property="BorderBrush" Value="#20E5484D"/>
+                                            </Style>
+                                        </Border.Styles>
+                                        <Grid ColumnDefinitions="2*, 1*, 1*, 1.2*, 0.9*, 0.7*">
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Address}" FontSize="11.5" Foreground="#ECECEF" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding History}" FontSize="9" Foreground="#42B883" FontFamily="Cascadia Code,Consolas" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{Binding PingStatus}" FontSize="10.5" Foreground="#C7C8CF" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding TcpStatus}" FontSize="10.5" Foreground="#C7C8CF" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding HttpStatus}" FontSize="10.5" Foreground="#ECECEF" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                            <TextBlock Grid.Column="4" Text="{Binding Uptime}" FontSize="10.5" Foreground="#4FCB97" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                            <TextBlock Grid.Column="5" Text="{Binding FailedCount}" FontSize="11" Foreground="#E5484D" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </Grid>
-                </Border>
-            </StackPanel>
-        </Grid>
+                </ScrollViewer>
+            </TabItem>
 
-        <Grid Grid.Row="1" ColumnDefinitions="2*, 1*, 1*, 1.2*, 0.9*, 0.7*" Margin="12,0,12,8">
-            <TextBlock Grid.Column="0" Text="ADDRESS" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8"/>
-            <TextBlock Grid.Column="1" Text="PING" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center"/>
-            <TextBlock Grid.Column="2" Text="TCP" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center"/>
-            <TextBlock Grid.Column="3" Text="HTTP" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center"/>
-            <TextBlock Grid.Column="4" Text="UPTIME" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center"/>
-            <TextBlock Grid.Column="5" Text="FAILS" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Right"/>
-        </Grid>
-
-        <ListBox Grid.Row="2" ItemsSource="{Binding Targets}" Background="Transparent" Padding="0">
-            <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:MonitorTarget">
-                    <Border CornerRadius="6" Margin="0,2" Padding="12,7" BorderThickness="1" Classes.success="{Binding IsSuccess}" Classes.failed="{Binding !IsSuccess}">
-                        <Border.Styles>
-                            <Style Selector="Border">
-                                <Setter Property="Background" Value="#191A1F"/>
-                                <Setter Property="BorderBrush" Value="#2F3139"/>
-                            </Style>
-                            <Style Selector="Border.success">
-                                <Setter Property="Background" Value="#2042B883"/>
-                                <Setter Property="BorderBrush" Value="#2042B883"/>
-                            </Style>
-                            <Style Selector="Border.failed">
-                                <Setter Property="Background" Value="#20E5484D"/>
-                                <Setter Property="BorderBrush" Value="#20E5484D"/>
-                            </Style>
-                        </Border.Styles>
-                        <Grid ColumnDefinitions="2*, 1*, 1*, 1.2*, 0.9*, 0.7*">
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Address}" FontSize="11.5" Foreground="#ECECEF" TextTrimming="CharacterEllipsis"/>
-                                <TextBlock Text="{Binding History}" FontSize="9" Foreground="#42B883" FontFamily="Cascadia Code,Consolas" Margin="0,2,0,0"/>
-                            </StackPanel>
-                            <TextBlock Grid.Column="1" Text="{Binding PingStatus}" FontSize="10.5" Foreground="#C7C8CF" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="2" Text="{Binding TcpStatus}" FontSize="10.5" Foreground="#C7C8CF" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="3" Text="{Binding HttpStatus}" FontSize="10.5" Foreground="#ECECEF" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                            <TextBlock Grid.Column="4" Text="{Binding Uptime}" FontSize="10.5" Foreground="#4FCB97" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                            <TextBlock Grid.Column="5" Text="{Binding FailedCount}" FontSize="11" Foreground="#E5484D" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
-                        </Grid>
-                    </Border>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+        </TabControl>
     </Grid>
 </UserControl>

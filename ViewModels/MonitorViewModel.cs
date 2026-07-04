@@ -35,13 +35,16 @@ public partial class MonitorTarget : ObservableObject
 public partial class MonitorViewModel : ObservableObject
 {
     private CancellationTokenSource? _cts;
-    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(3) };
+    // Per-request timeout is enforced with a linked CTS (see RunHttp) so the user-set
+    // Timeout option controls it; keep the client itself un-timed.
+    private readonly HttpClient _httpClient = new() { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
 
     private const int MaxTargets = 256;           // cap the watch list so a big paste can't fan out unbounded
     private const int MaxConcurrentChecks = 50;   // per-cycle concurrency (each target still does ping+tcp+http)
 
     [ObservableProperty] private string _inputAddresses = "google.com\n1.1.1.1:53\nhttps://api.ipify.org";
     [ObservableProperty] private int _interval = 2;
+    [ObservableProperty] private int _timeoutMs = 2000;   // per-check timeout (ping / tcp connect / http)
     [ObservableProperty] private bool _isMonitoring;
     [ObservableProperty] private bool _checkPing = true;
     [ObservableProperty] private bool _checkTcp = true;
@@ -195,7 +198,7 @@ public partial class MonitorViewModel : ObservableObject
         try
         {
             var addr = await Helpers.IcmpPinger.ResolveAsync(host, ct);
-            var r = await Helpers.IcmpPinger.SendAsync(addr, 2000, ct);
+            var r = await Helpers.IcmpPinger.SendAsync(addr, Math.Max(200, TimeoutMs), ct);
             if (ct.IsCancellationRequested) return "-";
             return r.Success ? $"{r.RoundtripMs}ms" : "ERR";
         }
@@ -213,7 +216,7 @@ public partial class MonitorViewModel : ObservableObject
             var connectTask = client.ConnectAsync(host, port, linked.Token).AsTask();
             _ = connectTask.ContinueWith(static t => { _ = t.Exception; },
                 CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
-            var delayTask = Task.Delay(2000, linked.Token);
+            var delayTask = Task.Delay(Math.Max(200, TimeoutMs), linked.Token);
             var winner = await Task.WhenAny(connectTask, delayTask);
             linked.Cancel();
             if (winner == connectTask && !connectTask.IsFaulted)
@@ -231,7 +234,9 @@ public partial class MonitorViewModel : ObservableObject
         var sw = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            linked.CancelAfter(Math.Max(200, TimeoutMs));
+            var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, linked.Token);
             sw.Stop();
             return $"{(int)response.StatusCode} ({sw.ElapsedMilliseconds}ms)";
         }

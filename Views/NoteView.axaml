@@ -5,8 +5,9 @@
              x:DataType="vm:NoteViewModel">
 
     <Grid Margin="8">
-        <Border IsVisible="{Binding IsLocked}" VerticalAlignment="Center" HorizontalAlignment="Center"
-                Width="300" Padding="20" Background="#191A1F" CornerRadius="8" BorderBrush="#2F3139" BorderThickness="1">
+        <!-- MaxWidth (not fixed Width) so the unlock card shrinks to fit a narrow phone screen. -->
+        <Border IsVisible="{Binding IsLocked}" VerticalAlignment="Center" HorizontalAlignment="Stretch"
+                MaxWidth="300" Padding="20" Background="#191A1F" CornerRadius="8" BorderBrush="#2F3139" BorderThickness="1">
             <StackPanel Spacing="12">
                 <TextBlock Text="ENCRYPTED STORAGE" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#ECECEF"/>
                 <TextBox Classes="field" Text="{Binding MasterKey}" PasswordChar="*" Watermark="Master Key...">

@@ -42,6 +42,8 @@
 			<Setter Property="FontSize" Value="12"/>
 			<Setter Property="Foreground" Value="#ECECEF"/>
 			<Setter Property="SelectionBrush" Value="#3042B883"/>
+			<!-- wrap long values (MAC / IPv4 / subnet) instead of clipping on a narrow phone column -->
+			<Setter Property="TextWrapping" Value="Wrap"/>
 		</Style>
 	</UserControl.Styles>
 
@@ -49,8 +51,8 @@
 		<!-- Header: title + refresh -->
 		<Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
 			<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
-				<TextBlock Text="NETWORK ADAPTERS" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
-				<TextBlock Text="Select any value to copy · click ⧉ to copy the whole adapter" FontSize="10" Foreground="#9E9FA8"/>
+				<TextBlock Text="NETWORK ADAPTERS" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF" TextWrapping="Wrap"/>
+				<TextBlock Text="Select any value to copy · click ⧉ to copy the whole adapter" FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap"/>
 			</StackPanel>
 
 			<Button Grid.Column="1" Classes="refresh-btn" Command="{Binding RefreshCommand}" VerticalAlignment="Center">
@@ -69,31 +71,29 @@
 						<Border Classes="card" Margin="0,0,0,10" Padding="16,13">
 							<StackPanel Spacing="11">
 
-								<!-- Header: name + type + status + speed + copy -->
+								<!-- Header: name + type + status + speed (wrap) + copy button (kept top-right) -->
 								<Grid ColumnDefinitions="*, Auto">
-									<StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-										<TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="#42B883" FontSize="14" VerticalAlignment="Center"/>
-										<Border Background="#24262E" CornerRadius="4" Padding="7,2" VerticalAlignment="Center">
+									<WrapPanel Grid.Column="0" VerticalAlignment="Center">
+										<TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="#42B883" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,3"/>
+										<Border Background="#24262E" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" Margin="0,0,8,3">
 											<TextBlock Text="{Binding Type}" Foreground="#C7C8CF" FontSize="9.5" FontWeight="SemiBold" LetterSpacing="0.5"/>
 										</Border>
-										<Border Background="#1E3A2B" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" IsVisible="{Binding IsUp}">
+										<Border Background="#1E3A2B" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" IsVisible="{Binding IsUp}" Margin="0,0,8,3">
 											<TextBlock Text="UP" Foreground="#4FCB97" FontSize="9.5" FontWeight="Bold"/>
 										</Border>
-										<Border Background="#2A2126" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" IsVisible="{Binding !IsUp}">
+										<Border Background="#2A2126" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" IsVisible="{Binding !IsUp}" Margin="0,0,8,3">
 											<TextBlock Text="DOWN" Foreground="#C08088" FontSize="9.5" FontWeight="Bold"/>
 										</Border>
-									</StackPanel>
-
-									<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
 										<TextBlock Text="{Binding Speed}" Foreground="#9E9FA8" FontSize="10.5"
-												   FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center"/>
-										<Button Classes="copy-btn"
-												Command="{Binding ((vm:NetworkInfoViewModel)DataContext).CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-												CommandParameter="{Binding Summary}" ToolTip.Tip="Copy all fields">
-											<Path Data="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
-												  Fill="#9E9FA8" Width="13" Height="13" Stretch="Uniform"/>
-										</Button>
-									</StackPanel>
+												   FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center" Margin="0,0,0,3"/>
+									</WrapPanel>
+
+									<Button Grid.Column="1" Classes="copy-btn" VerticalAlignment="Top"
+											Command="{Binding ((vm:NetworkInfoViewModel)DataContext).CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+											CommandParameter="{Binding Summary}" ToolTip.Tip="Copy all fields">
+										<Path Data="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
+											  Fill="#9E9FA8" Width="13" Height="13" Stretch="Uniform"/>
+									</Button>
 								</Grid>
 
 								<TextBlock Text="{Binding Model}" Foreground="#8A8B93" FontSize="10.5" TextWrapping="Wrap"/>

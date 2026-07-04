@@ -6,7 +6,9 @@
              Background="#0F1012">
 
     <Grid Margin="16">
-        <Border VerticalAlignment="Center" HorizontalAlignment="Center" Width="468"
+        <!-- MaxWidth (not a fixed Width) so the card caps at 468 and centres on desktop but
+             shrinks to fit a narrow phone screen instead of overflowing. -->
+        <Border VerticalAlignment="Center" HorizontalAlignment="Stretch" MaxWidth="468"
                 Background="#17181D" CornerRadius="12" BorderBrush="#2A2C33" BorderThickness="1" Padding="22,18">
             <StackPanel Spacing="14">
 
