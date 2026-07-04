@@ -33,7 +33,7 @@
 					</ItemsPanelTemplate>
 				</TabControl.ItemsPanel>
 				<TabControl.Styles>
-					<Style Selector="TabItem">
+					<Style Selector="TabItem.navtab">
 						<Setter Property="FontSize" Value="11.5"/>
 						<Setter Property="FontWeight" Value="Medium"/>
 						<Setter Property="Foreground" Value="#9E9FA8"/>
@@ -49,7 +49,7 @@
 
 					<!-- Paint our own background on the template root so the theme's
 					     default hover/selected brushes don't override it. -->
-					<Style Selector="TabItem /template/ Border#PART_LayoutRoot">
+					<Style Selector="TabItem.navtab /template/ Border#PART_LayoutRoot">
 						<Setter Property="Background" Value="Transparent"/>
 						<Setter Property="CornerRadius" Value="6"/>
 						<Setter Property="Transitions">
@@ -60,51 +60,51 @@
 					</Style>
 
 					<!-- Hover (non-selected): subtle neutral fill + brighter text -->
-					<Style Selector="TabItem:pointerover /template/ Border#PART_LayoutRoot">
+					<Style Selector="TabItem.navtab:pointerover /template/ Border#PART_LayoutRoot">
 						<Setter Property="Background" Value="#12FFFFFF"/>
 					</Style>
-					<Style Selector="TabItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+					<Style Selector="TabItem.navtab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
 						<Setter Property="Foreground" Value="#D7D8DE"/>
 					</Style>
 
 					<!-- Selected: neutral surface + accent-green text (Linear-style) -->
-					<Style Selector="TabItem:selected /template/ Border#PART_LayoutRoot">
+					<Style Selector="TabItem.navtab:selected /template/ Border#PART_LayoutRoot">
 						<Setter Property="Background" Value="#2A2B33"/>
 					</Style>
-					<Style Selector="TabItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+					<Style Selector="TabItem.navtab:selected /template/ ContentPresenter#PART_ContentPresenter">
 						<Setter Property="Foreground" Value="#55C795"/>
 					</Style>
 
-					<Style Selector="TabItem:selected:pointerover /template/ Border#PART_LayoutRoot">
+					<Style Selector="TabItem.navtab:selected:pointerover /template/ Border#PART_LayoutRoot">
 						<Setter Property="Background" Value="#32333C"/>
 					</Style>
 
-					<Style Selector="TabItem:selected /template/ Border#PART_SelectedPipe">
+					<Style Selector="TabItem.navtab:selected /template/ Border#PART_SelectedPipe">
 						<Setter Property="IsVisible" Value="False"/>
 					</Style>
 				</TabControl.Styles>
 
 				<!-- Ordered by importance -->
-				<TabItem Header="PING"><views:PingView DataContext="{Binding PingVM}"/></TabItem>
-				<TabItem Header="DNS"><views:DnsView DataContext="{Binding DnsVM}"/></TabItem>
-				<TabItem Header="CURL"><views:CurlView DataContext="{Binding CurlVM}"/></TabItem>
-				<TabItem Header="IP INFO"><views:IpInfoView DataContext="{Binding IpInfoVM}"/></TabItem>
-				<TabItem Header="CLOUDFLARE"><views:CloudflareView DataContext="{Binding CloudflareVM}"/></TabItem>
-				<TabItem Header="SCANNER"><views:PortScannerView DataContext="{Binding PortScannerVM}"/></TabItem>
-				<TabItem Header="NIC"><views:NetworkInfoView DataContext="{Binding NetworkVM}"/></TabItem>
-				<TabItem Header="MONITOR"><views:MonitorView DataContext="{Binding MonitorVM}"/></TabItem>
-				<TabItem Header="SSH"><views:SshView DataContext="{Binding SshVM}"/></TabItem>
-				<TabItem Header="TELEGRAM BOT">
+				<TabItem Classes="navtab" Header="PING"><views:PingView DataContext="{Binding PingVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="DNS"><views:DnsView DataContext="{Binding DnsVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="CURL"><views:CurlView DataContext="{Binding CurlVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="IP INFO"><views:IpInfoView DataContext="{Binding IpInfoVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="CLOUDFLARE"><views:CloudflareView DataContext="{Binding CloudflareVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="SCANNER"><views:PortScannerView DataContext="{Binding PortScannerVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="NIC"><views:NetworkInfoView DataContext="{Binding NetworkVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="MONITOR"><views:MonitorView DataContext="{Binding MonitorVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="SSH"><views:SshView DataContext="{Binding SshVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="TELEGRAM BOT">
 					<views:TgView>
 						<views:TgView.DataContext>
 							<vm:TgViewModel/>
 						</views:TgView.DataContext>
 					</views:TgView>
 				</TabItem>
-				<TabItem Header="STRING LAB"><views:StringLabView DataContext="{Binding StringTool}"/></TabItem>
-				<TabItem Header="NOTES"><views:NoteView DataContext="{Binding NoteVM}"/></TabItem>
-				<TabItem Header="BACKUP"><views:BackupView DataContext="{Binding BackupVM}"/></TabItem>
-				<TabItem Header="HISTORY"><views:HistoryView DataContext="{Binding HistoryVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="STRING LAB"><views:StringLabView DataContext="{Binding StringTool}"/></TabItem>
+				<TabItem Classes="navtab" Header="NOTES"><views:NoteView DataContext="{Binding NoteVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="BACKUP"><views:BackupView DataContext="{Binding BackupVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="HISTORY"><views:HistoryView DataContext="{Binding HistoryVM}"/></TabItem>
 			</TabControl>
 
 			<Border Grid.Row="2" Height="22" Background="#0C0D0F" BorderBrush="#1C1D22" BorderThickness="0,1,0,0">

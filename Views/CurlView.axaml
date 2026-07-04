@@ -14,8 +14,8 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto, *, Auto" Margin="12">
-        
+    <Grid RowDefinitions="Auto, *" Margin="12">
+
         <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,12">
           <AutoCompleteBox Classes="field" Text="{Binding Url}"
                    ItemsSource="{Binding UrlHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
@@ -25,30 +25,103 @@
               </AutoCompleteBox.KeyBindings>
           </AutoCompleteBox>
 
-          <Grid ColumnDefinitions="Auto, *, 150, 90">
-            <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding HttpMethods}" SelectedItem="{Binding HttpMethod}"
-                      MinWidth="90" HorizontalAlignment="Stretch" Margin="0,0,8,0"/>
+          <!-- method+interface | override-IP+RUN. One line when wide; the IP+RUN group drops
+               to its own row below the Responsive break (phone / narrow window). -->
+          <Grid helpers:Responsive.BreakWidth="470" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto"
+                ColumnSpacing="8" RowSpacing="8">
+            <Grid.Styles>
+                <Style Selector="Grid.wide > Grid#CurlActions">
+                    <Setter Property="Grid.Row" Value="0"/>
+                    <Setter Property="Grid.Column" Value="1"/>
+                    <Setter Property="Width" Value="248"/>
+                </Style>
+                <Style Selector="Grid.narrow > Grid#CurlActions">
+                    <Setter Property="Grid.Row" Value="1"/>
+                    <Setter Property="Grid.Column" Value="0"/>
+                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                </Style>
+            </Grid.Styles>
 
-            <ComboBox Grid.Column="1" Classes="field" ItemsSource="{Binding Interfaces}" SelectedItem="{Binding SelectedInterface}"
-                      HorizontalAlignment="Stretch" Margin="0,0,8,0"
-                      ToolTip.Tip="Outgoing network interface (binds the source IP). Auto = let the OS route."/>
+            <Grid Grid.Row="0" Grid.Column="0" ColumnDefinitions="Auto, *" ColumnSpacing="8">
+                <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding HttpMethods}" SelectedItem="{Binding HttpMethod}"
+                          MinWidth="90" HorizontalAlignment="Stretch"/>
+                <ComboBox Grid.Column="1" Classes="field" ItemsSource="{Binding Interfaces}" SelectedItem="{Binding SelectedInterface}"
+                          HorizontalAlignment="Stretch"
+                          ToolTip.Tip="Outgoing network interface (binds the source IP). Auto = let the OS route."/>
+            </Grid>
 
-            <TextBox Grid.Column="2" Classes="field" Text="{Binding OverrideIp}" Watermark="Override IP" Margin="0,0,8,0">
-                <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}"/>
-                </TextBox.KeyBindings>
-            </TextBox>
-
-            <Button Grid.Column="3" Classes="toggle"
-                    Command="{Binding ToggleCurlCommand}"
-                    HorizontalAlignment="Stretch"
-                    Classes.active="{Binding IsWorking}">
-                <Panel>
-                    <TextBlock Text="RUN" IsVisible="{Binding !IsWorking}" FontSize="12"/>
-                    <TextBlock Text="STOP" IsVisible="{Binding IsWorking}" FontSize="12"/>
-                </Panel>
-            </Button>
+            <Grid x:Name="CurlActions" ColumnDefinitions="*, 90" ColumnSpacing="8">
+                <TextBox Grid.Column="0" Classes="field" Text="{Binding OverrideIp}" Watermark="Override IP">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}"/>
+                    </TextBox.KeyBindings>
+                </TextBox>
+                <Button Grid.Column="1" Classes="toggle"
+                        Command="{Binding ToggleCurlCommand}"
+                        HorizontalAlignment="Stretch"
+                        Classes.active="{Binding IsWorking}">
+                    <Panel>
+                        <TextBlock Text="RUN" IsVisible="{Binding !IsWorking}" FontSize="12"/>
+                        <TextBlock Text="STOP" IsVisible="{Binding IsWorking}" FontSize="12"/>
+                    </Panel>
+                </Button>
+            </Grid>
           </Grid>
+
+          <!-- Request options sit here with the rest of the settings (not stranded below the
+               results). Engine + proxy + insecure + a toggle that reveals the flags editor. -->
+          <WrapPanel VerticalAlignment="Center" Margin="0,2,0,0">
+              <WrapPanel.Styles>
+                  <Style Selector="ToggleButton#FlagsToggle">
+                      <Setter Property="Background" Value="#1D1E25"/>
+                      <Setter Property="BorderBrush" Value="#3B3D47"/>
+                      <Setter Property="BorderThickness" Value="1"/>
+                      <Setter Property="CornerRadius" Value="6"/>
+                      <Setter Property="Padding" Value="10,4"/>
+                      <Setter Property="MinHeight" Value="0"/>
+                  </Style>
+                  <Style Selector="ToggleButton#FlagsToggle:checked /template/ ContentPresenter">
+                      <Setter Property="Background" Value="#1E3A2B"/>
+                      <Setter Property="BorderBrush" Value="#42B883"/>
+                  </Style>
+              </WrapPanel.Styles>
+              <ToggleSwitch IsChecked="{Binding UseDotNetEngine}"
+                            OnContent=".NET" OffContent="curl" FontSize="11" FontWeight="SemiBold"
+                            MinWidth="0" Margin="0,3,16,3" VerticalAlignment="Center"
+                            ToolTip.Tip="Engine: system curl binary, or built-in .NET HttpClient (no curl needed)"/>
+              <CheckBox Name="ProxyToggle" IsChecked="{Binding UseProxy}" Content="Proxy" FontSize="11.5"
+                        Foreground="#C7C8CF" FontWeight="SemiBold" MinHeight="0" Margin="0,3,16,3" VerticalAlignment="Center"/>
+              <CheckBox IsChecked="{Binding SkipSslVerify}" Content="Insecure" FontSize="11.5"
+                        Foreground="#C7C8CF" FontWeight="SemiBold" MinHeight="0" Margin="0,3,16,3" VerticalAlignment="Center"/>
+              <ToggleButton x:Name="FlagsToggle" Margin="0,3,0,3" VerticalAlignment="Center"
+                            ToolTip.Tip="Show / hide extra curl-style flags (-H, -d, -x, --resolve...)">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                      <TextBlock Text="flags" Foreground="#42B883" FontFamily="Consolas" FontWeight="Bold" FontSize="11.5"/>
+                      <TextBlock Text="&#x25BE;" FontSize="9" Foreground="#9E9FA8" VerticalAlignment="Center"/>
+                  </StackPanel>
+              </ToggleButton>
+          </WrapPanel>
+
+          <!-- Proxy credentials — revealed when Proxy is on -->
+          <Grid ColumnDefinitions="*, 110, 110" ColumnSpacing="6" IsVisible="{Binding #ProxyToggle.IsChecked}">
+              <AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Proxy}"
+                       ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                       Watermark="Proxy (IP:Port)"/>
+              <TextBox Grid.Column="1" Classes="field" Text="{Binding ProxyUser}" Watermark="User"/>
+              <TextBox Grid.Column="2" Classes="field" Text="{Binding ProxyPass}" Watermark="Pass" PasswordChar="*"/>
+          </Grid>
+
+          <!-- Flags editor — revealed when the flags toggle is on -->
+          <Border IsVisible="{Binding #FlagsToggle.IsChecked}"
+                  Background="#1D1E25" CornerRadius="6" Padding="8,0" BorderThickness="1" BorderBrush="#3B3D47">
+              <Grid ColumnDefinitions="Auto, *">
+                  <TextBlock Grid.Column="0" Text="flags &gt; " Foreground="#42B883" FontWeight="Bold"
+                             VerticalAlignment="Center" FontSize="12" FontFamily="Consolas"/>
+                  <TextBox Grid.Column="1" Text="{Binding CustomFlags}" Watermark="curl-style flags (-H, -d, -x, --resolve...)"
+                           FontSize="12" BorderThickness="0" Background="Transparent" Foreground="#ECECEF"
+                           FontFamily="Cascadia Code,Consolas" VerticalContentAlignment="Center" Height="30"/>
+              </Grid>
+          </Border>
         </StackPanel>
 
         <TabControl Grid.Row="1" Padding="0,4,0,0">
@@ -98,40 +171,6 @@
                 </Border>
             </TabItem>
         </TabControl>
-
-        <StackPanel Grid.Row="2" Margin="0,12,0,0">
-            
-            <Grid ColumnDefinitions="*, 120, 120" IsVisible="{Binding #ProxyToggle.IsChecked}" Margin="0,0,0,10">
-                <AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Proxy}"
-                         ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                         Watermark="Proxy (IP:Port)" Margin="0,0,6,0"/>
-                <TextBox Grid.Column="1" Classes="field" Text="{Binding ProxyUser}" Watermark="User" Margin="0,0,6,0"/>
-                <TextBox Grid.Column="2" Classes="field" Text="{Binding ProxyPass}" Watermark="Pass" PasswordChar="*"/>
-            </Grid>
-
-            <Grid ColumnDefinitions="*, Auto, Auto, Auto">
-                <Border Grid.Column="0" Background="#1D1E25" CornerRadius="6" Padding="8,0" BorderThickness="1" BorderBrush="#3B3D47"
-                        IsVisible="{x:Static helpers:AppPlatform.IsDesktop}">
-                    <Grid ColumnDefinitions="Auto, *">
-                        <TextBlock Grid.Column="0" Text="flags &gt; " Foreground="#42B883" FontWeight="Bold"
-                                   VerticalAlignment="Center" FontSize="12" FontFamily="Consolas"/>
-                        <TextBox Grid.Column="1" Text="{Binding CustomFlags}" Watermark="curl-style flags (-H, -d, -x, --resolve...)"
-                                 FontSize="12" BorderThickness="0" Background="Transparent" Foreground="#ECECEF"
-                                 FontFamily="Cascadia Code,Consolas" VerticalContentAlignment="Center" Height="30"/>
-                    </Grid>
-                </Border>
-
-                <ToggleSwitch Grid.Column="1" IsChecked="{Binding UseDotNetEngine}"
-                              OnContent=".NET" OffContent="curl" FontSize="11" FontWeight="SemiBold"
-                              MinWidth="0" Margin="15,0,0,0" VerticalAlignment="Center"
-                              ToolTip.Tip="Engine: system curl binary, or built-in .NET HttpClient (no curl needed)"/>
-
-                <CheckBox Name="ProxyToggle" Grid.Column="2" IsChecked="{Binding UseProxy}" Content="Proxy" FontSize="11.5"
-                          Foreground="#C7C8CF" FontWeight="SemiBold" MinHeight="0" Margin="15,0,0,0" VerticalAlignment="Center"/>
-                <CheckBox IsChecked="{Binding SkipSslVerify}" Grid.Column="3" Content="Insecure" FontSize="11.5"
-                          Foreground="#C7C8CF" FontWeight="SemiBold" MinHeight="0" Margin="15,0,0,0" VerticalAlignment="Center"/>
-            </Grid>
-        </StackPanel>
 
     </Grid>
 </UserControl>

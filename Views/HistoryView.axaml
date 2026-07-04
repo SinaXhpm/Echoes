@@ -36,7 +36,7 @@
         <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto" Margin="0,0,0,10">
             <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
                 <TextBlock Text="HISTORY" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
-                <TextBlock FontSize="10" Foreground="#9E9FA8">
+                <TextBlock FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap">
                     <Run Text="Recent inputs across every tool ·"/><Run Text="{Binding TotalCount}"/><Run Text=" entries"/>
                 </TextBlock>
             </StackPanel>
