@@ -1,12 +1,13 @@
 <UserControl xmlns="https://github.com/avaloniaui"
 			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 			 xmlns:vm="using:Echoes.ViewModels"
+			 xmlns:helpers="using:Echoes.Helpers"
 			 x:Class="Echoes.Views.SshView"
 			 x:DataType="vm:SshViewModel">
 
 	<UserControl.Styles>
 		<Style Selector="CheckBox">
-			<Setter Property="Foreground" Value="#42B883"/>
+			<Setter Property="Foreground" Value="#C7C8CF"/>
 			<Setter Property="FontSize" Value="10"/>
 			<Setter Property="Padding" Value="8,0,0,0"/>
 		</Style>
@@ -15,97 +16,137 @@
 			<Setter Property="BorderBrush" Value="#42B883"/>
 		</Style>
 		<Style Selector="CheckBox /template/ Path#CheckGlyph">
-			<Setter Property="Fill" Value="White"/>
+			<Setter Property="Fill" Value="#08130D"/>
 		</Style>
 
 		<Style Selector="TextBox.proxyInput">
-			<Setter Property="Height" Value="26"/>
-			<Setter Property="FontSize" Value="10"/>
-			<Setter Property="Background" Value="#0AFFFFFF"/>
+			<Setter Property="Height" Value="28"/>
+			<Setter Property="FontSize" Value="11"/>
+			<Setter Property="FontFamily" Value="Cascadia Code,Consolas"/>
+			<Setter Property="Foreground" Value="#ECECEF"/>
+			<Setter Property="CaretBrush" Value="#42B883"/>
+			<Setter Property="Background" Value="#1D1E25"/>
 			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="BorderBrush" Value="#15FFFFFF"/>
+			<Setter Property="BorderBrush" Value="#3B3D47"/>
 			<Setter Property="CornerRadius" Value="6"/>
 			<Setter Property="VerticalContentAlignment" Value="Center"/>
 		</Style>
+		<Style Selector="TextBox.proxyInput:focus">
+			<Setter Property="BorderBrush" Value="#42B883"/>
+		</Style>
 	</UserControl.Styles>
 
-	<Grid RowDefinitions="Auto, Auto, *, Auto" Margin="15">
+	<Grid RowDefinitions="Auto, Auto, *, Auto" Margin="14">
 
-		<StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,12">
+		<StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,10">
 
 			<Grid ColumnDefinitions="*, 80">
-				<AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Host}" ItemsSource="{Binding HostHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0" Watermark="Host / IP" Margin="0,0,8,0">
+				<AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Host}" ItemsSource="{Binding HostHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0" PlaceholderText="Host / IP" Margin="0,0,8,0">
 					<AutoCompleteBox.KeyBindings>
 						<KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
 					</AutoCompleteBox.KeyBindings>
 				</AutoCompleteBox>
-				<TextBox Grid.Column="1" Classes="field" Text="{Binding Port}" Watermark="Port" HorizontalContentAlignment="Center">
+				<TextBox Grid.Column="1" Classes="field" Text="{Binding Port}" PlaceholderText="Port" HorizontalContentAlignment="Center">
 					<TextBox.KeyBindings>
 						<KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
 					</TextBox.KeyBindings>
 				</TextBox>
 			</Grid>
 
-			<Grid ColumnDefinitions="*, *, 110">
-				<AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Username}" ItemsSource="{Binding UserHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0" Watermark="Username" Margin="0,0,8,0">
-					<AutoCompleteBox.KeyBindings>
-						<KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
-					</AutoCompleteBox.KeyBindings>
-				</AutoCompleteBox>
-				<TextBox Grid.Column="1" Classes="field" Text="{Binding Password}" PasswordChar="*" Watermark="Password" Margin="0,0,8,0">
-					<TextBox.KeyBindings>
-						<KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
-					</TextBox.KeyBindings>
-				</TextBox>
+			<!-- username+password | CONNECT. One line when wide; CONNECT drops to a full-width
+			     row under the credentials below the Responsive break (phone). -->
+			<Grid helpers:Responsive.BreakWidth="430" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto"
+				  ColumnSpacing="8" RowSpacing="8">
+				<Grid.Styles>
+					<Style Selector="Grid.wide > Button#SshConnect">
+						<Setter Property="Grid.Row" Value="0"/>
+						<Setter Property="Grid.Column" Value="1"/>
+						<Setter Property="Width" Value="110"/>
+					</Style>
+					<Style Selector="Grid.narrow > Button#SshConnect">
+						<Setter Property="Grid.Row" Value="1"/>
+						<Setter Property="Grid.Column" Value="0"/>
+						<Setter Property="HorizontalAlignment" Value="Stretch"/>
+					</Style>
+				</Grid.Styles>
 
-				<Button Grid.Column="2" Classes="toggle"
+				<Grid Grid.Row="0" Grid.Column="0" ColumnDefinitions="*, *" ColumnSpacing="8">
+					<AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Username}" ItemsSource="{Binding UserHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0" PlaceholderText="Username">
+						<AutoCompleteBox.KeyBindings>
+							<KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
+						</AutoCompleteBox.KeyBindings>
+					</AutoCompleteBox>
+					<TextBox Grid.Column="1" Classes="field" Text="{Binding Password}" PasswordChar="*" PlaceholderText="Password">
+						<TextBox.KeyBindings>
+							<KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
+						</TextBox.KeyBindings>
+					</TextBox>
+				</Grid>
+
+				<Button x:Name="SshConnect" Classes="toggle"
 						Command="{Binding ToggleConnectCommand}"
 						HorizontalAlignment="Stretch"
 						Classes.active="{Binding IsConnected}">
 					<Panel>
-						<TextBlock Text="CONNECT" IsVisible="{Binding !IsConnected}" FontWeight="Bold" FontSize="10" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-						<TextBlock Text="STOP" IsVisible="{Binding IsConnected}" FontWeight="Bold" FontSize="10" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+						<TextBlock Text="CONNECT" IsVisible="{Binding !IsConnected}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+						<TextBlock Text="STOP" IsVisible="{Binding IsConnected}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Center"/>
 					</Panel>
 				</Button>
 			</Grid>
 		</StackPanel>
 
-		<Grid Grid.Row="1" ColumnDefinitions="*, 15, *" Margin="0,0,0,12">
+		<!-- INBOUND | OUTBOUND cards side by side when wide; stacked on a phone. -->
+		<Grid Grid.Row="1" helpers:Responsive.BreakWidth="430" ColumnDefinitions="*, *" RowDefinitions="Auto, Auto"
+			  ColumnSpacing="12" RowSpacing="10" Margin="0,0,0,10">
+			<Grid.Styles>
+				<Style Selector="Grid.wide > Border#SshIn">
+					<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+				</Style>
+				<Style Selector="Grid.narrow > Border#SshIn">
+					<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+				</Style>
+				<Style Selector="Grid.wide > Border#SshOut">
+					<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+				</Style>
+				<Style Selector="Grid.narrow > Border#SshOut">
+					<Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+				</Style>
+			</Grid.Styles>
 
-			<Border Grid.Column="0" Background="#05FFFFFF" CornerRadius="8" Padding="8,4">
+			<Border x:Name="SshIn" Classes="card" Padding="8,5">
 				<Grid ColumnDefinitions="Auto, 8, *, 5, 40">
 					<CheckBox Grid.Column="0" IsChecked="{Binding ConnectViaProxy}" Margin="0">
-						<TextBlock Text="INBOUND" FontSize="9" FontWeight="Black" Opacity="0.6"/>
+						<TextBlock Text="INBOUND" FontSize="9" FontWeight="Bold" Foreground="#9E9FA8"/>
 					</CheckBox>
 
 					<TextBox Grid.Column="2" Classes="proxyInput"
-							 Text="{Binding ProxyInHost}" Watermark="Host"
+							 Text="{Binding ProxyInHost}" PlaceholderText="Host"
 							 IsVisible="{Binding ConnectViaProxy}"/>
 
 					<TextBox Grid.Column="4" Classes="proxyInput"
-							 Text="{Binding ProxyInPort}" Watermark="Port"
+							 Text="{Binding ProxyInPort}" PlaceholderText="Port"
 							 Padding="0" MinWidth="0" HorizontalContentAlignment="Center"
 							 IsVisible="{Binding ConnectViaProxy}"/>
 				</Grid>
 			</Border>
 
-			<Border Grid.Column="2" Background="#05FFFFFF" CornerRadius="8" Padding="8,4">
+			<Border x:Name="SshOut" Classes="card" Padding="8,5">
 				<Grid ColumnDefinitions="Auto, 8, *, 5, 40, Auto">
 					<CheckBox Grid.Column="0" IsChecked="{Binding EnableSocksTunnel}" Margin="0">
-						<TextBlock Text="OUTBOUND" FontSize="9" FontWeight="Black" Foreground="#3498DB" Opacity="0.8"/>
+						<TextBlock Text="OUTBOUND" FontSize="9" FontWeight="Bold" Foreground="#9E9FA8"/>
 					</CheckBox>
 
 					<TextBox Grid.Column="2" Classes="proxyInput"
-							 Text="{Binding TunnelHost}" Watermark="Listen"
+							 Text="{Binding TunnelHost}" PlaceholderText="Listen"
 							 IsVisible="{Binding EnableSocksTunnel}"/>
 
 					<TextBox Grid.Column="4" Classes="proxyInput"
-							 Text="{Binding TunnelPort}" Watermark="Port"
+							 Text="{Binding TunnelPort}" PlaceholderText="Port"
 							 Padding="0" MinWidth="0" HorizontalContentAlignment="Center"
 							 IsVisible="{Binding EnableSocksTunnel}"/>
 
 					<TextBlock Grid.Column="5" Text="●" IsVisible="{Binding IsConnected}"
-							   VerticalAlignment="Center" Margin="8,0,0,0" FontSize="10" Foreground="#3498DB"/>
+							   VerticalAlignment="Center" Margin="8,0,0,0" FontSize="10" Foreground="#42B883"/>
 				</Grid>
 			</Border>
 		</Grid>
@@ -114,17 +155,17 @@
 			<ScrollViewer Name="TermScroll">
 				<SelectableTextBlock Name="TerminalOutputBlock"
 									 Text="{Binding TerminalOutput}"
-									 Padding="10"
+									 Padding="12"
 									 FontFamily="Cascadia Code,Consolas"
-									 FontSize="11"
-									 Foreground="#00FF66"
+									 FontSize="12"
+									 Foreground="#4FCB97"
 									 TextWrapping="Wrap"/>
 			</ScrollViewer>
 		</Border>
 
 		<Grid Grid.Row="3" ColumnDefinitions="Auto, *" Margin="0,10,0,0">
-			<TextBlock Grid.Column="0" Text="TERMINAL >" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="9" FontWeight="Black" Opacity="0.3"/>
-			<TextBox Grid.Column="1" Classes="field" Text="{Binding CommandInput}" Watermark="Enter shell command..." Height="34" FontSize="11">
+			<TextBlock Grid.Column="0" Text="&gt;_" VerticalAlignment="Center" Margin="2,0,10,0" FontFamily="Cascadia Code,Consolas" FontSize="13" FontWeight="Bold" Foreground="#4FCB97"/>
+			<TextBox Grid.Column="1" Classes="field" Text="{Binding CommandInput}" PlaceholderText="Enter shell command..." Height="34" FontSize="12" FontFamily="Cascadia Code,Consolas">
 				<TextBox.KeyBindings>
 					<KeyBinding Gesture="Enter" Command="{Binding SendCommandCommand}"/>
 				</TextBox.KeyBindings>

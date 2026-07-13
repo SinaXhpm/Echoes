@@ -12,116 +12,190 @@
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
             <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
         </Style>
+        <Style Selector="TabItem">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="MinHeight" Value="30"/>
+            <Setter Property="Padding" Value="13,0"/>
+            <Setter Property="Foreground" Value="#9E9FA8"/>
+        </Style>
+        <Style Selector="TabItem:selected">
+            <Setter Property="Foreground" Value="#ECECEF"/>
+        </Style>
+        <!-- primary REQUEST / RESPONSE section tabs -->
+        <Style Selector="TabItem.section">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="16,0"/>
+        </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto, *, Auto" Margin="12">
-        
-        <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,12">
-          <AutoCompleteBox Classes="field" Text="{Binding Url}"
-                   ItemsSource="{Binding UrlHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                   Watermark="Target URL (https://...)">
-              <AutoCompleteBox.KeyBindings>
-                  <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}" />
-              </AutoCompleteBox.KeyBindings>
-          </AutoCompleteBox>
+    <Grid RowDefinitions="Auto, *" Margin="12">
 
-          <Grid ColumnDefinitions="Auto, *, 90">
-            <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding HttpMethods}" SelectedItem="{Binding HttpMethod}"
-                      MinWidth="90" HorizontalAlignment="Stretch" Margin="0,0,8,0"/>
+        <!-- ============ TOP CONTROLS ============ -->
+        <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,10">
 
-            <TextBox Grid.Column="1" Classes="field" Text="{Binding OverrideIp}" Watermark="Override IP (optional)" Margin="0,0,8,0">
-                <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}"/>
-                </TextBox.KeyBindings>
-            </TextBox>
+            <!-- Row 1: method (left of address) + address + RUN -->
+            <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="8">
+                <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding HttpMethods}" SelectedItem="{Binding HttpMethod}"
+                          MinWidth="90" HorizontalAlignment="Stretch"/>
+                <AutoCompleteBox Grid.Column="1" Classes="field" Text="{Binding Url}"
+                         ItemsSource="{Binding UrlHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         PlaceholderText="Target URL (https://...)">
+                    <AutoCompleteBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}" />
+                    </AutoCompleteBox.KeyBindings>
+                </AutoCompleteBox>
+                <Button Grid.Column="2" Classes="toggle" Command="{Binding ToggleCurlCommand}"
+                        Width="82" Classes.active="{Binding IsWorking}">
+                    <Panel>
+                        <TextBlock Text="RUN" IsVisible="{Binding !IsWorking}" FontSize="12"/>
+                        <TextBlock Text="STOP" IsVisible="{Binding IsWorking}" FontSize="12"/>
+                    </Panel>
+                </Button>
+            </Grid>
 
-            <Button Grid.Column="2" Classes="toggle"
-                    Command="{Binding ToggleCurlCommand}"
-                    HorizontalAlignment="Stretch"
-                    Classes.active="{Binding IsWorking}">
-                <Panel>
-                    <TextBlock Text="RUN" IsVisible="{Binding !IsWorking}" FontSize="12"/>
-                    <TextBlock Text="STOP" IsVisible="{Binding IsWorking}" FontSize="12"/>
-                </Panel>
-            </Button>
-          </Grid>
+            <!-- Row 2: engine mode = a switch; independent form options = checkboxes (applied on RUN) -->
+            <WrapPanel VerticalAlignment="Center">
+                <ToggleSwitch IsChecked="{Binding UseDotNetEngine}"
+                              OnContent=".NET" OffContent="curl" FontSize="11" FontWeight="SemiBold"
+                              MinWidth="0" Margin="0,2,18,2" VerticalAlignment="Center"
+                              ToolTip.Tip="Engine: system curl binary, or built-in .NET HttpClient (no curl needed)"/>
+                <CheckBox IsChecked="{Binding FollowRedirects}" Content="Follow redirects" FontSize="11.5"
+                          Foreground="#C7C8CF" FontWeight="SemiBold" MinHeight="0" Margin="0,2,16,2" VerticalAlignment="Center"
+                          ToolTip.Tip="curl -L — follow 3xx redirects (on by default)"/>
+                <CheckBox Name="ProxyToggle" IsChecked="{Binding UseProxy}" Content="Proxy" FontSize="11.5"
+                          Foreground="#C7C8CF" FontWeight="SemiBold" MinHeight="0" Margin="0,2,16,2" VerticalAlignment="Center"/>
+                <CheckBox IsChecked="{Binding SkipSslVerify}" Content="Insecure" FontSize="11.5"
+                          Foreground="#C7C8CF" FontWeight="SemiBold" MinHeight="0" Margin="0,2,16,2" VerticalAlignment="Center"
+                          ToolTip.Tip="curl -k — skip TLS certificate verification"/>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,0,2">
+                    <TextBlock Text="Timeout" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <NumericUpDown Value="{Binding TimeoutSec}" Minimum="0" Maximum="99" ShowButtonSpinner="False"
+                                   Height="28" Width="38" FontSize="11" HorizontalContentAlignment="Center" CornerRadius="6"
+                                   Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
+                    <TextBlock Text="s" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                </StackPanel>
+            </WrapPanel>
+
+            <!-- Row 3: connection settings (moved out of the CONN tab): interface + override IP -->
+            <Grid ColumnDefinitions="*, *" ColumnSpacing="8">
+                <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding Interfaces}" SelectedItem="{Binding SelectedInterface}"
+                          HorizontalAlignment="Stretch"
+                          ToolTip.Tip="Outgoing network interface (binds the source IP). Auto = let the OS route."/>
+                <TextBox Grid.Column="1" Classes="field" Text="{Binding OverrideIp}" PlaceholderText="Override IP (--resolve, optional)">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}"/>
+                    </TextBox.KeyBindings>
+                </TextBox>
+            </Grid>
+
+            <!-- Proxy credentials — revealed when Proxy is on -->
+            <Grid ColumnDefinitions="*, 110, 110" ColumnSpacing="6" IsVisible="{Binding #ProxyToggle.IsChecked}">
+                <AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Proxy}"
+                         ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         PlaceholderText="Proxy (IP:Port)"/>
+                <TextBox Grid.Column="1" Classes="field" Text="{Binding ProxyUser}" PlaceholderText="User"/>
+                <TextBox Grid.Column="2" Classes="field" Text="{Binding ProxyPass}" PlaceholderText="Pass" PasswordChar="*"/>
+            </Grid>
         </StackPanel>
 
-        <TabControl Grid.Row="1" Padding="0,4,0,0">
-            <TabControl.Styles>
-                <Style Selector="TabItem">
-                    <Setter Property="FontSize" Value="11.5"/>
-                    <Setter Property="MinHeight" Value="32"/>
-                    <Setter Property="Padding" Value="14,0"/>
-                    <Setter Property="Foreground" Value="#999999"/>
-                </Style>
-                <Style Selector="TabItem:selected">
-                    <Setter Property="Foreground" Value="White"/>
-                </Style>
-            </TabControl.Styles>
+        <!-- ============ REQUEST / RESPONSE — only one section shown at a time (full space) ============ -->
+        <Grid Grid.Row="1">
+        <TabControl Padding="0,2,0,0" SelectedIndex="{Binding SectionIndex}">
+            <TabControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+            </TabControl.ItemsPanel>
 
-            <TabItem Header="LOGS">
-                <Border Classes="card output">
-                    <TextBox Text="{Binding FullLog}" IsReadOnly="True" AcceptsReturn="True"
-                             Foreground="#FFFFFF" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
-                </Border>
+            <!-- REQUEST: what to send -->
+            <TabItem Header="REQUEST" Classes="section">
+                <TabControl Padding="0,4,0,0">
+                    <TabControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                    </TabControl.ItemsPanel>
+
+                    <TabItem Header="BODY">
+                        <Border Classes="card output">
+                            <TextBox Text="{Binding RequestBody}" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Foreground="#ECECEF" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"
+                                     PlaceholderText="Request body — sent with POST / PUT / PATCH (e.g. JSON). Add a Content-Type header if needed."/>
+                        </Border>
+                    </TabItem>
+
+                    <TabItem Header="HEADERS">
+                        <Border Classes="card output">
+                            <TextBox Text="{Binding RequestHeaders}" AcceptsReturn="True" TextWrapping="NoWrap"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                     Foreground="#ECECEF" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"
+                                     PlaceholderText="Request headers — one per line:&#x0a;Content-Type: application/json&#x0a;Authorization: Bearer ..."/>
+                        </Border>
+                    </TabItem>
+                </TabControl>
             </TabItem>
 
-            <TabItem Header="RAW BODY">
-                <Border Classes="card output">
-                    <TextBox Text="{Binding RawBody}" IsReadOnly="True" AcceptsReturn="True"
-                             Foreground="#00FF99" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
-                </Border>
-            </TabItem>
+            <!-- RESPONSE: the result only -->
+            <TabItem Header="RESPONSE" Classes="section">
+                <TabControl Padding="0,4,0,0">
+                    <TabControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                    </TabControl.ItemsPanel>
 
-            <TabItem Header="HEADERS">
-                <Border Classes="card output">
-                    <TextBox Text="{Binding HeadersLog}" IsReadOnly="True" AcceptsReturn="True"
-                             Foreground="#FFEA00" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
-                </Border>
-            </TabItem>
+                    <TabItem Header="BODY">
+                        <Border Classes="card output">
+                            <Grid RowDefinitions="Auto, *">
+                                <CheckBox Grid.Row="0" IsChecked="{Binding WrapRawBody}" Content="Wrap" FontSize="11"
+                                          Foreground="#9E9FA8" FontWeight="SemiBold" MinHeight="0"
+                                          HorizontalAlignment="Right" Margin="0,0,2,4"/>
+                                <TextBox Grid.Row="1" Text="{Binding RawBody}" IsReadOnly="True" AcceptsReturn="True"
+                                         TextWrapping="{Binding RawBodyWrapping}"
+                                         Foreground="#4FCB97" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
+                            </Grid>
+                        </Border>
+                    </TabItem>
 
-            <TabItem Header="SSL INFO">
-                <Border Classes="card output">
-                    <TextBox Text="{Binding SslLog}" IsReadOnly="True" AcceptsReturn="True"
-                             Foreground="#55CCFF" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
-                </Border>
+                    <TabItem Header="HEADERS">
+                        <Border Classes="card output">
+                            <TextBox Text="{Binding HeadersLog}" IsReadOnly="True" AcceptsReturn="True"
+                                     Foreground="#FFEA00" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
+                        </Border>
+                    </TabItem>
+
+                    <TabItem Header="LOGS">
+                        <Border Classes="card output">
+                            <TextBox Text="{Binding FullLog}" IsReadOnly="True" AcceptsReturn="True"
+                                     Foreground="#ECECEF" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
+                        </Border>
+                    </TabItem>
+
+                    <TabItem Header="SSL">
+                        <Border Classes="card output">
+                            <TextBox Text="{Binding SslLog}" IsReadOnly="True" AcceptsReturn="True"
+                                     Foreground="#55CCFF" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
+                        </Border>
+                    </TabItem>
+
+                    <!-- Rendered page. NativeWebView uses the OS engine (WebView2 / WebKitGTK / Android WebView). -->
+                    <TabItem Header="WEB">
+                        <Border Classes="card output" Padding="0" ClipToBounds="True">
+                            <NativeWebView Source="{Binding WebViewSource}"/>
+                        </Border>
+                    </TabItem>
+                </TabControl>
             </TabItem>
         </TabControl>
 
-        <StackPanel Grid.Row="2" Margin="0,12,0,0">
-            
-            <Grid ColumnDefinitions="*, 120, 120" IsVisible="{Binding #ProxyToggle.IsChecked}" Margin="0,0,0,10">
-                <AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Proxy}"
-                         ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                         Watermark="Proxy (IP:Port)" Margin="0,0,6,0"/>
-                <TextBox Grid.Column="1" Classes="field" Text="{Binding ProxyUser}" Watermark="User" Margin="0,0,6,0"/>
-                <TextBox Grid.Column="2" Classes="field" Text="{Binding ProxyPass}" Watermark="Pass" PasswordChar="*"/>
-            </Grid>
-
-            <Grid ColumnDefinitions="*, Auto, Auto, Auto">
-                <Border Grid.Column="0" Background="#2AFFFFFF" CornerRadius="4" Padding="8,0" BorderThickness="1" BorderBrush="#50FFFFFF"
-                        IsVisible="{x:Static helpers:AppPlatform.IsDesktop}">
-                    <Grid ColumnDefinitions="Auto, *">
-                        <TextBlock Grid.Column="0" Text="flags &gt; " Foreground="White" FontWeight="Bold"
-                                   VerticalAlignment="Center" FontSize="12" FontFamily="Consolas"/>
-                        <TextBox Grid.Column="1" Text="{Binding CustomFlags}" Watermark="curl-style flags (-H, -d, -x, --resolve...)"
-                                 FontSize="12" BorderThickness="0" Background="Transparent" Foreground="White"
-                                 FontFamily="Cascadia Code,Consolas" VerticalContentAlignment="Center" Height="30"/>
-                    </Grid>
-                </Border>
-
-                <ToggleSwitch Grid.Column="1" IsChecked="{Binding UseDotNetEngine}"
-                              OnContent=".NET" OffContent="curl" FontSize="11" FontWeight="SemiBold"
-                              MinWidth="0" Margin="15,0,0,0" VerticalAlignment="Center"
-                              ToolTip.Tip="Engine: system curl binary, or built-in .NET HttpClient (no curl needed)"/>
-
-                <CheckBox Name="ProxyToggle" Grid.Column="2" IsChecked="{Binding UseProxy}" Content="Proxy" FontSize="11.5"
-                          Foreground="White" FontWeight="SemiBold" MinHeight="0" Margin="15,0,0,0" VerticalAlignment="Center"/>
-                <CheckBox IsChecked="{Binding SkipSslVerify}" Grid.Column="3" Content="Insecure" FontSize="11.5"
-                          Foreground="White" FontWeight="SemiBold" MinHeight="0" Margin="15,0,0,0" VerticalAlignment="Center"/>
-            </Grid>
-        </StackPanel>
-
+            <!-- request timer + response size — floats on the right of the REQUEST/RESPONSE tab strip -->
+            <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,4,0" IsHitTestVisible="False">
+                <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" Margin="0,0,12,0">
+                    <TextBlock Text="&#x23F1;" FontSize="12" Foreground="#9E9FA8" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding RequestTimeText}" FontSize="11.5" FontWeight="SemiBold" Foreground="#7FCBA6"
+                               FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                    <TextBlock Text="&#x2B07;" FontSize="12" Foreground="#9E9FA8" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding ResponseSizeText}" FontSize="11.5" FontWeight="SemiBold" Foreground="#7FCBA6"
+                               FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center"/>
+                </StackPanel>
+            </WrapPanel>
+        </Grid>
     </Grid>
 </UserControl>

@@ -23,13 +23,18 @@ public partial class PortScannerView : UserControl
     }
     private async void Export_Click(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is PortScannerViewModel vm)
+        if (DataContext is not PortScannerViewModel vm) return;
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel is null) return;
+        // async void: an unguarded I/O failure (disk full, read-only target, locked file) would
+        // escape unobserved and crash the app. Surface it on the VM status instead.
+        try
         {
-            var topLevel = TopLevel.GetTopLevel(this);
-            if (topLevel != null)
-            {
-                await vm.ExportResults(topLevel.StorageProvider);
-            }
+            await vm.ExportResults(topLevel.StorageProvider);
+        }
+        catch (System.Exception ex)
+        {
+            vm.StatusMessage = "Export failed: " + ex.Message;
         }
     }
 }

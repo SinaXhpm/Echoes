@@ -1,97 +1,229 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.IpInfoView"
              x:DataType="vm:IpInfoViewModel">
 
-    <TabControl Padding="0,6,0,0" Margin="10,0,10,8">
-        <TabControl.Styles>
-            <Style Selector="TabItem">
-                <Setter Property="FontSize" Value="11.5"/>
-                <Setter Property="MinHeight" Value="30"/>
-                <Setter Property="Padding" Value="14,0"/>
-                <Setter Property="Foreground" Value="#999999"/>
-            </Style>
-            <Style Selector="TabItem:selected">
-                <Setter Property="Foreground" Value="White"/>
-            </Style>
-        </TabControl.Styles>
+    <UserControl.Styles>
+        <Style Selector="TabItem">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="MinHeight" Value="30"/>
+            <Setter Property="Padding" Value="14,0"/>
+            <Setter Property="Foreground" Value="#9E9FA8"/>
+        </Style>
+        <Style Selector="TabItem:selected"><Setter Property="Foreground" Value="#ECECEF"/></Style>
+        <Style Selector="TabItem:pointerover /template/ ContentPresenter">
+            <Setter Property="TextElement.Foreground" Value="#C7C8CF"/>
+        </Style>
 
+        <!-- result card section header -->
+        <Style Selector="TextBlock.cardHead">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#55C795"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+        <!-- key/value rows inside cards -->
+        <Style Selector="TextBlock.k">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="#7C7D86"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.v">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#E7E7EA"/>
+            <Setter Property="FontFamily" Value="Cascadia Code,Consolas"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="SelectionBrush" Value="#3042B883"/>
+        </Style>
+    </UserControl.Styles>
+
+    <TabControl Padding="0,6,0,0" Margin="12,0,12,10">
+
+        <!-- ============================ LOOKUP ============================ -->
         <TabItem Header="LOOKUP">
-            <Grid RowDefinitions="Auto, Auto, *" Margin="0,4,0,0">
-                <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,12">
-                    <AutoCompleteBox Classes="field" Text="{Binding TargetIp}" Watermark="Lookup IP (Empty for My IP)..."
+            <Grid RowDefinitions="Auto, Auto, *" Margin="0,6,0,0">
+
+                <!-- address + proxy toggle + actions -->
+                <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                    <TextBlock Classes="fieldLabel" Text="TARGET IP / HOST"/>
+                    <AutoCompleteBox Classes="field" Text="{Binding TargetIp}" PlaceholderText="Lookup IP / host (empty = My IP)…"
+                             FontFamily="Cascadia Code,Consolas"
                              ItemsSource="{Binding TargetHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0">
                         <AutoCompleteBox.KeyBindings>
-                            <KeyBinding Gesture="Enter" Command="{Binding LookupIpCommand}" />
+                            <KeyBinding Gesture="Enter" Command="{Binding LookupIpCommand}"/>
                         </AutoCompleteBox.KeyBindings>
                     </AutoCompleteBox>
 
-                    <Grid ColumnDefinitions="Auto, *, *">
+                    <!-- provider selector (Auto = query & cross-check all sources) -->
+                    <Grid ColumnDefinitions="Auto, *" Margin="0,10,0,0">
+                        <TextBlock Grid.Column="0" Text="Source" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <ComboBox Grid.Column="1" Classes="field" ItemsSource="{Binding Providers}" SelectedIndex="{Binding SelectedProviderIndex}"
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="Auto queries several providers at once and merges the result; or pin a single provider."/>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto, *, *" Margin="0,10,0,0">
                         <CheckBox Grid.Column="0" IsChecked="{Binding UseProxy}" Name="ProxyToggle"
-                                  Content="Proxy" FontSize="11.5" Foreground="White" FontWeight="SemiBold"
+                                  Content="Proxy" FontSize="11.5" Foreground="#ECECEF" FontWeight="SemiBold"
                                   VerticalAlignment="Center" Margin="0,0,12,0"/>
-
                         <Button Grid.Column="1" Classes="primary" Command="{Binding LookupIpCommand}" Content="LOOKUP"
-                                HorizontalAlignment="Stretch"
-                                IsEnabled="{Binding !IsWorking}" Margin="0,0,6,0"/>
-
+                                HorizontalAlignment="Stretch" IsEnabled="{Binding !IsWorking}" Margin="0,0,6,0"/>
                         <Button Grid.Column="2" Classes="secondary" Command="{Binding GetMyIpCommand}" Content="MY IP"
-                                HorizontalAlignment="Stretch"
-                                IsEnabled="{Binding !IsWorking}"/>
+                                HorizontalAlignment="Stretch" IsEnabled="{Binding !IsWorking}"/>
                     </Grid>
                 </StackPanel>
 
-                <StackPanel Grid.Row="1" Spacing="8" Margin="2,0,0,15" IsVisible="{Binding UseProxy}">
-                    <AutoCompleteBox Classes="field" Text="{Binding ProxyAddress}" Watermark="Host:Port (127.0.0.1:8080)"
+                <!-- proxy credentials -->
+                <StackPanel Grid.Row="1" Spacing="8" Margin="0,0,0,12" IsVisible="{Binding UseProxy}">
+                    <AutoCompleteBox Classes="field" Text="{Binding ProxyAddress}" PlaceholderText="Proxy Host:Port (127.0.0.1:8080)"
+                             FontFamily="Cascadia Code,Consolas"
                              ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"/>
-                    <TextBox Classes="field" Text="{Binding ProxyUser}" Watermark="User (Optional)"/>
-                    <TextBox Classes="field" Text="{Binding ProxyPass}" Watermark="Pass (Optional)" PasswordChar="*"/>
+                    <Grid ColumnDefinitions="*, *">
+                        <TextBox Grid.Column="0" Classes="field" Text="{Binding ProxyUser}" PlaceholderText="User (optional)" Margin="0,0,4,0"/>
+                        <TextBox Grid.Column="1" Classes="field" Text="{Binding ProxyPass}" PlaceholderText="Pass (optional)" PasswordChar="*" Margin="4,0,0,0"/>
+                    </Grid>
                 </StackPanel>
 
+                <!-- ===== RESULT ===== -->
                 <Grid Grid.Row="2">
-                    <Border Classes="card output">
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                            <SelectableTextBlock Text="{Binding RawResult}"
-                                                 FontFamily="Cascadia Code,Consolas"
-                                                 FontSize="11.5" Foreground="#00FF99"
-                                                 Margin="12" LineHeight="20"/>
-                        </ScrollViewer>
+
+                    <!-- cards (shown once a source answers) -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  IsVisible="{Binding Result, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <StackPanel Spacing="9">
+
+                            <!-- hero: flag + IP + location -->
+                            <Border Classes="card" Padding="16,13">
+                                <Grid ColumnDefinitions="Auto, *, Auto">
+                                    <Panel Grid.Column="0" Width="46" Height="34" Margin="0,0,14,0" VerticalAlignment="Center">
+                                        <TextBlock Text="🌐" FontSize="26" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   IsVisible="{Binding !Result.HasFlag}"/>
+                                        <Border CornerRadius="4" ClipToBounds="True" IsVisible="{Binding Result.HasFlag}">
+                                            <Image Source="{Binding Result.CountryCode, Converter={x:Static helpers:CountryFlagConverter.Instance}}"
+                                                   Stretch="Uniform"/>
+                                        </Border>
+                                    </Panel>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                        <StackPanel Orientation="Horizontal" Spacing="9">
+                                            <SelectableTextBlock Text="{Binding Result.Ip}" FontSize="21" FontWeight="Bold"
+                                                                 Foreground="#ECECEF" FontFamily="Cascadia Code,Consolas"
+                                                                 VerticalAlignment="Center" SelectionBrush="#3042B883"/>
+                                            <Border Background="#2042B883" CornerRadius="5" Padding="7,2" VerticalAlignment="Center"
+                                                    IsVisible="{Binding Result.HasVersion}">
+                                                <TextBlock Text="{Binding Result.Version}" FontSize="10" FontWeight="Bold" Foreground="#55C795"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Result.HeroLocation}" FontSize="12.5" Foreground="#9E9FA8"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+                                        <Button Classes="ghost" Command="{Binding OpenMapCommand}" Content="MAP ↗"
+                                                Height="24" FontSize="10" Padding="9,0"
+                                                IsVisible="{Binding Result.HasCoordinates}"/>
+                                        <Button Classes="ghost" Command="{Binding CopyResultCommand}" Content="COPY"
+                                                Height="24" FontSize="10" Padding="10,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- per-provider breakdown: exactly what each source returned -->
+                            <TextBlock Classes="fieldLabel" Text="EACH PROVIDER" Margin="2,1,0,0"/>
+                            <ItemsControl ItemsSource="{Binding ProviderResults}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:IpProviderResult">
+                                        <Border Classes="card" Padding="12,9" Margin="0,0,0,8">
+                                            <StackPanel Spacing="6">
+                                                <TextBlock Classes="cardHead" Text="{Binding Name}"/>
+                                                <Grid ColumnDefinitions="80,*" IsVisible="{Binding Data.HeroLocation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                    <TextBlock Grid.Column="0" Classes="k" Text="Location"/>
+                                                    <SelectableTextBlock Grid.Column="1" Classes="v" Text="{Binding Data.HeroLocation}"/>
+                                                </Grid>
+                                                <Grid ColumnDefinitions="80,*" IsVisible="{Binding Data.Isp, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                    <TextBlock Grid.Column="0" Classes="k" Text="ISP"/>
+                                                    <SelectableTextBlock Grid.Column="1" Classes="v" Text="{Binding Data.Isp}"/>
+                                                </Grid>
+                                                <Grid ColumnDefinitions="80,*" IsVisible="{Binding Data.Org, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                    <TextBlock Grid.Column="0" Classes="k" Text="Org"/>
+                                                    <SelectableTextBlock Grid.Column="1" Classes="v" Text="{Binding Data.Org}"/>
+                                                </Grid>
+                                                <Grid ColumnDefinitions="80,*" IsVisible="{Binding Data.Asn, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                    <TextBlock Grid.Column="0" Classes="k" Text="ASN"/>
+                                                    <SelectableTextBlock Grid.Column="1" Classes="v" Text="{Binding Data.Asn}"/>
+                                                </Grid>
+                                                <Grid ColumnDefinitions="80,*" IsVisible="{Binding Data.Hostname, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                    <TextBlock Grid.Column="0" Classes="k" Text="Host"/>
+                                                    <SelectableTextBlock Grid.Column="1" Classes="v" Text="{Binding Data.Hostname}"/>
+                                                </Grid>
+                                                <Grid ColumnDefinitions="80,*" IsVisible="{Binding Data.HasCoordinates}">
+                                                    <TextBlock Grid.Column="0" Classes="k" Text="Coords"/>
+                                                    <SelectableTextBlock Grid.Column="1" Classes="v" Text="{Binding Data.Coordinates}"/>
+                                                </Grid>
+                                                <Grid ColumnDefinitions="80,*" IsVisible="{Binding Data.Timezone, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                    <TextBlock Grid.Column="0" Classes="k" Text="Time zone"/>
+                                                    <SelectableTextBlock Grid.Column="1" Classes="v" Text="{Binding Data.Timezone}"/>
+                                                </Grid>
+                                                <Grid ColumnDefinitions="80,*" IsVisible="{Binding Data.Postal, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                    <TextBlock Grid.Column="0" Classes="k" Text="Postal"/>
+                                                    <SelectableTextBlock Grid.Column="1" Classes="v" Text="{Binding Data.Postal}"/>
+                                                </Grid>
+                                                <TextBlock Text="{Binding Data.SecurityText}" FontSize="11" Foreground="#E0A23C"
+                                                           TextWrapping="Wrap" Margin="0,2,0,0" IsVisible="{Binding Data.HasSecurity}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- sources / cross-check line -->
+                            <TextBlock Text="{Binding StatusLine}" FontSize="10.5" Foreground="#6B6C74" Margin="2,1,0,0"
+                                       IsVisible="{Binding StatusLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- empty / working / error state -->
+                    <Border Classes="card output" IsVisible="{Binding Result, Converter={x:Static ObjectConverters.IsNull}}">
+                        <TextBlock Text="{Binding RawResult}" FontSize="12" Foreground="#9E9FA8"
+                                   FontFamily="Cascadia Code,Consolas" TextWrapping="Wrap"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" Margin="20"/>
                     </Border>
-                    <Button Classes="ghost" Command="{Binding CopyResultCommand}" Content="COPY"
-                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,18,0"
-                            Height="26" FontSize="9" Padding="10,0"
-                            IsVisible="{Binding RawResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                 </Grid>
             </Grid>
         </TabItem>
 
+        <!-- ============================ SUBNET / CIDR ============================ -->
         <TabItem Header="SUBNET / CIDR">
-            <Grid RowDefinitions="Auto, *" Margin="0,4,0,0">
-                <Grid Grid.Row="0" ColumnDefinitions="*, 90" Margin="0,0,0,10">
-                    <TextBox Grid.Column="0" Classes="field" Text="{Binding SubnetInput}" AcceptsReturn="False"
-                             Watermark="192.168.1.0/24"
-                             FontFamily="Cascadia Code,Consolas" Margin="0,0,8,0">
-                        <TextBox.KeyBindings>
-                            <KeyBinding Gesture="Enter" Command="{Binding RunSubnetCommand}"/>
-                        </TextBox.KeyBindings>
-                    </TextBox>
-                    <Button Grid.Column="1" Classes="primary" Command="{Binding RunSubnetCommand}" Content="CALC"
-                            HorizontalAlignment="Stretch"/>
-                </Grid>
+            <Grid RowDefinitions="Auto, *" Margin="0,6,0,0">
+                <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                    <TextBlock Classes="fieldLabel" Text="CIDR / SUBNET"/>
+                    <Grid ColumnDefinitions="*, 90">
+                        <TextBox Grid.Column="0" Classes="field" Text="{Binding SubnetInput}" AcceptsReturn="False"
+                                 PlaceholderText="192.168.1.0/24"
+                                 FontFamily="Cascadia Code,Consolas" Margin="0,0,8,0">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding RunSubnetCommand}"/>
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                        <Button Grid.Column="1" Classes="primary" Command="{Binding RunSubnetCommand}" Content="CALC"
+                                HorizontalAlignment="Stretch"/>
+                    </Grid>
+                </StackPanel>
 
                 <Grid Grid.Row="1">
                     <Border Classes="card output">
                         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                             <SelectableTextBlock Text="{Binding SubnetOutput}"
                                                  FontFamily="Cascadia Code,Consolas"
-                                                 FontSize="12" Foreground="#00FF99"
+                                                 FontSize="12" Foreground="#4FCB97"
                                                  Margin="12" LineHeight="20"/>
                         </ScrollViewer>
                     </Border>
                     <Button Classes="ghost" Command="{Binding CopySubnetCommand}" Content="COPY"
-                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,18,0"
-                            Height="26" FontSize="9" Padding="10,0"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,10,0"
+                            Height="24" FontSize="10" Padding="10,0"
                             IsVisible="{Binding SubnetOutput, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                 </Grid>
             </Grid>

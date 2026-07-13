@@ -22,6 +22,16 @@ public partial class StringLabViewModel
 
             // Longest Common Subsequence (line level)
             int n = a.Length, m = b.Length;
+
+            // Guard the O(n*m) matrix: two very large pastes would allocate gigabytes on the UI
+            // thread and OOM. ~8M cells ≈ 32 MB for the int matrix — plenty for real diffs.
+            const long maxCells = 8_000_000;
+            if ((long)n * m > maxCells)
+            {
+                ErrorMessage = $"Input too large to diff ({n}×{m} lines). Compare smaller sections.";
+                return;
+            }
+
             var lcs = new int[n + 1, m + 1];
             for (int i = n - 1; i >= 0; i--)
                 for (int j = m - 1; j >= 0; j--)

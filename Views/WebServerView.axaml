@@ -1,0 +1,223 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
+             xmlns:sys="using:System"
+             x:Class="Echoes.Views.WebServerView"
+             x:DataType="vm:WebServerViewModel">
+
+    <!-- The whole page scrolls: once the server is running it grows (stats + share URLs + QR + log),
+         which overflows a short window, so a single outer ScrollViewer keeps everything reachable.
+         Full width (no MaxWidth) so it still uses the available space. -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="12" Margin="14,12,14,14">
+
+            <!-- ===== LISTEN SETTINGS + START (top) ===== -->
+            <StackPanel Spacing="7">
+                <TextBlock Classes="fieldLabel" Text="LISTEN"/>
+                <Border Classes="card" Padding="14,9">
+                    <StackPanel Spacing="9">
+                        <!-- how to listen: bind interface (default 0.0.0.0 = LAN-visible) -->
+                        <Grid ColumnDefinitions="Auto,*">
+                            <TextBlock Grid.Column="0" Text="Listen on" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <ComboBox Grid.Column="1" Classes="field" ItemsSource="{Binding BindOptions}" SelectedItem="{Binding SelectedBind}"
+                                      HorizontalAlignment="Stretch"
+                                      ToolTip.Tip="Which address the server binds to. 0.0.0.0 (default) = reachable from other devices on your network; 127.0.0.1 = this device only; or pick one specific interface IP.">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:BindOption">
+                                        <TextBlock Text="{Binding Label}" FontSize="11.5"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </Grid>
+                        <!-- port + max connections + require password -->
+                        <WrapPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,22,3">
+                                <TextBlock Text="Port" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" ShowButtonSpinner="False"
+                                               Height="30" Width="80" FontSize="11.5" HorizontalContentAlignment="Center" CornerRadius="6"
+                                               Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,22,3">
+                                <TextBlock Text="Max conns" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,8,0"
+                                           ToolTip.Tip="Maximum simultaneous connections the server accepts"/>
+                                <NumericUpDown Value="{Binding MaxConnections}" Minimum="1" Maximum="512" ShowButtonSpinner="False"
+                                               Height="30" Width="70" FontSize="11.5" HorizontalContentAlignment="Center" CornerRadius="6"
+                                               Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
+                            </StackPanel>
+                            <CheckBox IsChecked="{Binding RequireAuth}" Content="Require password" FontSize="11.5"
+                                      FontWeight="SemiBold" Foreground="#C7C8CF" VerticalAlignment="Center" Margin="0,3,0,3"
+                                      ToolTip.Tip="Protect downloads with HTTP Basic auth"/>
+                        </WrapPanel>
+                        <Grid ColumnDefinitions="*, *" ColumnSpacing="8" IsVisible="{Binding RequireAuth}">
+                            <TextBox Grid.Column="0" Classes="field" Text="{Binding AuthUser}" PlaceholderText="username"/>
+                            <TextBox Grid.Column="1" Classes="field" Text="{Binding AuthPass}" PasswordChar="●" PlaceholderText="password"/>
+                        </Grid>
+                        <!-- START / STOP + status — inside the settings box -->
+                        <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10" Margin="0,2,0,0">
+                            <Button Grid.Column="0" Classes="toggle" Command="{Binding ToggleServerCommand}" Classes.active="{Binding IsRunning}"
+                                    Height="32" Width="150">
+                                <Panel>
+                                    <TextBlock Text="START SHARING" IsVisible="{Binding !IsRunning}" FontSize="11" FontWeight="Bold"/>
+                                    <TextBlock Text="STOP" IsVisible="{Binding IsRunning}" FontSize="11" FontWeight="Bold"/>
+                                </Panel>
+                            </Button>
+                            <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" FontSize="11" Foreground="#42B883"
+                                       FontFamily="Cascadia Code,Consolas" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ===== SHARED FILES (below settings) ===== -->
+            <StackPanel Spacing="6">
+                <Grid ColumnDefinitions="*, Auto, Auto">
+                    <TextBlock Grid.Column="0" Classes="fieldLabel" Text="SHARED FILES" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Classes="secondary" Click="AddFiles_Click" Content="+ ADD FILES" FontSize="11" Margin="0,0,6,0"/>
+                    <Button Grid.Column="2" Classes="ghost" Command="{Binding ClearFilesCommand}" Content="CLEAR" FontSize="11"/>
+                </Grid>
+
+                <!-- files list (grows with the file count; a very long list caps here and scrolls internally) -->
+                <Border Classes="card" Padding="6" MinHeight="80">
+                    <Panel>
+                        <TextBlock Text="No files yet — press “+ ADD FILES”." FontSize="11.5" Foreground="#6B6C74"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   IsVisible="{Binding !HasFiles}"/>
+                        <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding Files}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:SharedFileRow">
+                                        <Border Background="#191A1F" BorderBrush="#2A2C33" BorderThickness="1" CornerRadius="6"
+                                                Padding="10,7" Margin="0,0,0,5">
+                                            <Grid ColumnDefinitions="*, Auto, 30">
+                                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" Foreground="#ECECEF"
+                                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding SizeText}" FontSize="10.5" Foreground="#9E9FA8"
+                                                           FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center" Margin="8,0"/>
+                                                <Button Grid.Column="2" Content="✕" FontSize="12" Padding="0" Width="26" Height="26"
+                                                        Background="#2A2C33" BorderThickness="0" CornerRadius="4"
+                                                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                        ToolTip.Tip="Remove"
+                                                        Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).RemoveFileCommand}"
+                                                        CommandParameter="{Binding}"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Panel>
+                </Border>
+            </StackPanel>
+
+            <!-- ===== LIVE STATS (while running) ===== -->
+            <Border Classes="card" Padding="12,8" IsVisible="{Binding IsRunning}">
+                <WrapPanel>
+                    <WrapPanel.Styles>
+                        <Style Selector="StackPanel.stat">
+                            <Setter Property="Orientation" Value="Horizontal"/>
+                            <Setter Property="Margin" Value="0,2,24,2"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                        <Style Selector="StackPanel.stat > TextBlock.k">
+                            <Setter Property="FontSize" Value="10.5"/>
+                            <Setter Property="Foreground" Value="#9E9FA8"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="Margin" Value="0,0,6,0"/>
+                        </Style>
+                        <Style Selector="StackPanel.stat > TextBlock.v">
+                            <Setter Property="FontSize" Value="13"/>
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="Foreground" Value="#7FCBA6"/>
+                            <Setter Property="FontFamily" Value="Cascadia Code,Consolas"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                    </WrapPanel.Styles>
+                    <StackPanel Classes="stat">
+                        <TextBlock Classes="k" Text="active"/>
+                        <TextBlock Classes="v" Text="{Binding ActiveConnections}"/>
+                    </StackPanel>
+                    <StackPanel Classes="stat">
+                        <TextBlock Classes="k" Text="downloads"/>
+                        <TextBlock Classes="v" Text="{Binding TotalDownloads}"/>
+                    </StackPanel>
+                    <StackPanel Classes="stat">
+                        <TextBlock Classes="k" Text="sent"/>
+                        <TextBlock Classes="v" Text="{Binding BytesSentText}"/>
+                    </StackPanel>
+                    <StackPanel Classes="stat">
+                        <TextBlock Classes="k" Text="clients"/>
+                        <TextBlock Classes="v" Text="{Binding ClientCount}"/>
+                    </StackPanel>
+                    <StackPanel Classes="stat">
+                        <TextBlock Classes="k" Text="total conns"/>
+                        <TextBlock Classes="v" Text="{Binding TotalConnections}"/>
+                    </StackPanel>
+                </WrapPanel>
+            </Border>
+
+            <!-- ===== SHARE URLs + QR (while running) ===== -->
+            <StackPanel Spacing="6" IsVisible="{Binding IsRunning}">
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBlock Grid.Column="0" Classes="fieldLabel" Text="SHARE  ·  SCAN TO DOWNLOAD" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Classes="ghost" Command="{Binding RefreshAddressesCommand}" Content="↻ REFRESH" FontSize="10.5"/>
+                </Grid>
+                <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12">
+                    <!-- addresses — click one to show its QR on the right -->
+                    <StackPanel Grid.Column="0" Spacing="5" VerticalAlignment="Top">
+                        <ListBox ItemsSource="{Binding Addresses}" SelectedItem="{Binding SelectedShareUrl}"
+                                 Background="Transparent" BorderThickness="0" Padding="0">
+                            <ListBox.Styles>
+                                <Style Selector="ListBoxItem">
+                                    <Setter Property="Padding" Value="0"/>
+                                    <Setter Property="Margin" Value="0"/>
+                                    <Setter Property="MinHeight" Value="0"/>
+                                </Style>
+                            </ListBox.Styles>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="sys:String">
+                                    <Border Background="#16311F" BorderBrush="#1E3A2B" BorderThickness="1" CornerRadius="6"
+                                            Padding="10,7" Margin="0,0,0,5">
+                                        <Grid ColumnDefinitions="*, Auto, Auto">
+                                            <TextBlock Grid.Column="0" Text="{Binding}" FontSize="12" Foreground="#7FCBA6"
+                                                       FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <Button Grid.Column="1" Content="COPY" FontSize="10" Classes="ghost" Padding="8,3" Margin="6,0,4,0"
+                                                    Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).CopyAddressCommand}"
+                                                    CommandParameter="{Binding}"/>
+                                            <Button Grid.Column="2" Content="OPEN" FontSize="10" Classes="ghost" Padding="8,3"
+                                                    IsVisible="{x:Static helpers:AppPlatform.IsDesktop}"
+                                                    Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).OpenAddressCommand}"
+                                                    CommandParameter="{Binding}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock Text="Point a phone camera at the QR, or open a URL in any browser on the same Wi-Fi/LAN."
+                                   FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap" Margin="2,0"/>
+                    </StackPanel>
+
+                    <!-- QR of the selected address -->
+                    <Border Grid.Column="1" Background="White" CornerRadius="8" Padding="8" VerticalAlignment="Top"
+                            IsVisible="{Binding QrImage, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <Image Source="{Binding QrImage}" Width="164" Height="164"
+                               RenderOptions.BitmapInterpolationMode="None"/>
+                    </Border>
+                </Grid>
+            </StackPanel>
+
+            <!-- ===== REQUEST LOG ===== -->
+            <StackPanel Spacing="6">
+                <TextBlock Classes="fieldLabel" Text="REQUESTS"/>
+                <TextBox Text="{Binding Log}" IsReadOnly="True" AcceptsReturn="True" Height="150"
+                         FontFamily="Cascadia Code,Consolas" FontSize="11" Background="#121317" Foreground="#9E9FA8"
+                         BorderBrush="#2A2C33" BorderThickness="1" CornerRadius="8" Padding="10"
+                         TextWrapping="NoWrap"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         PlaceholderText="Incoming download requests appear here."/>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

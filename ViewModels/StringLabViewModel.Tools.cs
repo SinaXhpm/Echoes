@@ -65,6 +65,15 @@ public partial class StringLabViewModel
         catch (Exception ex) { ErrorMessage = ex.Message; }
     }
 
+    // Shared so a future option toggle can't diverge between match-preview and replace.
+    private RegexOptions BuildRegexOptions()
+    {
+        var options = RegexOptions.None;
+        if (RegexIgnoreCase) options |= RegexOptions.IgnoreCase;
+        if (RegexMultiline) options |= RegexOptions.Multiline;
+        return options;
+    }
+
     [RelayCommand]
     private void RunRegex()
     {
@@ -73,9 +82,7 @@ public partial class StringLabViewModel
             ResetError();
             if (string.IsNullOrEmpty(RegexInput) || string.IsNullOrEmpty(RegexPattern)) return;
 
-            var options = RegexOptions.None;
-            if (RegexIgnoreCase) options |= RegexOptions.IgnoreCase;
-            if (RegexMultiline) options |= RegexOptions.Multiline;
+            var options = BuildRegexOptions();
 
             var matches = Regex.Matches(RegexInput, RegexPattern, options, TimeSpan.FromSeconds(5));
             if (matches.Count == 0) { RegexOutput = "No matches found."; return; }
@@ -109,9 +116,7 @@ public partial class StringLabViewModel
             ResetError();
             if (string.IsNullOrEmpty(RegexInput) || string.IsNullOrEmpty(RegexPattern)) return;
 
-            var options = RegexOptions.None;
-            if (RegexIgnoreCase) options |= RegexOptions.IgnoreCase;
-            if (RegexMultiline) options |= RegexOptions.Multiline;
+            var options = BuildRegexOptions();
 
             RegexOutput = Regex.Replace(RegexInput, RegexPattern, RegexReplacement ?? string.Empty, options, TimeSpan.FromSeconds(5));
         }

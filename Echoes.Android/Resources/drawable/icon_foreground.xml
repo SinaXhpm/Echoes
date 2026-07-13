@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The circular logo, inset into the adaptive-icon safe zone. The canvas is 108dp; an 18dp inset
+     per side leaves the logo in the central ~72dp, so the launcher mask never crops the round rim.
+     References @mipmap/icon_fg (a copy of the launcher PNG) — NOT @mipmap/icon, which resolves to this
+     adaptive-icon on API 26+ and would be a circular reference. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+       android:drawable="@mipmap/icon_fg"
+       android:inset="18dp"/>

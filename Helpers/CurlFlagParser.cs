@@ -21,6 +21,7 @@ public class HttpRequestSpec
     public string? Cookie;
     public string? Referer;
     public int? ConnectTimeoutSec;
+    public int? MaxTimeSec;                                // curl -m/--max-time: whole-operation cap
     public Dictionary<string, string> Overrides = new();   // original host -> override IP
 }
 
@@ -72,18 +73,21 @@ public static class CurlFlagParser
                 case "-b": case "--cookie": spec.Cookie = Next(); break;
                 case "-e": case "--referer": spec.Referer = Next(); break;
 
-                case "--connect-timeout": case "-m": case "--max-time":
-                    if (int.TryParse(Next(), out int ct)) spec.ConnectTimeoutSec = ct;
+                case "--connect-timeout":
+                    if (int.TryParse(Next(), out int cto)) spec.ConnectTimeoutSec = cto;
+                    break;
+                case "-m": case "--max-time":
+                    if (int.TryParse(Next(), out int mt)) spec.MaxTimeSec = mt;
                     break;
 
-                case "--resolve":   // host:port:addr
-                    var r = Next().Split(':');
-                    if (r.Length >= 3) spec.Overrides[r[0]] = r[^1];
+                case "--resolve":   // host:port:addr   (addr may be IPv6 with colons, or [ipv6])
+                    if (TryParseResolve(Next(), out var rHost, out var rAddr))
+                        spec.Overrides[rHost] = rAddr;
                     break;
 
-                case "--connect-to":   // host1:port1:host2:port2
-                    var cc = Next().Split(':');
-                    if (cc.Length >= 3 && cc[2].Length > 0) spec.Overrides[cc[0]] = cc[2];
+                case "--connect-to":   // host1:port1:host2:port2   (host2 may be [ipv6])
+                    if (TryParseConnectTo(Next(), out var ccHost, out var ccAddr))
+                        spec.Overrides[ccHost] = ccAddr;
                     break;
 
                 // valueless flags with no .NET equivalent (curl noise) — ignore
@@ -93,8 +97,9 @@ public static class CurlFlagParser
                     break;
 
                 // flags that consume a value we don't map — skip the value too
+                // (--interface is applied via the .NET ConnectCallback, not parsed here)
                 case "-o": case "--output": case "-K": case "--config":
-                case "--cacert": case "--cert": case "--key":
+                case "--cacert": case "--cert": case "--key": case "--interface":
                     Next(); break;
 
                 default:
@@ -111,6 +116,45 @@ public static class CurlFlagParser
         int i = s.IndexOf(':');
         if (i >= 0) { a = s[..i]; b = s[(i + 1)..]; }
         else { a = s; b = null; }
+    }
+
+    // --resolve host:port:addr — addr is everything after the 2nd ':' so an IPv6 literal
+    // (which itself contains colons) survives intact; strips optional [] and the '+' TTL prefix.
+    private static bool TryParseResolve(string s, out string host, out string addr)
+    {
+        host = addr = string.Empty;
+        if (s.StartsWith('+')) s = s[1..];
+        int c1 = s.IndexOf(':');
+        if (c1 <= 0) return false;
+        int c2 = s.IndexOf(':', c1 + 1);
+        if (c2 < 0) return false;
+        host = s[..c1];
+        addr = s[(c2 + 1)..].Trim('[', ']');
+        return addr.Length > 0;
+    }
+
+    // --connect-to host1:port1:host2:port2 — host2 (the connect target) may be [ipv6].
+    private static bool TryParseConnectTo(string s, out string host, out string addr)
+    {
+        host = addr = string.Empty;
+        int c1 = s.IndexOf(':');
+        if (c1 <= 0) return false;
+        int c2 = s.IndexOf(':', c1 + 1);
+        if (c2 < 0) return false;
+        host = s[..c1];
+        string rest = s[(c2 + 1)..];   // host2[:port2], host2 possibly bracketed
+        if (rest.StartsWith('['))
+        {
+            int close = rest.IndexOf(']');
+            if (close < 1) return false;
+            addr = rest[1..close];
+        }
+        else
+        {
+            int lc = rest.LastIndexOf(':');
+            addr = lc > 0 ? rest[..lc] : rest;   // drop trailing :port2
+        }
+        return addr.Length > 0;
     }
 
     private static List<string> Tokenize(string s)

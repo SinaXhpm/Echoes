@@ -16,6 +16,14 @@ public class MainApplication : AvaloniaAndroidApplication<global::Echoes.App>
     {
     }
 
+    public override void OnCreate()
+    {
+        base.OnCreate();
+        // Let the shared Monitor/Scanner loops keep the process alive in the background
+        // by starting a foreground service (no-op on desktop, which never registers one).
+        Echoes.Helpers.BackgroundGuard.Register(new AndroidBackgroundGuard(this));
+    }
+
     protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
         => base.CustomizeAppBuilder(builder).WithInterFont();
 }

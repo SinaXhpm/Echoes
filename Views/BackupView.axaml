@@ -1,0 +1,61 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             x:Class="Echoes.Views.BackupView"
+             x:DataType="vm:BackupViewModel"
+             Background="#0F1012">
+
+    <Grid Margin="16">
+        <!-- MaxWidth (not a fixed Width) so the card caps at 468 and centres on desktop but
+             shrinks to fit a narrow phone screen instead of overflowing. -->
+        <Border VerticalAlignment="Center" HorizontalAlignment="Stretch" MaxWidth="468"
+                Background="#17181D" CornerRadius="12" BorderBrush="#2A2C33" BorderThickness="1" Padding="22,18">
+            <StackPanel Spacing="14">
+
+                <StackPanel Spacing="3">
+                    <TextBlock Text="BACKUP" FontSize="13" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
+                    <TextBlock Text="Save everything to one encrypted file, or restore it. No account — fully offline."
+                               FontSize="10.5" Foreground="#9E9FA8" TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <Border Height="1" Background="#25272E"/>
+
+                <StackPanel>
+                    <TextBlock Classes="fieldLabel" Text="BACKUP PASSWORD"/>
+                    <TextBox Classes="field" Text="{Binding Password}" PasswordChar="●" PlaceholderText="protects the exported file"/>
+                    <TextBlock Text="Needed to export and to import. Keep it safe — without it the file can't be opened."
+                               FontSize="9.5" Foreground="#6E6F78" Margin="2,5,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*, *" ColumnSpacing="12">
+                    <Button Grid.Column="0" Name="ExportBtn" Click="OnExport" IsEnabled="{Binding !IsBusy}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            Background="#42B883" Foreground="#0F1012" BorderThickness="0" CornerRadius="9" Padding="0" Height="82">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="3">
+                            <TextBlock Text="↧" FontSize="23" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#0F1012"/>
+                            <TextBlock Text="EXPORT" FontSize="13" FontWeight="Black" HorizontalAlignment="Center" Foreground="#0F1012"/>
+                            <TextBlock Text="save to a file" FontSize="9.5" Opacity="0.7" HorizontalAlignment="Center" Foreground="#0F1012"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1" Name="ImportBtn" Click="OnImport" IsEnabled="{Binding !IsBusy}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            Background="#1D1E25" Foreground="#ECECEF" BorderThickness="1" BorderBrush="#3B3D47" CornerRadius="9" Padding="0" Height="82">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="3">
+                            <TextBlock Text="↥" FontSize="23" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#55C795"/>
+                            <TextBlock Text="IMPORT" FontSize="13" FontWeight="Black" HorizontalAlignment="Center"/>
+                            <TextBlock Text="restore from a file" FontSize="9.5" Opacity="0.7" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <Border Background="#101216" BorderBrush="#242630" BorderThickness="1" CornerRadius="7" Padding="12,9">
+                    <TextBlock FontSize="9.5" Foreground="#9E9FA8" TextWrapping="Wrap" LineHeight="15"
+                               Text="Includes settings, input history, DNS servers, SSH host pins, the encrypted Cloudflare vault, and notes — packed into one AES-256-GCM encrypted file. Import overwrites this device's data; restart Echoes afterwards to load it."/>
+                </Border>
+
+                <TextBlock Text="{Binding Status}" FontSize="10.5" Foreground="#55C795" FontFamily="Cascadia Code,Consolas"
+                           TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

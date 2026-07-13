@@ -22,6 +22,10 @@ public partial class MainViewModel : ObservableObject
     private NetworkInfoViewModel? _networkVM;
     private NoteViewModel? _noteVM;
     private CloudflareViewModel? _cloudflareVM;
+    private HistoryViewModel? _historyVM;
+    private BackupViewModel? _backupVM;
+    private WebServerViewModel? _webServerVM;
+    private CheckHostViewModel? _checkHostVM;
     public PingViewModel PingVM => _pingVM ??= new();
     public DnsViewModel DnsVM => _dnsVM ??= new();
     public CurlViewModel CurlVM => _curlVM ??= new();
@@ -33,6 +37,17 @@ public partial class MainViewModel : ObservableObject
     public NetworkInfoViewModel NetworkVM => _networkVM ??= new();
     public NoteViewModel NoteVM => _noteVM ??= new();
     public CloudflareViewModel CloudflareVM => _cloudflareVM ??= new();
+    public HistoryViewModel HistoryVM => _historyVM ??= new();
+    public BackupViewModel BackupVM => _backupVM ??= new();
+    public WebServerViewModel WebServerVM => _webServerVM ??= new();
+    public CheckHostViewModel CheckHostVM => _checkHostVM ??= new();
+
+    // Flush debounced persistence + release the file-share listening socket on shutdown.
+    public void FlushOnExit()
+    {
+        _cloudflareVM?.FlushPendingSave();
+        _webServerVM?.StopServer();
+    }
 
     [ObservableProperty] private string _currentVersion;
     [ObservableProperty] private string _latestVersion;

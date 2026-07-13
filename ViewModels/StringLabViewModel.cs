@@ -27,6 +27,7 @@ public partial class StringLabViewModel : ObservableObject
             case "gen": GenerateOutput = string.Empty; break;
             case "baseconv": BaseInput = BaseOutput = string.Empty; break;
             case "hashid": HashIdInput = HashIdOutput = string.Empty; break;
+            case "jwt": JwtInput = JwtKey = JwtOutput = JwtVerify = string.Empty; break;
             case "diff": DiffLeft = DiffRight = DiffOutput = string.Empty; break;
             case "case": CaseInput = CaseOutput = string.Empty; break;
             case "convert": ConvertInput = ConvertOutput = string.Empty; break;

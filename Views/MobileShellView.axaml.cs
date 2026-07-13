@@ -26,5 +26,16 @@ public partial class MobileShellView : UserControl
         // Split are assigned — guard against the null to avoid a startup crash.
         if (Split is not null)
             Split.IsPaneOpen = false; // close the drawer after picking a tool
+
+        // Mirror the desktop shell's per-tab refresh so live data is current when shown.
+        if (DataContext is MainViewModel vm && (sender as ListBox)?.SelectedItem is ListBoxItem { Content: string name })
+        {
+            switch (name)
+            {
+                case "CURL": vm.CurlVM.RefreshInterfaces(); break;
+                case "HISTORY": vm.HistoryVM.Reload(); break;
+                case "WEB SERVER": vm.WebServerVM.RefreshAddressesCommand.Execute(null); break;
+            }
+        }
     }
 }

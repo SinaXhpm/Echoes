@@ -4,71 +4,171 @@
              x:Class="Echoes.Views.DnsView"
              x:DataType="vm:DnsViewModel">
 
-    <Grid RowDefinitions="Auto, *" Margin="15">
-        <Grid Grid.Row="0" ColumnDefinitions="*, 178" Margin="0,0,0,12">
+    <!-- Query controls grouped in one card (top), results fill the rest -->
+    <Grid RowDefinitions="Auto, *" RowSpacing="10" Margin="15">
 
-            <!-- Left: domain + record types + actions (kept short) -->
-            <StackPanel Grid.Column="0" Spacing="8" Margin="0,0,12,0">
-                <StackPanel>
-                    <TextBlock Classes="fieldLabel" Text="TARGET DOMAIN"/>
-                    <AutoCompleteBox Classes="field" Text="{Binding DomainName}" Watermark="example.com"
-                             ItemsSource="{Binding DomainHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0">
-                        <AutoCompleteBox.KeyBindings>
-                            <KeyBinding Command="{Binding RunLookupCommand}" Gesture="Enter"/>
-                        </AutoCompleteBox.KeyBindings>
-                    </AutoCompleteBox>
+        <Border Grid.Row="0" Classes="card" Padding="12,9">
+            <!-- Two columns: query controls on the LEFT (flex to fill), the RESOLVERS box on the RIGHT. -->
+            <Grid ColumnDefinitions="*, 150" ColumnSpacing="12">
+
+                <!-- LEFT: domain + record-types + WHOIS + LOOKUP, stacked and compact -->
+                <StackPanel Grid.Column="0" Spacing="6" VerticalAlignment="Top">
+
+                    <!-- domain input (flex) + record-type select (proper fixed size) side by side -->
+                    <Grid ColumnDefinitions="*, 104" ColumnSpacing="6">
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Classes="fieldLabel" Text="TARGET DOMAIN"/>
+                        <AutoCompleteBox Classes="field" x:Name="DomainBox" Text="{Binding DomainName}" PlaceholderText="example.com"
+                                 ItemsSource="{Binding DomainHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0">
+                            <AutoCompleteBox.KeyBindings>
+                                <KeyBinding Command="{Binding RunLookupCommand}" Gesture="Enter"/>
+                            </AutoCompleteBox.KeyBindings>
+                        </AutoCompleteBox>
+                    </StackPanel>
+
+                    <!-- RECORD TYPES → compact multi-select dropdown (expands via its flyout) -->
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Classes="fieldLabel" Text="TYPES"/>
+                        <DropDownButton HorizontalAlignment="Stretch" Height="30" Padding="6,0"
+                                        Background="#1D1E25" BorderBrush="#3B3D47" BorderThickness="1" CornerRadius="6"
+                                        Foreground="#ECECEF">
+                            <TextBlock Text="{Binding SelectedTypesSummary}" FontSize="10.5" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <DropDownButton.Flyout>
+                                <Flyout Placement="Bottom">
+                                    <Border Background="#191A1F" CornerRadius="6" Padding="12,10" MinWidth="210">
+                                        <StackPanel Spacing="6">
+                                            <TextBlock Text="RECORD TYPES" Classes="fieldLabel" Margin="0,0,0,2"/>
+                                            <UniformGrid Columns="2">
+                                                <UniformGrid.Styles>
+                                                    <Style Selector="CheckBox">
+                                                        <Setter Property="FontSize" Value="12"/>
+                                                        <Setter Property="MinHeight" Value="28"/>
+                                                        <Setter Property="Padding" Value="6,0,0,0"/>
+                                                    </Style>
+                                                </UniformGrid.Styles>
+                                                <CheckBox IsChecked="{Binding TypeA}" Content="A"/>
+                                                <CheckBox IsChecked="{Binding TypeAAAA}" Content="AAAA"/>
+                                                <CheckBox IsChecked="{Binding TypeCNAME}" Content="CNAME"/>
+                                                <CheckBox IsChecked="{Binding TypeMX}" Content="MX"/>
+                                                <CheckBox IsChecked="{Binding TypeTXT}" Content="TXT"/>
+                                                <CheckBox IsChecked="{Binding TypeNS}" Content="NS"/>
+                                                <CheckBox IsChecked="{Binding TypeSOA}" Content="SOA"/>
+                                                <CheckBox IsChecked="{Binding TypeSRV}" Content="SRV"/>
+                                                <CheckBox IsChecked="{Binding TypeCAA}" Content="CAA"/>
+                                                <CheckBox IsChecked="{Binding TypePTR}" Content="PTR"/>
+                                            </UniformGrid>
+                                        </StackPanel>
+                                    </Border>
+                                </Flyout>
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                    </StackPanel>
+                    </Grid>
+
+                    <!-- WHOIS + LOOKUP (equal, compact) + Wrap checkbox filling the freed space -->
+                    <Grid ColumnDefinitions="88, 88, *" ColumnSpacing="6">
+                        <Button Grid.Column="0" x:Name="WhoisBtn" Classes="secondary" Command="{Binding RunWhoisCommand}" Content="WHOIS"
+                                IsEnabled="{Binding !IsWorking}" Height="30" FontSize="11" HorizontalAlignment="Stretch"/>
+                        <Panel Grid.Column="1" x:Name="LookupHost">
+                            <Button Classes="primary" Command="{Binding RunLookupCommand}" Content="LOOKUP"
+                                    Height="30" HorizontalAlignment="Stretch" FontSize="11" IsVisible="{Binding !IsWorking}"/>
+                            <Button Classes="toggle active" Command="{Binding StopCommand}" Content="STOP"
+                                    Height="30" HorizontalAlignment="Stretch" FontSize="11" IsVisible="{Binding IsWorking}"/>
+                        </Panel>
+                        <CheckBox Grid.Column="2" IsChecked="{Binding WrapResult}" Content="Wrap result" FontSize="10.5" FontWeight="SemiBold"
+                                  Foreground="#9E9FA8" VerticalAlignment="Center" Margin="8,0,0,0" MinHeight="0"
+                                  IsVisible="{Binding !ShowRecords}"/>
+                    </Grid>
                 </StackPanel>
 
-                <WrapPanel>
-                    <WrapPanel.Styles>
-                        <Style Selector="CheckBox">
-                            <Setter Property="FontSize" Value="11"/>
-                            <Setter Property="MinWidth" Value="0"/>
-                            <Setter Property="Margin" Value="0,0,6,3"/>
-                            <Setter Property="Padding" Value="4,0,0,0"/>
-                        </Style>
-                    </WrapPanel.Styles>
-                    <CheckBox IsChecked="{Binding TypeA}" Content="A"/>
-                    <CheckBox IsChecked="{Binding TypeAAAA}" Content="AAAA"/>
-                    <CheckBox IsChecked="{Binding TypeMX}" Content="MX"/>
-                    <CheckBox IsChecked="{Binding TypeNS}" Content="NS"/>
-                    <CheckBox IsChecked="{Binding TypeTXT}" Content="TXT"/>
-                    <CheckBox IsChecked="{Binding TypeCNAME}" Content="CNAME"/>
-                    <CheckBox IsChecked="{Binding TypeSOA}" Content="SOA"/>
-                    <CheckBox IsChecked="{Binding TypeSRV}" Content="SRV"/>
-                    <CheckBox IsChecked="{Binding TypeCAA}" Content="CAA"/>
-                    <CheckBox IsChecked="{Binding TypePTR}" Content="PTR"/>
-                </WrapPanel>
-
-                <Grid ColumnDefinitions="*, *">
-                    <Button Grid.Column="0" Classes="secondary" Command="{Binding RunWhoisCommand}" Content="WHOIS" Margin="0,0,5,0"
-                            HorizontalAlignment="Stretch"/>
-                    <Button Grid.Column="1" Classes="primary" Command="{Binding RunLookupCommand}" Content="LOOKUP" Margin="5,0,0,0"
-                            HorizontalAlignment="Stretch"/>
+                <!-- RIGHT: resolvers box (fills remaining height) with the result Wrap + Copy
+                     controls tucked underneath, which trims the resolvers height a little. -->
+                <Grid Grid.Column="1" RowDefinitions="Auto, *">
+                    <TextBlock Grid.Row="0" Classes="fieldLabel" Text="RESOLVERS"/>
+                    <TextBox Grid.Row="1" Classes="field multiline" Text="{Binding DnsServersText}" AcceptsReturn="True" FontSize="11.5"
+                             VerticalAlignment="Stretch" FontFamily="Cascadia Code,Consolas"
+                             PlaceholderText="one&#x0a;per&#x0a;line"/>
                 </Grid>
-            </StackPanel>
-
-            <!-- Right: resolvers — needs height, not width -->
-            <Grid Grid.Column="1" RowDefinitions="Auto, *">
-                <TextBlock Grid.Row="0" Classes="fieldLabel" Text="DNS RESOLVERS"/>
-                <TextBox Grid.Row="1" Classes="field multiline" Text="{Binding DnsServersText}" AcceptsReturn="True" FontSize="11"
-                         MinHeight="90" FontFamily="Cascadia Code,Consolas"/>
             </Grid>
-        </Grid>
+        </Border>
 
-        <Grid Grid.Row="1">
-            <Border Classes="card output">
-                <TextBox Text="{Binding LogText}" IsReadOnly="True" AcceptsReturn="True"
-                         TextWrapping="NoWrap"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto"
-                         FontFamily="Cascadia Code,Consolas" FontSize="12" Background="Transparent"
-                         BorderThickness="0" Foreground="#00FF99" Padding="12"/>
+        <!-- Results — header bar (count + result actions) over the output card -->
+        <Grid Grid.Row="1" RowDefinitions="Auto, *" RowSpacing="6">
+            <Grid Grid.Row="0" ColumnDefinitions="*" Margin="2,0">
+                <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="10" Foreground="#9E9FA8"
+                           IsVisible="{Binding ShowRecords}"
+                           Text="{Binding Records.Count, StringFormat='{}{0} record(s)'}"/>
+                <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="10" FontWeight="SemiBold" Foreground="#9E9FA8"
+                           IsVisible="{Binding !ShowRecords}" Text="WHOIS / RDAP"/>
+            </Grid>
+
+            <Border Grid.Row="1" Classes="card output">
+                <Panel>
+                    <!-- DNS lookup → record cards -->
+                    <ScrollViewer IsVisible="{Binding ShowRecords}" VerticalScrollBarVisibility="Auto" Padding="8">
+                        <ItemsControl ItemsSource="{Binding Records}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:DnsRecordRow">
+                                    <Border Background="#191A1F" BorderBrush="#2F3139" BorderThickness="1"
+                                            CornerRadius="6" Padding="8,6" Margin="0,0,0,5">
+                                        <Grid ColumnDefinitions="48, *, Auto">
+                                            <Border Grid.Column="0" Background="#2042B883" CornerRadius="4" Height="20"
+                                                    VerticalAlignment="Top" Margin="0,1,8,0">
+                                                <TextBlock Text="{Binding Type}" FontSize="10" FontWeight="Bold" Foreground="#55C795"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap"
+                                                                 FontFamily="Cascadia Code,Consolas" FontSize="12"
+                                                                 Foreground="#4FCB97" VerticalAlignment="Center"/>
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Server}" FontSize="9.5" Foreground="#9E9FA8" VerticalAlignment="Center"/>
+                                                <!-- Copy this record. Vector icon (two overlapping pages) so it's
+                                                     always pixel-centered — a glyph sits off-centre in a tiny button. -->
+                                                <Button IsVisible="{Binding IsRecord}"
+                                                        Command="{Binding $parent[ItemsControl].((vm:DnsViewModel)DataContext).CopyRowCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Width="24" Height="22" Padding="0"
+                                                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                        Background="#2A2C33" BorderThickness="0" CornerRadius="4"
+                                                        ToolTip.Tip="Copy this record">
+                                                    <Button.Styles>
+                                                        <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                            <Setter Property="Background" Value="#33353E"/>
+                                                        </Style>
+                                                        <Style Selector="Button Border.pg">
+                                                            <Setter Property="BorderBrush" Value="#C7C8CF"/>
+                                                        </Style>
+                                                        <Style Selector="Button:pointerover Border.pg">
+                                                            <Setter Property="BorderBrush" Value="#FFFFFF"/>
+                                                        </Style>
+                                                    </Button.Styles>
+                                                    <Grid Width="13" Height="13">
+                                                        <Border Classes="pg" Width="8" Height="9" CornerRadius="2"
+                                                                BorderThickness="1.2"
+                                                                HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
+                                                        <Border Classes="pg" Width="8" Height="9" CornerRadius="2"
+                                                                BorderThickness="1.2" Background="#2A2C33"
+                                                                HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                                                    </Grid>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <!-- WHOIS / RDAP → freeform text -->
+                    <TextBox IsVisible="{Binding !ShowRecords}" Text="{Binding LogText}" IsReadOnly="True" AcceptsReturn="True"
+                             TextWrapping="{Binding ResultWrapping}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             FontFamily="Cascadia Code,Consolas" FontSize="12" Background="Transparent"
+                             BorderThickness="0" Foreground="#4FCB97" Padding="12"/>
+                </Panel>
             </Border>
-            <Button Classes="ghost" Command="{Binding CopyResultCommand}" Content="COPY"
-                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,18,0"
-                    Height="26" FontSize="9" Padding="10,0"
-                    IsVisible="{Binding LogText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
         </Grid>
     </Grid>
 </UserControl>
