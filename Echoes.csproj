@@ -9,9 +9,9 @@
     <!-- The Android head lives in a subfolder with its own project; keep it out of the desktop build. -->
     <DefaultItemExcludes>$(DefaultItemExcludes);Echoes.Android\**</DefaultItemExcludes>
 
-    <Version>0.2.9</Version>
-    <AssemblyVersion>0.2.9.0</AssemblyVersion>
-    <FileVersion>0.2.9.0</FileVersion>
+    <Version>0.3.1</Version>
+    <AssemblyVersion>0.3.1.0</AssemblyVersion>
+    <FileVersion>0.3.1.0</FileVersion>
     <Description>Small utilities for network, API, and string tasks; throwing packets from a distant time, just to see what comes willowing back across the sand.</Description>
     
     <ApplicationIcon>Assets\echoes.ico</ApplicationIcon>
@@ -31,15 +31,37 @@
     <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
-  
+
+  <!-- Release-only size/startup trims (Debug/dev keeps full globalization, debugger, readable messages).
+       InvariantGlobalization drops the bundled ICU data (~large) — dates/numbers use the invariant
+       culture, which is what this dev-tool wants anyway. The feature switches strip runtime plumbing
+       this app never uses. StackTraceSupport is intentionally left ON (kept via the CI publish args).
+       Note: UseSystemResourceKeys is deliberately NOT set — the app surfaces exception .Message text
+       to users (cURL/SSH errors), which must stay human-readable. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <EventSourceSupport>false</EventSourceSupport>
+    <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+    <DebuggerSupport>false</DebuggerSupport>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.0.2" />
     <PackageReference Include="Avalonia.Desktop" Version="12.0.2" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.2" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.2" />
+    <PackageReference Include="Avalonia.Controls.WebView" Version="12.0.1" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="DnsClient" Version="1.8.0" />
     <PackageReference Include="SSH.NET" Version="2025.1.0" />
+  </ItemGroup>
+
+  <!-- SSH.NET and DnsClient use reflection to register cipher/kex/HMAC and DNS record types.
+       Root the whole assemblies so trimming / Native-AOT never drops a member reached only via
+       reflection (which would surface as a MissingMethod/TypeLoad crash ONLY in the shipped
+       Release/AOT build, not in Debug). Guards against the SuppressTrimAnalysisWarnings blind spot. -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="Renci.SshNet" />
+    <TrimmerRootAssembly Include="DnsClient" />
   </ItemGroup>
 
   <ItemGroup>

@@ -67,6 +67,16 @@ public partial class TgViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task CopyResponse()
+    {
+        if (!string.IsNullOrWhiteSpace(ResponseLog))
+            await ClipboardHelper.SetTextAsync(ResponseLog);
+    }
+
+    [RelayCommand]
+    private void ClearResponse() => ResponseLog = string.Empty;
+
+    [RelayCommand]
     private async Task ExecuteTg()
     {
         if (string.IsNullOrWhiteSpace(BotToken) || IsBusy) return;

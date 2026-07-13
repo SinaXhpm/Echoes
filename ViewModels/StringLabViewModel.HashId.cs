@@ -22,6 +22,7 @@ public partial class StringLabViewModel
             if (string.IsNullOrEmpty(h)) return;
 
             var candidates = new List<string>();
+            bool isHex = Regex.IsMatch(h, "^[0-9a-fA-F]+$");   // computed once, reused for the branch + charset label
 
             // Prefixed / structured formats first
             if (h.StartsWith("$2a$") || h.StartsWith("$2b$") || h.StartsWith("$2y$")) candidates.Add("bcrypt");
@@ -31,7 +32,7 @@ public partial class StringLabViewModel
             else if (h.StartsWith("$argon2")) candidates.Add("Argon2");
             else if (h.StartsWith("$pbkdf2")) candidates.Add("PBKDF2");
             else if (Regex.IsMatch(h, @"^eyJ[A-Za-z0-9_-]+\.")) candidates.Add("JWT (JSON Web Token)");
-            else if (Regex.IsMatch(h, "^[0-9a-fA-F]+$"))
+            else if (isHex)
             {
                 switch (h.Length)
                 {
@@ -53,7 +54,7 @@ public partial class StringLabViewModel
 
             var sb = new StringBuilder();
             Row2(sb, "Length", h.Length.ToString());
-            Row2(sb, "Charset", Regex.IsMatch(h, "^[0-9a-fA-F]+$") ? "hex" : "mixed");
+            Row2(sb, "Charset", isHex ? "hex" : "mixed");
             sb.AppendLine();
             sb.AppendLine("Possible types:");
             foreach (var c in candidates) sb.AppendLine("  • " + c);

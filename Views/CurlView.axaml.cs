@@ -10,14 +10,8 @@ namespace Echoes.Views
         public CurlView()
         {
             InitializeComponent();
-            //DataContextChanged += (s, e) =>
-            //{
-            //    if (DataContext is CurlViewModel vm)
-            //    {
-            //        vm.PropertyChanged += Vm_PropertyChanged;
-            //    }
-            //};
         }
+        // NIC list refresh is driven by MainView's tab SelectionChanged (deterministic).
 
         //private void Vm_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         //{

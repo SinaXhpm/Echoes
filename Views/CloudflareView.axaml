@@ -4,32 +4,90 @@
              x:Class="Echoes.Views.CloudflareView"
              x:DataType="vm:CloudflareViewModel">
 
-    <Grid RowDefinitions="Auto, Auto, Auto, *, Auto, Auto" Margin="12">
+    <Panel>
 
-        <!-- Auth (proxy checkbox merged into this row) -->
+      <!-- Lock screen (master password). MaxWidth (not fixed Width) so it fits a narrow phone. -->
+      <Border IsVisible="{Binding IsLocked}" VerticalAlignment="Center" HorizontalAlignment="Stretch"
+              MaxWidth="340" Margin="16,0" Padding="20" Background="#191A1F" CornerRadius="8" BorderBrush="#2F3139" BorderThickness="1">
+          <StackPanel Spacing="12">
+              <TextBlock Text="CLOUDFLARE — ENCRYPTED" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#ECECEF"/>
+              <TextBlock IsVisible="{Binding HasVault}" TextWrapping="Wrap" TextAlignment="Center" FontSize="10" Foreground="#9E9FA8"
+                         Text="Enter your master password to unlock your saved profiles."/>
+              <TextBlock IsVisible="{Binding !HasVault}" TextWrapping="Wrap" TextAlignment="Center" FontSize="10" Foreground="#9E9FA8"
+                         Text="First time: set a master password to encrypt your Cloudflare tokens. It can't be recovered if lost."/>
+              <TextBox Classes="field" Text="{Binding MasterKey}" PasswordChar="*" PlaceholderText="Master password...">
+                  <TextBox.KeyBindings>
+                      <KeyBinding Command="{Binding UnlockCommand}" Gesture="Enter"/>
+                  </TextBox.KeyBindings>
+              </TextBox>
+              <Button Classes="primary" Command="{Binding UnlockCommand}" Content="UNLOCK" HorizontalAlignment="Stretch"/>
+              <TextBlock Text="{Binding UnlockError}" Foreground="#E5484D" FontSize="10" HorizontalAlignment="Center"/>
+          </StackPanel>
+      </Border>
+
+      <Grid IsVisible="{Binding !IsLocked}" RowDefinitions="Auto, Auto, Auto, *, Auto" Margin="12">
+
+        <!-- Profiles + Auth -->
         <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,8">
-            <Grid ColumnDefinitions="Auto, Auto, *">
-                <CheckBox Grid.Column="0" IsChecked="{Binding UseProxy}" Content="Proxy"
-                          FontSize="11" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <ToggleSwitch Grid.Column="1" IsChecked="{Binding UseApiToken}"
+
+            <!-- Profile switcher: pick / rename / add / delete / lock -->
+            <Grid ColumnDefinitions="*, 150, Auto, Auto, Auto">
+                <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}"
+                          PlaceholderText="Profile" HorizontalAlignment="Stretch" Margin="0,0,6,0">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CfProfile"><TextBlock Text="{Binding Name}"/></DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBox Grid.Column="1" Classes="field" Text="{Binding SelectedProfile.Name}" PlaceholderText="Profile name" Margin="0,0,6,0"/>
+                <Button Grid.Column="2" Classes="ghost" Content="+ NEW" Command="{Binding AddProfileCommand}" Padding="12,0" Margin="0,0,6,0"/>
+                <Button Grid.Column="3" Classes="ghost" Content="DELETE" Command="{Binding DeleteProfileCommand}" Padding="12,0" Margin="0,0,6,0"/>
+                <Button Grid.Column="4" Classes="ghost" Content="🔒 LOCK" Command="{Binding LockAppCommand}" Padding="12,0"/>
+            </Grid>
+
+            <Grid ColumnDefinitions="Auto, Auto, Auto, *">
+                <CheckBox Grid.Column="0" IsChecked="{Binding SelectedProfile.UseProxy}" Content="Proxy"
+                          FontSize="11" Foreground="#ECECEF" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding SelectedProfile.UseApiToken}"
                               OnContent="Token" OffContent="Key+Email"
                               FontSize="11" MinWidth="0" VerticalAlignment="Center"/>
 
-                <TextBox Grid.Column="2" Classes="field" Text="{Binding ApiToken}" PasswordChar="●"
-                         Watermark="Paste your API token" Margin="10,0,0,0" IsVisible="{Binding UseApiToken}"/>
-                <Grid Grid.Column="2" ColumnDefinitions="*, *" Margin="10,0,0,0" IsVisible="{Binding !UseApiToken}">
-                    <TextBox Grid.Column="0" Classes="field" Text="{Binding ApiEmail}" Watermark="Account email" Margin="0,0,4,0"/>
-                    <TextBox Grid.Column="1" Classes="field" Text="{Binding ApiKey}" PasswordChar="●" Watermark="Global API key" Margin="4,0,0,0"/>
+                <!-- Help: which token to create -->
+                <Button Grid.Column="2" Width="22" Height="22" Padding="0" Margin="10,0,0,0"
+                        VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                        Background="#2042B883" Foreground="#42B883" BorderThickness="0" CornerRadius="11"
+                        ToolTip.Tip="Which API token do I need?">
+                    <TextBlock Text="?" FontWeight="Bold" FontSize="12" LineHeight="12"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"/>
+                    <Button.Flyout>
+                        <Flyout Placement="Bottom">
+                            <Border MaxWidth="340" Padding="6">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Which API token?" FontWeight="Bold" Foreground="#ECECEF" FontSize="12"/>
+                                    <TextBlock TextWrapping="Wrap" Foreground="#C7C8CF" FontSize="11" LineHeight="16"
+                                               Text="Create a ZONE token (not an account-only one):&#10;1) Cloudflare dashboard → My Profile → API Tokens → Create Token&#10;2) Use the &quot;Edit zone DNS&quot; template&#10;3) Permissions:  Zone → Zone : Read   AND   Zone → DNS : Edit&#10;4) Zone Resources:  Include → All zones (or pick yours)&#10;&#10;Tokens without these zone permissions return auth error (code 10000 / 9109)."/>
+                                    <TextBlock Text="Key+Email mode uses the Global API Key (full access) — less safe; prefer a scoped token."
+                                               TextWrapping="Wrap" Foreground="#9E9FA8" FontSize="10" FontStyle="Italic"/>
+                                </StackPanel>
+                            </Border>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+
+                <TextBox Grid.Column="3" Classes="field" Text="{Binding SelectedProfile.ApiToken}" PasswordChar="●"
+                         PlaceholderText="Paste your API token" Margin="8,0,0,0" IsVisible="{Binding SelectedProfile.UseApiToken}"/>
+                <Grid Grid.Column="3" ColumnDefinitions="*, *" Margin="8,0,0,0" IsVisible="{Binding !SelectedProfile.UseApiToken}">
+                    <TextBox Grid.Column="0" Classes="field" Text="{Binding SelectedProfile.ApiEmail}" PlaceholderText="Account email" Margin="0,0,4,0"/>
+                    <TextBox Grid.Column="1" Classes="field" Text="{Binding SelectedProfile.ApiKey}" PasswordChar="●" PlaceholderText="Global API key" Margin="4,0,0,0"/>
                 </Grid>
             </Grid>
 
             <!-- proxy fields appear only when Proxy is enabled -->
-            <Grid ColumnDefinitions="*, 120, 120" IsVisible="{Binding UseProxy}">
-                <AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding ProxyAddress}"
+            <Grid ColumnDefinitions="*, 120, 120" IsVisible="{Binding SelectedProfile.UseProxy}">
+                <AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding SelectedProfile.ProxyAddress}"
                          ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                         Watermark="host:port (e.g. 127.0.0.1:1080)"/>
-                <TextBox Grid.Column="1" Classes="field" Text="{Binding ProxyUser}" Watermark="User" Margin="6,0,0,0"/>
-                <TextBox Grid.Column="2" Classes="field" Text="{Binding ProxyPass}" PasswordChar="*" Watermark="Pass" Margin="6,0,0,0"/>
+                         PlaceholderText="host:port (e.g. 127.0.0.1:1080)"/>
+                <TextBox Grid.Column="1" Classes="field" Text="{Binding SelectedProfile.ProxyUser}" PlaceholderText="User" Margin="6,0,0,0"/>
+                <TextBox Grid.Column="2" Classes="field" Text="{Binding SelectedProfile.ProxyPass}" PasswordChar="*" PlaceholderText="Pass" Margin="6,0,0,0"/>
             </Grid>
         </StackPanel>
 
@@ -67,8 +125,8 @@
                             <Border Grid.Column="0" Background="#2042B883" CornerRadius="4" Padding="4,1" HorizontalAlignment="Left" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Type}" FontSize="10" FontWeight="Bold" Foreground="#42B883"/>
                             </Border>
-                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="11.5" Foreground="White" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="6,0"/>
-                            <TextBlock Grid.Column="2" Text="{Binding Content}" FontSize="11" Foreground="#9FE7C8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontFamily="Cascadia Code,Consolas" Margin="6,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="11.5" Foreground="#ECECEF" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="6,0"/>
+                            <TextBlock Grid.Column="2" Text="{Binding Content}" FontSize="11" Foreground="#4FCB97" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontFamily="Cascadia Code,Consolas" Margin="6,0"/>
                             <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
                                 <TextBlock Text="{Binding ProxiedText}" FontSize="9" FontWeight="Bold" VerticalAlignment="Center"
                                            Foreground="#F6821F" IsVisible="{Binding Proxied}"/>
@@ -80,44 +138,49 @@
             </ListBox>
         </Border>
 
-        <!-- Record editor — only visible after ADD / EDIT -->
-        <Border Grid.Row="4" Classes="card" Padding="10" Margin="0,8,0,0" IsVisible="{Binding IsEditorOpen}">
-            <StackPanel Spacing="8">
-                <TextBlock Classes="cardHeader" Text="RECORD EDITOR" Margin="2,0,0,0"/>
-                <Grid ColumnDefinitions="110, *">
-                    <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding RecordTypes}" SelectedItem="{Binding EditType}" Margin="0,0,8,0"/>
-                    <TextBox Grid.Column="1" Classes="field" Text="{Binding EditName}" Watermark="Name (e.g. www or sub.example.com or @)"/>
-                </Grid>
-                <TextBox Classes="field" Text="{Binding EditContent}" Watermark="Content (IPv4 / IPv6 / target / text)"/>
-                <Grid ColumnDefinitions="Auto, 80, Auto, 80, *, Auto">
-                    <TextBlock Grid.Column="0" Text="TTL" VerticalAlignment="Center" FontSize="10" Opacity="0.5" Margin="0,0,6,0"/>
-                    <TextBox Grid.Column="1" Classes="field" Text="{Binding EditTtl}" HorizontalContentAlignment="Center" ToolTip.Tip="1 = automatic"/>
-                    <TextBlock Grid.Column="2" Text="Prio" VerticalAlignment="Center" FontSize="10" Opacity="0.5" Margin="12,0,6,0"/>
-                    <TextBox Grid.Column="3" Classes="field" Text="{Binding EditPriority}" HorizontalContentAlignment="Center" ToolTip.Tip="MX priority"/>
-                    <CheckBox Grid.Column="5" IsChecked="{Binding EditProxied}" Content="Proxied"
-                              FontSize="11.5" Foreground="#F6821F" FontWeight="SemiBold" VerticalAlignment="Center"
-                              ToolTip.Tip="Orange cloud (A/AAAA/CNAME only)"/>
-                </Grid>
-                <Grid ColumnDefinitions="*, *, *">
-                    <Button Grid.Column="0" Classes="ghost" Content="CANCEL" Command="{Binding CancelEditCommand}" Margin="0,0,4,0" HorizontalAlignment="Stretch"/>
-                    <Button Grid.Column="1" Classes="primary" Content="SAVE" Command="{Binding SaveRecordCommand}" IsEnabled="{Binding !IsBusy}" Margin="4,0,4,0" HorizontalAlignment="Stretch"/>
-                    <Button Grid.Column="2" Content="DELETE" Command="{Binding DeleteRecordCommand}" IsEnabled="{Binding !IsBusy}" Margin="4,0,0,0"
-                            HorizontalAlignment="Stretch" Height="34" CornerRadius="8" Foreground="White" FontWeight="Bold" FontSize="12"
-                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Background="#C0392B">
-                        <Button.Styles>
-                            <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                <Setter Property="Background" Value="#E74C3C"/>
-                                <Setter Property="Foreground" Value="White"/>
-                            </Style>
-                        </Button.Styles>
-                    </Button>
-                </Grid>
-            </StackPanel>
-        </Border>
-
         <!-- Status -->
-        <Border Grid.Row="5" Margin="0,8,0,0" Padding="10,6" Background="#2AFFFFFF" CornerRadius="8" BorderThickness="1" BorderBrush="#40FFFFFF">
-            <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="White" TextWrapping="Wrap"/>
+        <Border Grid.Row="4" Margin="0,8,0,0" Padding="10,6" Background="#121317" CornerRadius="8" BorderThickness="1" BorderBrush="#2A2C33">
+            <TextBlock Text="{Binding StatusMessage}" FontSize="11" Foreground="#C7C8CF" TextWrapping="Wrap"/>
         </Border>
-    </Grid>
+      </Grid>
+
+      <!-- Record editor — modal overlay (floats over the tab, keeps the window height fixed) -->
+      <Border IsVisible="{Binding IsEditorOpen}" Background="#AA000000">
+          <Border Classes="card" Background="#191A1F" Padding="16" Margin="20"
+                  MaxWidth="440" CornerRadius="10" BorderBrush="#2F3139" BorderThickness="1"
+                  VerticalAlignment="Center" HorizontalAlignment="Center">
+              <StackPanel Spacing="10">
+                  <TextBlock Classes="cardHeader" Text="RECORD EDITOR" Margin="2,0,0,0"/>
+                  <Grid ColumnDefinitions="110, *">
+                      <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding RecordTypes}" SelectedItem="{Binding EditType}" Margin="0,0,8,0"/>
+                      <TextBox Grid.Column="1" Classes="field" Text="{Binding EditName}" PlaceholderText="Name (e.g. www or sub.example.com or @)"/>
+                  </Grid>
+                  <TextBox Classes="field" Text="{Binding EditContent}" PlaceholderText="Content (IPv4 / IPv6 / target / text)"/>
+                  <Grid ColumnDefinitions="Auto, 80, Auto, 80, *, Auto">
+                      <TextBlock Grid.Column="0" Text="TTL" VerticalAlignment="Center" FontSize="10" Opacity="0.5" Margin="0,0,6,0"/>
+                      <TextBox Grid.Column="1" Classes="field" Text="{Binding EditTtl}" HorizontalContentAlignment="Center" ToolTip.Tip="1 = automatic"/>
+                      <TextBlock Grid.Column="2" Text="Prio" VerticalAlignment="Center" FontSize="10" Opacity="0.5" Margin="12,0,6,0"/>
+                      <TextBox Grid.Column="3" Classes="field" Text="{Binding EditPriority}" HorizontalContentAlignment="Center" ToolTip.Tip="MX priority"/>
+                      <CheckBox Grid.Column="5" IsChecked="{Binding EditProxied}" Content="Proxied"
+                                FontSize="11.5" Foreground="#F6821F" FontWeight="SemiBold" VerticalAlignment="Center"
+                                ToolTip.Tip="Orange cloud (A/AAAA/CNAME only)"/>
+                  </Grid>
+                  <Grid ColumnDefinitions="*, *, *">
+                      <Button Grid.Column="0" Classes="ghost" Content="CANCEL" Command="{Binding CancelEditCommand}" Margin="0,0,4,0" HorizontalAlignment="Stretch"/>
+                      <Button Grid.Column="1" Classes="primary" Content="SAVE" Command="{Binding SaveRecordCommand}" IsEnabled="{Binding !IsBusy}" Margin="4,0,4,0" HorizontalAlignment="Stretch"/>
+                      <Button Grid.Column="2" Content="DELETE" Command="{Binding DeleteRecordCommand}" IsEnabled="{Binding !IsBusy}" Margin="4,0,0,0"
+                              HorizontalAlignment="Stretch" Height="34" CornerRadius="8" Foreground="#ECECEF" FontWeight="Bold" FontSize="12"
+                              HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Background="#E5484D">
+                          <Button.Styles>
+                              <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                  <Setter Property="Background" Value="#E5484D"/>
+                                  <Setter Property="Foreground" Value="#ECECEF"/>
+                              </Style>
+                          </Button.Styles>
+                      </Button>
+                  </Grid>
+              </StackPanel>
+          </Border>
+      </Border>
+    </Panel>
 </UserControl>

@@ -39,8 +39,8 @@ public partial class StringLabViewModel
                 case "reverse": EditInput = string.Join(Environment.NewLine, lines.AsEnumerable().Reverse()); break;
                 case "trim": EditInput = EditInput.Trim(); break;
                 case "clean": EditInput = string.Join(Environment.NewLine, lines.Where(l => !string.IsNullOrWhiteSpace(l)).Select(l => l.Trim())); break;
-                case "upper": EditInput = EditInput.ToUpper(); break;
-                case "lower": EditInput = EditInput.ToLower(); break;
+                case "upper": EditInput = EditInput.ToUpperInvariant(); break;
+                case "lower": EditInput = EditInput.ToLowerInvariant(); break;
             }
         }
         catch (Exception ex) { ErrorMessage = ex.Message; }

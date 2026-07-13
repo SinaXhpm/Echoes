@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.NetworkInformation;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
@@ -20,10 +21,20 @@ using Echoes.Helpers;
 
 namespace Echoes.ViewModels;
 
+/// <summary>A selectable outgoing network interface. Ip == null means "Auto" (let the OS route).</summary>
+public sealed record NicOption(string Display, string? Ip)
+{
+    public override string ToString() => Display;
+}
+
 public partial class CurlViewModel : ObservableObject
 {
     private Process? _currentProcess;
     private CancellationTokenSource? _dotNetCts;
+    // Generation token so only the latest TLS-diagnostic task may write SslLog.
+    // Prevents a slow, fire-and-forget cert probe from an earlier run overwriting
+    // the SSL INFO tab after a newer run cleared it (the "SSL doesn't clear" bug).
+    private int _sslGen;
 
     [ObservableProperty] private string _url = "https://";
     [ObservableProperty] private string _overrideIp = string.Empty;
@@ -33,10 +44,36 @@ public partial class CurlViewModel : ObservableObject
     [ObservableProperty] private string _customFlags = string.Empty;
     [ObservableProperty] private bool _skipSslVerify;
 
+    // Structured request builder (REQUEST section). Headers = one "Key: Value" per line; Body = raw
+    // payload for POST/PUT/PATCH. Timeout + FollowRedirects fold into the command for both engines.
+    [ObservableProperty] private string _requestHeaders = string.Empty;
+    [ObservableProperty] private string _requestBody = string.Empty;
+    [ObservableProperty] private int _timeoutSec = 30;
+    [ObservableProperty] private bool _followRedirects = true;
+
+    // Outer REQUEST(0)/RESPONSE(1) section selector — defaults to RESPONSE, auto-jumps there after a run.
+    [ObservableProperty] private int _sectionIndex = 1;
+
+    // Full (uncapped) response body — RawBody shown in the UI is capped for smoothness; this backs
+    // the "save response" button so the complete source is written to disk without lagging the UI.
+    private string _rawBodyFull = string.Empty;
+    public string RawBodyFull => _rawBodyFull;
+
     [ObservableProperty] private string _rawBody = string.Empty;
     [ObservableProperty] private string _sslLog = string.Empty;
     [ObservableProperty] private string _headersLog = string.Empty;
     [ObservableProperty] private string _fullLog = string.Empty;
+
+    // Rendered "web" view (Curl → WEB tab). The NativeWebView navigates to this URL, so it shows the
+    // live page for the request. Set automatically after each run.
+    [ObservableProperty] private Uri? _webViewSource;
+
+    // Live request timer + response size, shown atop the WEB tab. The timer counts up while the
+    // request is in flight (DispatcherTimer), then freezes at the final elapsed time.
+    [ObservableProperty] private string _requestTimeText = "—";
+    [ObservableProperty] private string _responseSizeText = "—";
+    private readonly Stopwatch _reqSw = new();
+    private Avalonia.Threading.DispatcherTimer? _reqTimer;
 
     [ObservableProperty] private string _htmlPath = "about:blank";
     [ObservableProperty] private bool _isWorking;
@@ -44,6 +81,52 @@ public partial class CurlViewModel : ObservableObject
     [ObservableProperty] private bool _useDotNetEngine;
     [ObservableProperty] private string _httpMethod = "GET";
     [ObservableProperty] private bool _useProxy;
+
+    [ObservableProperty] private bool _wrapRawBody;
+    // Drives the RAW BODY pane's TextWrapping (overrides the read-only NoWrap style).
+    public Avalonia.Media.TextWrapping RawBodyWrapping
+        => WrapRawBody ? Avalonia.Media.TextWrapping.Wrap : Avalonia.Media.TextWrapping.NoWrap;
+    partial void OnWrapRawBodyChanged(bool value) => OnPropertyChanged(nameof(RawBodyWrapping));
+
+    // Outgoing network interface (source IP binding). Auto = let the OS route.
+    [ObservableProperty] private List<NicOption> _interfaces = new();
+    [ObservableProperty] private NicOption? _selectedInterface;
+    private string? SelectedNicIp => SelectedInterface?.Ip;
+
+    partial void OnSelectedInterfaceChanged(NicOption? value)
+    {
+        if (_loaded) Echoes.Helpers.ProfileService.Instance.SetSetting("curl.nicIp", value?.Ip ?? string.Empty);
+        UpdateCommand();
+    }
+
+    // Re-enumerate NICs (e.g. when the cURL tab becomes visible) so newly up/down
+    // interfaces appear; keeps the current selection if it still exists.
+    public void RefreshInterfaces() => LoadInterfaces();
+
+    private void LoadInterfaces()
+    {
+        var list = new List<NicOption> { new("Auto (default route)", null) };
+        try
+        {
+            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up) continue;
+                if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+                foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+                {
+                    var a = ua.Address;
+                    if (a.AddressFamily != AddressFamily.InterNetwork && a.AddressFamily != AddressFamily.InterNetworkV6) continue;
+                    if (a.IsIPv6LinkLocal || a.IsIPv6Multicast) continue;   // skip fe80::/link-local noise
+                    list.Add(new NicOption($"{ni.Name} — {a}", a.ToString()));
+                }
+            }
+        }
+        catch { }
+
+        Interfaces = list;
+        string? savedIp = Echoes.Helpers.ProfileService.Instance.GetSetting("curl.nicIp");
+        SelectedInterface = (!string.IsNullOrEmpty(savedIp) ? list.FirstOrDefault(n => n.Ip == savedIp) : null) ?? list[0];
+    }
 
     public List<string> HttpMethods { get; } = new() { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS" };
 
@@ -54,7 +137,7 @@ public partial class CurlViewModel : ObservableObject
 
     private bool _loaded;
     private static readonly System.Collections.Generic.HashSet<string> PersistProps = new()
-    { "Url", "OverrideIp", "Proxy", "ProxyUser", "ProxyPass", "CustomFlags", "SkipSslVerify", "UseDotNetEngine", "HttpMethod", "UseProxy" };
+    { "Url", "OverrideIp", "Proxy", "ProxyUser", "ProxyPass", "CustomFlags", "SkipSslVerify", "UseDotNetEngine", "HttpMethod", "UseProxy", "WrapRawBody" };
 
     public CurlViewModel()
     {
@@ -69,6 +152,8 @@ public partial class CurlViewModel : ObservableObject
         UseDotNetEngine = ps.GetBool("curl.useDotNet");
         HttpMethod = ps.GetSetting("curl.method") ?? "GET";
         UseProxy = ps.GetBool("curl.useProxy");
+        WrapRawBody = ps.GetBool("curl.wrapRawBody");
+        LoadInterfaces();
         _loaded = true;
     }
 
@@ -80,7 +165,8 @@ public partial class CurlViewModel : ObservableObject
                 ("curl.url", Url), ("curl.overrideIp", OverrideIp), ("curl.proxy", Proxy),
                 ("curl.proxyUser", ProxyUser), ("curl.proxyPass", ProxyPass), ("curl.flags", CustomFlags),
                 ("curl.skipSsl", SkipSslVerify ? "true" : "false"), ("curl.useDotNet", UseDotNetEngine ? "true" : "false"),
-                ("curl.method", HttpMethod), ("curl.useProxy", UseProxy ? "true" : "false"));
+                ("curl.method", HttpMethod), ("curl.useProxy", UseProxy ? "true" : "false"),
+                ("curl.wrapRawBody", WrapRawBody ? "true" : "false"));
     }
 
     partial void OnUrlChanged(string value) => UpdateCommand();
@@ -89,13 +175,26 @@ public partial class CurlViewModel : ObservableObject
     partial void OnProxyUserChanged(string value) => UpdateCommand();
     partial void OnProxyPassChanged(string value) => UpdateCommand();
     partial void OnSkipSslVerifyChanged(bool value) => UpdateCommand();
+    partial void OnRequestHeadersChanged(string value) => UpdateCommand();
+    partial void OnTimeoutSecChanged(int value) => UpdateCommand();
+    partial void OnFollowRedirectsChanged(bool value) => UpdateCommand();
 
     private void UpdateCommand()
     {
-        var args = new List<string> { "-v", "-s", "-L" };
+        var args = new List<string> { "-v", "-s" };
+        if (FollowRedirects) args.Add("-L");
+        if (TimeoutSec > 0) args.Add($"--max-time {TimeoutSec}");
 
         if (!string.IsNullOrEmpty(HttpMethod) && HttpMethod != "GET") args.Add($"-X {HttpMethod}");
         if (SkipSslVerify) args.Add("-k");
+
+        // structured request headers (one "Key: Value" per line)
+        foreach (var h in RequestHeaders.Split('\n'))
+        {
+            var line = h.Trim().TrimEnd('\r');
+            if (line.Length > 0) args.Add($"-H \"{line.Replace("\"", "\\\"")}\"");
+        }
+        if (!string.IsNullOrEmpty(SelectedNicIp)) args.Add($"--interface {SelectedNicIp}");
         if (!string.IsNullOrWhiteSpace(Proxy))
         {
             args.Add($"-x \"{Proxy}\"");
@@ -127,7 +226,11 @@ public partial class CurlViewModel : ObservableObject
             if (targetPort == urlPort)
                 args.Add($"--resolve \"{uri.Host}:{urlPort}:{ipPart}\"");
             else
-                args.Add($"--connect-to \"{uri.Host}:{urlPort}:{ipPart}:{targetPort}\"");
+            {
+                // curl needs an IPv6 literal bracketed in the --connect-to host2 field.
+                string h2 = ipPart.Contains(':') ? $"[{ipPart}]" : ipPart;
+                args.Add($"--connect-to \"{uri.Host}:{urlPort}:{h2}:{targetPort}\"");
+            }
         }
 
         args.Add($"\"{Url}\"");
@@ -138,6 +241,7 @@ public partial class CurlViewModel : ObservableObject
     private void StopCurl()
     {
         IsWorking = false;
+        _sslGen++;   // invalidate any in-flight TLS probe so its late write is ignored
         try { _dotNetCts?.Cancel(); } catch { }
         try
         {
@@ -147,20 +251,26 @@ public partial class CurlViewModel : ObservableObject
             }
         }
         catch { }
+        _currentProcess?.Dispose();   // release the OS handle now instead of leaving it for the finalizer
         _currentProcess = null;
     }
 
-    private async Task GetCertificateDetails(string url)
+    private async Task GetCertificateDetails(string url, int gen)
     {
+        // Only write if this is still the current run (guards against stale races).
+        void SetSsl(string text) { if (gen == _sslGen) SslLog = text; }
+
         try
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return;
-            if (uri.Scheme != Uri.UriSchemeHttps) { SslLog = "  Not an HTTPS URL — no TLS certificate to inspect."; return; }
+            if (uri.Scheme != Uri.UriSchemeHttps) { SetSsl("  Not an HTTPS URL — no TLS certificate to inspect."); return; }
 
             int port = uri.Port > 0 ? uri.Port : 443;
 
+            // Bounded: never hang the SSL probe on an unreachable host.
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             using var client = new TcpClient();
-            await client.ConnectAsync(uri.Host, port);
+            await client.ConnectAsync(uri.Host, port, cts.Token);
 
             var policyErrors = SslPolicyErrors.None;
             using var sslStream = new SslStream(client.GetStream(), false,
@@ -175,7 +285,7 @@ public partial class CurlViewModel : ObservableObject
                     SslApplicationProtocol.Http11
                 }
             };
-            await sslStream.AuthenticateAsClientAsync(sslOptions);
+            await sslStream.AuthenticateAsClientAsync(sslOptions, cts.Token);
 
             var sb = new StringBuilder();
 
@@ -218,11 +328,15 @@ public partial class CurlViewModel : ObservableObject
                 AppendChain(sb, cert, policyErrors);
             }
 
-            SslLog = TextLimit.Cap(sb.ToString().TrimStart('\r', '\n'));
+            SetSsl(TextLimit.Cap(sb.ToString().TrimStart('\r', '\n')));
+        }
+        catch (OperationCanceledException)
+        {
+            SetSsl("  TLS Diagnostic: connection timed out.");
         }
         catch (Exception ex)
         {
-            SslLog = $"  TLS Diagnostic Error: {ex.Message}{Environment.NewLine}";
+            SetSsl($"  TLS Diagnostic Error: {ex.Message}{Environment.NewLine}");
         }
     }
 
@@ -373,12 +487,16 @@ public partial class CurlViewModel : ObservableObject
 
         RawBody = SslLog = HeadersLog = FullLog = string.Empty;
 
-        _ = GetCertificateDetails(Url);
+        _ = GetCertificateDetails(Url, ++_sslGen);
 
         // -v is required for the verbose parser; it's normally already in CustomFlags, so don't duplicate it.
         string finalArgs = System.Text.RegularExpressions.Regex.IsMatch(CustomFlags, @"(^|\s)-v(\s|$)")
             ? CustomFlags
             : $"{CustomFlags} -v";
+
+        // Send the request body (if any) via stdin — robust for JSON/quotes/newlines, no shell quoting.
+        bool hasBody = !string.IsNullOrEmpty(RequestBody);
+        if (hasBody) finalArgs += " --data-binary @-";
 
         try
         {
@@ -388,6 +506,7 @@ public partial class CurlViewModel : ObservableObject
                 Arguments = finalArgs,
                 UseShellExecute = false,
                 CreateNoWindow = true,
+                RedirectStandardInput = hasBody,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 StandardOutputEncoding = Encoding.UTF8
@@ -397,6 +516,11 @@ public partial class CurlViewModel : ObservableObject
 
             if (_currentProcess != null)
             {
+                if (hasBody)
+                {
+                    await _currentProcess.StandardInput.WriteAsync(RequestBody);
+                    _currentProcess.StandardInput.Close();
+                }
                 var outputTask = _currentProcess.StandardOutput.ReadToEndAsync();
                 var errorTask = _currentProcess.StandardError.ReadToEndAsync();
 
@@ -404,7 +528,11 @@ public partial class CurlViewModel : ObservableObject
 
                 if (!IsWorking) return;
 
-                RawBody = TextLimit.Cap(outputTask.Result);
+                _rawBodyFull = outputTask.Result;
+                RawBody = TextLimit.Cap(outputTask.Result, 60_000);   // smaller cap keeps the UI smooth
+                SetWebView(Url);
+                SetResponseSize(outputTask.Result);
+                SectionIndex = 1;   // jump to the RESPONSE section
                 string stdErr = errorTask.Result;
 
                 await _currentProcess.WaitForExitAsync();
@@ -497,10 +625,53 @@ public partial class CurlViewModel : ObservableObject
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task ToggleCurl()
     {
-        if (IsWorking) StopCurl();
-        else if (UseDotNetEngine) await ExecuteDotNet();
-        else await ExecuteCurl();
+        if (IsWorking) { StopCurl(); return; }
+        StartRequestTimer();
+        try
+        {
+            if (UseDotNetEngine) await ExecuteDotNet();
+            else await ExecuteCurl();
+        }
+        finally { StopRequestTimer(); }
     }
+
+    // Point the WEB tab's NativeWebView at the current URL (also called after a run).
+    private void SetWebView(string? url)
+    {
+        if (Uri.TryCreate(url, UriKind.Absolute, out var u) &&
+            (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps))
+            WebViewSource = u;
+    }
+
+    // ---- request timer + response size (shown atop the WEB tab) ----
+
+    private void StartRequestTimer()
+    {
+        ResponseSizeText = "—";
+        RequestTimeText = "0 ms";
+        _reqSw.Restart();
+        _reqTimer ??= CreateReqTimer();
+        _reqTimer.Start();
+    }
+
+    private Avalonia.Threading.DispatcherTimer CreateReqTimer()
+    {
+        var t = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(66) };
+        t.Tick += (_, _) => RequestTimeText = FormatMs(_reqSw.ElapsedMilliseconds);
+        return t;
+    }
+
+    private void StopRequestTimer()
+    {
+        _reqTimer?.Stop();
+        _reqSw.Stop();
+        RequestTimeText = FormatMs(_reqSw.ElapsedMilliseconds);
+    }
+
+    private void SetResponseSize(string? body)
+        => ResponseSizeText = FileHttpServer.HumanSize(Encoding.UTF8.GetByteCount(body ?? string.Empty));
+
+    private static string FormatMs(long ms) => ms < 1000 ? $"{ms} ms" : $"{ms / 1000.0:0.00} s";
 
     private async Task ExecuteDotNet()
     {
@@ -516,10 +687,13 @@ public partial class CurlViewModel : ObservableObject
             return;
         }
 
+        // structured body from the REQUEST section (overrides any --data parsed from the flags)
+        if (!string.IsNullOrEmpty(RequestBody)) spec.Body = RequestBody;
+
         HistoryService.Instance.Add("curl.url", spec.Url);
         if (!string.IsNullOrWhiteSpace(spec.Proxy)) HistoryService.Instance.Add("curl.proxy", spec.Proxy);
 
-        _ = GetCertificateDetails(spec.Url);   // populates SSL INFO tab (cross-platform)
+        _ = GetCertificateDetails(spec.Url, ++_sslGen);   // populates SSL INFO tab (cross-platform)
 
         var handler = new SocketsHttpHandler
         {
@@ -540,23 +714,38 @@ public partial class CurlViewModel : ObservableObject
             handler.UseProxy = true;
         }
 
-        if (spec.Overrides.Count > 0)
+        IPAddress? bindIp = null;
+        if (!string.IsNullOrEmpty(SelectedNicIp)) IPAddress.TryParse(SelectedNicIp, out bindIp);
+
+        if (spec.Overrides.Count > 0 || bindIp != null)
         {
             // curl --resolve / --connect-to: dial the override IP but keep Host/SNI from the URL.
+            // --interface: bind the outgoing socket to the chosen NIC's source IP.
             handler.ConnectCallback = async (ctx, ct) =>
             {
                 string host = ctx.DnsEndPoint.Host;
                 string target = spec.Overrides.TryGetValue(host, out var ip) ? ip : host;
-                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-                try { await socket.ConnectAsync(target, ctx.DnsEndPoint.Port, ct); return new NetworkStream(socket, true); }
+
+                var family = bindIp?.AddressFamily ?? AddressFamily.InterNetworkV6;
+                var socket = new Socket(family, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+                if (bindIp == null) socket.DualMode = true;   // keep default dual-stack when not binding
+                try
+                {
+                    if (bindIp != null) socket.Bind(new IPEndPoint(bindIp, 0));
+                    await socket.ConnectAsync(target, ctx.DnsEndPoint.Port, ct);
+                    return new NetworkStream(socket, true);
+                }
                 catch { socket.Dispose(); throw; }
             };
         }
 
         try
         {
+            _dotNetCts?.Dispose();
             _dotNetCts = new CancellationTokenSource();
-            using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(100) };
+            // curl -m/--max-time bounds the whole operation (not just connect); default 100s.
+            int overallSec = spec.MaxTimeSec is > 0 ? spec.MaxTimeSec.Value : 100;
+            using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(overallSec) };
             using var req = new HttpRequestMessage(new HttpMethod(spec.Method), uri);
 
             if (spec.Body != null)
@@ -583,7 +772,11 @@ public partial class CurlViewModel : ObservableObject
 
             if (!IsWorking) return;
 
-            RawBody = TextLimit.Cap(body);
+            _rawBodyFull = body;
+            RawBody = TextLimit.Cap(body, 60_000);   // smaller cap keeps the UI smooth
+            SetWebView(spec.Url);
+            SetResponseSize(body);
+            SectionIndex = 1;   // jump to the RESPONSE section
             BuildDotNetLogs(spec, req, resp, sw.ElapsedMilliseconds);
         }
         catch (Exception ex)

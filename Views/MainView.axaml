@@ -5,35 +5,43 @@
              xmlns:chrome="using:Avalonia.Controls.Chrome"
              x:Class="Echoes.Views.MainView"
              x:DataType="vm:MainViewModel"
-             Background="#1e1e1e">
+             Background="#0F1012">
 
 	<Panel>
 		<Grid RowDefinitions="Auto, *, Auto">
 
 			<Border Grid.Row="0" Background="Transparent"
 					chrome:WindowDecorationProperties.ElementRole="TitleBar">
-				<StackPanel Orientation="Horizontal" Margin="15,12,15,5" Spacing="8">
+				<StackPanel Orientation="Horizontal" Margin="16,12,15,7" Spacing="8" VerticalAlignment="Center">
 					<Border Width="80" IsVisible="{Binding IsMac}"/>
+					<Border Width="9" Height="9" CornerRadius="2.5" Background="#42B883" VerticalAlignment="Center"/>
 					<TextBlock Text="Echoes"
-							   FontSize="20"
-							   FontWeight="Black"
-							   Foreground="White"
-							   Opacity="0.9"
-							   LetterSpacing="-0.5"/>
+							   FontSize="15"
+							   FontWeight="Bold"
+							   Foreground="#E7E7EA"
+							   LetterSpacing="-0.3"
+							   VerticalAlignment="Center"/>
 				</StackPanel>
 			</Border>
 
-			<TabControl Grid.Row="1" Margin="8,0,8,4" TabStripPlacement="Left">
+			<TabControl Grid.Row="1" Margin="8,0,8,4" TabStripPlacement="Left"
+						x:Name="MainTabs" SelectionChanged="OnTabSelectionChanged">
+				<!-- Single vertical column — never wrap tabs into a second column -->
+				<TabControl.ItemsPanel>
+					<ItemsPanelTemplate>
+						<StackPanel/>
+					</ItemsPanelTemplate>
+				</TabControl.ItemsPanel>
 				<TabControl.Styles>
-					<Style Selector="TabItem">
+					<Style Selector="TabItem.navtab">
 						<Setter Property="FontSize" Value="11.5"/>
-						<Setter Property="FontWeight" Value="SemiBold"/>
-						<Setter Property="Foreground" Value="#80FFFFFF"/>
+						<Setter Property="FontWeight" Value="Medium"/>
+						<Setter Property="Foreground" Value="#9E9FA8"/>
 						<Setter Property="Margin" Value="0,1"/>
-						<Setter Property="Padding" Value="14,0"/>
-						<Setter Property="Height" Value="32"/>
-						<Setter Property="MinHeight" Value="32"/>
-						<Setter Property="Width" Value="120"/>
+						<Setter Property="Padding" Value="12,0"/>
+						<Setter Property="Height" Value="27"/>
+						<Setter Property="MinHeight" Value="27"/>
+						<Setter Property="Width" Value="118"/>
 						<Setter Property="CornerRadius" Value="6"/>
 						<Setter Property="HorizontalContentAlignment" Value="Left"/>
 						<Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -41,7 +49,7 @@
 
 					<!-- Paint our own background on the template root so the theme's
 					     default hover/selected brushes don't override it. -->
-					<Style Selector="TabItem /template/ Border#PART_LayoutRoot">
+					<Style Selector="TabItem.navtab /template/ Border#PART_LayoutRoot">
 						<Setter Property="Background" Value="Transparent"/>
 						<Setter Property="CornerRadius" Value="6"/>
 						<Setter Property="Transitions">
@@ -51,53 +59,57 @@
 						</Setter>
 					</Style>
 
-					<!-- Hover (non-selected): clear, brighter fill + brighter text -->
-					<Style Selector="TabItem:pointerover /template/ Border#PART_LayoutRoot">
-						<Setter Property="Background" Value="#1FFFFFFF"/>
+					<!-- Hover (non-selected): subtle neutral fill + brighter text -->
+					<Style Selector="TabItem.navtab:pointerover /template/ Border#PART_LayoutRoot">
+						<Setter Property="Background" Value="#12FFFFFF"/>
 					</Style>
-					<Style Selector="TabItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-						<Setter Property="Foreground" Value="#E6FFFFFF"/>
-					</Style>
-
-					<!-- Selected: green tint + white text -->
-					<Style Selector="TabItem:selected /template/ Border#PART_LayoutRoot">
-						<Setter Property="Background" Value="#2142B883"/>
-					</Style>
-					<Style Selector="TabItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-						<Setter Property="Foreground" Value="White"/>
+					<Style Selector="TabItem.navtab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+						<Setter Property="Foreground" Value="#D7D8DE"/>
 					</Style>
 
-					<!-- Selected + hover: brighter green so it stays distinguishable -->
-					<Style Selector="TabItem:selected:pointerover /template/ Border#PART_LayoutRoot">
-						<Setter Property="Background" Value="#3342B883"/>
+					<!-- Selected: neutral surface + accent-green text (Linear-style) -->
+					<Style Selector="TabItem.navtab:selected /template/ Border#PART_LayoutRoot">
+						<Setter Property="Background" Value="#2A2B33"/>
+					</Style>
+					<Style Selector="TabItem.navtab:selected /template/ ContentPresenter#PART_ContentPresenter">
+						<Setter Property="Foreground" Value="#55C795"/>
 					</Style>
 
-					<Style Selector="TabItem:selected /template/ Border#PART_SelectedPipe">
+					<Style Selector="TabItem.navtab:selected:pointerover /template/ Border#PART_LayoutRoot">
+						<Setter Property="Background" Value="#32333C"/>
+					</Style>
+
+					<Style Selector="TabItem.navtab:selected /template/ Border#PART_SelectedPipe">
 						<Setter Property="IsVisible" Value="False"/>
 					</Style>
 				</TabControl.Styles>
 
-				<TabItem Header="PING"><views:PingView DataContext="{Binding PingVM}"/></TabItem>
-				<TabItem Header="DNS"><views:DnsView DataContext="{Binding DnsVM}"/></TabItem>
-				<TabItem Header="SCANNER"><views:PortScannerView DataContext="{Binding PortScannerVM}"/></TabItem>
-				<TabItem Header="IP INFO"><views:IpInfoView DataContext="{Binding IpInfoVM}"/></TabItem>
-				<TabItem Header="NIC"><views:NetworkInfoView DataContext="{Binding NetworkVM}"/></TabItem>
-				<TabItem Header="CURL"><views:CurlView DataContext="{Binding CurlVM}"/></TabItem>
-				<TabItem Header="TELEGRAM BOT">
+				<!-- Ordered by importance -->
+				<TabItem Classes="navtab" Header="PING"><views:PingView DataContext="{Binding PingVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="DNS"><views:DnsView DataContext="{Binding DnsVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="CURL"><views:CurlView DataContext="{Binding CurlVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="IP INFO"><views:IpInfoView DataContext="{Binding IpInfoVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="CHECK-HOST"><views:CheckHostView DataContext="{Binding CheckHostVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="CLOUDFLARE"><views:CloudflareView DataContext="{Binding CloudflareVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="SCANNER"><views:PortScannerView DataContext="{Binding PortScannerVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="WEB SERVER"><views:WebServerView DataContext="{Binding WebServerVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="NIC"><views:NetworkInfoView DataContext="{Binding NetworkVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="MONITOR"><views:MonitorView DataContext="{Binding MonitorVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="SSH"><views:SshView DataContext="{Binding SshVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="TELEGRAM BOT">
 					<views:TgView>
 						<views:TgView.DataContext>
 							<vm:TgViewModel/>
 						</views:TgView.DataContext>
 					</views:TgView>
 				</TabItem>
-				<TabItem Header="MONITOR"><views:MonitorView DataContext="{Binding MonitorVM}"/></TabItem>
-				<TabItem Header="CLOUDFLARE"><views:CloudflareView DataContext="{Binding CloudflareVM}"/></TabItem>
-				<TabItem Header="SSH"><views:SshView DataContext="{Binding SshVM}"/></TabItem>
-				<TabItem Header="STRING LAB"><views:StringLabView DataContext="{Binding StringTool}"/></TabItem>
-				<TabItem Header="NOTES"><views:NoteView DataContext="{Binding NoteVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="STRING LAB"><views:StringLabView DataContext="{Binding StringTool}"/></TabItem>
+				<TabItem Classes="navtab" Header="NOTES"><views:NoteView DataContext="{Binding NoteVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="BACKUP"><views:BackupView DataContext="{Binding BackupVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="HISTORY"><views:HistoryView DataContext="{Binding HistoryVM}"/></TabItem>
 			</TabControl>
 
-			<Border Grid.Row="2" Height="24" Background="#10000000" BorderBrush="#10FFFFFF" BorderThickness="0,1,0,0">
+			<Border Grid.Row="2" Height="22" Background="#0C0D0F" BorderBrush="#1C1D22" BorderThickness="0,1,0,0">
 				<Grid ColumnDefinitions="*, Auto, Auto">
 
 					<StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0" Opacity="0.3">

@@ -25,6 +25,12 @@ public partial class MonitorTarget : ObservableObject
     [ObservableProperty] private string _uptime = "-";
     [ObservableProperty] private string _history = string.Empty; // recent status sparkline
 
+    // Which stat columns are shown — mirror of the VM's Check* toggles, so each row can collapse
+    // the PING/TCP/HTTP column (bound to a 0-width GridLength) when that check is off.
+    [ObservableProperty] private bool _showPing = true;
+    [ObservableProperty] private bool _showTcp = true;
+    [ObservableProperty] private bool _showHttp = true;
+
     public int TotalChecks;
     public int SuccessChecks;
     public string Host { get; set; } = string.Empty;
@@ -35,10 +41,16 @@ public partial class MonitorTarget : ObservableObject
 public partial class MonitorViewModel : ObservableObject
 {
     private CancellationTokenSource? _cts;
-    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(3) };
+    // Per-request timeout is enforced with a linked CTS (see RunHttp) so the user-set
+    // Timeout option controls it; keep the client itself un-timed.
+    private readonly HttpClient _httpClient = new() { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
+
+    private const int MaxTargets = 256;           // cap the watch list so a big paste can't fan out unbounded
+    private const int MaxConcurrentChecks = 50;   // per-cycle concurrency (each target still does ping+tcp+http)
 
     [ObservableProperty] private string _inputAddresses = "google.com\n1.1.1.1:53\nhttps://api.ipify.org";
     [ObservableProperty] private int _interval = 2;
+    [ObservableProperty] private int _timeoutMs = 2000;   // per-check timeout (ping / tcp connect / http)
     [ObservableProperty] private bool _isMonitoring;
     [ObservableProperty] private bool _checkPing = true;
     [ObservableProperty] private bool _checkTcp = true;
@@ -50,6 +62,11 @@ public partial class MonitorViewModel : ObservableObject
     {
         if (Helpers.HistoryService.Instance.Last("monitor.addresses") is { } a) InputAddresses = a;
     }
+
+    // Toggling a check live-collapses/expands its column on every row (header binds to Check* directly).
+    partial void OnCheckPingChanged(bool value) { foreach (var t in Targets) t.ShowPing = value; }
+    partial void OnCheckTcpChanged(bool value) { foreach (var t in Targets) t.ShowTcp = value; }
+    partial void OnCheckHttpChanged(bool value) { foreach (var t in Targets) t.ShowHttp = value; }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task ToggleMonitor()
@@ -68,12 +85,27 @@ public partial class MonitorViewModel : ObservableObject
         IsMonitoring = true;
         _cts = new CancellationTokenSource();
 
+        // Keep the process alive while monitoring so an Android background switch doesn't
+        // silently freeze the checks (no-op on desktop).
+        Helpers.BackgroundGuard.Acquire("Monitoring targets");
+
         try
         {
             while (!_cts.Token.IsCancellationRequested)
             {
-                var tasks = Targets.Select(t => UpdateTargetStatus(t, _cts.Token));
-                await Task.WhenAll(tasks);
+                // Throttle: at most MaxConcurrentChecks targets probed at once, so a large watch
+                // list can't spawn thousands of concurrent sockets and exhaust ports/handles.
+                using (var gate = new SemaphoreSlim(MaxConcurrentChecks))
+                {
+                    var token = _cts.Token;
+                    var tasks = Targets.Select(async t =>
+                    {
+                        await gate.WaitAsync(token);
+                        try { await UpdateTargetStatus(t, token); }
+                        finally { gate.Release(); }
+                    });
+                    await Task.WhenAll(tasks);
+                }
 
                 await Task.Delay(Math.Max(1, Interval) * 1000, _cts.Token);
             }
@@ -85,6 +117,7 @@ public partial class MonitorViewModel : ObservableObject
             IsMonitoring = false;
             _cts?.Dispose();
             _cts = null;
+            Helpers.BackgroundGuard.Release();
         }
     }
 
@@ -95,7 +128,8 @@ public partial class MonitorViewModel : ObservableObject
 
         foreach (var line in lines.Select(l => l.Trim()))
         {
-            var target = new MonitorTarget { Address = line };
+            if (Targets.Count >= MaxTargets) break;   // cap the watch list
+            var target = new MonitorTarget { Address = line, ShowPing = CheckPing, ShowTcp = CheckTcp, ShowHttp = CheckHttp };
             if (line.StartsWith("http"))
             {
                 target.HttpUrl = line;
@@ -175,7 +209,7 @@ public partial class MonitorViewModel : ObservableObject
         try
         {
             var addr = await Helpers.IcmpPinger.ResolveAsync(host, ct);
-            var r = await Helpers.IcmpPinger.SendAsync(addr, 2000, ct);
+            var r = await Helpers.IcmpPinger.SendAsync(addr, Math.Max(200, TimeoutMs), ct);
             if (ct.IsCancellationRequested) return "-";
             return r.Success ? $"{r.RoundtripMs}ms" : "ERR";
         }
@@ -188,9 +222,15 @@ public partial class MonitorViewModel : ObservableObject
         try
         {
             using var client = new TcpClient();
-            var connectTask = client.ConnectAsync(host, port, ct).AsTask();
-            var delayTask = Task.Delay(2000, ct);
-            if (await Task.WhenAny(connectTask, delayTask) == connectTask)
+            // Linked CTS so the loser is cancelled (no orphaned timer / no unobserved connect fault).
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var connectTask = client.ConnectAsync(host, port, linked.Token).AsTask();
+            _ = connectTask.ContinueWith(static t => { _ = t.Exception; },
+                CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+            var delayTask = Task.Delay(Math.Max(200, TimeoutMs), linked.Token);
+            var winner = await Task.WhenAny(connectTask, delayTask);
+            linked.Cancel();
+            if (winner == connectTask && !connectTask.IsFaulted)
             {
                 sw.Stop();
                 return $"{sw.ElapsedMilliseconds}ms";
@@ -205,7 +245,11 @@ public partial class MonitorViewModel : ObservableObject
         var sw = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            linked.CancelAfter(Math.Max(200, TimeoutMs));
+            // ResponseHeadersRead + dispose returns the connection to the pool immediately after the
+            // status code is read; without the using it would leak a pooled connection every cycle.
+            using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, linked.Token);
             sw.Stop();
             return $"{(int)response.StatusCode} ({sw.ElapsedMilliseconds}ms)";
         }

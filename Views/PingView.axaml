@@ -5,15 +5,15 @@
              x:DataType="vm:PingViewModel"
              x:CompileBindings="True">
 
-    <Grid RowDefinitions="Auto, Auto, *, Auto" Margin="12">
-        
-        <Grid Grid.Row="0" ColumnDefinitions="*, 100" Margin="0,0,0,12">
-            <AutoCompleteBox Grid.Column="0" Classes="field"
+    <Grid RowDefinitions="Auto, Auto, *, Auto" Margin="12" Background="#0F1012">
+
+        <Grid Grid.Row="0" ColumnDefinitions="*, 96" Margin="0,0,0,10">
+            <AutoCompleteBox Grid.Column="0" Classes="field" x:Name="HostBox"
                      Text="{Binding TargetHost}"
                      ItemsSource="{Binding TargetHostHistory}"
                      FilterMode="ContainsOrdinal"
                      MinimumPrefixLength="0"
-                     Watermark="Enter Host or IP (e.g. 8.8.8.8)"
+                     PlaceholderText="Enter Host or IP (e.g. 8.8.8.8)"
                      Margin="0,0,8,0">
                 <AutoCompleteBox.KeyBindings>
                     <KeyBinding Gesture="Enter" Command="{Binding TogglePingCommand}" />
@@ -31,28 +31,30 @@
             </Button>
         </Grid>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="20" Margin="5,0,0,12">
-            <CheckBox IsChecked="{Binding IsTraceRoute}" Content="Trace Route" FontSize="11.5" Foreground="White" FontWeight="SemiBold"/>
-            <CheckBox IsChecked="{Binding NotifyOnline}" Content="Alert Online" FontSize="11.5" Foreground="White" FontWeight="SemiBold"/>
-            <CheckBox IsChecked="{Binding NotifyOffline}" Content="Alert Offline" FontSize="11.5" Foreground="White" FontWeight="SemiBold"/>
-        </StackPanel>
+        <!-- WrapPanel so the third checkbox drops to a second line instead of clipping on a phone -->
+        <WrapPanel Grid.Row="1" Margin="2,0,0,10">
+            <CheckBox IsChecked="{Binding IsTraceRoute}" Content="Trace Route" FontSize="12" FontWeight="SemiBold" Margin="0,0,18,4"/>
+            <CheckBox IsChecked="{Binding NotifyOnline}" Content="Alert Online" FontSize="12" FontWeight="SemiBold" Margin="0,0,18,4"/>
+            <CheckBox IsChecked="{Binding NotifyOffline}" Content="Alert Offline" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        </WrapPanel>
 
         <Border Grid.Row="2" Classes="card output">
             <ListBox Name="LogList"
                      ItemsSource="{Binding LogItems}"
                      Background="Transparent"
                      BorderThickness="0"
+                     Padding="4"
                      FontSize="11.5"
-                     Foreground="#00FF99"
+                     Foreground="#4FCB97"
                      FontFamily="Cascadia Code,Consolas,Monospace">
                 <ListBox.Styles>
                     <Style Selector="ListBoxItem">
-                        <Setter Property="Padding" Value="4,2"/>
+                        <Setter Property="Padding" Value="6,2"/>
                         <Setter Property="MinHeight" Value="0"/>
                         <Setter Property="Background" Value="Transparent"/>
                     </Style>
                     <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
-                        <Setter Property="Background" Value="#25FFFFFF"/>
+                        <Setter Property="Background" Value="#2042B883"/>
                     </Style>
                 </ListBox.Styles>
                 <ListBox.ItemsPanel>
@@ -64,11 +66,16 @@
         </Border>
 
         <Button Grid.Row="2" Classes="ghost" Command="{Binding CopyLogCommand}" Content="COPY"
-                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,14,0"
+                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,12,0"
                 Height="26" FontSize="9" Padding="10,0"/>
 
-        <Border Grid.Row="3" Margin="0,12,0,0" Padding="10,6" Background="#2AFFFFFF" CornerRadius="8" BorderThickness="1" BorderBrush="#40FFFFFF">
-            <TextBlock Text="{Binding StatsSummary}" FontSize="11.5" FontFamily="Consolas" Foreground="White" FontWeight="Medium"/>
+        <Border Grid.Row="3" Classes="card" Margin="0,10,0,0" Padding="12,7">
+            <TextBlock Text="{Binding StatsSummary}"
+                       FontSize="11.5"
+                       FontFamily="Cascadia Code,Consolas,Monospace"
+                       Foreground="#C7C8CF"
+                       FontWeight="Medium"
+                       TextWrapping="Wrap"/>
         </Border>
     </Grid>
 </UserControl>

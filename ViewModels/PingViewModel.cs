@@ -34,7 +34,6 @@ public partial class PingViewModel : ObservableObject
     private bool? _lastStatus;
     private long _sent;
     private long _received;
-    private List<long> _times = new();
 
     [RelayCommand]
     private void TogglePing()
@@ -49,6 +48,8 @@ public partial class PingViewModel : ObservableObject
 
     private void Start()
     {
+        // Accept a pasted URL / "host:port" / "user@host" and reduce it to the bare host.
+        TargetHost = HostExtractor.Extract(TargetHost);
         if (string.IsNullOrWhiteSpace(TargetHost)) return;
 
         HistoryService.Instance.Add("ping.host", TargetHost);
@@ -57,7 +58,6 @@ public partial class PingViewModel : ObservableObject
 
         _sent = 0;
         _received = 0;
-        _times.Clear();
         Dispatcher.UIThread.Invoke(() => LogItems.Clear());
         StatsSummary = "Packets: Sent = 0, Received = 0, Lost = 0";
 
@@ -96,8 +96,8 @@ public partial class PingViewModel : ObservableObject
                 System.Net.Sockets.SocketException s when s.SocketErrorCode == System.Net.Sockets.SocketError.NetworkUnreachable => "Network unreachable",
                 _ => e.Message
             };
-            UpdateLog($"Error: {message}");
-            if (IsPermissionError(e)) UpdateLog(PermissionHint);
+            UpdateLog($"Error: {message}", token);
+            if (IsPermissionError(e)) UpdateLog(PermissionHint, token);
         }
         finally
         {
@@ -118,12 +118,12 @@ public partial class PingViewModel : ObservableObject
         catch (OperationCanceledException) { return; }
         catch
         {
-            UpdateLog("Error: Host not found");
+            UpdateLog("Error: Host not found", token);
             return;
         }
 
         int bytes = IcmpPinger.PayloadSize + 28; // ICMP header + IP header, classic ping accounting
-        UpdateLog($"PING {TargetHost} ({addr}) {IcmpPinger.PayloadSize}({bytes}) bytes of data.");
+        UpdateLog($"PING {TargetHost} ({addr}) {IcmpPinger.PayloadSize}({bytes}) bytes of data.", token);
 
         int seq = 1;
         while (!token.IsCancellationRequested)
@@ -135,25 +135,24 @@ public partial class PingViewModel : ObservableObject
 
             if (r.PermissionDenied)
             {
-                UpdateLog($"Ping error: {r.Error}");
-                UpdateLog(PermissionHint);
+                UpdateLog($"Ping error: {r.Error}", token);
+                UpdateLog(PermissionHint, token);
                 break;
             }
 
             if (r.Success)
             {
                 _received++;
-                _times.Add(r.RoundtripMs);
                 string ttl = r.Ttl >= 0 ? r.Ttl.ToString() : "?";
-                UpdateLog($"{bytes} bytes from {r.Address}: icmp_seq={seq} ttl={ttl} time={r.RoundtripMs} ms");
+                UpdateLog($"{bytes} bytes from {r.Address}: icmp_seq={seq} ttl={ttl} time={r.RoundtripMs} ms", token);
             }
             else
             {
                 string extra = !string.IsNullOrEmpty(r.Error) && r.Error != "Request timed out" ? $" ({r.Error})" : "";
-                UpdateLog($"Request timeout from {TargetHost}: icmp_seq={seq}{extra}");
+                UpdateLog($"Request timeout from {TargetHost}: icmp_seq={seq}{extra}", token);
             }
 
-            UpdateStats();
+            UpdateStats(token);
             HandleAlerts(r.Success);
 
             seq++;
@@ -163,7 +162,7 @@ public partial class PingViewModel : ObservableObject
 
     private async Task RunTraceRoute(CancellationToken token)
     {
-        UpdateLog($"Tracing route to {TargetHost} over a maximum of 30 hops:");
+        UpdateLog($"Tracing route to {TargetHost} over a maximum of 30 hops:", token);
         using var pinger = new Ping();
         var buffer = new byte[32];
 
@@ -181,11 +180,11 @@ public partial class PingViewModel : ObservableObject
                 long elapsed = reply.Status == IPStatus.TimedOut ? 0 : sw.ElapsedMilliseconds;
                 string timeStr = reply.Status == IPStatus.TimedOut ? "*" : $"{elapsed} ms";
                 string addr = reply.Status == IPStatus.TimedOut ? "Request timed out." : reply.Address?.ToString() ?? "*";
-                UpdateLog($"{ttl}\t{timeStr}\t{addr}");
+                UpdateLog($"{ttl}\t{timeStr}\t{addr}", token);
 
                 if (reply.Status == IPStatus.Success)
                 {
-                    UpdateLog("Trace complete.");
+                    UpdateLog("Trace complete.", token);
                     break;
                 }
             }
@@ -195,11 +194,14 @@ public partial class PingViewModel : ObservableObject
         }
     }
 
-    private void UpdateStats()
+    private void UpdateStats(CancellationToken token)
     {
         long lost = _sent - _received;
         double lossPercent = _sent > 0 ? ((double)lost / _sent) * 100 : 0;
-        StatsSummary = $"Packets: Sent = {_sent}, Received = {_received}, Lost = {lost} ({lossPercent:F0}% loss)";
+        var text = $"Packets: Sent = {_sent}, Received = {_received}, Lost = {lost} ({lossPercent:F0}% loss)";
+        // StatsSummary is data-bound; this runs from the background ping loop, so marshal it.
+        // Skip if this session was cancelled — a stale post must not overwrite a newer run.
+        Dispatcher.UIThread.Post(() => { if (!token.IsCancellationRequested) StatsSummary = text; });
     }
 
     private void HandleAlerts(bool current)
@@ -222,8 +224,7 @@ public partial class PingViewModel : ObservableObject
     private static bool IsPermissionError(Exception e)
     {
         if (e is System.Net.Sockets.SocketException s &&
-            (s.SocketErrorCode == System.Net.Sockets.SocketError.AccessDenied ||
-             s.SocketErrorCode == System.Net.Sockets.SocketError.SocketError))
+            s.SocketErrorCode == System.Net.Sockets.SocketError.AccessDenied)
             return true;
 
         var msg = e.Message;
@@ -235,10 +236,13 @@ public partial class PingViewModel : ObservableObject
 
     private const int MaxLogItems = 5000;
 
-    private void UpdateLog(string m)
+    private void UpdateLog(string m, CancellationToken token)
     {
         Dispatcher.UIThread.Post(() =>
         {
+            // A stray line queued by a just-cancelled session must NOT land after the next run cleared
+            // the list — otherwise old lines linger and mix with the new run's output.
+            if (token.IsCancellationRequested) return;
             LogItems.Add(m);
             while (LogItems.Count > MaxLogItems) LogItems.RemoveAt(0);
         });

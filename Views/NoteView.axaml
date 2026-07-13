@@ -5,34 +5,35 @@
              x:DataType="vm:NoteViewModel">
 
     <Grid Margin="8">
-        <Border IsVisible="{Binding IsLocked}" VerticalAlignment="Center" HorizontalAlignment="Center" 
-                Width="300" Padding="20" Background="#30000000" CornerRadius="8" BorderBrush="#60FFFFFF" BorderThickness="1">
+        <!-- MaxWidth (not fixed Width) so the unlock card shrinks to fit a narrow phone screen. -->
+        <Border IsVisible="{Binding IsLocked}" VerticalAlignment="Center" HorizontalAlignment="Stretch"
+                MaxWidth="300" Padding="20" Background="#191A1F" CornerRadius="8" BorderBrush="#2F3139" BorderThickness="1">
             <StackPanel Spacing="12">
-                <TextBlock Text="ENCRYPTED STORAGE" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" Foreground="White"/>
-                <TextBox Classes="field" Text="{Binding MasterKey}" PasswordChar="*" Watermark="Master Key...">
+                <TextBlock Text="ENCRYPTED STORAGE" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#ECECEF"/>
+                <TextBox Classes="field" Text="{Binding MasterKey}" PasswordChar="*" PlaceholderText="Master Key...">
                     <TextBox.KeyBindings>
                         <KeyBinding Command="{Binding UnlockCommand}" Gesture="Enter"/>
                     </TextBox.KeyBindings>
                 </TextBox>
                 <Button Classes="primary" Command="{Binding UnlockCommand}" Content="UNLOCK"
                         HorizontalAlignment="Stretch"/>
-                <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF4444" FontSize="10" HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="#E5484D" FontSize="10" HorizontalAlignment="Center"/>
             </StackPanel>
         </Border>
 
         <Grid IsVisible="{Binding !IsLocked}">
             <Grid RowDefinitions="Auto, Auto, *" IsVisible="{Binding !IsEditing}">
                 <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto, Auto" Margin="0,0,0,8">
-                    <TextBlock Grid.Column="0" Text="NOTES" FontSize="14" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="0" Text="NOTES" FontSize="14" FontWeight="Bold" Foreground="#ECECEF" VerticalAlignment="Center"/>
                     <TextBlock Grid.Column="1" Text="{Binding FilteredNotes.Count, StringFormat='{}{0} item(s)'}" FontSize="10"
-                               Foreground="White" Opacity="0.4" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <Button Grid.Column="2" Command="{Binding LockAppCommand}" Content="LOCK" Background="#CCFF3333"
-                            Foreground="White" FontSize="10" FontWeight="Bold" Padding="10,5" Margin="0,0,8,0"/>
+                               Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <Button Grid.Column="2" Command="{Binding LockAppCommand}" Content="LOCK" Background="#E5484D"
+                            Foreground="#ECECEF" FontSize="10" FontWeight="Bold" Padding="10,5" Margin="0,0,8,0"/>
                     <Button Grid.Column="3" Command="{Binding AddNoteCommand}" Content="+ NEW" Background="#42B883"
-                            Foreground="White" FontWeight="Bold" FontSize="10" Padding="10,5"/>
+                            Foreground="#0F1012" FontWeight="Bold" FontSize="10" Padding="10,5"/>
                 </Grid>
 
-                <TextBox Grid.Row="1" Classes="field" Text="{Binding SearchQuery}" Watermark="Search titles &amp; content..."
+                <TextBox Grid.Row="1" Classes="field" Text="{Binding SearchQuery}" PlaceholderText="Search titles &amp; content..."
                          Height="34" FontSize="11.5" Margin="0,0,0,8"/>
 
                 <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -51,8 +52,8 @@
                                 <Setter Property="Opacity" Value="1"/>
                             </Style>
                             <Style Selector="ListBoxItem:pointerover Border#Card">
-                                <Setter Property="Background" Value="#33FFFFFF"/>
-                                <Setter Property="BorderBrush" Value="#6042B883"/>
+                                <Setter Property="Background" Value="#1E3A2B"/>
+                                <Setter Property="BorderBrush" Value="#42B883"/>
                             </Style>
                         </ListBox.Styles>
                         <ListBox.ItemsPanel>
@@ -68,22 +69,50 @@
                                             HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                                             HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                                             Background="Transparent" BorderThickness="0">
-                                        <Border Name="Card" Background="#1EFFFFFF" BorderBrush="#30FFFFFF" BorderThickness="1"
+                                        <Border Name="Card" Background="#191A1F" BorderBrush="#2F3139" BorderThickness="1"
                                                 CornerRadius="6" Padding="10,8">
                                             <StackPanel>
-                                                <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="12" Foreground="White"
+                                                <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="12" Foreground="#ECECEF"
                                                            TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding Content}" FontSize="9.5" Foreground="#88FFFFFF"
+                                                <TextBlock Text="{Binding Content}" FontSize="9.5" Foreground="#9E9FA8"
                                                            TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" Margin="0,5,0,0"/>
                                             </StackPanel>
                                         </Border>
                                     </Button>
-                                    <Button Name="DelBtn" Content="✕"
-                                            Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).DeleteNoteCommand}"
+                                    <Button Name="DelBtn"
+                                            Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).RequestDeleteNoteCommand}"
                                             CommandParameter="{Binding}"
+                                            IsVisible="{Binding !PendingDelete}"
+                                            ToolTip.Tip="Delete note"
                                             HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,4,0"
-                                            FontSize="10" FontWeight="Bold" Width="20" Height="20" Padding="0"
-                                            Background="#40FF3333" Foreground="White" BorderThickness="0" CornerRadius="10"/>
+                                            Width="22" Height="22" Padding="0"
+                                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                            Background="#E5484D" BorderThickness="0" CornerRadius="11">
+                                        <!-- Vector cross — a glyph sits slightly off-centre in a 22px circle. -->
+                                        <Path Data="M0,0 L8,8 M8,0 L0,8" Stroke="#FFFFFF" StrokeThickness="1.7"
+                                              StrokeLineCap="Round" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Button>
+
+                                    <!-- Inline delete confirmation overlay -->
+                                    <Border IsVisible="{Binding PendingDelete}" Background="#121317"
+                                            BorderBrush="#E5484D" BorderThickness="1" CornerRadius="6">
+                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
+                                            <TextBlock Text="Delete this note?" Foreground="#ECECEF" FontSize="11" FontWeight="Bold"
+                                                       HorizontalAlignment="Center"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                                <Button Content="Delete"
+                                                        Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).DeleteNoteCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Background="#E5484D" Foreground="#ECECEF" FontSize="10" FontWeight="Bold"
+                                                        Padding="10,4" BorderThickness="0" CornerRadius="4"/>
+                                                <Button Content="Cancel"
+                                                        Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).CancelDeleteNoteCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Background="#1D1E25" Foreground="#C7C8CF" FontSize="10" FontWeight="Bold"
+                                                        Padding="10,4" BorderThickness="1" BorderBrush="#3B3D47" CornerRadius="4"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
                                 </Panel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -99,9 +128,9 @@
                 </Grid>
 
                 <Border Grid.Row="1" Classes="card output">
-                    <TextBox TextWrapping="Wrap" Text="{Binding SelectedNote.Content, FallbackValue=''}" AcceptsReturn="True" FontSize="12" 
-                             Foreground="#FFFFFF" Background="Transparent" BorderThickness="0"
-                             FontFamily="Cascadia Code,Consolas" Watermark="Type your note here..." Padding="10"/>
+                    <TextBox TextWrapping="Wrap" Text="{Binding SelectedNote.Content, FallbackValue=''}" AcceptsReturn="True" FontSize="12"
+                             Foreground="#ECECEF" Background="Transparent" BorderThickness="0"
+                             FontFamily="Cascadia Code,Consolas" PlaceholderText="Type your note here..." Padding="10"/>
                 </Border>
             </Grid>
         </Grid>
