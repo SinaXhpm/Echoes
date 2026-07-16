@@ -16,6 +16,10 @@
 # Mono auto generated files
 mono_crash.*
 
+# Screen recordings used to author docs (only the exported GIF is committed)
+*.mp4
+*.mov
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
