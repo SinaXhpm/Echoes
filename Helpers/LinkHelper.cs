@@ -36,7 +36,8 @@ public static class LinkHelper
         catch { }
     }
 
-    private static TopLevel? GetTopLevel() => Application.Current?.ApplicationLifetime switch
+    // Fully-qualify: on the Android head bare `Application` clashes with Android.App.Application.
+    private static TopLevel? GetTopLevel() => Avalonia.Application.Current?.ApplicationLifetime switch
     {
         IClassicDesktopStyleApplicationLifetime desktop => desktop.MainWindow,
         ISingleViewApplicationLifetime single when single.MainView is { } mv => TopLevel.GetTopLevel(mv),
