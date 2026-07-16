@@ -9,19 +9,13 @@
 
 [GitHub Repository](https://github.com/SinaXhpm/Echoes) | [Telegram](https://t.me/the_pink_palace)
 
-![Echoes — cross-platform network and developer toolkit (animated tour: ping, DNS, cURL, host checker, scanner, web server, monitor, SSH, string lab)](docs/screenshots/demo.gif)
-
+<p align="center">
+  <img src="docs/screenshots/demo.gif" width="640" alt="Echoes — animated tour: ping, DNS, cURL, host checker, scanner, web server, monitor, SSH, string lab">
+</p>
 
 ## About
 
 **Echoes** is a single desktop and mobile app that bundles the network and developer utilities you reach for every day — pinging hosts, scanning ports, connecting over SSH, looking up DNS/WHOIS and IP/GeoIP data, sending HTTP requests, managing Cloudflare DNS, serving files over a built-in web server, checking a host from servers around the world, monitoring uptime, keeping encrypted notes and backups, and transforming text/JSON. It runs on Windows, macOS, Linux, and Android from one codebase, works offline, and stores your data locally (no accounts, no telemetry). The desktop builds are zero-dependency Native AOT binaries — nothing to install.
-
-## Screenshots
-
-| | |
-| :---: | :---: |
-| ![Port Scanner](docs/screenshots/scanner.png)<br>**Port Scanner** — TCP/UDP, IP ranges & CIDR | ![cURL Client](docs/screenshots/curl.png)<br>**cURL Client** — HTTP requests with full logging |
-| ![SSH Terminal](docs/screenshots/ssh.png)<br>**SSH Terminal** — ANSI colors + SOCKS proxy | ![String Lab](docs/screenshots/stringlab.png)<br>**String Lab** — encode, hash, regex, JSON |
 
 ## Install
 
