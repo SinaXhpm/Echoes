@@ -195,7 +195,7 @@ public partial class StringLabViewModel
         if (lines.Count == 0) return "{}";
 
         int pos = 0;
-        var node = ParseYaml(lines, ref pos, lines[0].indent);
+        var node = ParseYaml(lines, ref pos, lines[0].indent, 0);
         var sb = new StringBuilder();
         node.WriteJson(sb, 0);
         return sb.ToString();
@@ -215,8 +215,12 @@ public partial class StringLabViewModel
         return line;
     }
 
-    private static YNode ParseYaml(List<(int indent, string text)> lines, ref int pos, int indent)
+    private static YNode ParseYaml(List<(int indent, string text)> lines, ref int pos, int indent, int depth)
     {
+        // Bail out well before a genuine stack overflow (which is uncatchable and would kill the app)
+        // on pathologically nested input. The Convert() caller catches this and shows a friendly error.
+        if (depth > 128) throw new InvalidOperationException("YAML nesting is too deep.");
+
         if (lines[pos].text.StartsWith("- "))
         {
             var list = new YList();
@@ -227,7 +231,7 @@ public partial class StringLabViewModel
                 {
                     pos++;
                     if (pos < lines.Count && lines[pos].indent > indent)
-                        list.Items.Add(ParseYaml(lines, ref pos, lines[pos].indent));
+                        list.Items.Add(ParseYaml(lines, ref pos, lines[pos].indent, depth + 1));
                     else list.Items.Add(new YScalar(""));
                 }
                 else if (LooksLikeKey(item))
@@ -238,7 +242,7 @@ public partial class StringLabViewModel
                     pos++;
                     while (pos < lines.Count && lines[pos].indent > indent && !lines[pos].text.StartsWith("- "))
                     {
-                        if (HandleMapLine(lines, ref pos, map)) continue;
+                        if (HandleMapLine(lines, ref pos, map, depth)) continue;
                         break;
                     }
                     list.Items.Add(map);
@@ -251,12 +255,12 @@ public partial class StringLabViewModel
         var topMap = new YMap();
         while (pos < lines.Count && lines[pos].indent == indent && !lines[pos].text.StartsWith("- "))
         {
-            if (!HandleMapLine(lines, ref pos, topMap)) break;
+            if (!HandleMapLine(lines, ref pos, topMap, depth)) break;
         }
         return topMap;
     }
 
-    private static bool HandleMapLine(List<(int indent, string text)> lines, ref int pos, YMap map)
+    private static bool HandleMapLine(List<(int indent, string text)> lines, ref int pos, YMap map, int depth)
     {
         var (ind, text) = lines[pos];
         int colon = FindColon(text);
@@ -269,7 +273,7 @@ public partial class StringLabViewModel
         if (val.Length == 0)
         {
             if (pos < lines.Count && lines[pos].indent > ind)
-                map.Items.Add((key, ParseYaml(lines, ref pos, lines[pos].indent)));
+                map.Items.Add((key, ParseYaml(lines, ref pos, lines[pos].indent, depth + 1)));
             else
                 map.Items.Add((key, new YScalar("")));
         }
@@ -308,6 +312,11 @@ public partial class StringLabViewModel
 
     private sealed class YScalar : YNode
     {
+        // Exact JSON number grammar: optional sign, no leading zeros, optional fraction/exponent.
+        private static readonly System.Text.RegularExpressions.Regex JsonNumberRe =
+            new(@"^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$",
+                System.Text.RegularExpressions.RegexOptions.Compiled);
+
         private readonly string _raw;
         public YScalar(string raw) => _raw = raw;
 
@@ -318,8 +327,10 @@ public partial class StringLabViewModel
             if (v == "true" || v == "false") { sb.Append(v); return; }
             if ((v.StartsWith('"') && v.EndsWith('"')) || (v.StartsWith('\'') && v.EndsWith('\'')))
             { sb.Append('"').Append(JsonEsc(v[1..^1])).Append('"'); return; }
-            if (long.TryParse(v, out _) || double.TryParse(v, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _))
-            { sb.Append(v); return; }
+            // Only emit an unquoted number when the token is itself valid JSON-number syntax. Tokens that
+            // parse in .NET but aren't legal JSON (leading zeros "08", ".5", "5.", "+5", "1,000",
+            // "Infinity"/"NaN") must be quoted, or the output is invalid JSON.
+            if (JsonNumberRe.IsMatch(v)) { sb.Append(v); return; }
             sb.Append('"').Append(JsonEsc(v)).Append('"');
         }
     }

@@ -97,19 +97,5 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void OpenReleases() => OpenUrl(LatestReleaseUrl);
 
-    private static void OpenUrl(string url)
-    {
-        try
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                Process.Start("xdg-open", url);
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                Process.Start("open", url);
-        }
-        catch
-        {
-        }
-    }
+    private static void OpenUrl(string url) => Helpers.LinkHelper.Open(url);
 }

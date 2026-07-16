@@ -41,4 +41,18 @@ public static class MasterSession
         _password = string.Empty;
         Changed?.Invoke();
     }
+
+    /// <summary>Raised after a backup restore overwrote the on-disk vaults. Live areas must DROP their
+    /// stale in-memory decrypted state WITHOUT re-saving (a save would clobber the just-restored file)
+    /// and lock, forcing a re-unlock that reads the restored data. Handlers marshal to the UI thread.</summary>
+    public static event Action? RestoreApplied;
+
+    /// <summary>Signal a completed backup restore. Wipes the shared password directly (no <see cref="Changed"/>
+    /// event, so nothing auto-re-unlocks with the old key or triggers a clobbering save) then fires
+    /// <see cref="RestoreApplied"/> so live vault VMs discard-and-lock without saving.</summary>
+    public static void NotifyRestoreApplied()
+    {
+        _password = string.Empty;
+        RestoreApplied?.Invoke();
+    }
 }

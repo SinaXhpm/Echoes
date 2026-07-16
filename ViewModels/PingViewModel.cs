@@ -163,32 +163,50 @@ public partial class PingViewModel : ObservableObject
     private async Task RunTraceRoute(CancellationToken token)
     {
         UpdateLog($"Tracing route to {TargetHost} over a maximum of 30 hops:", token);
-        using var pinger = new Ping();
-        var buffer = new byte[32];
+
+        System.Net.IPAddress target;
+        try
+        {
+            target = await IcmpPinger.ResolveAsync(TargetHost, token);
+        }
+        catch (OperationCanceledException) { return; }
+        catch (Exception ex)
+        {
+            UpdateLog($"Unable to resolve {TargetHost}: {ex.Message}", token);
+            return;
+        }
 
         for (int ttl = 1; ttl <= 30; ttl++)
         {
             if (token.IsCancellationRequested) break;
 
+            IcmpPinger.PingResult r;
             try
             {
-                var options = new PingOptions(ttl, true);
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                var reply = await pinger.SendPingAsync(TargetHost, 2000, buffer, options).WaitAsync(token);
-                sw.Stop();
-
-                long elapsed = reply.Status == IPStatus.TimedOut ? 0 : sw.ElapsedMilliseconds;
-                string timeStr = reply.Status == IPStatus.TimedOut ? "*" : $"{elapsed} ms";
-                string addr = reply.Status == IPStatus.TimedOut ? "Request timed out." : reply.Address?.ToString() ?? "*";
-                UpdateLog($"{ttl}\t{timeStr}\t{addr}", token);
-
-                if (reply.Status == IPStatus.Success)
-                {
-                    UpdateLog("Trace complete.", token);
-                    break;
-                }
+                // Unprivileged ICMP that also works on Android/Linux without root (raw Ping needs it).
+                r = await IcmpPinger.SendAsync(target, 2000, token, ttl);
             }
             catch (OperationCanceledException) { break; }
+
+            if (r.PermissionDenied)
+            {
+                UpdateLog("Traceroute needs ICMP permission, which isn't available on this platform.", token);
+                break;
+            }
+
+            // A real intermediate hop is any responder that isn't the 0.0.0.0 placeholder used for timeouts.
+            bool hasHop = r.Address != null && !r.Address.Equals(System.Net.IPAddress.Any);
+            if (r.Success)
+            {
+                UpdateLog($"{ttl}\t{r.RoundtripMs} ms\t{r.Address}", token);
+                UpdateLog("Trace complete.", token);
+                break;
+            }
+
+            if (hasHop)
+                UpdateLog($"{ttl}\t{r.RoundtripMs} ms\t{r.Address}", token);
+            else
+                UpdateLog($"{ttl}\t*\tRequest timed out.", token);
 
             await Task.Delay(100, token);
         }

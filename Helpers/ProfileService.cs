@@ -143,6 +143,23 @@ public sealed class ProfileService
         lock (_gate) { _knownHosts[host] = fingerprint; Save(); }
     }
 
+    // Atomically replace the on-disk profile with the given JSON AND refresh the in-memory stores,
+    // all under _gate. Used by backup import so a concurrent background Save() (e.g. an SSH TOFU pin)
+    // can neither hit a sharing violation on the raw write nor serialize stale pre-import state back
+    // over the restore between the write and the reload. Throws on invalid JSON (nothing is written).
+    public void ReplaceFromJson(string json)
+    {
+        if (JsonNode.Parse(json) is not JsonObject) throw new InvalidOperationException("Invalid profile JSON.");
+        lock (_gate)
+        {
+            var tmp = _path + ".tmp";
+            File.WriteAllText(tmp, json);
+            if (File.Exists(_path)) File.Replace(tmp, _path, null);
+            else File.Move(tmp, _path);
+            Reload();   // Monitor is reentrant → refreshes in-memory from the just-written file under the same lock
+        }
+    }
+
     // Re-read the profile file from disk and refresh the in-memory stores IN PLACE. Called after a
     // backup import so the running singleton reflects the restored file — otherwise the next Save()
     // (a settings change, an SSH TOFU pin, a debounced edit) serializes the pre-import state straight

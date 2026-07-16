@@ -150,6 +150,12 @@ public partial class PortScannerViewModel : ObservableObject
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
 
+            // Resolve any hostname targets to IP literals up front — the socket scan paths below use
+            // IPAddress.Parse and would otherwise silently fail (the throw is caught + swallowed) on a
+            // bare hostname like "scanme.nmap.org".
+            ips = await ResolveHostsAsync(ips, token);
+            if (ips.Count == 0) { StatusMessage = "No resolvable targets."; return; }
+
             // Keep the process alive for the scan so backgrounding the Android app doesn't kill an
             // in-flight sweep (no-op on desktop).
             Helpers.BackgroundGuard.Acquire(PingScanOnly ? "Ping scan" : "Scanning ports");
@@ -448,6 +454,30 @@ public partial class PortScannerViewModel : ObservableObject
         }
 
         ReportText = sb.ToString().TrimEnd();
+    }
+
+    // Turn hostname targets into IPv4 literals so the socket scan paths (which use IPAddress.Parse)
+    // can dial them. IP literals and CIDR/range expansions pass through untouched; hosts that don't
+    // resolve within 5s are dropped.
+    private static async Task<List<string>> ResolveHostsAsync(List<string> targets, CancellationToken ct)
+    {
+        var resolved = new List<string>();
+        foreach (var t in targets)
+        {
+            if (IPAddress.TryParse(t, out _)) { resolved.Add(t); continue; }
+            try
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeout.CancelAfter(5000);
+                var addrs = await Dns.GetHostAddressesAsync(t, timeout.Token);
+                var ip = addrs.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork)
+                         ?? addrs.FirstOrDefault();
+                if (ip != null) resolved.Add(ip.ToString());
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch { /* unresolvable host — skip it */ }
+        }
+        return resolved.Distinct().ToList();
     }
 
     private List<string> ParseIPs(string input)

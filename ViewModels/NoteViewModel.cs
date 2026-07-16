@@ -62,12 +62,43 @@ public partial class NoteViewModel : ObservableObject
 
     private bool _isAuthenticated = false;
 
+    // 32-byte key derived from the master password, cached for the unlocked SESSION so we don't re-run
+    // 600k-iteration PBKDF2 on every save (which froze the UI ~0.5-1s per note action, esp. on Android).
+    // A fresh random nonce per save keeps AES-GCM secure while the key + salt stay fixed for the session.
+    private byte[]? _sessionKey;
+    private byte[] _sessionSalt = Array.Empty<byte>();
+
     public NoteViewModel()
     {
         // Share one master password with Cloudflare + Sync: if the app is already unlocked
         // elsewhere, open silently with the same credential.
         MasterSession.Changed += OnMasterSessionChanged;
+        MasterSession.RestoreApplied += OnRestoreApplied;
         if (MasterSession.IsSet) TryUnlock(MasterSession.Password, silent: true);
+    }
+
+    // A backup restore overwrote notes.dat on disk. Drop our stale in-memory notes + session key WITHOUT
+    // saving (a save would clobber the restore) and lock — the user re-unlocks to read the restored notes.
+    private void OnRestoreApplied()
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            Notes.Clear();
+            FilteredNotes.Clear();
+            SearchQuery = string.Empty;
+            MasterKey = string.Empty;
+            ClearSessionKey();
+            _isAuthenticated = false;
+            IsLocked = true;
+            IsEditing = false;
+            ErrorMessage = string.Empty;
+        });
+    }
+
+    private void ClearSessionKey()
+    {
+        if (_sessionKey is not null) { Array.Clear(_sessionKey); _sessionKey = null; }
+        _sessionSalt = Array.Empty<byte>();
     }
 
     private void OnMasterSessionChanged()
@@ -169,20 +200,21 @@ public partial class NoteViewModel : ObservableObject
 
     private byte[] Encrypt(string plainText, string password)
     {
-        byte[] salt = RandomNumberGenerator.GetBytes(16);
+        // Derive the key ONCE per unlocked session; reuse it with a fresh nonce per save.
+        if (_sessionKey is null)
+        {
+            _sessionSalt = RandomNumberGenerator.GetBytes(16);
+            _sessionKey = Rfc2898DeriveBytes.Pbkdf2(password, _sessionSalt, Pbkdf2Iterations, HashAlgorithmName.SHA256, 32);
+        }
+        byte[] salt = _sessionSalt;
         byte[] nonce = RandomNumberGenerator.GetBytes(12);
-        byte[] key = Rfc2898DeriveBytes.Pbkdf2(password, salt, Pbkdf2Iterations, HashAlgorithmName.SHA256, 32);
 
         byte[] plain = Encoding.UTF8.GetBytes(plainText);
         byte[] cipher = new byte[plain.Length];
         byte[] tag = new byte[16];
 
-        try
-        {
-            using var gcm = new AesGcm(key, 16);
+        using (var gcm = new AesGcm(_sessionKey, 16))
             gcm.Encrypt(nonce, plain, cipher, tag);
-        }
-        finally { Array.Clear(key); }
 
         using var ms = new MemoryStream();
         ms.Write(Magic);
@@ -211,6 +243,9 @@ public partial class NoteViewModel : ObservableObject
             {
                 using var gcm = new AesGcm(key, 16);
                 gcm.Decrypt(nonce, cipher, tag, plain); // throws on wrong key / tampering
+                // Cache the derived key + this file's salt for the session so saves don't re-derive.
+                _sessionSalt = salt;
+                _sessionKey = (byte[])key.Clone();
             }
             finally { Array.Clear(key); }
 
@@ -307,6 +342,7 @@ public partial class NoteViewModel : ObservableObject
         FilteredNotes.Clear();
         SearchQuery = string.Empty;
         MasterKey = string.Empty;
+        ClearSessionKey();
         _isAuthenticated = false;
         IsLocked = true;
         IsEditing = false;
