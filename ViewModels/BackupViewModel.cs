@@ -55,13 +55,15 @@ public partial class BackupViewModel : ObservableObject
         if (JsonNode.Parse(inner) is not JsonObject o) throw new InvalidOperationException("Corrupt backup contents.");
         string profile = (string?)o["profile"] ?? string.Empty;
         string notes = (string?)o["notes"] ?? string.Empty;
+        // Atomic, gated write + in-memory refresh so a concurrent background Save() can't race the
+        // write or serialize stale pre-import state back over the restore.
         if (profile.Length > 0)
-        {
-            File.WriteAllText(AppStorage.UserPath("echoes.profile.json"), profile);
-            // Refresh the running singleton from the restored file so a later Save() can't clobber it.
-            // (Per-tool VM fields still need a restart to re-read, which the UI message says.)
-            ProfileService.Instance.Reload();
-        }
-        if (notes.Length > 0) File.WriteAllBytes(AppStorage.UserPath("notes.dat"), Convert.FromBase64String(notes));
+            ProfileService.Instance.ReplaceFromJson(profile);
+        if (notes.Length > 0)
+            File.WriteAllBytes(AppStorage.UserPath("notes.dat"), Convert.FromBase64String(notes));
+
+        // Tell the live vault VMs (Notes, Cloudflare) to drop their stale in-memory decrypted state
+        // WITHOUT saving — otherwise the next unlocked save would overwrite the just-restored files.
+        MasterSession.NotifyRestoreApplied();
     }
 }

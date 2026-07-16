@@ -99,7 +99,26 @@ public partial class CloudflareViewModel : ObservableObject
 
         // Share one master password with Notes + Sync: auto-unlock if the app is already open.
         MasterSession.Changed += OnMasterSessionChanged;
+        MasterSession.RestoreApplied += OnRestoreApplied;
         if (MasterSession.IsSet) TryUnlock(MasterSession.Password, silent: true);
+    }
+
+    // A backup restore overwrote the cf.vault inside the profile. Drop stale in-memory profiles WITHOUT
+    // saving (a save would re-encrypt them over the restored vault) and lock — the user re-unlocks.
+    private void OnRestoreApplied()
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            IsLocked = true;              // set FIRST so Profiles.Clear()'s CollectionChanged handler won't save
+            _saveCts?.Cancel();
+            foreach (var p in Profiles) p.PropertyChanged -= OnProfileEdited;
+            Profiles.Clear();
+            Zones.Clear();
+            Records.Clear();
+            SelectedProfile = null;
+            _master = string.Empty;
+            HasVault = !string.IsNullOrEmpty(ProfileService.Instance.GetSetting("cf.vault"));
+        });
     }
 
     private void OnMasterSessionChanged()

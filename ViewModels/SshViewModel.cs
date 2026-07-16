@@ -96,7 +96,10 @@ public partial class SshViewModel : ObservableObject
     [RelayCommand]
     private async Task ToggleConnect()
     {
-        if (IsConnected) { StopSsh(); return; }
+        // Off the UI thread: SSH.NET's Disconnect/Stop/Dispose block until TCP teardown/timeout, which on a
+        // half-open connection (dropped Wi-Fi / dead tunnel) would freeze the whole window. StopSsh marshals
+        // its own bound-state writes back via the Dispatcher, so running it on a worker thread is safe.
+        if (IsConnected) { await Task.Run(StopSsh); return; }
         if (string.IsNullOrWhiteSpace(Host) || string.IsNullOrWhiteSpace(Username)) return;
 
         HistoryService.Instance.Add("ssh.host", Host);

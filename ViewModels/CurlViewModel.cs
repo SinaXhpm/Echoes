@@ -149,7 +149,10 @@ public partial class CurlViewModel : ObservableObject
         ProxyPass = ps.GetSetting("curl.proxyPass") ?? string.Empty;
         CustomFlags = ps.GetSetting("curl.flags") ?? string.Empty;
         SkipSslVerify = ps.GetBool("curl.skipSsl");
-        UseDotNetEngine = ps.GetBool("curl.useDotNet");
+        // Android has no `curl` binary to shell out to, so default it to the managed .NET engine there
+        // (otherwise the very first request fails with "curl not found"). Desktop keeps native curl,
+        // which ships on Windows 10+/macOS/Linux. A value the user explicitly saved still wins.
+        UseDotNetEngine = ps.GetBool("curl.useDotNet", OperatingSystem.IsAndroid());
         HttpMethod = ps.GetSetting("curl.method") ?? "GET";
         UseProxy = ps.GetBool("curl.useProxy");
         WrapRawBody = ps.GetBool("curl.wrapRawBody");
@@ -521,7 +524,8 @@ public partial class CurlViewModel : ObservableObject
                     await _currentProcess.StandardInput.WriteAsync(RequestBody);
                     _currentProcess.StandardInput.Close();
                 }
-                var outputTask = _currentProcess.StandardOutput.ReadToEndAsync();
+                // Bound stdout so a huge download can't balloon memory; stderr stays small (the -v trace).
+                var outputTask = ReadCappedDrainAsync(_currentProcess.StandardOutput);
                 var errorTask = _currentProcess.StandardError.ReadToEndAsync();
 
                 await Task.WhenAll(outputTask, errorTask);
@@ -766,8 +770,10 @@ public partial class CurlViewModel : ObservableObject
             }
 
             var sw = Stopwatch.StartNew();
-            using var resp = await client.SendAsync(req, HttpCompletionOption.ResponseContentRead, _dotNetCts.Token);
-            string body = await resp.Content.ReadAsStringAsync(_dotNetCts.Token);
+            // Stream the response and cap how much we pull into memory — an unbounded ReadAsStringAsync
+            // on a multi-GB body would OOM the app (especially on Android).
+            using var resp = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, _dotNetCts.Token);
+            string body = await ReadCappedAsync(resp.Content, _dotNetCts.Token);
             sw.Stop();
 
             if (!IsWorking) return;
@@ -787,6 +793,58 @@ public partial class CurlViewModel : ObservableObject
         {
             IsWorking = false;
         }
+    }
+
+    // Safety cap on how much of a response we hold in memory. Big enough for real API/HTML payloads,
+    // small enough that a rogue multi-GB body can't OOM the app (matters most on Android).
+    private const int MaxResponseBytes = 16 * 1024 * 1024;
+
+    // Read an HttpContent stream up to MaxResponseBytes, decoding with the response's charset (UTF-8
+    // fallback), and mark truncation. Uses ResponseHeadersRead upstream so nothing is pre-buffered.
+    private static async Task<string> ReadCappedAsync(HttpContent content, CancellationToken ct)
+    {
+        await using var stream = await content.ReadAsStreamAsync(ct);
+        using var ms = new System.IO.MemoryStream();
+        var buf = new byte[64 * 1024];
+        bool truncated = false;
+        while (true)
+        {
+            long room = MaxResponseBytes - ms.Length;
+            if (room <= 0) { truncated = await stream.ReadAsync(buf, ct) > 0; break; }
+            int read = await stream.ReadAsync(buf.AsMemory(0, (int)Math.Min(buf.Length, room)), ct);
+            if (read == 0) break;
+            ms.Write(buf, 0, read);
+        }
+
+        var enc = ResolveCharset(content.Headers.ContentType?.CharSet);
+        string text = enc.GetString(ms.GetBuffer(), 0, (int)ms.Length);
+        if (truncated) text += $"\n\n… [response truncated at {MaxResponseBytes / (1024 * 1024)} MB]";
+        return text;
+    }
+
+    private static Encoding ResolveCharset(string? charset)
+    {
+        if (!string.IsNullOrWhiteSpace(charset))
+        {
+            try { return Encoding.GetEncoding(charset.Trim().Trim('"')); } catch { }
+        }
+        return Encoding.UTF8;
+    }
+
+    // Read a text pipe up to MaxResponseBytes chars but KEEP draining past the cap so the child process
+    // never blocks on a full stdout pipe (which would deadlock the concurrent stderr read).
+    private static async Task<string> ReadCappedDrainAsync(System.IO.TextReader reader)
+    {
+        var sb = new StringBuilder();
+        var buf = new char[64 * 1024];
+        int read;
+        while ((read = await reader.ReadAsync(buf, 0, buf.Length)) > 0)
+        {
+            if (sb.Length < MaxResponseBytes)
+                sb.Append(buf, 0, Math.Min(read, MaxResponseBytes - sb.Length));
+            // past the cap: keep reading to drain the pipe, but drop the overflow
+        }
+        return sb.ToString();
     }
 
     private void BuildDotNetLogs(HttpRequestSpec spec, HttpRequestMessage req, HttpResponseMessage resp, long ms)

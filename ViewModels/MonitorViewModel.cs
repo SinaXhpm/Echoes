@@ -130,12 +130,16 @@ public partial class MonitorViewModel : ObservableObject
         {
             if (Targets.Count >= MaxTargets) break;   // cap the watch list
             var target = new MonitorTarget { Address = line, ShowPing = CheckPing, ShowTcp = CheckTcp, ShowHttp = CheckHttp };
-            if (line.StartsWith("http"))
+            // Only a real scheme is a URL — a bare host like "httpbin.org" starts with "http" but is NOT
+            // an absolute Uri, and new Uri(...) would throw. Parse defensively so one line can't abort start.
+            if ((line.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                 || line.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                && Uri.TryCreate(line, UriKind.Absolute, out var uri))
             {
                 target.HttpUrl = line;
-                target.Host = new Uri(line).Host;
+                target.Host = uri.Host;
             }
-            else if (line.Contains(":"))
+            else if (line.Contains(":") && !line.Contains("//"))
             {
                 var parts = line.Split(':');
                 target.Host = parts[0];

@@ -42,7 +42,11 @@ public static class HttpHelper
         proxy = proxy.Trim();
         if (proxy.Contains("://")) return proxy;
 
-        if (proxy.Contains(":1080") || proxy.Contains(":1081") || proxy.Contains(":9050"))
+        // Infer SOCKS5 from the ACTUAL numeric port, not a substring: a Contains(":1080") test wrongly
+        // tags ports like 10800 / 10809 (v2rayN's default HTTP port) as SOCKS and breaks every request.
+        int lastColon = proxy.LastIndexOf(':');
+        if (lastColon >= 0 && int.TryParse(proxy.AsSpan(lastColon + 1), out int port)
+            && port is 1080 or 1081 or 9050)
             return "socks5://" + proxy;
 
         return "http://" + proxy;

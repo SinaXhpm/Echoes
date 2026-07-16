@@ -211,11 +211,14 @@ public sealed class FileHttpServer : IDisposable
     {
         var buf = new byte[8192];
         int len = 0;
+        // ONE wall-clock deadline for the ENTIRE header read. Creating the CTS per-iteration reset the
+        // 15s cap on every byte, letting a slow-drip client (slowloris) hold a connection slot forever
+        // and — since a slot is taken before AcceptTcpClientAsync — stall the whole accept loop.
+        using var readCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        readCts.CancelAfter(15000);
         // Read until the end-of-headers marker or the cap.
         while (len < buf.Length)
         {
-            using var readCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            readCts.CancelAfter(15000);
             int n = await stream.ReadAsync(buf.AsMemory(len, buf.Length - len), readCts.Token).ConfigureAwait(false);
             if (n <= 0) break;
             len += n;

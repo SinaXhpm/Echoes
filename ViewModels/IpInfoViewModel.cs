@@ -135,21 +135,7 @@ public partial class IpInfoViewModel : ObservableObject
     private async Task CopySubnet() => await ClipboardHelper.SetTextAsync(SubnetOutput);
 
     [RelayCommand]
-    private void OpenMap()
-    {
-        string? url = Result?.MapUrl;
-        if (string.IsNullOrEmpty(url)) return;
-        try
-        {
-            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
-            else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux))
-                System.Diagnostics.Process.Start("xdg-open", url);
-            else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX))
-                System.Diagnostics.Process.Start("open", url);
-        }
-        catch { }
-    }
+    private void OpenMap() => Helpers.LinkHelper.Open(Result?.MapUrl);
 
     [RelayCommand]
     private async Task GetMyIp()

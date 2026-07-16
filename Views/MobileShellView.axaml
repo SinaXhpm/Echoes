@@ -64,6 +64,7 @@
 					<ListBoxItem>DNS</ListBoxItem>
 					<ListBoxItem>SCANNER</ListBoxItem>
 					<ListBoxItem>IP INFO</ListBoxItem>
+					<ListBoxItem>CHECK-HOST</ListBoxItem>
 					<ListBoxItem>CURL</ListBoxItem>
 					<ListBoxItem>TELEGRAM BOT</ListBoxItem>
 					<ListBoxItem>MONITOR</ListBoxItem>
@@ -106,7 +107,8 @@
 					<views:DnsView DataContext="{Binding DnsVM}"/>
 					<views:PortScannerView DataContext="{Binding PortScannerVM}"/>
 					<views:IpInfoView DataContext="{Binding IpInfoVM}"/>
-					<views:CurlView DataContext="{Binding CurlVM}"/>
+					<views:CheckHostView DataContext="{Binding CheckHostVM}"/>
+						<views:CurlView DataContext="{Binding CurlVM}"/>
 					<views:TgView>
 						<views:TgView.DataContext>
 							<vm:TgViewModel/>
