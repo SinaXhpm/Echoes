@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Adaptive icon (Android 8/API 26+). Without this the launcher wraps the legacy square
-     bitmap in a white rounded box; here the circular logo sits in the safe zone over a dark
-     background that matches the icon, so it fills the mask (circle/squircle) with no white box. -->
+<!-- Adaptive icon (Android 8/API 26+). The foreground is the full 108dp layer with the circular
+     logo baked in at ~80dp (icon_fg.png), so it fills the launcher's circle mask edge-to-edge while
+     leaving the outer bleed transparent. The background is transparent — no dark plate shows in the
+     squircle/rounded-square corners; the logo sits alone on the wallpaper. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@drawable/icon_background"/>
-    <foreground android:drawable="@drawable/icon_foreground"/>
+    <foreground android:drawable="@mipmap/icon_fg"/>
 </adaptive-icon>

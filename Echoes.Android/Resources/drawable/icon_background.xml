@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Solid dark fill behind the logo — matches the icon's own dark interior so the seam is invisible. -->
+<!-- Transparent background layer: the logo is a self-contained circular badge, so no plate is drawn
+     behind it. On circle-mask launchers the logo fills the mask (nothing shows through); on
+     squircle/rounded-square launchers the corners stay transparent instead of a dark tile. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#0C0D14"/>
+    <solid android:color="#00000000"/>
 </shape>
