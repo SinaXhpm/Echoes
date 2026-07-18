@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
 			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 			 xmlns:vm="using:Echoes.ViewModels"
+			 xmlns:h="using:Echoes.Helpers"
 			 x:Class="Echoes.Views.NetworkInfoView"
 			 x:DataType="vm:NetworkInfoViewModel"
 			 Background="#0F1012">
@@ -42,106 +43,273 @@
 			<Setter Property="FontSize" Value="12"/>
 			<Setter Property="Foreground" Value="#ECECEF"/>
 			<Setter Property="SelectionBrush" Value="#3042B883"/>
-			<!-- wrap long values (MAC / IPv4 / subnet) instead of clipping on a narrow phone column -->
 			<Setter Property="TextWrapping" Value="Wrap"/>
+		</Style>
+
+		<!-- inner sub-tabs -->
+		<Style Selector="TabItem.subtab">
+			<Setter Property="FontSize" Value="11"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="LetterSpacing" Value="0.5"/>
+			<Setter Property="Foreground" Value="#9E9FA8"/>
+			<Setter Property="Padding" Value="12,5"/>
+			<Setter Property="MinHeight" Value="0"/>
+			<Setter Property="Margin" Value="0,0,4,0"/>
+		</Style>
+		<Style Selector="TabItem.subtab:selected">
+			<Setter Property="Foreground" Value="#55C795"/>
+		</Style>
+		<Style Selector="TabItem.subtab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Foreground" Value="#D7D8DE"/>
+		</Style>
+
+		<!-- table cells -->
+		<Style Selector="TextBlock.colhead">
+			<Setter Property="FontSize" Value="9.5"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="LetterSpacing" Value="0.5"/>
+			<Setter Property="Foreground" Value="#8A8B93"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="TextBlock.cell">
+			<Setter Property="FontFamily" Value="Cascadia Code,Consolas"/>
+			<Setter Property="FontSize" Value="11.5"/>
+			<Setter Property="Foreground" Value="#D7D8DE"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+			<Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+		</Style>
+		<Style Selector="Border.zebra:nth-child(2n)">
+			<Setter Property="Background" Value="#0A131417"/>
 		</Style>
 	</UserControl.Styles>
 
-	<Grid RowDefinitions="Auto, *" Margin="14,12">
-		<!-- Header: title + refresh -->
-		<Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
-			<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
-				<TextBlock Text="NETWORK ADAPTERS" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF" TextWrapping="Wrap"/>
-				<TextBlock Text="Select any value to copy · click ⧉ to copy the whole adapter" FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap"/>
-			</StackPanel>
+	<TabControl Margin="10,6,10,8" TabStripPlacement="Top">
 
-			<Button Grid.Column="1" Classes="refresh-btn" Command="{Binding RefreshCommand}" VerticalAlignment="Center">
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"
-						  Fill="#42B883" Width="14" Height="14" Stretch="Uniform"/>
-					<TextBlock Text="REFRESH" FontSize="11" FontWeight="SemiBold" LetterSpacing="1" Foreground="#42B883" VerticalAlignment="Center"/>
-				</StackPanel>
-			</Button>
-		</Grid>
+		<!-- ============================ INTERFACES ============================ -->
+		<TabItem Classes="subtab" Header="INTERFACES">
+			<Grid RowDefinitions="Auto, *" Margin="0,8,0,0">
+				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
+					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+						<TextBlock Text="NETWORK ADAPTERS" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
+						<TextBlock Text="Select any value to copy · click ⧉ to copy the whole adapter" FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap"/>
+					</StackPanel>
+					<Button Grid.Column="1" Classes="refresh-btn" Command="{Binding RefreshCommand}" VerticalAlignment="Center">
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<Path Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"
+								  Fill="#42B883" Width="14" Height="14" Stretch="Uniform"/>
+							<TextBlock Text="REFRESH" FontSize="11" FontWeight="SemiBold" LetterSpacing="1" Foreground="#42B883" VerticalAlignment="Center"/>
+						</StackPanel>
+					</Button>
+				</Grid>
 
-		<ScrollViewer Grid.Row="1">
-			<ItemsControl ItemsSource="{Binding Adapters}">
-				<ItemsControl.ItemTemplate>
-					<DataTemplate x:DataType="vm:NetworkAdapterInfo">
-						<Border Classes="card" Margin="0,0,0,10" Padding="16,13">
-							<StackPanel Spacing="11">
-
-								<!-- Header: name + type + status + speed (wrap) + copy button (kept top-right) -->
-								<Grid ColumnDefinitions="*, Auto">
-									<WrapPanel Grid.Column="0" VerticalAlignment="Center">
-										<TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="#42B883" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,3"/>
-										<Border Background="#24262E" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" Margin="0,0,8,3">
-											<TextBlock Text="{Binding Type}" Foreground="#C7C8CF" FontSize="9.5" FontWeight="SemiBold" LetterSpacing="0.5"/>
-										</Border>
-										<Border Background="#1E3A2B" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" IsVisible="{Binding IsUp}" Margin="0,0,8,3">
-											<TextBlock Text="UP" Foreground="#4FCB97" FontSize="9.5" FontWeight="Bold"/>
-										</Border>
-										<Border Background="#2A2126" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" IsVisible="{Binding !IsUp}" Margin="0,0,8,3">
-											<TextBlock Text="DOWN" Foreground="#C08088" FontSize="9.5" FontWeight="Bold"/>
-										</Border>
-										<TextBlock Text="{Binding Speed}" Foreground="#9E9FA8" FontSize="10.5"
-												   FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center" Margin="0,0,0,3"/>
-									</WrapPanel>
-
-									<Button Grid.Column="1" Classes="copy-btn" VerticalAlignment="Top"
-											Command="{Binding ((vm:NetworkInfoViewModel)DataContext).CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-											CommandParameter="{Binding Summary}" ToolTip.Tip="Copy all fields">
-										<Path Data="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
-											  Fill="#9E9FA8" Width="13" Height="13" Stretch="Uniform"/>
-									</Button>
-								</Grid>
-
-								<TextBlock Text="{Binding Model}" Foreground="#8A8B93" FontSize="10.5" TextWrapping="Wrap"/>
-
-								<Border Height="1" Background="#22242B"/>
-
-								<!-- Values: label + selectable value, using the full row width -->
-								<Grid ColumnDefinitions="*,*" ColumnSpacing="18" RowSpacing="10">
-									<Grid.RowDefinitions>
-										<RowDefinition Height="Auto"/>
-										<RowDefinition Height="Auto"/>
-										<RowDefinition Height="Auto"/>
-										<RowDefinition Height="Auto"/>
-									</Grid.RowDefinitions>
-
-									<StackPanel Grid.Row="0" Grid.Column="0" Spacing="2">
-										<TextBlock Classes="fieldLabel" Text="IPV4"/>
-										<SelectableTextBlock Classes="val" Text="{Binding IPv4}"/>
+				<ScrollViewer Grid.Row="1">
+					<ItemsControl ItemsSource="{Binding Adapters}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate x:DataType="vm:NetworkAdapterInfo">
+								<Border Classes="card" Margin="0,0,0,10" Padding="16,13">
+									<StackPanel Spacing="11">
+										<Grid ColumnDefinitions="*, Auto">
+											<WrapPanel Grid.Column="0" VerticalAlignment="Center">
+												<TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="#42B883" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,3"/>
+												<Border Background="#24262E" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" Margin="0,0,8,3">
+													<TextBlock Text="{Binding Type}" Foreground="#C7C8CF" FontSize="9.5" FontWeight="SemiBold" LetterSpacing="0.5"/>
+												</Border>
+												<Border Background="#1E3A2B" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" IsVisible="{Binding IsUp}" Margin="0,0,8,3">
+													<TextBlock Text="UP" Foreground="#4FCB97" FontSize="9.5" FontWeight="Bold"/>
+												</Border>
+												<Border Background="#2A2126" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" IsVisible="{Binding !IsUp}" Margin="0,0,8,3">
+													<TextBlock Text="DOWN" Foreground="#C08088" FontSize="9.5" FontWeight="Bold"/>
+												</Border>
+												<TextBlock Text="{Binding Speed}" Foreground="#9E9FA8" FontSize="10.5"
+														   FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center" Margin="0,0,0,3"/>
+											</WrapPanel>
+											<Button Grid.Column="1" Classes="copy-btn" VerticalAlignment="Top"
+													Command="{Binding ((vm:NetworkInfoViewModel)DataContext).CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+													CommandParameter="{Binding Summary}" ToolTip.Tip="Copy all fields">
+												<Path Data="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
+													  Fill="#9E9FA8" Width="13" Height="13" Stretch="Uniform"/>
+											</Button>
+										</Grid>
+										<TextBlock Text="{Binding Model}" Foreground="#8A8B93" FontSize="10.5" TextWrapping="Wrap"/>
+										<Border Height="1" Background="#22242B"/>
+										<Grid ColumnDefinitions="*,*" ColumnSpacing="18" RowSpacing="10">
+											<Grid.RowDefinitions>
+												<RowDefinition Height="Auto"/>
+												<RowDefinition Height="Auto"/>
+												<RowDefinition Height="Auto"/>
+												<RowDefinition Height="Auto"/>
+											</Grid.RowDefinitions>
+											<StackPanel Grid.Row="0" Grid.Column="0" Spacing="2">
+												<TextBlock Classes="fieldLabel" Text="IPV4"/>
+												<SelectableTextBlock Classes="val" Text="{Binding IPv4}"/>
+											</StackPanel>
+											<StackPanel Grid.Row="0" Grid.Column="1" Spacing="2">
+												<TextBlock Classes="fieldLabel" Text="MAC"/>
+												<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding MacAddress}"/>
+											</StackPanel>
+											<StackPanel Grid.Row="1" Grid.Column="0" Spacing="2">
+												<TextBlock Classes="fieldLabel" Text="SUBNET"/>
+												<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding Subnet}"/>
+											</StackPanel>
+											<StackPanel Grid.Row="1" Grid.Column="1" Spacing="2">
+												<TextBlock Classes="fieldLabel" Text="GATEWAY"/>
+												<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding Gateway}"/>
+											</StackPanel>
+											<StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Spacing="2">
+												<TextBlock Classes="fieldLabel" Text="IPV6"/>
+												<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding IPv6}" TextWrapping="Wrap"/>
+											</StackPanel>
+											<StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Spacing="2">
+												<TextBlock Classes="fieldLabel" Text="DNS SERVERS"/>
+												<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding Dns}" TextWrapping="Wrap"/>
+											</StackPanel>
+										</Grid>
 									</StackPanel>
-									<StackPanel Grid.Row="0" Grid.Column="1" Spacing="2">
-										<TextBlock Classes="fieldLabel" Text="MAC"/>
-										<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding MacAddress}"/>
-									</StackPanel>
+								</Border>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</ScrollViewer>
+			</Grid>
+		</TabItem>
 
-									<StackPanel Grid.Row="1" Grid.Column="0" Spacing="2">
-										<TextBlock Classes="fieldLabel" Text="SUBNET"/>
-										<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding Subnet}"/>
-									</StackPanel>
-									<StackPanel Grid.Row="1" Grid.Column="1" Spacing="2">
-										<TextBlock Classes="fieldLabel" Text="GATEWAY"/>
-										<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding Gateway}"/>
-									</StackPanel>
+		<!-- ============================ NEIGHBORS ============================ -->
+		<TabItem Classes="subtab" Header="NEIGHBORS">
+			<Grid RowDefinitions="Auto, Auto, *" Margin="0,8,0,0">
+				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
+					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+						<TextBlock Text="LOCAL NETWORK NEIGHBORS" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
+						<TextBlock Text="Devices in this machine's ARP cache (IP ↔ MAC)" FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap"/>
+					</StackPanel>
+					<Button Grid.Column="1" Classes="refresh-btn" Command="{Binding RefreshNeighborsCommand}" VerticalAlignment="Center">
+						<TextBlock Text="REFRESH" FontSize="11" FontWeight="SemiBold" LetterSpacing="1" Foreground="#42B883"/>
+					</Button>
+				</Grid>
 
-									<StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Spacing="2">
-										<TextBlock Classes="fieldLabel" Text="IPV6"/>
-										<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding IPv6}" TextWrapping="Wrap"/>
-									</StackPanel>
+				<Grid Grid.Row="1" ColumnDefinitions="*,180,80,110" Margin="4,0,4,4" IsVisible="{Binding NeighborsHasRows}">
+					<TextBlock Grid.Column="0" Classes="colhead" Text="IP ADDRESS"/>
+					<TextBlock Grid.Column="1" Classes="colhead" Text="MAC"/>
+					<TextBlock Grid.Column="2" Classes="colhead" Text="TYPE"/>
+					<TextBlock Grid.Column="3" Classes="colhead" Text="INTERFACE"/>
+				</Grid>
 
-									<StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Spacing="2">
-										<TextBlock Classes="fieldLabel" Text="DNS SERVERS"/>
-										<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding Dns}" TextWrapping="Wrap"/>
-									</StackPanel>
-								</Grid>
-							</StackPanel>
-						</Border>
-					</DataTemplate>
-				</ItemsControl.ItemTemplate>
-			</ItemsControl>
-		</ScrollViewer>
-	</Grid>
+				<ScrollViewer Grid.Row="2" IsVisible="{Binding NeighborsHasRows}">
+					<ItemsControl ItemsSource="{Binding Neighbors}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate x:DataType="h:Neighbor">
+								<Border Classes="zebra" CornerRadius="4" Padding="4,0">
+									<Grid ColumnDefinitions="*,180,80,110" Height="27">
+										<TextBlock Grid.Column="0" Classes="cell" Foreground="#ECECEF" Text="{Binding Ip}"/>
+										<TextBlock Grid.Column="1" Classes="cell" Text="{Binding Mac}"/>
+										<TextBlock Grid.Column="2" Classes="cell" Foreground="#9E9FA8" Text="{Binding Kind}"/>
+										<TextBlock Grid.Column="3" Classes="cell" Foreground="#9E9FA8" Text="{Binding Iface}"/>
+									</Grid>
+								</Border>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</ScrollViewer>
+
+				<Border Grid.Row="2" IsVisible="{Binding !NeighborsHasRows}" Background="#14161A" BorderBrush="#22242B" BorderThickness="1" CornerRadius="8" Padding="24" VerticalAlignment="Top" Margin="0,4,0,0">
+					<StackPanel Spacing="8" HorizontalAlignment="Center">
+						<TextBlock Text="⛔ NOT AVAILABLE" FontSize="11" FontWeight="Bold" LetterSpacing="1" Foreground="#8A8B93" HorizontalAlignment="Center"/>
+						<TextBlock Text="{Binding NeighborsNote}" FontSize="11.5" Foreground="#9E9FA8" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="380"/>
+					</StackPanel>
+				</Border>
+			</Grid>
+		</TabItem>
+
+		<!-- ============================ PORTS ============================ -->
+		<TabItem Classes="subtab" Header="PORTS">
+			<Grid RowDefinitions="Auto, Auto, *" Margin="0,8,0,0">
+				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
+					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+						<TextBlock Text="LISTENING &amp; ACTIVE PORTS" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
+						<TextBlock Text="TCP/UDP endpoints open on this machine" FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap"/>
+					</StackPanel>
+					<Button Grid.Column="1" Classes="refresh-btn" Command="{Binding RefreshPortsCommand}" VerticalAlignment="Center">
+						<TextBlock Text="REFRESH" FontSize="11" FontWeight="SemiBold" LetterSpacing="1" Foreground="#42B883"/>
+					</Button>
+				</Grid>
+
+				<Grid Grid.Row="1" ColumnDefinitions="60,*,*,120" Margin="4,0,4,4" IsVisible="{Binding PortsHasRows}">
+					<TextBlock Grid.Column="0" Classes="colhead" Text="PROTO"/>
+					<TextBlock Grid.Column="1" Classes="colhead" Text="LOCAL"/>
+					<TextBlock Grid.Column="2" Classes="colhead" Text="REMOTE"/>
+					<TextBlock Grid.Column="3" Classes="colhead" Text="STATE"/>
+				</Grid>
+
+				<ScrollViewer Grid.Row="2" IsVisible="{Binding PortsHasRows}">
+					<ItemsControl ItemsSource="{Binding Ports}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate x:DataType="h:PortEntry">
+								<Border Classes="zebra" CornerRadius="4" Padding="4,0">
+									<Grid ColumnDefinitions="60,*,*,120" Height="26">
+										<TextBlock Grid.Column="0" Classes="cell" Foreground="#7FB4FF" Text="{Binding Proto}"/>
+										<TextBlock Grid.Column="1" Classes="cell" Foreground="#ECECEF" Text="{Binding Local}"/>
+										<TextBlock Grid.Column="2" Classes="cell" Foreground="#9E9FA8" Text="{Binding Remote}"/>
+										<TextBlock Grid.Column="3" Classes="cell" Foreground="#55C795" Text="{Binding State}"/>
+									</Grid>
+								</Border>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</ScrollViewer>
+
+				<Border Grid.Row="2" IsVisible="{Binding !PortsHasRows}" Background="#14161A" BorderBrush="#22242B" BorderThickness="1" CornerRadius="8" Padding="24" VerticalAlignment="Top" Margin="0,4,0,0">
+					<StackPanel Spacing="8" HorizontalAlignment="Center">
+						<TextBlock Text="⛔ NOT AVAILABLE" FontSize="11" FontWeight="Bold" LetterSpacing="1" Foreground="#8A8B93" HorizontalAlignment="Center"/>
+						<TextBlock Text="{Binding PortsNote}" FontSize="11.5" Foreground="#9E9FA8" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="380"/>
+					</StackPanel>
+				</Border>
+			</Grid>
+		</TabItem>
+
+		<!-- ============================ ROUTING ============================ -->
+		<TabItem Classes="subtab" Header="ROUTING">
+			<Grid RowDefinitions="Auto, Auto, *" Margin="0,8,0,0">
+				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
+					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+						<TextBlock Text="ROUTING TABLE" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
+						<TextBlock Text="IPv4 routes (read-only)" FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap"/>
+					</StackPanel>
+					<Button Grid.Column="1" Classes="refresh-btn" Command="{Binding RefreshRoutesCommand}" VerticalAlignment="Center">
+						<TextBlock Text="REFRESH" FontSize="11" FontWeight="SemiBold" LetterSpacing="1" Foreground="#42B883"/>
+					</Button>
+				</Grid>
+
+				<Grid Grid.Row="1" ColumnDefinitions="*,*,110,70" Margin="4,0,4,4" IsVisible="{Binding RoutesHasRows}">
+					<TextBlock Grid.Column="0" Classes="colhead" Text="DESTINATION"/>
+					<TextBlock Grid.Column="1" Classes="colhead" Text="GATEWAY"/>
+					<TextBlock Grid.Column="2" Classes="colhead" Text="INTERFACE"/>
+					<TextBlock Grid.Column="3" Classes="colhead" Text="METRIC"/>
+				</Grid>
+
+				<ScrollViewer Grid.Row="2" IsVisible="{Binding RoutesHasRows}">
+					<ItemsControl ItemsSource="{Binding Routes}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate x:DataType="h:RouteEntry">
+								<Border Classes="zebra" CornerRadius="4" Padding="4,0">
+									<Grid ColumnDefinitions="*,*,110,70" Height="26">
+										<TextBlock Grid.Column="0" Classes="cell" Foreground="#ECECEF" Text="{Binding Destination}"/>
+										<TextBlock Grid.Column="1" Classes="cell" Foreground="#ECECEF" Text="{Binding Gateway}"/>
+										<TextBlock Grid.Column="2" Classes="cell" Foreground="#9E9FA8" Text="{Binding Iface}"/>
+										<TextBlock Grid.Column="3" Classes="cell" Foreground="#9E9FA8" Text="{Binding Metric}"/>
+									</Grid>
+								</Border>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</ScrollViewer>
+
+				<Border Grid.Row="2" IsVisible="{Binding !RoutesHasRows}" Background="#14161A" BorderBrush="#22242B" BorderThickness="1" CornerRadius="8" Padding="24" VerticalAlignment="Top" Margin="0,4,0,0">
+					<StackPanel Spacing="8" HorizontalAlignment="Center">
+						<TextBlock Text="⛔ NOT AVAILABLE" FontSize="11" FontWeight="Bold" LetterSpacing="1" Foreground="#8A8B93" HorizontalAlignment="Center"/>
+						<TextBlock Text="{Binding RoutesNote}" FontSize="11.5" Foreground="#9E9FA8" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="380"/>
+					</StackPanel>
+				</Border>
+			</Grid>
+		</TabItem>
+
+	</TabControl>
 </UserControl>
