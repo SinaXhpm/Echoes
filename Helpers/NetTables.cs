@@ -28,6 +28,8 @@ public sealed class PortEntry
     public string Local { get; init; } = "";
     public string Remote { get; init; } = "";
     public string State { get; init; } = "";
+    public string Process { get; init; } = "—";
+    public int Pid { get; init; }
     public bool IsListen => State == "LISTEN";
 }
 
@@ -56,37 +58,47 @@ public static class NetTables
     {
         try
         {
-            var g = IPGlobalProperties.GetIPGlobalProperties();
-            var rows = new List<PortEntry>();
-
-            foreach (var c in g.GetActiveTcpConnections())
-                rows.Add(new PortEntry
-                {
-                    Proto = "TCP",
-                    Local = c.LocalEndPoint.ToString(),
-                    Remote = c.RemoteEndPoint.ToString(),
-                    State = TcpStateText(c.State),
-                });
-
-            foreach (var l in g.GetActiveTcpListeners())
-                rows.Add(new PortEntry { Proto = "TCP", Local = l.ToString(), Remote = "*", State = "LISTEN" });
-
-            foreach (var u in g.GetActiveUdpListeners())
-                rows.Add(new PortEntry { Proto = "UDP", Local = u.ToString(), Remote = "*", State = "—" });
+            List<PortEntry> rows;
+            if (OperatingSystem.IsWindows())
+            {
+                // Prefer the owner-PID tables so we can show which process holds each port. If the
+                // iphlpapi entry points are ever missing, fall back to the process-less managed list.
+                try { rows = WindowsPortsWithPid(); }
+                catch { rows = ManagedPorts(); }
+            }
+            else
+            {
+                rows = ManagedPorts();
+            }
 
             // Listening sockets first, then by protocol/port — the ones people scan for on top.
-            var ordered = rows
+            rows = rows
                 .OrderByDescending(r => r.IsListen)
                 .ThenBy(r => r.Proto, StringComparer.Ordinal)
                 .ThenBy(r => PortOf(r.Local))
                 .ToList();
-            return new NetResult<PortEntry>(true, ordered);
+            return new NetResult<PortEntry>(true, rows);
         }
         catch (Exception ex)
         {
             // Android restricts /proc/net/tcp for non-system apps → this throws; report unsupported.
             return new NetResult<PortEntry>(false, new List<PortEntry>(), Note(ex));
         }
+    }
+
+    // Cross-platform port list via the managed BCL. No owning-process info (that needs OS-specific
+    // calls), so Process stays "—". Used everywhere except the Windows fast path below.
+    private static List<PortEntry> ManagedPorts()
+    {
+        var g = IPGlobalProperties.GetIPGlobalProperties();
+        var rows = new List<PortEntry>();
+        foreach (var c in g.GetActiveTcpConnections())
+            rows.Add(new PortEntry { Proto = "TCP", Local = c.LocalEndPoint.ToString(), Remote = c.RemoteEndPoint.ToString(), State = TcpStateText(c.State) });
+        foreach (var l in g.GetActiveTcpListeners())
+            rows.Add(new PortEntry { Proto = "TCP", Local = l.ToString(), Remote = "*", State = "LISTEN" });
+        foreach (var u in g.GetActiveUdpListeners())
+            rows.Add(new PortEntry { Proto = "UDP", Local = u.ToString(), Remote = "*", State = "—" });
+        return rows;
     }
 
     private static int PortOf(string endpoint)
@@ -211,7 +223,134 @@ public static class NetTables
     [DllImport("iphlpapi.dll")]
     private static extern int GetIpForwardTable(IntPtr pIpForwardTable, ref int pdwSize, bool bOrder);
 
+    [DllImport("iphlpapi.dll", SetLastError = true)]
+    private static extern uint GetExtendedTcpTable(IntPtr pTable, ref int size, bool order, int af, int tableClass, int reserved);
+
+    [DllImport("iphlpapi.dll", SetLastError = true)]
+    private static extern uint GetExtendedUdpTable(IntPtr pTable, ref int size, bool order, int af, int tableClass, int reserved);
+
     private const int ERROR_INSUFFICIENT_BUFFER = 122;
+    private const int AF_INET = 2, AF_INET6 = 23;
+    private const int TCP_TABLE_OWNER_PID_ALL = 5, UDP_TABLE_OWNER_PID = 1;
+
+    // Windows: the *_OWNER_PID tables give every endpoint plus the PID that owns it, which we resolve
+    // to a process name. Any failure here bubbles up so GetPorts() can fall back to the managed list.
+    private static List<PortEntry> WindowsPortsWithPid()
+    {
+        var rows = new List<PortEntry>();
+        var nameCache = new Dictionary<int, string>();
+        ReadTcpTable(AF_INET, false, rows, nameCache);
+        ReadTcpTable(AF_INET6, true, rows, nameCache);
+        ReadUdpTable(AF_INET, false, rows, nameCache);
+        ReadUdpTable(AF_INET6, true, rows, nameCache);
+        return rows;
+    }
+
+    private static void ReadTcpTable(int af, bool v6, List<PortEntry> rows, Dictionary<int, string> cache)
+    {
+        int size = 0;
+        GetExtendedTcpTable(IntPtr.Zero, ref size, true, af, TCP_TABLE_OWNER_PID_ALL, 0);
+        if (size == 0) return;
+        IntPtr buf = Marshal.AllocHGlobal(size);
+        try
+        {
+            if (GetExtendedTcpTable(buf, ref size, true, af, TCP_TABLE_OWNER_PID_ALL, 0) != 0) return;
+            int count = Marshal.ReadInt32(buf);
+            int rowSize = v6 ? 56 : 24;
+            for (int i = 0; i < count; i++)
+            {
+                long p = buf.ToInt64() + 4 + (long)i * rowSize;
+                int state, lport, rport, pid; string local, remote;
+                if (v6)
+                {
+                    // MIB_TCP6ROW_OWNER_PID: localAddr[16] localScope(4) localPort(4) remoteAddr[16] remoteScope(4) remotePort(4) state(4) pid(4)
+                    var la = Bytes(p + 0, 16); lport = PortAt(p + 20);
+                    var ra = Bytes(p + 24, 16); rport = PortAt(p + 44);
+                    state = Marshal.ReadInt32((IntPtr)(p + 48)); pid = Marshal.ReadInt32((IntPtr)(p + 52));
+                    local = $"[{new IPAddress(la)}]:{lport}"; remote = $"[{new IPAddress(ra)}]:{rport}";
+                }
+                else
+                {
+                    // MIB_TCPROW_OWNER_PID: state(4) localAddr(4) localPort(4) remoteAddr(4) remotePort(4) pid(4)
+                    state = Marshal.ReadInt32((IntPtr)(p + 0));
+                    var la = Bytes(p + 4, 4); lport = PortAt(p + 8);
+                    var ra = Bytes(p + 12, 4); rport = PortAt(p + 16);
+                    pid = Marshal.ReadInt32((IntPtr)(p + 20));
+                    local = $"{new IPAddress(la)}:{lport}"; remote = $"{new IPAddress(ra)}:{rport}";
+                }
+                bool listen = state == 2; // MIB_TCP_STATE_LISTEN
+                rows.Add(new PortEntry
+                {
+                    Proto = "TCP",
+                    Local = local,
+                    Remote = listen ? "*" : remote,
+                    State = MibTcpStateText(state),
+                    Process = ProcName(pid, cache),
+                    Pid = pid,
+                });
+            }
+        }
+        finally { Marshal.FreeHGlobal(buf); }
+    }
+
+    private static void ReadUdpTable(int af, bool v6, List<PortEntry> rows, Dictionary<int, string> cache)
+    {
+        int size = 0;
+        GetExtendedUdpTable(IntPtr.Zero, ref size, true, af, UDP_TABLE_OWNER_PID, 0);
+        if (size == 0) return;
+        IntPtr buf = Marshal.AllocHGlobal(size);
+        try
+        {
+            if (GetExtendedUdpTable(buf, ref size, true, af, UDP_TABLE_OWNER_PID, 0) != 0) return;
+            int count = Marshal.ReadInt32(buf);
+            int rowSize = v6 ? 28 : 12;
+            for (int i = 0; i < count; i++)
+            {
+                long p = buf.ToInt64() + 4 + (long)i * rowSize;
+                string local; int pid;
+                if (v6)
+                {
+                    // MIB_UDP6ROW_OWNER_PID: localAddr[16] scope(4) localPort(4) pid(4)
+                    var la = Bytes(p + 0, 16); int lport = PortAt(p + 20); pid = Marshal.ReadInt32((IntPtr)(p + 24));
+                    local = $"[{new IPAddress(la)}]:{lport}";
+                }
+                else
+                {
+                    // MIB_UDPROW_OWNER_PID: localAddr(4) localPort(4) pid(4)
+                    var la = Bytes(p + 0, 4); int lport = PortAt(p + 4); pid = Marshal.ReadInt32((IntPtr)(p + 8));
+                    local = $"{new IPAddress(la)}:{lport}";
+                }
+                rows.Add(new PortEntry { Proto = "UDP", Local = local, Remote = "*", State = "—", Process = ProcName(pid, cache), Pid = pid });
+            }
+        }
+        finally { Marshal.FreeHGlobal(buf); }
+    }
+
+    private static byte[] Bytes(long addr, int n) { var b = new byte[n]; Marshal.Copy((IntPtr)addr, b, 0, n); return b; }
+
+    // The port DWORD holds the port in network byte order in its low 16 bits.
+    private static int PortAt(long addr) { uint d = (uint)Marshal.ReadInt32((IntPtr)addr); return (int)(((d & 0xFF) << 8) | ((d >> 8) & 0xFF)); }
+
+    private static string MibTcpStateText(int s) => s switch
+    {
+        1 => "CLOSED", 2 => "LISTEN", 3 => "SYN_SENT", 4 => "SYN_RECV", 5 => "ESTABLISHED",
+        6 => "FIN_WAIT_1", 7 => "FIN_WAIT_2", 8 => "CLOSE_WAIT", 9 => "CLOSING",
+        10 => "LAST_ACK", 11 => "TIME_WAIT", 12 => "DELETE_TCB", _ => s.ToString(),
+    };
+
+    // Resolve a PID to a process name, cached. Never throws — access-denied / exited processes just
+    // show "pid N" so a locked-down box or a race with a closing process can't crash the list.
+    private static string ProcName(int pid, Dictionary<int, string> cache)
+    {
+        if (pid == 0) return "System Idle";
+        if (pid == 4) return "System";
+        if (cache.TryGetValue(pid, out var cached)) return cached;
+        string name;
+        try { using var pr = System.Diagnostics.Process.GetProcessById(pid); name = pr.ProcessName; }
+        catch { name = $"pid {pid}"; }
+        cache[pid] = name;
+        return name;
+    }
 
     private static List<Neighbor> WindowsArp()
     {

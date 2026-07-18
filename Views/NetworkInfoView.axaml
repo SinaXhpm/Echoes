@@ -46,21 +46,42 @@
 			<Setter Property="TextWrapping" Value="Wrap"/>
 		</Style>
 
-		<!-- inner sub-tabs -->
+		<!-- inner sub-tabs: transparent, green underline + green text when selected -->
 		<Style Selector="TabItem.subtab">
 			<Setter Property="FontSize" Value="11"/>
 			<Setter Property="FontWeight" Value="SemiBold"/>
 			<Setter Property="LetterSpacing" Value="0.5"/>
 			<Setter Property="Foreground" Value="#9E9FA8"/>
-			<Setter Property="Padding" Value="12,5"/>
+			<Setter Property="Padding" Value="14,6"/>
 			<Setter Property="MinHeight" Value="0"/>
-			<Setter Property="Margin" Value="0,0,4,0"/>
+			<Setter Property="Margin" Value="0,0,2,0"/>
 		</Style>
-		<Style Selector="TabItem.subtab:selected">
-			<Setter Property="Foreground" Value="#55C795"/>
+		<Style Selector="TabItem.subtab /template/ Border#PART_LayoutRoot">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Transitions">
+				<Transitions>
+					<BrushTransition Property="Background" Duration="0:0:0.12"/>
+				</Transitions>
+			</Setter>
+		</Style>
+		<Style Selector="TabItem.subtab:pointerover /template/ Border#PART_LayoutRoot">
+			<Setter Property="Background" Value="#14FFFFFF"/>
 		</Style>
 		<Style Selector="TabItem.subtab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
 			<Setter Property="Foreground" Value="#D7D8DE"/>
+		</Style>
+		<Style Selector="TabItem.subtab:selected /template/ Border#PART_LayoutRoot">
+			<Setter Property="Background" Value="Transparent"/>
+		</Style>
+		<Style Selector="TabItem.subtab:selected /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Foreground" Value="#55C795"/>
+		</Style>
+		<Style Selector="TabItem.subtab:selected /template/ Border#PART_SelectedPipe">
+			<Setter Property="Background" Value="#55C795"/>
+			<Setter Property="Height" Value="2"/>
+			<Setter Property="CornerRadius" Value="1"/>
+			<Setter Property="Margin" Value="6,0"/>
 		</Style>
 
 		<!-- table cells -->
@@ -232,11 +253,12 @@
 					</Button>
 				</Grid>
 
-				<Grid Grid.Row="1" ColumnDefinitions="60,*,*,120" Margin="4,0,4,4" IsVisible="{Binding PortsHasRows}">
+				<Grid Grid.Row="1" ColumnDefinitions="50,*,*,90,134" Margin="4,0,4,4" IsVisible="{Binding PortsHasRows}">
 					<TextBlock Grid.Column="0" Classes="colhead" Text="PROTO"/>
 					<TextBlock Grid.Column="1" Classes="colhead" Text="LOCAL"/>
 					<TextBlock Grid.Column="2" Classes="colhead" Text="REMOTE"/>
 					<TextBlock Grid.Column="3" Classes="colhead" Text="STATE"/>
+					<TextBlock Grid.Column="4" Classes="colhead" Text="PROCESS"/>
 				</Grid>
 
 				<ScrollViewer Grid.Row="2" IsVisible="{Binding PortsHasRows}">
@@ -244,11 +266,13 @@
 						<ItemsControl.ItemTemplate>
 							<DataTemplate x:DataType="h:PortEntry">
 								<Border Classes="zebra" CornerRadius="4" Padding="4,0">
-									<Grid ColumnDefinitions="60,*,*,120" Height="26">
+									<Grid ColumnDefinitions="50,*,*,90,134" Height="26">
 										<TextBlock Grid.Column="0" Classes="cell" Foreground="#7FB4FF" Text="{Binding Proto}"/>
 										<TextBlock Grid.Column="1" Classes="cell" Foreground="#ECECEF" Text="{Binding Local}"/>
 										<TextBlock Grid.Column="2" Classes="cell" Foreground="#9E9FA8" Text="{Binding Remote}"/>
 										<TextBlock Grid.Column="3" Classes="cell" Foreground="#55C795" Text="{Binding State}"/>
+										<TextBlock Grid.Column="4" Classes="cell" Foreground="#CBA6E6" Text="{Binding Process}"
+												   ToolTip.Tip="{Binding Pid, StringFormat='PID {0}'}"/>
 									</Grid>
 								</Border>
 							</DataTemplate>
