@@ -93,7 +93,7 @@
 				<TabItem Classes="navtab" Header="CLOUDFLARE"><views:CloudflareView DataContext="{Binding CloudflareVM}"/></TabItem>
 				<TabItem Classes="navtab" Header="SCANNER"><views:PortScannerView DataContext="{Binding PortScannerVM}"/></TabItem>
 				<TabItem Classes="navtab" Header="WEB SERVER"><views:WebServerView DataContext="{Binding WebServerVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="NIC"><views:NetworkInfoView DataContext="{Binding NetworkVM}"/></TabItem>
+				<TabItem Classes="navtab" Header="NETWORK"><views:NetworkInfoView DataContext="{Binding NetworkVM}"/></TabItem>
 				<TabItem Classes="navtab" Header="MONITOR"><views:MonitorView DataContext="{Binding MonitorVM}"/></TabItem>
 				<TabItem Classes="navtab" Header="SSH"><views:SshView DataContext="{Binding SshVM}"/></TabItem>
 				<TabItem Classes="navtab" Header="TELEGRAM BOT">

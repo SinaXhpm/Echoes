@@ -72,7 +72,7 @@
 					<ListBoxItem>SSH</ListBoxItem>
 					<ListBoxItem>STRING LAB</ListBoxItem>
 					<ListBoxItem>NOTES</ListBoxItem>
-					<ListBoxItem>NIC</ListBoxItem>
+					<ListBoxItem>NETWORK</ListBoxItem>
 					<ListBoxItem>BACKUP</ListBoxItem>
 					<ListBoxItem>HISTORY</ListBoxItem>
 					<ListBoxItem>WEB SERVER</ListBoxItem>

@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Echoes.Helpers;
 
 namespace Echoes.ViewModels;
 
@@ -40,13 +41,60 @@ public partial class NetworkInfoViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<NetworkAdapterInfo> _adapters = new();
 
+    // --- Ports (listening + active connections) ---
+    [ObservableProperty] private ObservableCollection<PortEntry> _ports = new();
+    [ObservableProperty] private bool _portsHasRows;
+    [ObservableProperty] private string _portsNote = string.Empty;
+
+    // --- Neighbors (ARP cache) ---
+    [ObservableProperty] private ObservableCollection<Neighbor> _neighbors = new();
+    [ObservableProperty] private bool _neighborsHasRows;
+    [ObservableProperty] private string _neighborsNote = string.Empty;
+
+    // --- Routing table ---
+    [ObservableProperty] private ObservableCollection<RouteEntry> _routes = new();
+    [ObservableProperty] private bool _routesHasRows;
+    [ObservableProperty] private string _routesNote = string.Empty;
+
     public NetworkInfoViewModel()
     {
         _ = RefreshAsync();
+        _ = RefreshPorts();
+        _ = RefreshNeighbors();
+        _ = RefreshRoutes();
     }
 
     [RelayCommand]
     private async Task Refresh() => await RefreshAsync();
+
+    [RelayCommand]
+    private async Task RefreshPorts()
+    {
+        var r = await Task.Run(NetTables.GetPorts);
+        Ports = new ObservableCollection<PortEntry>(r.Rows);
+        PortsHasRows = r.Supported && r.Rows.Count > 0;
+        PortsNote = !r.Supported ? (r.Note ?? "Not available on this platform.") : "No open ports found.";
+    }
+
+    [RelayCommand]
+    private async Task RefreshNeighbors()
+    {
+        var r = await Task.Run(NetTables.GetNeighbors);
+        Neighbors = new ObservableCollection<Neighbor>(r.Rows);
+        NeighborsHasRows = r.Supported && r.Rows.Count > 0;
+        NeighborsNote = !r.Supported
+            ? (r.Note ?? "Not available on this platform.")
+            : "No neighbors in the ARP cache yet — ping a device on your LAN, then refresh.";
+    }
+
+    [RelayCommand]
+    private async Task RefreshRoutes()
+    {
+        var r = await Task.Run(NetTables.GetRoutes);
+        Routes = new ObservableCollection<RouteEntry>(r.Rows);
+        RoutesHasRows = r.Supported && r.Rows.Count > 0;
+        RoutesNote = !r.Supported ? (r.Note ?? "Not available on this platform.") : "No routes found.";
+    }
 
     private async Task RefreshAsync()
     {

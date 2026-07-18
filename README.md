@@ -39,7 +39,7 @@ The desktop builds are self-contained (Native AOT) — no .NET runtime needed.
 - **SSH Terminal** — terminal with ANSI colors, command history, and SOCKS5 proxy/tunneling.
 - **DNS & WHOIS** — query DNS records (A, AAAA, MX, TXT, …) via custom resolvers with a multi-select type picker, plus RDAP domain lookups; paste a full URL and it extracts the host automatically.
 - **Host Checker** — check a host from servers around the world (via check-host.net): **ping / HTTP / TCP / DNS** from multiple global nodes at once, with per-node latency, status, and country flag, plus an optional proxy.
-- **NIC Explorer** — network adapters with IPv4/IPv6, MAC, and status (desktop only).
+- **Network** — a multi-view panel: **Interfaces** (adapters with IPv4/IPv6, MAC, gateway, DNS, speed), local **Neighbors** (the ARP cache — IP ↔ MAC), **Ports** (listening + active TCP/UDP endpoints), and the **Routing** table. Interfaces work on every platform; neighbors/ports/routing are desktop features and show a clear "not available" notice where the OS doesn't expose them.
 
 ### Web & API
 - **cURL Client** — a GUI for HTTP requests with HTTP/SOCKS proxy, IP override, and full logging, plus a built-in web view to preview the response.
