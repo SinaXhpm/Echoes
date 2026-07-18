@@ -13,8 +13,8 @@
     <RootNamespace>Echoes.Android</RootNamespace>
 
     <ApplicationId>com.sinaxhpm.echoes</ApplicationId>
-    <ApplicationVersion>8</ApplicationVersion>
-    <ApplicationDisplayVersion>0.3.3</ApplicationDisplayVersion>
+    <ApplicationVersion>9</ApplicationVersion>
+    <ApplicationDisplayVersion>0.3.4</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <!-- Ship only real-device ABIs; x86/x86_64 are emulator-only and roughly double the native payload. -->
     <RuntimeIdentifiers>android-arm64;android-arm</RuntimeIdentifiers>
