@@ -35,6 +35,9 @@ public partial class MainView : UserControl
             case TabItem { Header: "WEB SERVER" }:
                 vm.WebServerVM.RefreshAddressesCommand.Execute(null);
                 break;
+            case TabItem { Header: "PROXY" }:
+                vm.ProxyVM.RefreshAddressesCommand.Execute(null);
+                break;
         }
     }
 }

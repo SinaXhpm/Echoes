@@ -26,6 +26,7 @@ public partial class MainViewModel : ObservableObject
     private BackupViewModel? _backupVM;
     private WebServerViewModel? _webServerVM;
     private CheckHostViewModel? _checkHostVM;
+    private ProxyViewModel? _proxyVM;
     public PingViewModel PingVM => _pingVM ??= new();
     public DnsViewModel DnsVM => _dnsVM ??= new();
     public CurlViewModel CurlVM => _curlVM ??= new();
@@ -41,12 +42,14 @@ public partial class MainViewModel : ObservableObject
     public BackupViewModel BackupVM => _backupVM ??= new();
     public WebServerViewModel WebServerVM => _webServerVM ??= new();
     public CheckHostViewModel CheckHostVM => _checkHostVM ??= new();
+    public ProxyViewModel ProxyVM => _proxyVM ??= new();
 
     // Flush debounced persistence + release the file-share listening socket on shutdown.
     public void FlushOnExit()
     {
         _cloudflareVM?.FlushPendingSave();
         _webServerVM?.StopServer();
+        _proxyVM?.StopServer();
     }
 
     [ObservableProperty] private string _currentVersion;
