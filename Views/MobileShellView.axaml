@@ -76,6 +76,7 @@
 					<ListBoxItem>BACKUP</ListBoxItem>
 					<ListBoxItem>HISTORY</ListBoxItem>
 					<ListBoxItem>WEB SERVER</ListBoxItem>
+					<ListBoxItem>PROXY</ListBoxItem>
 				</ListBox>
 			</DockPanel>
 		</SplitView.Pane>
@@ -123,6 +124,7 @@
 					<views:BackupView DataContext="{Binding BackupVM}"/>
 					<views:HistoryView DataContext="{Binding HistoryVM}"/>
 					<views:WebServerView DataContext="{Binding WebServerVM}"/>
+					<views:ProxyView DataContext="{Binding ProxyVM}"/>
 				</Carousel>
 			</Grid>
 		</SplitView.Content>

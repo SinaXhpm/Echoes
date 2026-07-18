@@ -44,6 +44,7 @@ The desktop builds are self-contained (Native AOT) — no .NET runtime needed.
 ### Web & API
 - **cURL Client** — a GUI for HTTP requests with HTTP/SOCKS proxy, IP override, and full logging, plus a built-in web view to preview the response.
 - **Web Server** — share files and folders over HTTP with any device on your network in one click. Comes with a branded landing page, live stats (active connections, total downloads, bytes sent, unique clients), per-file counters, and copy/QR share links. A pure managed server — no external dependency, works on desktop and Android.
+- **Proxy Server** — run a **SOCKS5 + HTTP** forward proxy on a single port; the protocol is auto-detected per connection. Optional username/password auth (SOCKS5 user/pass per RFC 1929 + HTTP Basic 407), a live connection log (target, user, status), and traffic stats. Pure managed sockets — no external binary, works on desktop and Android.
 - **Cloudflare DNS Manager** — manage a domain's DNS straight from the app: list zones and add / edit / delete records (A, AAAA, CNAME, MX, TXT, …), toggle proxied vs DNS-only, and set TTL. Authenticate with an API Token or Global API Key + email, keep several named connection profiles (each with its own proxy), all locked behind a master password in an encrypted vault.
 - **Telegram Bot Tester** — call Bot API methods and see the raw verbose response.
 - **SSL Inspector** — read a site's TLS certificate (subject, issuer, validity, key, chain).

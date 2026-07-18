@@ -35,6 +35,7 @@ public partial class MobileShellView : UserControl
                 case "CURL": vm.CurlVM.RefreshInterfaces(); break;
                 case "HISTORY": vm.HistoryVM.Reload(); break;
                 case "WEB SERVER": vm.WebServerVM.RefreshAddressesCommand.Execute(null); break;
+                case "PROXY": vm.ProxyVM.RefreshAddressesCommand.Execute(null); break;
             }
         }
     }

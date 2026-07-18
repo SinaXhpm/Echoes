@@ -1,0 +1,197 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
+             xmlns:sys="using:System"
+             x:Class="Echoes.Views.ProxyView"
+             x:DataType="vm:ProxyViewModel">
+    <UserControl.Styles>
+        <Style Selector="TextBlock.colhead">
+            <Setter Property="FontSize" Value="9.5"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="LetterSpacing" Value="0.5"/>
+            <Setter Property="Foreground" Value="#8A8B93"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.cell">
+            <Setter Property="FontFamily" Value="Cascadia Code,Consolas"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="#D7D8DE"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Border.zebra:nth-child(2n)">
+            <Setter Property="Background" Value="#0A131417"/>
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="12" Margin="14,12,14,14">
+
+            <!-- ===== LISTEN SETTINGS + START ===== -->
+            <StackPanel Spacing="7">
+                <TextBlock Classes="fieldLabel" Text="PROXY SERVER  ·  SOCKS5 + HTTP"/>
+                <Border Classes="card" Padding="14,9">
+                    <StackPanel Spacing="9">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <TextBlock Grid.Column="0" Text="Listen on" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <ComboBox Grid.Column="1" Classes="field" ItemsSource="{Binding BindOptions}" SelectedItem="{Binding SelectedBind}"
+                                      HorizontalAlignment="Stretch"
+                                      ToolTip.Tip="Which address the proxy binds to. 0.0.0.0 = reachable from other devices on your LAN; 127.0.0.1 = this device only.">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:BindOption">
+                                        <TextBlock Text="{Binding Label}" FontSize="11.5"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </Grid>
+                        <WrapPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,22,3">
+                                <TextBlock Text="Port" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" ShowButtonSpinner="False"
+                                               Height="30" Width="80" FontSize="11.5" HorizontalContentAlignment="Center" CornerRadius="6"
+                                               Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,22,3">
+                                <TextBlock Text="Max conns" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,8,0"
+                                           ToolTip.Tip="Maximum simultaneous connections"/>
+                                <NumericUpDown Value="{Binding MaxConnections}" Minimum="1" Maximum="512" ShowButtonSpinner="False"
+                                               Height="30" Width="70" FontSize="11.5" HorizontalContentAlignment="Center" CornerRadius="6"
+                                               Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
+                            </StackPanel>
+                            <CheckBox IsChecked="{Binding RequireAuth}" Content="Require auth" FontSize="11.5"
+                                      FontWeight="SemiBold" Foreground="#C7C8CF" VerticalAlignment="Center" Margin="0,3,0,3"
+                                      ToolTip.Tip="Require a username/password (SOCKS5 user/pass + HTTP Basic)"/>
+                        </WrapPanel>
+                        <Grid ColumnDefinitions="*, *" ColumnSpacing="8" IsVisible="{Binding RequireAuth}">
+                            <TextBox Grid.Column="0" Classes="field" Text="{Binding AuthUser}" PlaceholderText="username"/>
+                            <TextBox Grid.Column="1" Classes="field" Text="{Binding AuthPass}" PasswordChar="●" PlaceholderText="password"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10" Margin="0,2,0,0">
+                            <Button Grid.Column="0" Classes="toggle" Command="{Binding ToggleServerCommand}" Classes.active="{Binding IsRunning}"
+                                    Height="32" Width="150">
+                                <Panel>
+                                    <TextBlock Text="START PROXY" IsVisible="{Binding !IsRunning}" FontSize="11" FontWeight="Bold"/>
+                                    <TextBlock Text="STOP" IsVisible="{Binding IsRunning}" FontSize="11" FontWeight="Bold"/>
+                                </Panel>
+                            </Button>
+                            <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" FontSize="11" Foreground="#42B883"
+                                       FontFamily="Cascadia Code,Consolas" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ===== LIVE STATS + PROXY ADDRESS (while running) ===== -->
+            <Border Classes="card" Padding="12,8" IsVisible="{Binding IsRunning}">
+                <WrapPanel>
+                    <WrapPanel.Styles>
+                        <Style Selector="StackPanel.stat">
+                            <Setter Property="Orientation" Value="Horizontal"/>
+                            <Setter Property="Margin" Value="0,2,24,2"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                        <Style Selector="StackPanel.stat > TextBlock.k">
+                            <Setter Property="FontSize" Value="10.5"/>
+                            <Setter Property="Foreground" Value="#9E9FA8"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="Margin" Value="0,0,6,0"/>
+                        </Style>
+                        <Style Selector="StackPanel.stat > TextBlock.v">
+                            <Setter Property="FontSize" Value="13"/>
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="Foreground" Value="#7FCBA6"/>
+                            <Setter Property="FontFamily" Value="Cascadia Code,Consolas"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                    </WrapPanel.Styles>
+                    <StackPanel Classes="stat">
+                        <TextBlock Classes="k" Text="active"/>
+                        <TextBlock Classes="v" Text="{Binding ActiveConnections}"/>
+                    </StackPanel>
+                    <StackPanel Classes="stat">
+                        <TextBlock Classes="k" Text="total conns"/>
+                        <TextBlock Classes="v" Text="{Binding TotalConnections}"/>
+                    </StackPanel>
+                    <StackPanel Classes="stat">
+                        <TextBlock Classes="k" Text="traffic"/>
+                        <TextBlock Classes="v" Text="{Binding TrafficText}"/>
+                    </StackPanel>
+                </WrapPanel>
+            </Border>
+
+            <!-- ===== PROXY ADDRESS (while running) ===== -->
+            <StackPanel Spacing="6" IsVisible="{Binding IsRunning}">
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBlock Grid.Column="0" Classes="fieldLabel" Text="PROXY ADDRESS  ·  point your client here" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Classes="ghost" Command="{Binding RefreshAddressesCommand}" Content="↻ REFRESH" FontSize="10.5"/>
+                </Grid>
+                <ItemsControl ItemsSource="{Binding Addresses}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="sys:String">
+                            <Border Background="#16311F" BorderBrush="#1E3A2B" BorderThickness="1" CornerRadius="6"
+                                    Padding="10,7" Margin="0,0,0,5">
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <TextBlock Grid.Column="0" Text="{Binding}" FontSize="12.5" Foreground="#7FCBA6"
+                                               FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <Button Grid.Column="1" Content="COPY" FontSize="10" Classes="ghost" Padding="8,3"
+                                            Command="{Binding $parent[ItemsControl].((vm:ProxyViewModel)DataContext).CopyAddressCommand}"
+                                            CommandParameter="{Binding}"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="Use it as a SOCKS5 proxy or an HTTP proxy — same host:port. In a browser/curl set the proxy to this address (and the credentials if auth is on)."
+                           FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap" Margin="2,0"/>
+            </StackPanel>
+
+            <!-- ===== CONNECTION LOG ===== -->
+            <StackPanel Spacing="6">
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBlock Grid.Column="0" Classes="fieldLabel" Text="CONNECTIONS" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Classes="ghost" Command="{Binding ClearLogCommand}" Content="CLEAR" FontSize="10.5"/>
+                </Grid>
+                <Border Classes="card" Padding="8" MinHeight="150">
+                    <Grid RowDefinitions="Auto,*">
+                        <Grid Grid.Row="0" ColumnDefinitions="62,58,*,74,118" Margin="4,0,4,6" IsVisible="{Binding HasConnections}">
+                            <TextBlock Grid.Column="0" Classes="colhead" Text="TIME"/>
+                            <TextBlock Grid.Column="1" Classes="colhead" Text="PROTO"/>
+                            <TextBlock Grid.Column="2" Classes="colhead" Text="TARGET"/>
+                            <TextBlock Grid.Column="3" Classes="colhead" Text="USER"/>
+                            <TextBlock Grid.Column="4" Classes="colhead" Text="STATUS"/>
+                        </Grid>
+
+                        <TextBlock Grid.Row="1" Text="Connections appear here as clients use the proxy."
+                                   FontSize="11.5" Foreground="#6B6C74" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   IsVisible="{Binding !HasConnections}"/>
+
+                        <ScrollViewer Grid.Row="1" MaxHeight="300" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                      IsVisible="{Binding HasConnections}">
+                            <ItemsControl ItemsSource="{Binding Connections}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="helpers:ProxyLogEntry">
+                                        <Border Classes="zebra" CornerRadius="4" Padding="4,0" ToolTip.Tip="{Binding Client, StringFormat='client {0}'}">
+                                            <Grid ColumnDefinitions="62,58,*,74,118" Height="26">
+                                                <TextBlock Grid.Column="0" Classes="cell" Foreground="#9E9FA8" Text="{Binding Time}"/>
+                                                <TextBlock Grid.Column="1" Classes="cell" Foreground="#7FB4FF" Text="{Binding Proto}"/>
+                                                <TextBlock Grid.Column="2" Classes="cell" Foreground="#ECECEF" Text="{Binding Target}"/>
+                                                <TextBlock Grid.Column="3" Classes="cell" Foreground="#CBA6E6" Text="{Binding User}"/>
+                                                <Panel Grid.Column="4">
+                                                    <TextBlock Classes="cell" Foreground="#55C795" Text="{Binding Status}" IsVisible="{Binding Ok}"/>
+                                                    <TextBlock Classes="cell" Foreground="#E0736F" Text="{Binding Status}" IsVisible="{Binding !Ok}"/>
+                                                </Panel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
