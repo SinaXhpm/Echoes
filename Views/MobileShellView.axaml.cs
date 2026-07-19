@@ -28,7 +28,8 @@ public partial class MobileShellView : UserControl
             Split.IsPaneOpen = false; // close the drawer after picking a tool
 
         // Mirror the desktop shell's per-tab refresh so live data is current when shown.
-        if (DataContext is MainViewModel vm && (sender as ListBox)?.SelectedItem is ListBoxItem { Content: string name })
+        // The tool name lives in Tag: Content is now an icon + label panel, not a bare string.
+        if (DataContext is MainViewModel vm && (sender as ListBox)?.SelectedItem is ListBoxItem { Tag: string name })
         {
             switch (name)
             {
