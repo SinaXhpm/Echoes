@@ -6,29 +6,6 @@
              x:DataType="vm:MainViewModel"
              Background="#0F1012">
 
-	<UserControl.Resources>
-		<!-- Drawer glyphs. Outline geometries drawn in a 24x24 box and stroked (not filled), so a
-		     single set reads correctly against the drawer's light-on-dark palette; the stroke colour
-		     is driven by the ListBoxItem state below rather than baked in. -->
-		<StreamGeometry x:Key="IcoPing">M4.5 11 a10.6 10.6 0 0 1 15 0 M7.5 14 a6.4 6.4 0 0 1 9 0 M10.5 17 a2.2 2.2 0 0 1 3 0</StreamGeometry>
-		<StreamGeometry x:Key="IcoDns">M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M3 12 H21 M12 3 A5.5 9 0 0 0 12 21 M12 3 A5.5 9 0 0 1 12 21</StreamGeometry>
-		<StreamGeometry x:Key="IcoScanner">M11 4 A7 7 0 1 0 11 18 A7 7 0 1 0 11 4 Z M16 16 L21 21</StreamGeometry>
-		<StreamGeometry x:Key="IcoNetwork">M9.5 3 h5 v4 h-5 Z M2.5 17 h5 v4 h-5 Z M16.5 17 h5 v4 h-5 Z M12 7 v3.5 M5 17 v-2.5 h14 v2.5 M12 10.5 v4</StreamGeometry>
-		<StreamGeometry x:Key="IcoProxy">M3 8.5 H17 M14 5.5 L17 8.5 L14 11.5 M21 15.5 H7 M10 12.5 L7 15.5 L10 18.5</StreamGeometry>
-		<StreamGeometry x:Key="IcoWebServer">M3.5 4.5 h17 v5 h-17 Z M3.5 14.5 h17 v5 h-17 Z M6.5 7 m-0.8 0 a0.8 0.8 0 1 0 1.6 0 a0.8 0.8 0 1 0 -1.6 0 M6.5 17 m-0.8 0 a0.8 0.8 0 1 0 1.6 0 a0.8 0.8 0 1 0 -1.6 0</StreamGeometry>
-		<StreamGeometry x:Key="IcoIpInfo">M12 21 C12 21 18.5 14.4 18.5 10 A6.5 6.5 0 1 0 5.5 10 C5.5 14.4 12 21 12 21 Z M12 12.5 A2.5 2.5 0 1 0 12 7.5 A2.5 2.5 0 1 0 12 12.5</StreamGeometry>
-		<StreamGeometry x:Key="IcoCheckHost">M10 3 A7 7 0 1 0 10 17 A7 7 0 1 0 10 3 Z M3 10 H17 M10 3 A4.4 7 0 0 0 10 17 M10 3 A4.4 7 0 0 1 10 17 M14.5 18.5 l2.2 2.2 L21.5 16</StreamGeometry>
-		<StreamGeometry x:Key="IcoCurl">M3 5 h18 v14 h-18 Z M3 9 h18 M7 12.5 l2 2 l-2 2 M12.5 16.5 h5</StreamGeometry>
-		<StreamGeometry x:Key="IcoTelegram">M21.5 3.5 L2.5 11 l7 2.5 l2.5 7 Z M9.5 13.5 L21.5 3.5</StreamGeometry>
-		<StreamGeometry x:Key="IcoMonitor">M2.5 12 H7 L9.5 6.5 L13 17.5 L15.5 12 H21.5</StreamGeometry>
-		<StreamGeometry x:Key="IcoCloudflare">M18.5 18 H7 A4.5 4.5 0 1 1 7.6 9 A5.5 5.5 0 0 1 18 11.2 A3.4 3.4 0 0 1 18.5 18 Z</StreamGeometry>
-		<StreamGeometry x:Key="IcoSsh">M4 6.5 l4.5 5 l-4.5 5 M12.5 17 h7.5</StreamGeometry>
-		<StreamGeometry x:Key="IcoStringLab">M9 6.5 L3.5 12 L9 17.5 M15 6.5 L20.5 12 L15 17.5</StreamGeometry>
-		<StreamGeometry x:Key="IcoNotes">M6 3 h8 l4 4 v14 h-12 Z M14 3 v4 h4 M8.5 12 h7 M8.5 16 h7</StreamGeometry>
-		<StreamGeometry x:Key="IcoBackup">M3.5 4.5 h17 v4 h-17 Z M5 8.5 v11 h14 v-11 M12 11 v5 M9.5 13.5 L12 16 l2.5 -2.5</StreamGeometry>
-		<StreamGeometry x:Key="IcoHistory">M12 3 A9 9 0 1 1 3.6 15 M3 4 v5 h5 M12 7.5 V12.5 L15.5 14.5</StreamGeometry>
-		<StreamGeometry x:Key="IcoAbout">M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M12 11 V16.5 M12 7.3 V8.8</StreamGeometry>
-	</UserControl.Resources>
 
 	<UserControl.Styles>
 		<!-- Phase 1 mobile shell: bump touch targets / font sizes for the embedded
@@ -52,18 +29,6 @@
 		<Style Selector="CheckBox">
 			<Setter Property="MinHeight" Value="36"/>
 		</Style>
-		<!-- Drawer glyphs: stroked outlines, so colour comes from Stroke (a Path does not inherit
-		     Foreground the way a TextBlock does). Sized in the 24x24 space the geometries are drawn in. -->
-		<Style Selector="Path.ico">
-			<Setter Property="Stroke" Value="#8CFFFFFF"/>
-			<Setter Property="StrokeThickness" Value="1.6"/>
-			<Setter Property="StrokeLineCap" Value="Round"/>
-			<Setter Property="StrokeJoin" Value="Round"/>
-			<Setter Property="Width" Value="24"/>
-			<Setter Property="Height" Value="24"/>
-			<Setter Property="Stretch" Value="None"/>
-			<Setter Property="VerticalAlignment" Value="Center"/>
-		</Style>
 	</UserControl.Styles>
 
 	<SplitView x:Name="Split"
@@ -81,7 +46,7 @@
 						   Opacity="0.9" Margin="18,4,0,12"/>
 				<!-- Opens the GitHub repo in the browser (LinkHelper works on Android too). Kept out of the
 				     nav ListBox on purpose: that list is index-coupled to the Carousel. -->
-				<Button DockPanel.Dock="Bottom" Command="{Binding OpenGitHubCommand}"
+				<Button DockPanel.Dock="Bottom" Command="{Binding OpenGitHubCommand}" AutomationProperties.Name="ABOUT"
 						Background="Transparent" BorderThickness="0" Padding="16,10" Margin="0,6,0,10"
 						HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
 					<StackPanel Orientation="Horizontal" Spacing="12">
@@ -120,103 +85,103 @@
 							<Setter Property="Background" Value="#255034"/>
 						</Style>
 					</ListBox.Styles>
-					<ListBoxItem Tag="PING">
+					<ListBoxItem Tag="PING" AutomationProperties.Name="PING">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoPing}"/>
 							<TextBlock Text="PING" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="DNS">
+					<ListBoxItem Tag="DNS" AutomationProperties.Name="DNS">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoDns}"/>
 							<TextBlock Text="DNS" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="SCANNER">
+					<ListBoxItem Tag="SCANNER" AutomationProperties.Name="SCANNER">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoScanner}"/>
 							<TextBlock Text="SCANNER" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="NETWORK">
+					<ListBoxItem Tag="NETWORK" AutomationProperties.Name="NETWORK">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoNetwork}"/>
 							<TextBlock Text="NETWORK" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="PROXY">
+					<ListBoxItem Tag="PROXY" AutomationProperties.Name="PROXY">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoProxy}"/>
 							<TextBlock Text="PROXY" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="WEB SERVER">
+					<ListBoxItem Tag="WEB SERVER" AutomationProperties.Name="WEB SERVER">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoWebServer}"/>
 							<TextBlock Text="WEB SERVER" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="IP INFO">
+					<ListBoxItem Tag="IP INFO" AutomationProperties.Name="IP INFO">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoIpInfo}"/>
 							<TextBlock Text="IP INFO" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="CHECK-HOST">
+					<ListBoxItem Tag="CHECK-HOST" AutomationProperties.Name="CHECK-HOST">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoCheckHost}"/>
 							<TextBlock Text="CHECK-HOST" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="CURL">
+					<ListBoxItem Tag="CURL" AutomationProperties.Name="CURL">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoCurl}"/>
 							<TextBlock Text="CURL" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="TELEGRAM BOT">
+					<ListBoxItem Tag="TELEGRAM BOT" AutomationProperties.Name="TELEGRAM BOT">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoTelegram}"/>
 							<TextBlock Text="TELEGRAM BOT" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="MONITOR">
+					<ListBoxItem Tag="MONITOR" AutomationProperties.Name="MONITOR">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoMonitor}"/>
 							<TextBlock Text="MONITOR" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="CLOUDFLARE">
+					<ListBoxItem Tag="CLOUDFLARE" AutomationProperties.Name="CLOUDFLARE">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoCloudflare}"/>
 							<TextBlock Text="CLOUDFLARE" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="SSH">
+					<ListBoxItem Tag="SSH" AutomationProperties.Name="SSH">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoSsh}"/>
 							<TextBlock Text="SSH" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="STRING LAB">
+					<ListBoxItem Tag="STRING LAB" AutomationProperties.Name="STRING LAB">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoStringLab}"/>
 							<TextBlock Text="STRING LAB" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="NOTES">
+					<ListBoxItem Tag="NOTES" AutomationProperties.Name="NOTES">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoNotes}"/>
 							<TextBlock Text="NOTES" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="BACKUP">
+					<ListBoxItem Tag="BACKUP" AutomationProperties.Name="BACKUP">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoBackup}"/>
 							<TextBlock Text="BACKUP" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="HISTORY">
+					<ListBoxItem Tag="HISTORY" AutomationProperties.Name="HISTORY">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoHistory}"/>
 							<TextBlock Text="HISTORY" VerticalAlignment="Center"/>

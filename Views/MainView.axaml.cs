@@ -24,18 +24,19 @@ public partial class MainView : UserControl
         if (!ReferenceEquals(e.Source, MainTabs)) return;
         if (DataContext is not MainViewModel vm) return;
 
+        // Matched on Tag: Header is now an icon + label panel, not a bare string.
         switch (MainTabs.SelectedItem)
         {
-            case TabItem { Header: "CURL" }:
+            case TabItem { Tag: "CURL" }:
                 vm.CurlVM.RefreshInterfaces();
                 break;
-            case TabItem { Header: "HISTORY" }:
+            case TabItem { Tag: "HISTORY" }:
                 vm.HistoryVM.Reload();
                 break;
-            case TabItem { Header: "WEB SERVER" }:
+            case TabItem { Tag: "WEB SERVER" }:
                 vm.WebServerVM.RefreshAddressesCommand.Execute(null);
                 break;
-            case TabItem { Header: "PROXY" }:
+            case TabItem { Tag: "PROXY" }:
                 vm.ProxyVM.RefreshAddressesCommand.Execute(null);
                 break;
         }
