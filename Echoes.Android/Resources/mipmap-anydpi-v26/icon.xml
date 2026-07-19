@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Adaptive icon (Android 8/API 26+). The foreground is the full 108dp layer with the circular
-     logo baked in at ~80dp (icon_fg.png), so it fills the launcher's circle mask edge-to-edge while
-     leaving the outer bleed transparent. The background is transparent — no dark plate shows in the
-     squircle/rounded-square corners; the logo sits alone on the wallpaper. -->
+     logo baked in at 68dp (icon_fg.png) — comfortably inside the 72dp mask viewport, so no launcher
+     mask (circle / squircle / rounded square) clips the logo's rim. The background is the solid
+     dark plate that matches the logo's interior. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@drawable/icon_background"/>
     <foreground android:drawable="@mipmap/icon_fg"/>

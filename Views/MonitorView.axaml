@@ -59,21 +59,19 @@
                             <CheckBox IsChecked="{Binding CheckTcp}" Content="TCP" ToolTip.Tip="TCP connect to the port (default 80, or host:port)"/>
                             <CheckBox IsChecked="{Binding CheckHttp}" Content="HTTP" ToolTip.Tip="HTTP GET — status code + latency"/>
 
-                            <!-- divider -->
-                            <Border Width="1" Height="18" Background="#33363F" Margin="6,0,16,0" VerticalAlignment="Center"/>
+                            <!-- No divider here: once the row wraps on a narrow screen it is left
+                                 dangling at the end of the line as a stray mark. -->
 
-                            <!-- cadence + timeout kept together (one wrap unit) so they never split across rows -->
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,16,3">
-                                    <TextBlock Text="Interval" FontSize="11.5" Foreground="#C7C8CF" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                    <TextBox Classes="field" Text="{Binding Interval}" Width="50" HorizontalContentAlignment="Center"/>
-                                    <TextBlock Text="sec" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="5,0,0,0"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,16,3">
-                                    <TextBlock Text="Timeout" FontSize="11.5" Foreground="#C7C8CF" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                    <TextBox Classes="field" Text="{Binding TimeoutMs}" Width="62" HorizontalContentAlignment="Center"/>
-                                    <TextBlock Text="ms" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="5,0,0,0"/>
-                                </StackPanel>
+                            <!-- Interval and Timeout wrap independently — as one unit they overflow the frame. -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,16,3">
+                                <TextBlock Text="Interval" FontSize="11.5" Foreground="#C7C8CF" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                <TextBox Classes="field" Text="{Binding Interval}" Width="50" HorizontalContentAlignment="Center"/>
+                                <TextBlock Text="sec" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,16,3">
+                                <TextBlock Text="Timeout" FontSize="11.5" Foreground="#C7C8CF" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                <TextBox Classes="field" Text="{Binding TimeoutMs}" Width="62" HorizontalContentAlignment="Center"/>
+                                <TextBlock Text="ms" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="5,0,0,0"/>
                             </StackPanel>
                             <CheckBox IsChecked="{Binding AlertSound}" Foreground="#C7C8CF" Margin="0,3,0,3"
                                       Content="Sound alert" ToolTip.Tip="Beep when a target goes up or down"/>

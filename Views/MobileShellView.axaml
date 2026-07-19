@@ -4,7 +4,7 @@
              xmlns:views="using:Echoes.Views"
              x:Class="Echoes.Views.MobileShellView"
              x:DataType="vm:MainViewModel"
-             Background="#1e1e1e">
+             Background="#0F1012">
 
 	<UserControl.Styles>
 		<!-- Phase 1 mobile shell: bump touch targets / font sizes for the embedded
@@ -63,6 +63,9 @@
 					<ListBoxItem>PING</ListBoxItem>
 					<ListBoxItem>DNS</ListBoxItem>
 					<ListBoxItem>SCANNER</ListBoxItem>
+					<ListBoxItem>NETWORK</ListBoxItem>
+					<ListBoxItem>PROXY</ListBoxItem>
+					<ListBoxItem>WEB SERVER</ListBoxItem>
 					<ListBoxItem>IP INFO</ListBoxItem>
 					<ListBoxItem>CHECK-HOST</ListBoxItem>
 					<ListBoxItem>CURL</ListBoxItem>
@@ -72,11 +75,8 @@
 					<ListBoxItem>SSH</ListBoxItem>
 					<ListBoxItem>STRING LAB</ListBoxItem>
 					<ListBoxItem>NOTES</ListBoxItem>
-					<ListBoxItem>NETWORK</ListBoxItem>
 					<ListBoxItem>BACKUP</ListBoxItem>
 					<ListBoxItem>HISTORY</ListBoxItem>
-					<ListBoxItem>WEB SERVER</ListBoxItem>
-					<ListBoxItem>PROXY</ListBoxItem>
 				</ListBox>
 			</DockPanel>
 		</SplitView.Pane>
@@ -104,12 +104,16 @@
 				<Carousel Grid.Row="1" x:Name="Pages"
 						  SelectedIndex="{Binding #Nav.SelectedIndex}"
 						  PageTransition="{x:Null}">
+					<!-- Order MUST match the Nav ListBox above (Carousel is index-coupled to it). -->
 					<views:PingView DataContext="{Binding PingVM}"/>
 					<views:DnsView DataContext="{Binding DnsVM}"/>
 					<views:PortScannerView DataContext="{Binding PortScannerVM}"/>
+					<views:NetworkInfoView DataContext="{Binding NetworkVM}"/>
+					<views:ProxyView DataContext="{Binding ProxyVM}"/>
+					<views:WebServerView DataContext="{Binding WebServerVM}"/>
 					<views:IpInfoView DataContext="{Binding IpInfoVM}"/>
 					<views:CheckHostView DataContext="{Binding CheckHostVM}"/>
-						<views:CurlView DataContext="{Binding CurlVM}"/>
+					<views:CurlView DataContext="{Binding CurlVM}"/>
 					<views:TgView>
 						<views:TgView.DataContext>
 							<vm:TgViewModel/>
@@ -120,11 +124,8 @@
 					<views:SshView DataContext="{Binding SshVM}"/>
 					<views:StringLabView DataContext="{Binding StringTool}"/>
 					<views:NoteView DataContext="{Binding NoteVM}"/>
-					<views:NetworkInfoView DataContext="{Binding NetworkVM}"/>
 					<views:BackupView DataContext="{Binding BackupVM}"/>
 					<views:HistoryView DataContext="{Binding HistoryVM}"/>
-					<views:WebServerView DataContext="{Binding WebServerVM}"/>
-					<views:ProxyView DataContext="{Binding ProxyVM}"/>
 				</Carousel>
 			</Grid>
 		</SplitView.Content>

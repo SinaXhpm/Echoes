@@ -7,6 +7,38 @@
              x:DataType="vm:MainViewModel"
              Background="#0F1012">
 
+	<UserControl.Styles>
+		<!-- The tab rail is a fixed vertical stack; once the window is shorter than the whole list
+		     the last tabs were simply unreachable. Re-template the TabControl so the tab strip lives
+		     in its own ScrollViewer (content host untouched) and the rail can scroll. -->
+		<Style Selector="TabControl#MainTabs">
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Background="{TemplateBinding Background}"
+							BorderBrush="{TemplateBinding BorderBrush}"
+							BorderThickness="{TemplateBinding BorderThickness}"
+							CornerRadius="{TemplateBinding CornerRadius}">
+						<DockPanel>
+							<ScrollViewer DockPanel.Dock="{TemplateBinding TabStripPlacement}"
+										  VerticalScrollBarVisibility="Auto"
+										  HorizontalScrollBarVisibility="Disabled"
+										  AllowAutoHide="True">
+								<ItemsPresenter Name="PART_ItemsPresenter"
+												ItemsPanel="{TemplateBinding ItemsPanel}"/>
+							</ScrollViewer>
+							<ContentPresenter Name="PART_SelectedContentHost"
+											  Margin="{TemplateBinding Padding}"
+											  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+											  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+											  Content="{TemplateBinding SelectedContent}"
+											  ContentTemplate="{TemplateBinding SelectedContentTemplate}"/>
+						</DockPanel>
+					</Border>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+	</UserControl.Styles>
+
 	<Panel>
 		<Grid RowDefinitions="Auto, *, Auto">
 
