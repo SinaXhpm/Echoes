@@ -44,11 +44,35 @@
             <!-- ===================== SETUP ===================== -->
             <!-- No ScrollViewer: a Grid fills the tab; TARGETS takes the '*' row and absorbs leftover height. -->
             <TabItem Header="SETUP">
-                <!-- Side-by-side: TARGETS (left, needs vertical height) | settings (right). -->
-                <Grid Margin="2,10,2,2" ColumnDefinitions="1*, 1.35*" ColumnSpacing="12">
+                <!-- Wide: TARGETS (left, needs vertical height) | settings (right).
+                     Narrow (phone): the two columns stack, otherwise each gets ~170px and the
+                     ports field and timing row are clipped by the frame. -->
+                <Grid x:Name="ScanSetupGrid" helpers:Responsive.BreakWidth="560" Margin="2,10,2,2"
+                      ColumnDefinitions="1*, 1.35*" RowDefinitions="Auto, *" ColumnSpacing="12" RowSpacing="10">
+                    <!-- Rows are Auto,* so that when stacked TARGETS sizes to its content at the top and
+                         the options block takes the slack. When wide both columns span both rows, so the
+                         split is irrelevant and each still fills the full height. -->
+                    <Grid.Styles>
+                        <Style Selector="Grid.wide > Grid#ScanTargetsCol">
+                            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Grid.RowSpan" Value="2"/>
+                        </Style>
+                        <Style Selector="Grid.narrow > Grid#ScanTargetsCol">
+                            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Grid.RowSpan" Value="1"/>
+                        </Style>
+                        <Style Selector="Grid.wide > Grid#ScanOptionsCol">
+                            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Grid.RowSpan" Value="2"/>
+                        </Style>
+                        <Style Selector="Grid.narrow > Grid#ScanOptionsCol">
+                            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Grid.RowSpan" Value="1"/>
+                        </Style>
+                        <!-- targets box is height-driven by the row when wide; cap it once stacked -->
+                        <Style Selector="Grid.narrow TextBox#ScanTargets">
+                            <Setter Property="Height" Value="110"/>
+                        </Style>
+                    </Grid.Styles>
 
                     <!-- LEFT: targets — fills the full height -->
-                    <Grid Grid.Column="0" RowDefinitions="Auto,*">
+                    <Grid x:Name="ScanTargetsCol" RowDefinitions="Auto,*">
                         <TextBlock Grid.Row="0" Classes="fieldLabel" Text="TARGETS" Margin="0,0,0,5"/>
                         <TextBox Grid.Row="1" x:Name="ScanTargets" Classes="field multiline" Text="{Binding TargetInput}" AcceptsReturn="True"
                                  VerticalContentAlignment="Top" KeyDown="Input_KeyDown"
@@ -56,7 +80,7 @@
                     </Grid>
 
                     <!-- RIGHT: ports + scan options + actions -->
-                    <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*,Auto">
+                    <Grid x:Name="ScanOptionsCol" RowDefinitions="Auto,Auto,*,Auto">
 
                         <!-- PORTS: unified field (custom typing OR pick a preset from the dropdown) -->
                         <StackPanel Grid.Row="0" Spacing="4">
@@ -84,8 +108,12 @@
 
                     <!-- protocol + nmap scan options + timing + interval/timeout -->
                     <Border Grid.Row="1" Classes="card" Padding="12,8" Margin="0,8,0,0">
-                        <WrapPanel>
+                        <WrapPanel helpers:Responsive.BreakWidth="430">
                             <WrapPanel.Styles>
+                                <!-- Group dividers read as stray marks once the row wraps -->
+                                <Style Selector="WrapPanel.narrow > Border.sep">
+                                    <Setter Property="IsVisible" Value="False"/>
+                                </Style>
                                 <Style Selector="CheckBox">
                                     <Setter Property="FontSize" Value="11.5"/>
                                     <Setter Property="FontWeight" Value="SemiBold"/>
@@ -126,9 +154,9 @@
                                           Background="#1D1E25" BorderBrush="#3B3D47" Foreground="#ECECEF"
                                           ToolTip.Tip="T0 Paranoid → T5 Insane — controls parallelism and per-port timeout"/>
                             </StackPanel>
-                            <!-- interval + timeout kept together (one wrap unit) so they never split across rows -->
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,14,3">
+                            <!-- Interval and Timeout wrap independently: as one unit they are ~330px and
+                                 overflow the frame on a phone. Each is still atomic on its own. -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,14,3">
                                     <TextBlock Text="Interval" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,7,0"/>
                                     <NumericUpDown Value="{Binding RepeatInterval}" Minimum="1" ShowButtonSpinner="False" Height="30" Width="62" FontSize="11.5"
                                                    HorizontalContentAlignment="Center" CornerRadius="6" Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
@@ -140,7 +168,6 @@
                                                    HorizontalContentAlignment="Center" CornerRadius="6" Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
                                     <TextBlock Text="ms" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="4,0,0,0"/>
                                 </StackPanel>
-                            </StackPanel>
                         </WrapPanel>
                     </Border>
 
