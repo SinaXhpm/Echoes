@@ -70,10 +70,11 @@
 						<Setter Property="FontWeight" Value="Medium"/>
 						<Setter Property="Foreground" Value="#9E9FA8"/>
 						<Setter Property="Margin" Value="0,1"/>
-						<Setter Property="Padding" Value="12,0"/>
-						<Setter Property="Height" Value="27"/>
-						<Setter Property="MinHeight" Value="27"/>
-						<Setter Property="Width" Value="118"/>
+						<!-- Sized to fit a 24px glyph plus the longest label ("TELEGRAM BOT"). -->
+						<Setter Property="Padding" Value="10,0"/>
+						<Setter Property="Height" Value="31"/>
+						<Setter Property="MinHeight" Value="31"/>
+						<Setter Property="Width" Value="150"/>
 						<Setter Property="CornerRadius" Value="6"/>
 						<Setter Property="HorizontalContentAlignment" Value="Left"/>
 						<Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -114,32 +115,143 @@
 					<Style Selector="TabItem.navtab:selected /template/ Border#PART_SelectedPipe">
 						<Setter Property="IsVisible" Value="False"/>
 					</Style>
+
+					<!-- Glyphs track the tab state via Stroke: the ContentPresenter Foreground rules
+					     above only reach the label, since a Path does not inherit Foreground. -->
+					<Style Selector="TabItem.navtab:pointerover Path.ico">
+						<Setter Property="Stroke" Value="#D7D8DE"/>
+					</Style>
+					<Style Selector="TabItem.navtab:selected Path.ico">
+						<Setter Property="Stroke" Value="#55C795"/>
+					</Style>
 				</TabControl.Styles>
 
 				<!-- Ordered by importance -->
-				<TabItem Classes="navtab" Header="PING"><views:PingView DataContext="{Binding PingVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="DNS"><views:DnsView DataContext="{Binding DnsVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="CURL"><views:CurlView DataContext="{Binding CurlVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="IP INFO"><views:IpInfoView DataContext="{Binding IpInfoVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="CHECK-HOST"><views:CheckHostView DataContext="{Binding CheckHostVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="CLOUDFLARE"><views:CloudflareView DataContext="{Binding CloudflareVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="SCANNER"><views:PortScannerView DataContext="{Binding PortScannerVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="WEB SERVER"><views:WebServerView DataContext="{Binding WebServerVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="PROXY"><views:ProxyView DataContext="{Binding ProxyVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="NETWORK"><views:NetworkInfoView DataContext="{Binding NetworkVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="MONITOR"><views:MonitorView DataContext="{Binding MonitorVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="SSH"><views:SshView DataContext="{Binding SshVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="TELEGRAM BOT">
+				<TabItem Classes="navtab" Tag="PING" AutomationProperties.Name="PING">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoPing}"/>
+							<TextBlock Text="PING" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:PingView DataContext="{Binding PingVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="DNS" AutomationProperties.Name="DNS">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoDns}"/>
+							<TextBlock Text="DNS" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:DnsView DataContext="{Binding DnsVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="CURL" AutomationProperties.Name="CURL">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoCurl}"/>
+							<TextBlock Text="CURL" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:CurlView DataContext="{Binding CurlVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="IP INFO" AutomationProperties.Name="IP INFO">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoIpInfo}"/>
+							<TextBlock Text="IP INFO" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:IpInfoView DataContext="{Binding IpInfoVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="CHECK-HOST" AutomationProperties.Name="CHECK-HOST">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoCheckHost}"/>
+							<TextBlock Text="CHECK-HOST" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:CheckHostView DataContext="{Binding CheckHostVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="CLOUDFLARE" AutomationProperties.Name="CLOUDFLARE">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoCloudflare}"/>
+							<TextBlock Text="CLOUDFLARE" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:CloudflareView DataContext="{Binding CloudflareVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="SCANNER" AutomationProperties.Name="SCANNER">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoScanner}"/>
+							<TextBlock Text="SCANNER" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:PortScannerView DataContext="{Binding PortScannerVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="WEB SERVER" AutomationProperties.Name="WEB SERVER">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoWebServer}"/>
+							<TextBlock Text="WEB SERVER" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:WebServerView DataContext="{Binding WebServerVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="PROXY" AutomationProperties.Name="PROXY">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoProxy}"/>
+							<TextBlock Text="PROXY" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:ProxyView DataContext="{Binding ProxyVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="NETWORK" AutomationProperties.Name="NETWORK">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoNetwork}"/>
+							<TextBlock Text="NETWORK" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:NetworkInfoView DataContext="{Binding NetworkVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="MONITOR" AutomationProperties.Name="MONITOR">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoMonitor}"/>
+							<TextBlock Text="MONITOR" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:MonitorView DataContext="{Binding MonitorVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="SSH" AutomationProperties.Name="SSH">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoSsh}"/>
+							<TextBlock Text="SSH" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:SshView DataContext="{Binding SshVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="TELEGRAM BOT" AutomationProperties.Name="TELEGRAM BOT">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoTelegram}"/>
+							<TextBlock Text="TELEGRAM BOT" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header>
 					<views:TgView>
 						<views:TgView.DataContext>
 							<vm:TgViewModel/>
 						</views:TgView.DataContext>
 					</views:TgView>
 				</TabItem>
-				<TabItem Classes="navtab" Header="STRING LAB"><views:StringLabView DataContext="{Binding StringTool}"/></TabItem>
-				<TabItem Classes="navtab" Header="NOTES"><views:NoteView DataContext="{Binding NoteVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="BACKUP"><views:BackupView DataContext="{Binding BackupVM}"/></TabItem>
-				<TabItem Classes="navtab" Header="HISTORY"><views:HistoryView DataContext="{Binding HistoryVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="STRING LAB" AutomationProperties.Name="STRING LAB">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoStringLab}"/>
+							<TextBlock Text="STRING LAB" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:StringLabView DataContext="{Binding StringTool}"/></TabItem>
+				<TabItem Classes="navtab" Tag="NOTES" AutomationProperties.Name="NOTES">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoNotes}"/>
+							<TextBlock Text="NOTES" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:NoteView DataContext="{Binding NoteVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="BACKUP" AutomationProperties.Name="BACKUP">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoBackup}"/>
+							<TextBlock Text="BACKUP" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:BackupView DataContext="{Binding BackupVM}"/></TabItem>
+				<TabItem Classes="navtab" Tag="HISTORY" AutomationProperties.Name="HISTORY">
+					<TabItem.Header>
+						<StackPanel Orientation="Horizontal" Spacing="9">
+							<Path Classes="ico" Data="{StaticResource IcoHistory}"/>
+							<TextBlock Text="HISTORY" VerticalAlignment="Center"/>
+						</StackPanel>
+					</TabItem.Header><views:HistoryView DataContext="{Binding HistoryVM}"/></TabItem>
 			</TabControl>
 
 			<Border Grid.Row="2" Height="22" Background="#0C0D0F" BorderBrush="#1C1D22" BorderThickness="0,1,0,0">

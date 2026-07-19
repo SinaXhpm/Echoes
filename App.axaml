@@ -3,6 +3,14 @@
              xmlns:local="using:Echoes"
              x:Class="Echoes.App"
              RequestedThemeVariant="Dark">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <!-- Per-tool glyphs shared by the desktop tab rail and the mobile drawer. -->
+        <ResourceInclude Source="avares://Echoes/Assets/ToolIcons.axaml"/>
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
   <Application.Styles>
     <FluentTheme />
     <Style Selector="TabItem">

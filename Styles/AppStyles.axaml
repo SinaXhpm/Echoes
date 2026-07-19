@@ -212,4 +212,18 @@
         <Setter Property="Foreground" Value="#D7D8DE"/>
     </Style>
 
+    <!-- Per-tool nav glyphs (Assets/ToolIcons.axaml), shared by the desktop tab rail and the mobile
+         drawer. Stroked, not filled: a Path does not inherit Foreground like a TextBlock, so each
+         shell overrides Stroke for its selected state. Drawn in a 24x24 box, hence Stretch=None. -->
+    <Style Selector="Path.ico">
+        <Setter Property="Stroke" Value="#8CFFFFFF"/>
+        <Setter Property="StrokeThickness" Value="1.6"/>
+        <Setter Property="StrokeLineCap" Value="Round"/>
+        <Setter Property="StrokeJoin" Value="Round"/>
+        <Setter Property="Width" Value="24"/>
+        <Setter Property="Height" Value="24"/>
+        <Setter Property="Stretch" Value="None"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
 </Styles>
