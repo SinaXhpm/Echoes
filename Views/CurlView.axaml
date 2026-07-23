@@ -70,8 +70,9 @@
                           ToolTip.Tip="curl -k — skip TLS certificate verification"/>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,0,2">
                     <TextBlock Text="Timeout" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <NumericUpDown Value="{Binding TimeoutSec}" Minimum="0" Maximum="99" ShowButtonSpinner="False"
-                                   Height="28" Width="38" FontSize="11" HorizontalContentAlignment="Center" CornerRadius="6"
+                    <NumericUpDown Value="{Binding TimeoutSec}" Minimum="0" Maximum="999" ShowButtonSpinner="False"
+                                   Height="28" Width="50" MinWidth="0" Padding="4,0" FontSize="11"
+                                   HorizontalContentAlignment="Center" CornerRadius="6"
                                    Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
                     <TextBlock Text="s" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="4,0,0,0"/>
                 </StackPanel>

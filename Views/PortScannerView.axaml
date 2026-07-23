@@ -44,10 +44,13 @@
             <!-- ===================== SETUP ===================== -->
             <!-- No ScrollViewer: a Grid fills the tab; TARGETS takes the '*' row and absorbs leftover height. -->
             <TabItem Header="SETUP">
+              <!-- Row 0 holds the responsive settings; the action buttons are pinned in row 1 so
+                   START is always reachable even when the window is too short to fit everything. -->
+              <Grid RowDefinitions="*, Auto" Margin="2,10,2,2">
                 <!-- Wide: TARGETS (left, needs vertical height) | settings (right).
                      Narrow (phone): the two columns stack, otherwise each gets ~170px and the
                      ports field and timing row are clipped by the frame. -->
-                <Grid x:Name="ScanSetupGrid" helpers:Responsive.BreakWidth="560" Margin="2,10,2,2"
+                <Grid Grid.Row="0" x:Name="ScanSetupGrid" helpers:Responsive.BreakWidth="440"
                       ColumnDefinitions="1*, 1.35*" RowDefinitions="Auto, *" ColumnSpacing="12" RowSpacing="10">
                     <!-- Rows are Auto,* so that when stacked TARGETS sizes to its content at the top and
                          the options block takes the slack. When wide both columns span both rows, so the
@@ -79,8 +82,8 @@
                                  PlaceholderText="IP / Range / CIDR — one per line&#x0a;(Enter = scan, Shift+Enter = newline)"/>
                     </Grid>
 
-                    <!-- RIGHT: ports + scan options + actions -->
-                    <Grid x:Name="ScanOptionsCol" RowDefinitions="Auto,Auto,*,Auto">
+                    <!-- RIGHT: ports + scan options (actions are pinned at the tab bottom, below) -->
+                    <Grid x:Name="ScanOptionsCol" RowDefinitions="Auto,Auto">
 
                         <!-- PORTS: unified field (custom typing OR pick a preset from the dropdown) -->
                         <StackPanel Grid.Row="0" Spacing="4">
@@ -171,20 +174,22 @@
                         </WrapPanel>
                     </Border>
 
-                    <!-- actions (pushed to the bottom, aligned with the tall targets) -->
-                    <Grid Grid.Row="3" ColumnDefinitions="*, Auto" ColumnSpacing="8" Margin="0,8,0,0" VerticalAlignment="Bottom">
-                        <Button Grid.Column="0" Classes="toggle" Command="{Binding ToggleScanCommand}"
-                                Classes.active="{Binding IsScanning}" Height="34" HorizontalAlignment="Stretch">
-                            <Panel>
-                                <TextBlock Text="START" IsVisible="{Binding !IsScanning}" FontSize="12"/>
-                                <TextBlock Text="STOP" IsVisible="{Binding IsScanning}" FontSize="12"/>
-                            </Panel>
-                        </Button>
-                        <Button Grid.Column="1" Classes="secondary" Click="Export_Click" Height="34"
-                                Content="EXPORT CSV" FontSize="11" Padding="14,0"/>
-                    </Grid>
                     </Grid>
                 </Grid>
+
+                <!-- actions pinned at the tab bottom (row 1) — always visible/reachable -->
+                <Grid Grid.Row="1" ColumnDefinitions="*, Auto" ColumnSpacing="8" Margin="0,10,0,0">
+                    <Button Grid.Column="0" Classes="toggle" Command="{Binding ToggleScanCommand}"
+                            Classes.active="{Binding IsScanning}" Height="34" HorizontalAlignment="Stretch">
+                        <Panel>
+                            <TextBlock Text="START" IsVisible="{Binding !IsScanning}" FontSize="12"/>
+                            <TextBlock Text="STOP" IsVisible="{Binding IsScanning}" FontSize="12"/>
+                        </Panel>
+                    </Button>
+                    <Button Grid.Column="1" Classes="secondary" Click="Export_Click" Height="34"
+                            Content="EXPORT CSV" FontSize="11" Padding="14,0"/>
+                </Grid>
+              </Grid>
             </TabItem>
 
             <!-- ===================== RESULTS ===================== -->
