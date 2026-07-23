@@ -105,7 +105,9 @@ Primary development and testing is on **Windows**. macOS, Linux, and Android bui
 
 ## License
 
-MIT.
+Echoes is released under the **[MIT License](LICENSE)** — one of the most permissive open-source licenses.
+
+You are free to **use, copy, modify, merge, publish, distribute, sublicense, and even sell** copies of the software, for any purpose, personal or commercial. Fork it, edit it, rebrand it, ship it inside your own product — no permission or royalty required. The only condition is that the copyright notice and license text stay included with substantial copies. The software is provided "as is", without warranty.
 
 ---
 
