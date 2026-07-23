@@ -42,154 +42,152 @@
         <TabControl>
 
             <!-- ===================== SETUP ===================== -->
-            <!-- No ScrollViewer: a Grid fills the tab; TARGETS takes the '*' row and absorbs leftover height. -->
+            <!-- Everything lives in one ScrollViewer so nothing can overflow onto (or overlap) the
+                 action buttons, and the buttons stay reachable on any window height. -->
             <TabItem Header="SETUP">
-              <!-- Row 0 holds the responsive settings; the action buttons are pinned in row 1 so
-                   START is always reachable even when the window is too short to fit everything. -->
-              <Grid RowDefinitions="*, Auto" Margin="2,10,2,2">
-                <!-- Wide: TARGETS (left, needs vertical height) | settings (right).
-                     Narrow (phone): the two columns stack, otherwise each gets ~170px and the
-                     ports field and timing row are clipped by the frame. -->
-                <Grid Grid.Row="0" x:Name="ScanSetupGrid" helpers:Responsive.BreakWidth="440"
-                      ColumnDefinitions="1*, 1.35*" RowDefinitions="Auto, *" ColumnSpacing="12" RowSpacing="10">
-                    <!-- Rows are Auto,* so that when stacked TARGETS sizes to its content at the top and
-                         the options block takes the slack. When wide both columns span both rows, so the
-                         split is irrelevant and each still fills the full height. -->
+              <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="2,10,2,2">
+                <StackPanel Spacing="12">
+
+                  <!-- Wide: TARGETS (left) | settings (right). Narrow (phone): the two stack. -->
+                  <Grid x:Name="ScanSetupGrid" helpers:Responsive.BreakWidth="440"
+                        ColumnDefinitions="1*, 1.35*" RowDefinitions="Auto, Auto" ColumnSpacing="12" RowSpacing="10">
                     <Grid.Styles>
                         <Style Selector="Grid.wide > Grid#ScanTargetsCol">
-                            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Grid.RowSpan" Value="2"/>
+                            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
                         </Style>
                         <Style Selector="Grid.narrow > Grid#ScanTargetsCol">
-                            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Grid.RowSpan" Value="1"/>
+                            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
                         </Style>
-                        <Style Selector="Grid.wide > Grid#ScanOptionsCol">
-                            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Grid.RowSpan" Value="2"/>
+                        <Style Selector="Grid.wide > StackPanel#ScanOptionsCol">
+                            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
                         </Style>
-                        <Style Selector="Grid.narrow > Grid#ScanOptionsCol">
-                            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Grid.RowSpan" Value="1"/>
+                        <Style Selector="Grid.narrow > StackPanel#ScanOptionsCol">
+                            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
                         </Style>
-                        <!-- targets box is height-driven by the row when wide; cap it once stacked -->
-                        <Style Selector="Grid.narrow TextBox#ScanTargets">
-                            <Setter Property="Height" Value="110"/>
-                        </Style>
+                        <!-- a tall targets box on desktop, a capped one on a phone -->
+                        <Style Selector="Grid.wide TextBox#ScanTargets"><Setter Property="MinHeight" Value="220"/></Style>
+                        <Style Selector="Grid.narrow TextBox#ScanTargets"><Setter Property="Height" Value="110"/></Style>
                     </Grid.Styles>
 
-                    <!-- LEFT: targets — fills the full height -->
-                    <Grid x:Name="ScanTargetsCol" RowDefinitions="Auto,*">
+                    <!-- LEFT: targets -->
+                    <Grid x:Name="ScanTargetsCol" RowDefinitions="Auto,Auto">
                         <TextBlock Grid.Row="0" Classes="fieldLabel" Text="TARGETS" Margin="0,0,0,5"/>
                         <TextBox Grid.Row="1" x:Name="ScanTargets" Classes="field multiline" Text="{Binding TargetInput}" AcceptsReturn="True"
                                  VerticalContentAlignment="Top" KeyDown="Input_KeyDown"
                                  PlaceholderText="IP / Range / CIDR — one per line&#x0a;(Enter = scan, Shift+Enter = newline)"/>
                     </Grid>
 
-                    <!-- RIGHT: ports + scan options (actions are pinned at the tab bottom, below) -->
-                    <Grid x:Name="ScanOptionsCol" RowDefinitions="Auto,Auto">
+                    <!-- RIGHT: ports + scan options -->
+                    <StackPanel x:Name="ScanOptionsCol" Spacing="8">
 
                         <!-- PORTS: unified field (custom typing OR pick a preset from the dropdown) -->
-                        <StackPanel Grid.Row="0" Spacing="4">
+                        <StackPanel Spacing="4">
                             <TextBlock Classes="fieldLabel" Text="PORTS"/>
-                        <AutoCompleteBox Classes="field" Text="{Binding PortInput}"
-                                         ItemsSource="{Binding PortPresets}"
-                                         ValueMemberBinding="{Binding Ports}"
-                                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                                         FontFamily="Cascadia Code,Consolas" FontSize="11.5"
-                                         PlaceholderText="type custom (80,443,1-1024) — or pick a preset ▾">
-                            <AutoCompleteBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:PortPreset">
-                                    <Grid ColumnDefinitions="104,*">
-                                        <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="11.5" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding Ports}" Foreground="#9E9FA8" FontSize="10"
-                                                   FontFamily="Cascadia Code,Consolas" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                    </Grid>
-                                </DataTemplate>
-                            </AutoCompleteBox.ItemTemplate>
-                            <AutoCompleteBox.KeyBindings>
-                                <KeyBinding Gesture="Enter" Command="{Binding ToggleScanCommand}"/>
-                            </AutoCompleteBox.KeyBindings>
-                        </AutoCompleteBox>
-                    </StackPanel>
+                            <AutoCompleteBox Classes="field" Text="{Binding PortInput}"
+                                             ItemsSource="{Binding PortPresets}"
+                                             ValueMemberBinding="{Binding Ports}"
+                                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                             FontFamily="Cascadia Code,Consolas" FontSize="11.5"
+                                             PlaceholderText="type custom (80,443,1-1024) — or pick a preset ▾">
+                                <AutoCompleteBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:PortPreset">
+                                        <Grid ColumnDefinitions="104,*">
+                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="11.5" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Ports}" Foreground="#9E9FA8" FontSize="10"
+                                                       FontFamily="Cascadia Code,Consolas" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </AutoCompleteBox.ItemTemplate>
+                                <AutoCompleteBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding ToggleScanCommand}"/>
+                                </AutoCompleteBox.KeyBindings>
+                            </AutoCompleteBox>
+                        </StackPanel>
 
-                    <!-- protocol + nmap scan options + timing + interval/timeout -->
-                    <Border Grid.Row="1" Classes="card" Padding="12,8" Margin="0,8,0,0">
-                        <WrapPanel helpers:Responsive.BreakWidth="430">
-                            <WrapPanel.Styles>
-                                <!-- Group dividers read as stray marks once the row wraps -->
-                                <Style Selector="WrapPanel.narrow > Border.sep">
-                                    <Setter Property="IsVisible" Value="False"/>
-                                </Style>
-                                <Style Selector="CheckBox">
-                                    <Setter Property="FontSize" Value="11.5"/>
-                                    <Setter Property="FontWeight" Value="SemiBold"/>
-                                    <Setter Property="Foreground" Value="#C7C8CF"/>
-                                    <Setter Property="VerticalAlignment" Value="Center"/>
-                                    <Setter Property="Margin" Value="0,3,14,3"/>
-                                    <Setter Property="MinHeight" Value="26"/>
-                                </Style>
-                                <Style Selector="TextBlock.grp">
-                                    <Setter Property="FontSize" Value="10"/>
-                                    <Setter Property="FontWeight" Value="Bold"/>
-                                    <Setter Property="Foreground" Value="#6E6F78"/>
-                                    <Setter Property="VerticalAlignment" Value="Center"/>
-                                    <Setter Property="Margin" Value="0,0,8,0"/>
-                                </Style>
-                                <Style Selector="Border.sep">
-                                    <Setter Property="Width" Value="1"/>
-                                    <Setter Property="Height" Value="18"/>
-                                    <Setter Property="Background" Value="#33363F"/>
-                                    <Setter Property="Margin" Value="4,0,14,0"/>
-                                    <Setter Property="VerticalAlignment" Value="Center"/>
-                                </Style>
-                            </WrapPanel.Styles>
+                        <!-- scan options — organized into tidy rows instead of a free-flowing wrap -->
+                        <Border Classes="card" Padding="12,10">
+                            <StackPanel Spacing="10">
+                                <StackPanel.Styles>
+                                    <Style Selector="CheckBox">
+                                        <Setter Property="FontSize" Value="11.5"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                        <Setter Property="Foreground" Value="#C7C8CF"/>
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                        <Setter Property="MinHeight" Value="28"/>
+                                        <Setter Property="Margin" Value="0"/>
+                                    </Style>
+                                    <Style Selector="TextBlock.grp">
+                                        <Setter Property="FontSize" Value="10"/>
+                                        <Setter Property="FontWeight" Value="Bold"/>
+                                        <Setter Property="Foreground" Value="#6E6F78"/>
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                        <Setter Property="Width" Value="52"/>
+                                    </Style>
+                                </StackPanel.Styles>
 
-                            <TextBlock Classes="grp" Text="PROTO"/>
-                            <CheckBox IsChecked="{Binding UseTcp}" Content="TCP"/>
-                            <CheckBox IsChecked="{Binding UseUdp}" Content="UDP"/>
-                            <Border Classes="sep"/>
-                            <CheckBox IsChecked="{Binding ServiceDetection}" Content="-sV version" ToolTip.Tip="Probe open ports for service + version (banner grab, HTTP / TLS / SSH / SMTP / MySQL ...)"/>
-                            <CheckBox IsChecked="{Binding PingScanOnly}" Content="-sn ping" ToolTip.Tip="Host discovery only — which hosts are up, no port scan"/>
-                            <CheckBox IsChecked="{Binding ShowReason}" Content="--reason" ToolTip.Tip="Show why each port is in its state (syn-ack / conn-refused / no-response)"/>
-                            <CheckBox IsChecked="{Binding Repeat}" Content="repeat"/>
-                            <Border Classes="sep"/>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,14,3">
-                                <TextBlock Classes="grp" Text="TIMING"/>
-                                <ComboBox ItemsSource="{Binding TimingOptions}" SelectedItem="{Binding SelectedTiming}"
-                                          MinHeight="30" Height="30" FontSize="11.5" Width="150" CornerRadius="6"
-                                          Background="#1D1E25" BorderBrush="#3B3D47" Foreground="#ECECEF"
-                                          ToolTip.Tip="T0 Paranoid → T5 Insane — controls parallelism and per-port timeout"/>
+                                <!-- PROTO -->
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Classes="grp" Text="PROTO"/>
+                                    <CheckBox IsChecked="{Binding UseTcp}" Content="TCP" Margin="0,0,20,0"/>
+                                    <CheckBox IsChecked="{Binding UseUdp}" Content="UDP"/>
+                                </StackPanel>
+
+                                <Border Height="1" Background="#2A2C33" Margin="0,-1"/>
+
+                                <!-- scan flags in a neat two-column grid -->
+                                <UniformGrid Columns="2">
+                                    <CheckBox IsChecked="{Binding ServiceDetection}" Content="-sV version" ToolTip.Tip="Probe open ports for service + version (banner grab, HTTP / TLS / SSH / SMTP / MySQL ...)"/>
+                                    <CheckBox IsChecked="{Binding PingScanOnly}" Content="-sn ping" ToolTip.Tip="Host discovery only — which hosts are up, no port scan"/>
+                                    <CheckBox IsChecked="{Binding ShowReason}" Content="--reason" ToolTip.Tip="Show why each port is in its state (syn-ack / conn-refused / no-response)"/>
+                                    <CheckBox IsChecked="{Binding Repeat}" Content="repeat"/>
+                                </UniformGrid>
+
+                                <Border Height="1" Background="#2A2C33" Margin="0,-1"/>
+
+                                <!-- TIMING -->
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Classes="grp" Text="TIMING"/>
+                                    <ComboBox ItemsSource="{Binding TimingOptions}" SelectedItem="{Binding SelectedTiming}"
+                                              MinHeight="30" Height="30" FontSize="11.5" Width="170" CornerRadius="6"
+                                              Background="#1D1E25" BorderBrush="#3B3D47" Foreground="#ECECEF"
+                                              ToolTip.Tip="T0 Paranoid → T5 Insane — controls parallelism and per-port timeout"/>
+                                </StackPanel>
+
+                                <!-- Interval + Timeout — a WrapPanel so the pair drops to a second line
+                                     instead of overflowing on a narrow phone. -->
+                                <WrapPanel>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                                        <TextBlock Text="Interval" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Width="52"/>
+                                        <NumericUpDown Value="{Binding RepeatInterval}" Minimum="1" ShowButtonSpinner="False" Height="30" Width="66" MinWidth="0" FontSize="11.5"
+                                                       HorizontalContentAlignment="Center" VerticalContentAlignment="Center" CornerRadius="6" Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
+                                        <TextBlock Text="s" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="Timeout" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Width="52"/>
+                                        <NumericUpDown Value="{Binding TimeoutMs}" Minimum="100" Increment="100" ShowButtonSpinner="False" Height="30" Width="80" MinWidth="0" FontSize="11.5"
+                                                       HorizontalContentAlignment="Center" VerticalContentAlignment="Center" CornerRadius="6" Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
+                                        <TextBlock Text="ms" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                    </StackPanel>
+                                </WrapPanel>
                             </StackPanel>
-                            <!-- Interval and Timeout wrap independently: as one unit they are ~330px and
-                                 overflow the frame on a phone. Each is still atomic on its own. -->
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,14,3">
-                                    <TextBlock Text="Interval" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                    <NumericUpDown Value="{Binding RepeatInterval}" Minimum="1" ShowButtonSpinner="False" Height="30" Width="62" FontSize="11.5"
-                                                   HorizontalContentAlignment="Center" CornerRadius="6" Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
-                                    <TextBlock Text="s" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,0,3">
-                                    <TextBlock Text="Timeout" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                    <NumericUpDown Value="{Binding TimeoutMs}" Minimum="100" Increment="100" ShowButtonSpinner="False" Height="30" Width="76" FontSize="11.5"
-                                                   HorizontalContentAlignment="Center" CornerRadius="6" Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
-                                    <TextBlock Text="ms" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                                </StackPanel>
-                        </WrapPanel>
-                    </Border>
+                        </Border>
+                    </StackPanel>
+                  </Grid>
 
-                    </Grid>
-                </Grid>
-
-                <!-- actions pinned at the tab bottom (row 1) — always visible/reachable -->
-                <Grid Grid.Row="1" ColumnDefinitions="*, Auto" ColumnSpacing="8" Margin="0,10,0,0">
-                    <Button Grid.Column="0" Classes="toggle" Command="{Binding ToggleScanCommand}"
-                            Classes.active="{Binding IsScanning}" Height="34" HorizontalAlignment="Stretch">
-                        <Panel>
-                            <TextBlock Text="START" IsVisible="{Binding !IsScanning}" FontSize="12"/>
-                            <TextBlock Text="STOP" IsVisible="{Binding IsScanning}" FontSize="12"/>
-                        </Panel>
-                    </Button>
-                    <Button Grid.Column="1" Classes="secondary" Click="Export_Click" Height="34"
-                            Content="EXPORT CSV" FontSize="11" Padding="14,0"/>
-                </Grid>
-              </Grid>
+                  <!-- actions at the end of the scroll flow — never overlap the settings -->
+                  <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                      <Button Grid.Column="0" Classes="toggle" Command="{Binding ToggleScanCommand}"
+                              Classes.active="{Binding IsScanning}" Height="36" HorizontalAlignment="Stretch">
+                          <Panel>
+                              <TextBlock Text="START" IsVisible="{Binding !IsScanning}" FontSize="12"/>
+                              <TextBlock Text="STOP" IsVisible="{Binding IsScanning}" FontSize="12"/>
+                          </Panel>
+                      </Button>
+                      <Button Grid.Column="1" Classes="secondary" Click="Export_Click" Height="36"
+                              Content="EXPORT CSV" FontSize="11" Padding="14,0"/>
+                  </Grid>
+                </StackPanel>
+              </ScrollViewer>
             </TabItem>
 
             <!-- ===================== RESULTS ===================== -->
