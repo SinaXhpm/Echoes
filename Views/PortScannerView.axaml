@@ -46,11 +46,14 @@
                  action buttons, and the buttons stay reachable on any window height. -->
             <TabItem Header="SETUP">
               <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="2,10,2,2">
-                <StackPanel Spacing="12">
-
-                  <!-- Wide: TARGETS (left) | settings (right). Narrow (phone): the two stack. -->
-                  <Grid x:Name="ScanSetupGrid" helpers:Responsive.BreakWidth="440"
-                        ColumnDefinitions="1*, 1.35*" RowDefinitions="Auto, Auto" ColumnSpacing="12" RowSpacing="10">
+                  <!-- Wide: [TARGETS above START/EXPORT] on the left | [PORTS + settings] on the right.
+                       The options panel spans both left rows (rowspan 2), so the TARGETS box stretches
+                       to make the left column exactly as tall as the settings panel and the buttons
+                       line up with the panel's bottom edge. Narrow (phone): everything stacks.
+                       One ScrollViewer wraps it all, so it scrolls whenever the content is taller than
+                       the window. -->
+                  <Grid x:Name="ScanSetupGrid" helpers:Responsive.BreakWidth="440" VerticalAlignment="Top"
+                        ColumnDefinitions="1*, 1.35*" RowDefinitions="*, Auto, Auto" ColumnSpacing="12" RowSpacing="10">
                     <Grid.Styles>
                         <Style Selector="Grid.wide > Grid#ScanTargetsCol">
                             <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
@@ -59,18 +62,24 @@
                             <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
                         </Style>
                         <Style Selector="Grid.wide > StackPanel#ScanOptionsCol">
-                            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+                            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Grid.RowSpan" Value="2"/>
                         </Style>
                         <Style Selector="Grid.narrow > StackPanel#ScanOptionsCol">
-                            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+                            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Grid.RowSpan" Value="1"/>
                         </Style>
-                        <!-- a tall targets box on desktop, a capped one on a phone -->
-                        <Style Selector="Grid.wide TextBox#ScanTargets"><Setter Property="MinHeight" Value="220"/></Style>
+                        <Style Selector="Grid.wide > Grid#ScanActions">
+                            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+                        </Style>
+                        <Style Selector="Grid.narrow > Grid#ScanActions">
+                            <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+                        </Style>
+                        <!-- wide: the targets box stretches to fill (matching the panel); phone: capped -->
+                        <Style Selector="Grid.wide TextBox#ScanTargets"><Setter Property="MinHeight" Value="150"/></Style>
                         <Style Selector="Grid.narrow TextBox#ScanTargets"><Setter Property="Height" Value="110"/></Style>
                     </Grid.Styles>
 
-                    <!-- LEFT: targets -->
-                    <Grid x:Name="ScanTargetsCol" RowDefinitions="Auto,Auto">
+                    <!-- LEFT: targets (fills the row so its bottom lines up with the panel) -->
+                    <Grid x:Name="ScanTargetsCol" RowDefinitions="Auto,*">
                         <TextBlock Grid.Row="0" Classes="fieldLabel" Text="TARGETS" Margin="0,0,0,5"/>
                         <TextBox Grid.Row="1" x:Name="ScanTargets" Classes="field multiline" Text="{Binding TargetInput}" AcceptsReturn="True"
                                  VerticalContentAlignment="Top" KeyDown="Input_KeyDown"
@@ -172,21 +181,21 @@
                             </StackPanel>
                         </Border>
                     </StackPanel>
-                  </Grid>
 
-                  <!-- actions at the end of the scroll flow — never overlap the settings -->
-                  <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
-                      <Button Grid.Column="0" Classes="toggle" Command="{Binding ToggleScanCommand}"
-                              Classes.active="{Binding IsScanning}" Height="36" HorizontalAlignment="Stretch">
-                          <Panel>
-                              <TextBlock Text="START" IsVisible="{Binding !IsScanning}" FontSize="12"/>
-                              <TextBlock Text="STOP" IsVisible="{Binding IsScanning}" FontSize="12"/>
-                          </Panel>
-                      </Button>
-                      <Button Grid.Column="1" Classes="secondary" Click="Export_Click" Height="36"
-                              Content="EXPORT CSV" FontSize="11" Padding="14,0"/>
+                    <!-- ACTIONS — wide: under TARGETS in the left column, bottom-aligned with the
+                         settings panel; narrow: full-width at the very bottom of the stack. -->
+                    <Grid x:Name="ScanActions" ColumnDefinitions="*, Auto" ColumnSpacing="8" VerticalAlignment="Bottom">
+                        <Button Grid.Column="0" Classes="toggle" Command="{Binding ToggleScanCommand}"
+                                Classes.active="{Binding IsScanning}" Height="36" HorizontalAlignment="Stretch">
+                            <Panel>
+                                <TextBlock Text="START" IsVisible="{Binding !IsScanning}" FontSize="12"/>
+                                <TextBlock Text="STOP" IsVisible="{Binding IsScanning}" FontSize="12"/>
+                            </Panel>
+                        </Button>
+                        <Button Grid.Column="1" Classes="secondary" Click="Export_Click" Height="36"
+                                Content="EXPORT CSV" FontSize="11" Padding="14,0"/>
+                    </Grid>
                   </Grid>
-                </StackPanel>
               </ScrollViewer>
             </TabItem>
 
