@@ -23,7 +23,8 @@ public static class RequestSnippets
         bool Insecure,
         bool FollowRedirects,
         int TimeoutSec,
-        string? OverrideIp);
+        string? OverrideIp,
+        string? Interface);
 
     public static readonly string[] Languages =
         { "curl", "PowerShell", "Python", "JavaScript", "HTTPie", "wget" };
@@ -93,6 +94,7 @@ public static class RequestSnippets
             var (host, port) = HostPort(s.Url);
             lines.Add($"  --resolve {Sq($"{host}:{port}:{s.OverrideIp.Trim().Trim('[', ']')}")}");
         }
+        if (!string.IsNullOrWhiteSpace(s.Interface)) lines.Add($"  --interface {Sq(s.Interface)}");
         if (s.Insecure) lines.Add("  -k");
         if (s.FollowRedirects) lines.Add("  -L");
         if (s.TimeoutSec > 0) lines.Add($"  --max-time {s.TimeoutSec}");
@@ -128,6 +130,8 @@ public static class RequestSnippets
         sb.Append("Invoke-RestMethod " + string.Join(" `\n    ", args));
         if (!string.IsNullOrWhiteSpace(s.OverrideIp))
             sb.Append($"\n\n# Override IP {s.OverrideIp}: add a hosts-file entry, e.g.\n#   {s.OverrideIp}  {HostPort(s.Url).host}");
+        if (!string.IsNullOrWhiteSpace(s.Interface))
+            sb.Append($"\n# Source interface {s.Interface}: Invoke-* can't bind a source IP (use curl --interface).");
         return sb.ToString();
     }
 
@@ -166,6 +170,8 @@ public static class RequestSnippets
         sb.Append("print(resp.text)");
         if (!string.IsNullOrWhiteSpace(s.OverrideIp))
             sb.Append($"\n# Override IP {s.OverrideIp}: pin DNS via a custom adapter or /etc/hosts ({HostPort(s.Url).host}).");
+        if (!string.IsNullOrWhiteSpace(s.Interface))
+            sb.Append($"\n# Source IP {s.Interface}: use an HTTPAdapter with source_address=({Dq(s.Interface)}, 0).");
         return sb.ToString();
     }
 
@@ -189,6 +195,7 @@ public static class RequestSnippets
         if (!string.IsNullOrWhiteSpace(s.Proxy)) notes.Add($"proxy {s.Proxy} — set an Agent (Node undici ProxyAgent); not settable from browser fetch");
         if (s.Insecure) notes.Add("insecure TLS — Node only: set an Agent with rejectUnauthorized:false");
         if (!string.IsNullOrWhiteSpace(s.OverrideIp)) notes.Add($"override IP {s.OverrideIp} — Node only: custom lookup/Agent");
+        if (!string.IsNullOrWhiteSpace(s.Interface)) notes.Add($"source interface {s.Interface} — Node only: Agent localAddress");
         if (notes.Count > 0) sb.Append("\n\n// " + string.Join("\n// ", notes));
         return sb.ToString();
     }
@@ -212,6 +219,8 @@ public static class RequestSnippets
         if (HasBody(s)) cmd = $"echo {Sq(s.Body)} | " + cmd + " --raw=@-";
         if (!string.IsNullOrWhiteSpace(s.OverrideIp))
             cmd += $"\n# Override IP {s.OverrideIp}: pin via /etc/hosts ({HostPort(s.Url).host}).";
+        if (!string.IsNullOrWhiteSpace(s.Interface))
+            cmd += $"\n# Source IP {s.Interface}: httpie has no bind-address option (use curl --interface).";
         return cmd;
     }
 
@@ -227,6 +236,7 @@ public static class RequestSnippets
             if (!string.IsNullOrWhiteSpace(s.ProxyUser))
                 lines.Add($"  --proxy-user={Sq(s.ProxyUser)} --proxy-password={Sq(s.ProxyPass)}");
         }
+        if (!string.IsNullOrWhiteSpace(s.Interface)) lines.Add($"  --bind-address={Sq(s.Interface)}");
         if (s.Insecure) lines.Add("  --no-check-certificate");
         if (!s.FollowRedirects) lines.Add("  --max-redirect=0");
         if (s.TimeoutSec > 0) lines.Add($"  --timeout={s.TimeoutSec}");

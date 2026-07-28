@@ -122,12 +122,14 @@ public partial class CurlViewModel : ObservableObject
                 .Where(l => l.Length > 0 && l.Contains(':'))
                 .Select(l => { int i = l.IndexOf(':'); return (l[..i].Trim(), l[(i + 1)..].Trim()); })
                 .ToList();
+            bool proxyOn = UseProxy && !string.IsNullOrWhiteSpace(Proxy);
             var spec = new Echoes.Helpers.RequestSnippets.Spec(
                 string.IsNullOrEmpty(HttpMethod) ? "GET" : HttpMethod, Url, headers,
                 string.IsNullOrEmpty(RequestBody) ? null : RequestBody,
-                string.IsNullOrWhiteSpace(Proxy) ? null : Proxy, ProxyUser, ProxyPass,
+                proxyOn ? Proxy : null, proxyOn ? ProxyUser : null, proxyOn ? ProxyPass : null,
                 SkipSslVerify, FollowRedirects, TimeoutSec,
-                string.IsNullOrWhiteSpace(OverrideIp) ? null : OverrideIp);
+                string.IsNullOrWhiteSpace(OverrideIp) ? null : OverrideIp,
+                SelectedNicIp);
             SnippetCode = Echoes.Helpers.RequestSnippets.Build(SnippetLanguage, spec);
         }
         catch (Exception ex) { SnippetCode = "# " + ex.Message; }
@@ -230,6 +232,7 @@ public partial class CurlViewModel : ObservableObject
     partial void OnRequestHeadersChanged(string value) => UpdateCommand();
     partial void OnTimeoutSecChanged(int value) => UpdateCommand();
     partial void OnFollowRedirectsChanged(bool value) => UpdateCommand();
+    partial void OnUseProxyChanged(bool value) => UpdateCommand();   // toggling Proxy re-evaluates the command + snippet
 
     private void UpdateCommand()
     {
@@ -247,7 +250,9 @@ public partial class CurlViewModel : ObservableObject
             if (line.Length > 0) args.Add($"-H \"{line.Replace("\"", "\\\"")}\"");
         }
         if (!string.IsNullOrEmpty(SelectedNicIp)) args.Add($"--interface {SelectedNicIp}");
-        if (!string.IsNullOrWhiteSpace(Proxy))
+        // Proxy is applied only when the Proxy checkbox is on (so unchecking it actually disables the
+        // proxy, instead of a hidden field value silently staying in the request).
+        if (UseProxy && !string.IsNullOrWhiteSpace(Proxy))
         {
             args.Add($"-x \"{Proxy}\"");
             if (!string.IsNullOrWhiteSpace(ProxyUser) || !string.IsNullOrWhiteSpace(ProxyPass))
@@ -406,7 +411,7 @@ public partial class CurlViewModel : ObservableObject
         string host = uri.Host;
         string nicSuffix = string.IsNullOrEmpty(SelectedNicIp) ? "" : $" · nic {SelectedNicIp}";
 
-        if (!string.IsNullOrWhiteSpace(Proxy))
+        if (UseProxy && !string.IsNullOrWhiteSpace(Proxy))
         {
             var (scheme, pHost, pPort) = ParseProxyEndpoint(Proxy);
             var sock = await DialSocketAsync(pHost, pPort, ct);
