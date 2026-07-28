@@ -64,9 +64,27 @@ public partial class CurlViewModel : ObservableObject
     [ObservableProperty] private string _headersLog = string.Empty;
     [ObservableProperty] private string _fullLog = string.Empty;
 
-    // Rendered "web" view (Curl → WEB tab). The NativeWebView navigates to this URL, so it shows the
-    // live page for the request. Set automatically after each run.
-    [ObservableProperty] private Uri? _webViewSource;
+    // Rendered "web" view (Curl → WEB tab). We render the ACTUAL response body that the configured
+    // request returned — through the same proxy / override IP / interface — instead of letting the
+    // OS WebView do its own fresh navigation to the URL (which would ignore all of that). WebBaseUri
+    // lets the document's relative assets resolve against the original URL. The view (code-behind)
+    // renders via NativeWebView.NavigateToString when RenderWebRequested fires.
+    public string WebHtml { get; private set; } = string.Empty;
+    public Uri? WebBaseUri { get; private set; }
+    public event Action? RenderWebRequested;
+
+    // WebView2's NavigateToString caps around 2 MB; keep the rendered document under that (the full
+    // body is still available in the BODY tab / save).
+    private const int WebRenderCap = 2_000_000;
+
+    private void RenderWeb(string? body, string? url)
+    {
+        WebHtml = string.IsNullOrEmpty(body) ? string.Empty
+                : (body.Length > WebRenderCap ? body[..WebRenderCap] : body);
+        WebBaseUri = Uri.TryCreate(url, UriKind.Absolute, out var u) &&
+                     (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps) ? u : null;
+        RenderWebRequested?.Invoke();
+    }
 
     // Live request timer + response size, shown atop the WEB tab. The timer counts up while the
     // request is in flight (DispatcherTimer), then freezes at the final elapsed time.
@@ -87,6 +105,36 @@ public partial class CurlViewModel : ObservableObject
     public Avalonia.Media.TextWrapping RawBodyWrapping
         => WrapRawBody ? Avalonia.Media.TextWrapping.Wrap : Avalonia.Media.TextWrapping.NoWrap;
     partial void OnWrapRawBodyChanged(bool value) => OnPropertyChanged(nameof(RawBodyWrapping));
+
+    // ---- CODE tab: the current request as a copyable snippet, in sync with what would be sent ----
+    public string[] SnippetLanguages => Echoes.Helpers.RequestSnippets.Languages;
+    [ObservableProperty] private string _snippetLanguage = "curl";
+    [ObservableProperty] private string _snippetCode = string.Empty;
+    partial void OnSnippetLanguageChanged(string value) => RegenerateSnippet();
+    partial void OnRequestBodyChanged(string value) => RegenerateSnippet();
+
+    private void RegenerateSnippet()
+    {
+        try
+        {
+            var headers = RequestHeaders.Split('\n')
+                .Select(h => h.Trim().TrimEnd('\r'))
+                .Where(l => l.Length > 0 && l.Contains(':'))
+                .Select(l => { int i = l.IndexOf(':'); return (l[..i].Trim(), l[(i + 1)..].Trim()); })
+                .ToList();
+            var spec = new Echoes.Helpers.RequestSnippets.Spec(
+                string.IsNullOrEmpty(HttpMethod) ? "GET" : HttpMethod, Url, headers,
+                string.IsNullOrEmpty(RequestBody) ? null : RequestBody,
+                string.IsNullOrWhiteSpace(Proxy) ? null : Proxy, ProxyUser, ProxyPass,
+                SkipSslVerify, FollowRedirects, TimeoutSec,
+                string.IsNullOrWhiteSpace(OverrideIp) ? null : OverrideIp);
+            SnippetCode = Echoes.Helpers.RequestSnippets.Build(SnippetLanguage, spec);
+        }
+        catch (Exception ex) { SnippetCode = "# " + ex.Message; }
+    }
+
+    [RelayCommand]
+    private async Task CopySnippet() => await Echoes.Helpers.ClipboardHelper.SetTextAsync(SnippetCode);
 
     // Outgoing network interface (source IP binding). Auto = let the OS route.
     [ObservableProperty] private List<NicOption> _interfaces = new();
@@ -158,6 +206,7 @@ public partial class CurlViewModel : ObservableObject
         WrapRawBody = ps.GetBool("curl.wrapRawBody");
         LoadInterfaces();
         _loaded = true;
+        RegenerateSnippet();   // populate the CODE tab from the restored request
     }
 
     protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
@@ -238,6 +287,8 @@ public partial class CurlViewModel : ObservableObject
 
         args.Add($"\"{Url}\"");
         CustomFlags = string.Join(" ", args);
+
+        RegenerateSnippet();   // keep the CODE tab in sync with every request-field change
     }
 
     [RelayCommand]
@@ -271,12 +322,15 @@ public partial class CurlViewModel : ObservableObject
             int port = uri.Port > 0 ? uri.Port : 443;
 
             // Bounded: never hang the SSL probe on an unreachable host.
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            using var client = new TcpClient();
-            await client.ConnectAsync(uri.Host, port, cts.Token);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+
+            // Reach the server exactly the way the request does: through the proxy (HTTP CONNECT or
+            // SOCKS5), pinned to the override IP, and/or bound to the chosen interface. Without this
+            // the cert came from a fresh direct connection over the default NIC — not the request path.
+            var (probeStream, via) = await OpenProbeConnectionAsync(uri, port, cts.Token);
 
             var policyErrors = SslPolicyErrors.None;
-            using var sslStream = new SslStream(client.GetStream(), false,
+            using var sslStream = new SslStream(probeStream, false,
                 (sender, certificate, chain, errors) => { policyErrors = errors; return true; });
 
             var sslOptions = new SslClientAuthenticationOptions
@@ -293,6 +347,7 @@ public partial class CurlViewModel : ObservableObject
             var sb = new StringBuilder();
 
             Section(sb, $"TLS CONNECTION — {uri.Host}:{port}");
+            Row(sb, "Route", via);
             Row(sb, "Protocol", ProtocolName(sslStream.SslProtocol));
             TryRow(sb, "Cipher Suite", () => sslStream.NegotiatedCipherSuite.ToString());
             TryRow(sb, "Cipher", () => $"{sslStream.CipherAlgorithm} ({sslStream.CipherStrength}-bit)");
@@ -341,6 +396,171 @@ public partial class CurlViewModel : ObservableObject
         {
             SetSsl($"  TLS Diagnostic Error: {ex.Message}{Environment.NewLine}");
         }
+    }
+
+    // Open a raw TCP stream to the target the SAME way the request reaches it: via the proxy
+    // (HTTP CONNECT or SOCKS5), pinned to the override IP, and/or bound to the selected NIC. Returns
+    // the connected stream plus a short human description of the route (shown in the SSL tab).
+    private async Task<(System.IO.Stream stream, string via)> OpenProbeConnectionAsync(Uri uri, int port, CancellationToken ct)
+    {
+        string host = uri.Host;
+        string nicSuffix = string.IsNullOrEmpty(SelectedNicIp) ? "" : $" · nic {SelectedNicIp}";
+
+        if (!string.IsNullOrWhiteSpace(Proxy))
+        {
+            var (scheme, pHost, pPort) = ParseProxyEndpoint(Proxy);
+            var sock = await DialSocketAsync(pHost, pPort, ct);
+            var ns = new NetworkStream(sock, ownsSocket: true);
+            try
+            {
+                if (scheme.StartsWith("socks", StringComparison.Ordinal))
+                    await Socks5ConnectAsync(ns, host, port, ProxyUser, ProxyPass, ct);
+                else
+                    await HttpConnectAsync(ns, host, port, ProxyUser, ProxyPass, ct);
+            }
+            catch { ns.Dispose(); throw; }
+            return (ns, $"proxy {Proxy}{nicSuffix}");
+        }
+
+        var ov = ParseOverrideTarget(uri, port);
+        string dialHost = ov?.ip ?? host;
+        int dialPort = ov?.port ?? port;
+        var s = await DialSocketAsync(dialHost, dialPort, ct);
+        string via = ov != null ? $"override {ov.Value.ip}:{ov.Value.port}{nicSuffix}"
+                                 : (string.IsNullOrEmpty(SelectedNicIp) ? "direct" : $"direct{nicSuffix}");
+        return (new NetworkStream(s, ownsSocket: true), via);
+    }
+
+    private async Task<Socket> DialSocketAsync(string host, int port, CancellationToken ct)
+    {
+        IPAddress? bindIp = null;
+        if (!string.IsNullOrEmpty(SelectedNicIp)) IPAddress.TryParse(SelectedNicIp, out bindIp);
+        var family = bindIp?.AddressFamily ?? AddressFamily.InterNetworkV6;
+        var socket = new Socket(family, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+        if (bindIp == null) socket.DualMode = true;   // default dual-stack when not binding a NIC
+        try
+        {
+            if (bindIp != null) socket.Bind(new IPEndPoint(bindIp, 0));
+            await socket.ConnectAsync(host, port, ct);
+            return socket;
+        }
+        catch { socket.Dispose(); throw; }
+    }
+
+    private static (string scheme, string host, int port) ParseProxyEndpoint(string proxy)
+    {
+        string norm = HttpHelper.NormalizeProxy(proxy);
+        if (Uri.TryCreate(norm, UriKind.Absolute, out var u))
+        {
+            string scheme = u.Scheme.ToLowerInvariant();
+            int port = u.Port > 0 ? u.Port : (scheme.StartsWith("socks", StringComparison.Ordinal) ? 1080 : 8080);
+            return (scheme, u.Host, port);
+        }
+        return ("http", proxy, 8080);
+    }
+
+    // Mirror UpdateCommand's --resolve/--connect-to parsing: OverrideIp may carry a trailing :port.
+    private (string ip, int port)? ParseOverrideTarget(Uri uri, int urlPort)
+    {
+        if (string.IsNullOrWhiteSpace(OverrideIp)) return null;
+        string ipPart = OverrideIp.Trim();
+        int targetPort = urlPort;
+        if (!IPAddress.TryParse(ipPart, out _))
+        {
+            int idx = ipPart.LastIndexOf(':');
+            if (idx > ipPart.LastIndexOf(']') && int.TryParse(ipPart[(idx + 1)..], out int p))
+            {
+                targetPort = p;
+                ipPart = ipPart[..idx];
+            }
+        }
+        ipPart = ipPart.Trim('[', ']');
+        return (ipPart, targetPort);
+    }
+
+    private static async Task HttpConnectAsync(System.IO.Stream stream, string host, int port, string? user, string? pass, CancellationToken ct)
+    {
+        var sb = new StringBuilder();
+        sb.Append($"CONNECT {host}:{port} HTTP/1.1\r\n");
+        sb.Append($"Host: {host}:{port}\r\n");
+        if (!string.IsNullOrEmpty(user))
+        {
+            string token = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{user}:{pass}"));
+            sb.Append($"Proxy-Authorization: Basic {token}\r\n");
+        }
+        sb.Append("Proxy-Connection: keep-alive\r\n\r\n");
+        var reqBytes = Encoding.ASCII.GetBytes(sb.ToString());
+        await stream.WriteAsync(reqBytes, ct);
+        await stream.FlushAsync(ct);
+
+        var resp = new StringBuilder();
+        var one = new byte[1];
+        while (!resp.ToString().EndsWith("\r\n\r\n", StringComparison.Ordinal))
+        {
+            int n = await stream.ReadAsync(one.AsMemory(0, 1), ct);
+            if (n == 0) break;
+            resp.Append((char)one[0]);
+            if (resp.Length > 8192) break;
+        }
+        string statusLine = resp.ToString().Split('\r')[0];
+        if (!statusLine.Contains(" 200")) throw new Exception("proxy CONNECT rejected: " + statusLine);
+    }
+
+    private static async Task Socks5ConnectAsync(System.IO.Stream stream, string host, int port, string? user, string? pass, CancellationToken ct)
+    {
+        bool wantAuth = !string.IsNullOrEmpty(user);
+        byte[] greet = wantAuth ? new byte[] { 0x05, 0x02, 0x00, 0x02 } : new byte[] { 0x05, 0x01, 0x00 };
+        await stream.WriteAsync(greet, ct);
+
+        var sel = await ReadExactAsync(stream, 2, ct);
+        if (sel[0] != 0x05) throw new Exception("SOCKS5: bad version");
+        if (sel[1] == 0x02)
+        {
+            if (!wantAuth) throw new Exception("SOCKS5: proxy requires username/password");
+            var u = Encoding.UTF8.GetBytes(user!);
+            var p = Encoding.UTF8.GetBytes(pass ?? string.Empty);
+            var authReq = new byte[3 + u.Length + p.Length];
+            authReq[0] = 0x01; authReq[1] = (byte)u.Length;
+            Array.Copy(u, 0, authReq, 2, u.Length);
+            authReq[2 + u.Length] = (byte)p.Length;
+            Array.Copy(p, 0, authReq, 3 + u.Length, p.Length);
+            await stream.WriteAsync(authReq, ct);
+            var ar = await ReadExactAsync(stream, 2, ct);
+            if (ar[1] != 0x00) throw new Exception("SOCKS5: authentication failed");
+        }
+        else if (sel[1] != 0x00) throw new Exception("SOCKS5: no acceptable auth method");
+
+        var hb = Encoding.UTF8.GetBytes(host);
+        var req = new byte[7 + hb.Length];
+        req[0] = 0x05; req[1] = 0x01; req[2] = 0x00; req[3] = 0x03; req[4] = (byte)hb.Length;
+        Array.Copy(hb, 0, req, 5, hb.Length);
+        req[5 + hb.Length] = (byte)(port >> 8);
+        req[6 + hb.Length] = (byte)(port & 0xFF);
+        await stream.WriteAsync(req, ct);
+
+        var rep = await ReadExactAsync(stream, 4, ct);
+        if (rep[1] != 0x00) throw new Exception($"SOCKS5: connect failed (reply 0x{rep[1]:X2})");
+        int addrLen = rep[3] switch
+        {
+            0x01 => 4,
+            0x04 => 16,
+            0x03 => (await ReadExactAsync(stream, 1, ct))[0],
+            _ => throw new Exception("SOCKS5: unexpected address type")
+        };
+        await ReadExactAsync(stream, addrLen + 2, ct);   // bound addr + port, discarded
+    }
+
+    private static async Task<byte[]> ReadExactAsync(System.IO.Stream s, int n, CancellationToken ct)
+    {
+        var buf = new byte[n];
+        int off = 0;
+        while (off < n)
+        {
+            int r = await s.ReadAsync(buf.AsMemory(off, n - off), ct);
+            if (r == 0) throw new Exception("connection closed by peer");
+            off += r;
+        }
+        return buf;
     }
 
     private static void Section(StringBuilder sb, string title)
@@ -534,7 +754,7 @@ public partial class CurlViewModel : ObservableObject
 
                 _rawBodyFull = outputTask.Result;
                 RawBody = TextLimit.Cap(outputTask.Result, 60_000);   // smaller cap keeps the UI smooth
-                SetWebView(Url);
+                RenderWeb(_rawBodyFull, Url);
                 SetResponseSize(outputTask.Result);
                 SectionIndex = 1;   // jump to the RESPONSE section
                 string stdErr = errorTask.Result;
@@ -637,14 +857,6 @@ public partial class CurlViewModel : ObservableObject
             else await ExecuteCurl();
         }
         finally { StopRequestTimer(); }
-    }
-
-    // Point the WEB tab's NativeWebView at the current URL (also called after a run).
-    private void SetWebView(string? url)
-    {
-        if (Uri.TryCreate(url, UriKind.Absolute, out var u) &&
-            (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps))
-            WebViewSource = u;
     }
 
     // ---- request timer + response size (shown atop the WEB tab) ----
@@ -780,7 +992,7 @@ public partial class CurlViewModel : ObservableObject
 
             _rawBodyFull = body;
             RawBody = TextLimit.Cap(body, 60_000);   // smaller cap keeps the UI smooth
-            SetWebView(spec.Url);
+            RenderWeb(body, spec.Url);
             SetResponseSize(body);
             SectionIndex = 1;   // jump to the RESPONSE section
             BuildDotNetLogs(spec, req, resp, sw.ElapsedMilliseconds);

@@ -174,13 +174,31 @@
                         </Border>
                     </TabItem>
 
-                    <!-- Rendered page. NativeWebView uses the OS engine (WebView2 / WebKitGTK / Android WebView). -->
+                    <!-- Renders the ACTUAL response body (code-behind calls NavigateToString) rather
+                         than re-navigating to the URL, so it reflects the exact document the configured
+                         request returned — via the same proxy / override IP / interface. -->
                     <TabItem Header="WEB">
                         <Border Classes="card output" Padding="0" ClipToBounds="True">
-                            <NativeWebView Source="{Binding WebViewSource}"/>
+                            <NativeWebView x:Name="Web"/>
                         </Border>
                     </TabItem>
                 </TabControl>
+            </TabItem>
+
+            <!-- COMMAND: the request as a copyable snippet for curl / PowerShell / Python / … -->
+            <TabItem Header="COMMAND" Classes="section">
+                <Grid RowDefinitions="Auto, *" Margin="0,4,0,0" RowSpacing="8">
+                    <Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                        <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding SnippetLanguages}"
+                                  SelectedItem="{Binding SnippetLanguage}" HorizontalAlignment="Left" MinWidth="190"/>
+                        <Button Grid.Column="1" Classes="secondary" Command="{Binding CopySnippetCommand}"
+                                Content="COPY" Height="30" Padding="18,0" FontSize="11"/>
+                    </Grid>
+                    <Border Grid.Row="1" Classes="card output">
+                        <TextBox Text="{Binding SnippetCode}" IsReadOnly="True" AcceptsReturn="True"
+                                 Foreground="#8CE6B0" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
+                    </Border>
+                </Grid>
             </TabItem>
         </TabControl>
 
