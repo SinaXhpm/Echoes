@@ -175,16 +175,10 @@
 							<TextBlock Text="NOTES" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
-					<ListBoxItem Tag="BACKUP" AutomationProperties.Name="BACKUP">
+					<ListBoxItem Tag="DATA" AutomationProperties.Name="DATA">
 						<StackPanel Orientation="Horizontal" Spacing="12">
 							<Path Classes="ico" Data="{StaticResource IcoBackup}"/>
-							<TextBlock Text="BACKUP" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="HISTORY" AutomationProperties.Name="HISTORY">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoHistory}"/>
-							<TextBlock Text="HISTORY" VerticalAlignment="Center"/>
+							<TextBlock Text="DATA" VerticalAlignment="Center"/>
 						</StackPanel>
 					</ListBoxItem>
 				</ListBox>
@@ -234,8 +228,11 @@
 					<views:SshView DataContext="{Binding SshVM}"/>
 					<views:StringLabView DataContext="{Binding StringTool}"/>
 					<views:NoteView DataContext="{Binding NoteVM}"/>
-					<views:BackupView DataContext="{Binding BackupVM}"/>
-					<views:HistoryView DataContext="{Binding HistoryVM}"/>
+					<!-- DATA: HISTORY + BACKUP merged into one page (index-aligned with the Nav list) -->
+					<TabControl Padding="0,2,0,0">
+						<TabItem Header="HISTORY"><views:HistoryView DataContext="{Binding HistoryVM}"/></TabItem>
+						<TabItem Header="BACKUP"><views:BackupView DataContext="{Binding BackupVM}"/></TabItem>
+					</TabControl>
 				</Carousel>
 			</Grid>
 		</SplitView.Content>

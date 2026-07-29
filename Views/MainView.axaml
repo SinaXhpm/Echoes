@@ -238,20 +238,19 @@
 							<TextBlock Text="NOTES" VerticalAlignment="Center"/>
 						</StackPanel>
 					</TabItem.Header><views:NoteView DataContext="{Binding NoteVM}"/></TabItem>
-				<TabItem Classes="navtab" Tag="BACKUP" AutomationProperties.Name="BACKUP">
+				<!-- HISTORY + BACKUP merged into one nav entry with two sub-tabs -->
+				<TabItem Classes="navtab" Tag="DATA" AutomationProperties.Name="DATA">
 					<TabItem.Header>
 						<StackPanel Orientation="Horizontal" Spacing="9">
 							<Path Classes="ico" Data="{StaticResource IcoBackup}"/>
-							<TextBlock Text="BACKUP" VerticalAlignment="Center"/>
+							<TextBlock Text="DATA" VerticalAlignment="Center"/>
 						</StackPanel>
-					</TabItem.Header><views:BackupView DataContext="{Binding BackupVM}"/></TabItem>
-				<TabItem Classes="navtab" Tag="HISTORY" AutomationProperties.Name="HISTORY">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoHistory}"/>
-							<TextBlock Text="HISTORY" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:HistoryView DataContext="{Binding HistoryVM}"/></TabItem>
+					</TabItem.Header>
+					<TabControl Padding="0,4,0,0">
+						<TabItem Header="HISTORY"><views:HistoryView DataContext="{Binding HistoryVM}"/></TabItem>
+						<TabItem Header="BACKUP"><views:BackupView DataContext="{Binding BackupVM}"/></TabItem>
+					</TabControl>
+				</TabItem>
 			</TabControl>
 
 			<Border Grid.Row="2" Height="22" Background="#0C0D0F" BorderBrush="#1C1D22" BorderThickness="0,1,0,0">

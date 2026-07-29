@@ -30,7 +30,7 @@ public partial class MainView : UserControl
             case TabItem { Tag: "CURL" }:
                 vm.CurlVM.RefreshInterfaces();
                 break;
-            case TabItem { Tag: "HISTORY" }:
+            case TabItem { Tag: "DATA" }:   // merged HISTORY + BACKUP tab
                 vm.HistoryVM.Reload();
                 break;
             case TabItem { Tag: "WEB SERVER" }:

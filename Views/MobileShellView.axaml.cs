@@ -34,7 +34,7 @@ public partial class MobileShellView : UserControl
             switch (name)
             {
                 case "CURL": vm.CurlVM.RefreshInterfaces(); break;
-                case "HISTORY": vm.HistoryVM.Reload(); break;
+                case "DATA": vm.HistoryVM.Reload(); break;   // merged HISTORY + BACKUP tab
                 case "WEB SERVER": vm.WebServerVM.RefreshAddressesCommand.Execute(null); break;
                 case "PROXY": vm.ProxyVM.RefreshAddressesCommand.Execute(null); break;
             }
