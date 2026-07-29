@@ -79,11 +79,28 @@ public partial class CurlViewModel : ObservableObject
 
     private void RenderWeb(string? body, string? url)
     {
-        WebHtml = string.IsNullOrEmpty(body) ? string.Empty
-                : (body.Length > WebRenderCap ? body[..WebRenderCap] : body);
+        string doc = string.IsNullOrEmpty(body) ? string.Empty
+                   : (body.Length > WebRenderCap ? body[..WebRenderCap] : body);
+        WebHtml = EnsureReadableBackground(doc);
         WebBaseUri = Uri.TryCreate(url, UriKind.Absolute, out var u) &&
                      (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps) ? u : null;
         RenderWebRequested?.Invoke();
+    }
+
+    // The native WebView composites over black, so a page that declares no background of its own comes
+    // up black-on-black. Inject a default white background + dark text FIRST — a page that sets its own
+    // background/color still overrides it (later CSS wins), exactly like a real browser's defaults.
+    private static string EnsureReadableBackground(string html)
+    {
+        if (string.IsNullOrEmpty(html)) return html;
+        const string style = "<style>html{background:#ffffff;color:#111111}</style>";
+        var head = System.Text.RegularExpressions.Regex.Match(html, "<head[^>]*>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (head.Success) return html.Insert(head.Index + head.Length, style);
+        var htmlTag = System.Text.RegularExpressions.Regex.Match(html, "<html[^>]*>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (htmlTag.Success) return html.Insert(htmlTag.Index + htmlTag.Length, style);
+        return style + html;
     }
 
     // Live request timer + response size, shown atop the WEB tab. The timer counts up while the
