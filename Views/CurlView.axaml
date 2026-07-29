@@ -176,9 +176,11 @@
 
                     <!-- Renders the ACTUAL response body (code-behind calls NavigateToString) rather
                          than re-navigating to the URL, so it reflects the exact document the configured
-                         request returned — via the same proxy / override IP / interface. -->
+                         request returned — via the same proxy / override IP / interface.
+                         White backdrop like a real browser: a page that sets no background of its own
+                         defaults to black-on-white (readable) instead of black-on-dark-app. -->
                     <TabItem Header="WEB">
-                        <Border Classes="card output" Padding="0" ClipToBounds="True">
+                        <Border Classes="card" Background="White" Padding="0" ClipToBounds="True">
                             <NativeWebView x:Name="Web"/>
                         </Border>
                     </TabItem>
