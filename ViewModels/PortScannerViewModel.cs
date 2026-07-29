@@ -623,7 +623,7 @@ public partial class PortScannerViewModel : ObservableObject
         ? "\"" + v.Replace("\"", "\"\"") + "\"" : v;
 }
 
-public class PortResult
+public partial class PortResult : ObservableObject
 {
     public string IP { get; set; } = string.Empty;
     public int Port { get; set; }
@@ -638,6 +638,17 @@ public class PortResult
     public string ServiceDisplay => Service.Length > 0 ? Service : Helpers.NmapData.ServiceName(Port);
     // "22/tcp" style label for the port column.
     public string PortLabel => Port > 0 ? $"{Port}/{Protocol.ToLowerInvariant()}" : "—";
+
+    // Row detail (VERSION column is kept narrow; the full text lives here). A row is expandable when
+    // it carries a version banner or a reason — click it to reveal the full, wrapped/selectable text.
+    public bool HasVersion => Version.Length > 0;
+    public bool HasDetail => Version.Length > 0 || Reason.Length > 0;
+    public string LatencyText => Latency > 0 ? $"{Latency} ms" : "—";
+
+    [ObservableProperty] private bool _isExpanded;
+
+    [RelayCommand]
+    private void ToggleExpand() { if (HasDetail) IsExpanded = !IsExpanded; }
 }
 
 public sealed record PortPreset(string Name, string Ports);

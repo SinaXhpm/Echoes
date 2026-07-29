@@ -19,6 +19,22 @@
         <Style Selector="Button.colhead:pointerover /template/ ContentPresenter">
             <Setter Property="Foreground" Value="#42B883"/>
         </Style>
+        <!-- version cell = a borderless "click to expand" button -->
+        <Style Selector="Button.verexp">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.verexp:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1AFFFFFF"/>
+        </Style>
+        <Style Selector="Button.verexp:disabled">
+            <Setter Property="Cursor" Value="Arrow"/>
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
         <!-- status pill -->
         <Style Selector="Border.pill">
             <Setter Property="CornerRadius" Value="4"/>
@@ -224,11 +240,11 @@
                         <Grid MinWidth="580" RowDefinitions="Auto, *">
 
                             <!-- sortable column headers -->
-                            <Grid Grid.Row="0" ColumnDefinitions="1.3*, 66, 96, 1.5*, 78" Margin="14,0,14,6">
+                            <Grid Grid.Row="0" ColumnDefinitions="1.3*, 56, 92, 1*, 70" Margin="14,0,14,6">
                                 <Button Grid.Column="0" Classes="colhead" Command="{Binding SortByCommand}" CommandParameter="IP" Content="IP ADDRESS" HorizontalAlignment="Left"/>
                                 <Button Grid.Column="1" Classes="colhead" Command="{Binding SortByCommand}" CommandParameter="Port" Content="PORT"/>
                                 <Button Grid.Column="2" Classes="colhead" Command="{Binding SortByCommand}" CommandParameter="Service" Content="SERVICE"/>
-                                <TextBlock Grid.Column="3" Text="VERSION" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                <TextBlock Grid.Column="3" Text="VERSION" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="2,0,0,0"/>
                                 <Button Grid.Column="4" Classes="colhead" Command="{Binding SortByCommand}" CommandParameter="Status" Content="STATE" HorizontalAlignment="Right"/>
                             </Grid>
 
@@ -264,14 +280,26 @@
                                                 <Binding Path="Status"/>
                                             </Border.Tag>
 
-                                            <Grid ColumnDefinitions="1.3*, 66, 96, 1.5*, 78">
+                                            <Grid RowDefinitions="Auto, Auto">
+                                            <Grid Grid.Row="0" ColumnDefinitions="1.3*, 56, 92, 1*, 70">
                                                 <SelectableTextBlock Grid.Column="0" Text="{Binding IP}" FontSize="11.5" FontFamily="Cascadia Code,Consolas"
                                                                      Foreground="#ECECEF" VerticalAlignment="Center" FontWeight="SemiBold"
                                                                      SelectionBrush="#3042B883"/>
                                                 <TextBlock Grid.Column="1" Text="{Binding PortLabel}" FontSize="11" FontFamily="Cascadia Code,Consolas" Foreground="#C7C8CF" VerticalAlignment="Center"/>
                                                 <TextBlock Grid.Column="2" Text="{Binding ServiceDisplay}" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Grid.Column="3" Text="{Binding Version}" FontSize="10.5" FontFamily="Cascadia Code,Consolas" Foreground="#7FCBA6"
-                                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0" ToolTip.Tip="{Binding Version}"/>
+
+                                                <!-- VERSION: kept narrow; click to expand the full text below -->
+                                                <Button Grid.Column="3" Classes="verexp" Command="{Binding ToggleExpandCommand}" IsEnabled="{Binding HasDetail}"
+                                                        ToolTip.Tip="Click to show the full version / details">
+                                                    <Grid ColumnDefinitions="*, Auto">
+                                                        <TextBlock Grid.Column="0" Text="{Binding Version}" FontSize="10.5" FontFamily="Cascadia Code,Consolas"
+                                                                   Foreground="#7FCBA6" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                        <Panel Grid.Column="1" IsVisible="{Binding HasDetail}" Margin="4,0,4,0" VerticalAlignment="Center">
+                                                            <TextBlock Text="&#x25B8;" FontSize="9" Foreground="#7F8088" IsVisible="{Binding !IsExpanded}"/>
+                                                            <TextBlock Text="&#x25BE;" FontSize="9" Foreground="#7FCBA6" IsVisible="{Binding IsExpanded}"/>
+                                                        </Panel>
+                                                    </Grid>
+                                                </Button>
 
                                                 <Border Grid.Column="4" Classes="pill" VerticalAlignment="Center">
                                                     <Border.Styles>
@@ -301,6 +329,34 @@
                                                     <TextBlock Text="{Binding Status}" FontSize="10.5" FontWeight="Bold" Foreground="#ECECEF"
                                                                HorizontalAlignment="Center"/>
                                                 </Border>
+                                            </Grid>
+
+                                            <!-- expanded detail: the full, wrapped, selectable text that the narrow columns trim -->
+                                            <Border Grid.Row="1" IsVisible="{Binding IsExpanded}" Margin="0,7,0,1" Padding="9,6"
+                                                    Background="#12141A" CornerRadius="4" BorderBrush="#2A2C33" BorderThickness="1">
+                                                <StackPanel Spacing="5">
+                                                    <StackPanel IsVisible="{Binding HasVersion}" Spacing="1">
+                                                        <TextBlock Text="VERSION" FontSize="8.5" FontWeight="Bold" Foreground="#6E6F78"/>
+                                                        <SelectableTextBlock Text="{Binding Version}" FontSize="11" FontFamily="Cascadia Code,Consolas"
+                                                                             Foreground="#8CE6B0" TextWrapping="Wrap" SelectionBrush="#3042B883"/>
+                                                    </StackPanel>
+                                                    <WrapPanel>
+                                                        <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,18,0">
+                                                            <TextBlock Text="SERVICE" FontSize="8.5" FontWeight="Bold" Foreground="#6E6F78" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="{Binding ServiceDisplay}" FontSize="10.5" Foreground="#C7C8CF" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                        <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,18,0">
+                                                            <TextBlock Text="LATENCY" FontSize="8.5" FontWeight="Bold" Foreground="#6E6F78" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="{Binding LatencyText}" FontSize="10.5" Foreground="#C7C8CF" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                        <StackPanel Orientation="Horizontal" Spacing="5"
+                                                                    IsVisible="{Binding Reason, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                            <TextBlock Text="REASON" FontSize="8.5" FontWeight="Bold" Foreground="#6E6F78" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="{Binding Reason}" FontSize="10.5" Foreground="#C7C8CF" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                                        </StackPanel>
+                                                    </WrapPanel>
+                                                </StackPanel>
+                                            </Border>
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
