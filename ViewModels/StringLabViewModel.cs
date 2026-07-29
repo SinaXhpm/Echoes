@@ -31,6 +31,7 @@ public partial class StringLabViewModel : ObservableObject
             case "diff": DiffLeft = DiffRight = DiffOutput = string.Empty; break;
             case "case": CaseInput = CaseOutput = string.Empty; break;
             case "convert": ConvertInput = ConvertOutput = string.Empty; break;
+            case "cron": CronExpression = "* * * * *"; break;
         }
     }
 }

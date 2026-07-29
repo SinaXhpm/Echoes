@@ -350,6 +350,39 @@
 						</Grid>
 					</TabItem>
 
+					<TabItem Header="CRON">
+						<Grid RowDefinitions="Auto, Auto, Auto, *" Margin="0,2,0,0">
+							<!-- presets + the assembled (editable) expression + copy -->
+							<Grid Grid.Row="0" ColumnDefinitions="Auto, *, 60" ColumnSpacing="8" Margin="0,0,0,8">
+								<ComboBox Grid.Column="0" ItemsSource="{Binding CronPresets}" SelectedItem="{Binding SelectedCronPreset}" PlaceholderText="Presets" MinWidth="170"/>
+								<TextBox Grid.Column="1" Text="{Binding CronExpression, Mode=TwoWay}" AcceptsReturn="False" TextWrapping="NoWrap" FontFamily="Cascadia Code,Consolas" FontSize="14" FontWeight="SemiBold" Foreground="#7FE0A8" PlaceholderText="* * * * *"/>
+								<Button Grid.Column="2" Command="{Binding CopyCronCommand}" Content="COPY" Classes="secondary"/>
+							</Grid>
+							<!-- the five fields (edit any; the expression above follows) -->
+							<Grid Grid.Row="1" ColumnDefinitions="*,*,*,*,*" ColumnSpacing="6" Margin="0,0,0,8">
+								<Grid.Styles>
+									<Style Selector="TextBlock.cf"><Setter Property="FontSize" Value="9.5"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="Foreground" Value="#8A8B93"/><Setter Property="HorizontalAlignment" Value="Center"/></Style>
+									<Style Selector="TextBlock.ch"><Setter Property="FontSize" Value="9"/><Setter Property="Foreground" Value="#6E6F78"/><Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="Margin" Value="0,2,0,0"/></Style>
+									<Style Selector="TextBox.cfield"><Setter Property="FontFamily" Value="Cascadia Code,Consolas"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="Margin" Value="0,2,0,0"/></Style>
+								</Grid.Styles>
+								<StackPanel Grid.Column="0"><TextBlock Classes="cf" Text="MINUTE"/><TextBox Classes="cfield" Text="{Binding CronMinute}"/><TextBlock Classes="ch" Text="0-59"/></StackPanel>
+								<StackPanel Grid.Column="1"><TextBlock Classes="cf" Text="HOUR"/><TextBox Classes="cfield" Text="{Binding CronHour}"/><TextBlock Classes="ch" Text="0-23"/></StackPanel>
+								<StackPanel Grid.Column="2"><TextBlock Classes="cf" Text="DAY (MONTH)"/><TextBox Classes="cfield" Text="{Binding CronDom}"/><TextBlock Classes="ch" Text="1-31"/></StackPanel>
+								<StackPanel Grid.Column="3"><TextBlock Classes="cf" Text="MONTH"/><TextBox Classes="cfield" Text="{Binding CronMonth}"/><TextBlock Classes="ch" Text="1-12 / JAN"/></StackPanel>
+								<StackPanel Grid.Column="4"><TextBlock Classes="cf" Text="DAY (WEEK)"/><TextBox Classes="cfield" Text="{Binding CronDow}"/><TextBlock Classes="ch" Text="0-6 / SUN"/></StackPanel>
+							</Grid>
+							<!-- human description -->
+							<Border Grid.Row="2" Background="#141C17" BorderBrush="#24402E" BorderThickness="1" CornerRadius="6" Padding="10,7" Margin="0,0,0,8">
+								<TextBlock Text="{Binding CronDescription}" Foreground="#8CE6B0" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
+							</Border>
+							<!-- upcoming runs -->
+							<Grid Grid.Row="3" RowDefinitions="Auto, *">
+								<TextBlock Grid.Row="0" Text="NEXT RUNS" Classes="fieldLabel" Margin="2,0,0,3"/>
+								<TextBox Grid.Row="1" Text="{Binding CronNextRuns}" IsReadOnly="True" PlaceholderText="Upcoming run times…" FontFamily="Cascadia Code,Consolas"/>
+							</Grid>
+						</Grid>
+					</TabItem>
+
 					<TabItem Header="GENERATE">
 						<Grid RowDefinitions="Auto, *" Margin="0,2,0,0">
 							<StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,8">
