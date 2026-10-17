@@ -2,14 +2,21 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
              xmlns:views="using:Echoes.Views"
+             xmlns:ctl="using:Echoes.Views.Controls"
              x:Class="Echoes.Views.MobileShellView"
              x:DataType="vm:MainViewModel"
-             Background="#0F1012">
+             Background="{DynamicResource Bg.App}">
 
+	<!-- Touch sizing for the embedded tool views (the desktop sizes are mouse-sized). The shared input and
+	     button classes (.field, .primary, .icon, …) read these two with DynamicResource, so every control
+	     under this shell grows to a 44px touch height. -->
+	<UserControl.Resources>
+		<x:Double x:Key="Control.Height">44</x:Double>
+		<x:Double x:Key="Font.Input">14</x:Double>
+	</UserControl.Resources>
 
 	<UserControl.Styles>
-		<!-- Phase 1 mobile shell: bump touch targets / font sizes for the embedded
-		     desktop tool views. (Per-tool layouts are reworked in phase 2.) -->
+		<!-- the same for controls without a design class (these plain type styles rank below class styles) -->
 		<Style Selector="AutoCompleteBox">
 			<Setter Property="MinHeight" Value="44"/>
 			<Setter Property="FontSize" Value="14"/>
@@ -19,222 +26,357 @@
 			<Setter Property="FontSize" Value="14"/>
 		</Style>
 		<Style Selector="Button">
-			<Setter Property="MinHeight" Value="42"/>
+			<Setter Property="MinHeight" Value="44"/>
 			<Setter Property="HorizontalContentAlignment" Value="Center"/>
 			<Setter Property="VerticalContentAlignment" Value="Center"/>
 		</Style>
 		<Style Selector="ComboBox">
-			<Setter Property="MinHeight" Value="42"/>
+			<Setter Property="MinHeight" Value="44"/>
 		</Style>
 		<Style Selector="CheckBox">
 			<Setter Property="MinHeight" Value="36"/>
 		</Style>
+
+		<!-- ===== Drawer nav item: [section label] + a pill with an accent indicator (as on desktop) ===== -->
+		<Style Selector="ListBox#Nav > ListBoxItem">
+			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+			<Setter Property="FontSize" Value="15"/>
+			<Setter Property="FontWeight" Value="Medium"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="Margin" Value="0,1"/>
+			<Setter Property="MinHeight" Value="0"/>
+			<Setter Property="Template">
+				<ControlTemplate TargetType="ctl:NavListItem">
+					<StackPanel>
+						<TextBlock Classes="navgroup" Text="{TemplateBinding Group}" IsHitTestVisible="False"
+								   IsVisible="{TemplateBinding Group, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+						<Border Name="PART_Pill" Height="46" CornerRadius="10" Padding="14,0"
+								Background="{DynamicResource Bg.Sidebar}">
+							<Panel>
+								<Border Name="PART_Indicator" Width="3" Height="20" CornerRadius="2" Margin="-14,0,0,0"
+										HorizontalAlignment="Left" VerticalAlignment="Center"
+										Background="{DynamicResource Accent}" IsVisible="False"/>
+								<ContentPresenter VerticalAlignment="Center" Content="{TemplateBinding Content}"
+												  ContentTemplate="{TemplateBinding ContentTemplate}"
+												  Foreground="{TemplateBinding Foreground}"/>
+							</Panel>
+						</Border>
+					</StackPanel>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+		<Style Selector="ListBox#Nav > ListBoxItem:pointerover /template/ Border#PART_Pill">
+			<Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+		</Style>
+		<Style Selector="ListBox#Nav > ListBoxItem:selected /template/ Border#PART_Pill">
+			<Setter Property="Background" Value="{DynamicResource Bg.Selected}"/>
+		</Style>
+		<Style Selector="ListBox#Nav > ListBoxItem:selected /template/ Border#PART_Indicator">
+			<Setter Property="IsVisible" Value="True"/>
+		</Style>
+		<Style Selector="ListBox#Nav > ListBoxItem:selected">
+			<Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+		</Style>
+		<Style Selector="ListBox#Nav > ListBoxItem:nth-child(1) /template/ TextBlock.navgroup">
+			<Setter Property="Margin" Value="14,4,0,7"/>
+		</Style>
+		<Style Selector="ListBox#Nav Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+		</Style>
+		<Style Selector="ListBox#Nav > ListBoxItem:selected Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+		</Style>
+		<Style Selector="TextBlock.navgroup">
+			<Setter Property="Margin" Value="14,18,0,7"/>
+		</Style>
+
+		<!-- app bar menu button -->
+		<Style Selector="Button#MenuButton">
+			<Setter Property="Background" Value="{DynamicResource Bg.Sidebar}"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="CornerRadius" Value="10"/>
+			<Setter Property="Padding" Value="0"/>
+		</Style>
+		<Style Selector="Button#MenuButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+		</Style>
+		<Style Selector="Button#MenuButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Bg.Pressed}"/>
+		</Style>
 	</UserControl.Styles>
 
+	<Panel>
+	<!-- Overlay drawer WITHOUT the translucent light-dismiss layer (no alpha blending); tapping outside
+	     the pane still closes it. -->
 	<SplitView x:Name="Split"
 			   DisplayMode="Overlay"
-			   OpenPaneLength="240"
-			   PaneBackground="#181818"
+			   OpenPaneLength="292"
+			   UseLightDismissOverlayMode="False"
+			   PaneBackground="{DynamicResource Bg.Sidebar}"
 			   IsPaneOpen="False">
 
-		<!-- Drawer: tool list -->
+		<!-- ===== Drawer ===== -->
 		<SplitView.Pane>
-			<DockPanel Margin="0,10,0,0">
-				<TextBlock DockPanel.Dock="Top"
-						   Text="ECHOES"
-						   FontSize="18" FontWeight="Black" Foreground="White"
-						   Opacity="0.9" Margin="18,4,0,12"/>
-				<!-- Opens the GitHub repo in the browser (LinkHelper works on Android too). Kept out of the
-				     nav ListBox on purpose: that list is index-coupled to the Carousel. -->
-				<Button DockPanel.Dock="Bottom" Command="{Binding OpenGitHubCommand}" AutomationProperties.Name="ABOUT"
-						Background="Transparent" BorderThickness="0" Padding="16,10" Margin="0,6,0,10"
-						HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
-					<StackPanel Orientation="Horizontal" Spacing="12">
-						<Path Classes="ico" Data="{StaticResource IcoAbout}"/>
-						<TextBlock Text="ABOUT" VerticalAlignment="Center" FontSize="14" FontWeight="SemiBold" Foreground="#8CFFFFFF"/>
+			<Border BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,1,0">
+				<DockPanel>
+					<!-- brand -->
+					<StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12" Margin="20,22,16,10">
+						<Image Source="avares://Echoes/Assets/logo-256.png" Width="34" Height="34"
+							   RenderOptions.BitmapInterpolationMode="HighQuality"/>
+						<StackPanel VerticalAlignment="Center">
+							<TextBlock Text="Echoes" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"/>
+							<TextBlock Text="network toolkit" FontSize="12" Foreground="{DynamicResource Text.Muted}"/>
+						</StackPanel>
 					</StackPanel>
-				</Button>
-				<ListBox x:Name="Nav"
-						 SelectedIndex="0"
-						 SelectionChanged="Nav_SelectionChanged"
-						 Background="Transparent"
-						 BorderThickness="0">
-					<ListBox.Styles>
-						<Style Selector="ListBoxItem">
-							<Setter Property="FontSize" Value="14"/>
-							<Setter Property="FontWeight" Value="SemiBold"/>
-							<Setter Property="Foreground" Value="#B0FFFFFF"/>
-							<Setter Property="Padding" Value="18,12"/>
-							<Setter Property="MinHeight" Value="46"/>
-						</Style>
-						<Style Selector="ListBoxItem:selected">
-							<Setter Property="Foreground" Value="White"/>
-						</Style>
-						<Style Selector="ListBoxItem:selected Path.ico">
-							<Setter Property="Stroke" Value="#55C795"/>
-						</Style>
-						<!-- Repaint the row background: the theme default is blue and clashes with the
-						     app's green accent. Painted on the template presenter so it wins. -->
-						<Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-							<Setter Property="Background" Value="#14FFFFFF"/>
-						</Style>
-						<Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-							<Setter Property="Background" Value="#1E3A2B"/>
-						</Style>
-						<Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-							<Setter Property="Background" Value="#255034"/>
-						</Style>
-					</ListBox.Styles>
-					<ListBoxItem Tag="PING" AutomationProperties.Name="PING">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoPing}"/>
-							<TextBlock Text="PING" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="DNS" AutomationProperties.Name="DNS">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoDns}"/>
-							<TextBlock Text="DNS" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="SCANNER" AutomationProperties.Name="SCANNER">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoScanner}"/>
-							<TextBlock Text="SCANNER" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="NETWORK" AutomationProperties.Name="NETWORK">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoNetwork}"/>
-							<TextBlock Text="NETWORK" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="PROXY" AutomationProperties.Name="PROXY">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoProxy}"/>
-							<TextBlock Text="PROXY" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="WEB SERVER" AutomationProperties.Name="WEB SERVER">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoWebServer}"/>
-							<TextBlock Text="WEB SERVER" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="IP INFO" AutomationProperties.Name="IP INFO">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoIpInfo}"/>
-							<TextBlock Text="IP INFO" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="CHECK-HOST" AutomationProperties.Name="CHECK-HOST">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoCheckHost}"/>
-							<TextBlock Text="CHECK-HOST" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="CURL" AutomationProperties.Name="CURL">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoCurl}"/>
-							<TextBlock Text="CURL" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="TELEGRAM BOT" AutomationProperties.Name="TELEGRAM BOT">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoTelegram}"/>
-							<TextBlock Text="TELEGRAM BOT" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="MONITOR" AutomationProperties.Name="MONITOR">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoMonitor}"/>
-							<TextBlock Text="MONITOR" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="CLOUDFLARE" AutomationProperties.Name="CLOUDFLARE">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoCloudflare}"/>
-							<TextBlock Text="CLOUDFLARE" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="SSH" AutomationProperties.Name="SSH">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoSsh}"/>
-							<TextBlock Text="SSH" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="STRING LAB" AutomationProperties.Name="STRING LAB">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoStringLab}"/>
-							<TextBlock Text="STRING LAB" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="NOTES" AutomationProperties.Name="NOTES">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoNotes}"/>
-							<TextBlock Text="NOTES" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-					<ListBoxItem Tag="DATA" AutomationProperties.Name="DATA">
-						<StackPanel Orientation="Horizontal" Spacing="12">
-							<Path Classes="ico" Data="{StaticResource IcoBackup}"/>
-							<TextBlock Text="DATA" VerticalAlignment="Center"/>
-						</StackPanel>
-					</ListBoxItem>
-				</ListBox>
-			</DockPanel>
+
+					<!-- footer: update + about/version. Kept out of the nav ListBox on purpose: that list is
+					     index-coupled to the page Carousel. -->
+					<StackPanel DockPanel.Dock="Bottom" Margin="12,6,12,16" Spacing="6">
+						<Button Classes="updatePill" Command="{Binding OpenReleasesCommand}"
+								IsVisible="{Binding IsUpdateAvailable}">
+							<StackPanel Orientation="Horizontal" Spacing="10">
+								<Ellipse Width="8" Height="8" Fill="{DynamicResource Accent}" VerticalAlignment="Center"/>
+								<TextBlock Classes="sideLabel" FontSize="14" VerticalAlignment="Center"
+										   Text="{Binding LatestVersion, StringFormat='Update to v{0}'}"/>
+							</StackPanel>
+						</Button>
+						<!-- light / dark: icon and label are per-theme resources (Styles/Tokens.axaml) -->
+						<Button Classes="sideLink" Command="{Binding ToggleThemeCommand}" Padding="14,12"
+								AutomationProperties.Name="Switch between the light and dark theme">
+							<StackPanel Orientation="Horizontal" Spacing="12">
+								<Path Classes="ico" Data="{DynamicResource IcoThemeToggle}"/>
+								<TextBlock Classes="sideLabel" Text="{DynamicResource Theme.ToggleLabel}" FontSize="14" VerticalAlignment="Center"/>
+							</StackPanel>
+						</Button>
+						<Button Classes="sideLink" Command="{Binding OpenAboutCommand}" Click="About_Click"
+								AutomationProperties.Name="About" Padding="14,12">
+							<Grid ColumnDefinitions="Auto,*,Auto">
+								<Path Grid.Column="0" Classes="ico" Data="{StaticResource IcoAbout}"/>
+								<TextBlock Grid.Column="1" Classes="sideLabel" Text="About" FontSize="14" Margin="12,0,0,0" VerticalAlignment="Center"/>
+								<TextBlock Grid.Column="2" Classes="sideLabel version" VerticalAlignment="Center">
+									<Run Text="v"/><Run Text="{Binding CurrentVersion}"/>
+								</TextBlock>
+							</Grid>
+						</Button>
+					</StackPanel>
+
+					<!-- nav: same sections + order as the desktop sidebar -->
+					<ListBox x:Name="Nav"
+							 SelectedIndex="0"
+							 SelectionChanged="Nav_SelectionChanged"
+							 Background="{DynamicResource Bg.Sidebar}"
+							 BorderThickness="0"
+							 Padding="10,4,10,8"
+							 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+
+						<!-- DIAGNOSE -->
+						<ctl:NavListItem Tag="PING" Group="Diagnose" Title="Ping"
+										 Subtitle="Live stats, TCP ping, traceroute and MTR" AutomationProperties.Name="Ping">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoPing}"/>
+								<TextBlock Text="Ping" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="DOCTOR" Title="Doctor"
+										 Subtitle="Why a site won't open for you" AutomationProperties.Name="Doctor">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoDoctor}"/>
+								<TextBlock Text="Doctor" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="DNS" Title="DNS &amp; WHOIS"
+										 Subtitle="DoH / DoT lookups, mail check, WHOIS" AutomationProperties.Name="DNS">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoDns}"/>
+								<TextBlock Text="DNS" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="SCANNER" Title="Port Scanner"
+										 Subtitle="TCP / UDP scan, service detection" AutomationProperties.Name="Port Scanner">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoScanner}"/>
+								<TextBlock Text="Scanner" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="CHECK-HOST" Title="Check Host"
+										 Subtitle="Checks from nodes around the world" AutomationProperties.Name="Check Host">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoCheckHost}"/>
+								<TextBlock Text="Check Host" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="MONITOR" Title="Monitor"
+										 Subtitle="Uptime, expiry checks, Telegram alerts" AutomationProperties.Name="Monitor">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoMonitor}"/>
+								<TextBlock Text="Monitor" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="NETWORK" Title="Network"
+										 Subtitle="Interfaces, Wi-Fi, ports and routes" AutomationProperties.Name="Network">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoNetwork}"/>
+								<TextBlock Text="Network" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="SPEED TEST" Title="Speed Test"
+										 Subtitle="Internet speed and latency" AutomationProperties.Name="Speed Test">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoSpeed}"/>
+								<TextBlock Text="Speed Test" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+
+						<!-- WEB & API -->
+						<ctl:NavListItem Tag="CURL" Group="Web &amp; API" Title="cURL"
+										 Subtitle="HTTP requests, responses and TLS" AutomationProperties.Name="cURL">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoCurl}"/>
+								<TextBlock Text="cURL" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="TLS" Title="TLS Inspector"
+										 Subtitle="Certificates, expiry, versions, ciphers" AutomationProperties.Name="TLS Inspector">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoTls}"/>
+								<TextBlock Text="TLS Inspector" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="IP INFO" Title="IP Info"
+										 Subtitle="Public IP and GeoIP lookups" AutomationProperties.Name="IP Info">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoIpInfo}"/>
+								<TextBlock Text="IP Info" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="CLOUDFLARE" Title="Cloudflare"
+										 Subtitle="DNS, DDNS, SSL/TLS, security, rules" AutomationProperties.Name="Cloudflare">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoCloudflare}"/>
+								<TextBlock Text="Cloudflare" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="TELEGRAM BOT" Title="Telegram Bot"
+										 Subtitle="Bot API calls, uploads, updates" AutomationProperties.Name="Telegram Bot">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoTelegram}"/>
+								<TextBlock Text="Telegram Bot" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+
+						<!-- SERVE & CONNECT -->
+						<ctl:NavListItem Tag="SSH" Group="Serve &amp; Connect" Title="SSH"
+										 Subtitle="Terminal, files, forwards, health" AutomationProperties.Name="SSH">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoSsh}"/>
+								<TextBlock Text="SSH" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="SOCKET" Title="Socket"
+										 Subtitle="TCP / UDP client and server, WebSocket" AutomationProperties.Name="Socket">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoSocket}"/>
+								<TextBlock Text="Socket" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="WEB SERVER" Title="Web Server"
+										 Subtitle="Share files or catch webhooks" AutomationProperties.Name="Web Server">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoWebServer}"/>
+								<TextBlock Text="Web Server" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="PROXY" Title="Proxy"
+										 Subtitle="SOCKS5 / HTTP server and checker" AutomationProperties.Name="Proxy">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoProxy}"/>
+								<TextBlock Text="Proxy" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+
+						<!-- WORKSPACE -->
+						<ctl:NavListItem Tag="STRING LAB" Group="Workspace" Title="String Lab"
+										 Subtitle="Encode, hash, convert, diff, generate" AutomationProperties.Name="String Lab">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoStringLab}"/>
+								<TextBlock Text="String Lab" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="NOTES" Title="Notes"
+										 Subtitle="Encrypted notes" AutomationProperties.Name="Notes">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoNotes}"/>
+								<TextBlock Text="Notes" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+						<ctl:NavListItem Tag="DATA" Title="History &amp; Backup"
+										 Subtitle="Recent inputs and encrypted backups" AutomationProperties.Name="History and Backup">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoBackup}"/>
+								<TextBlock Text="History &amp; Backup" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
+					</ListBox>
+				</DockPanel>
+			</Border>
 		</SplitView.Pane>
 
-		<!-- Content -->
+		<!-- ===== Content ===== -->
 		<SplitView.Content>
 			<Grid RowDefinitions="Auto,*">
-
-				<!-- Top app bar (no window chrome on mobile) -->
-				<Grid Grid.Row="0" Height="54" Background="#181818" ColumnDefinitions="Auto,*">
-					<Button Grid.Column="0"
-							x:Name="MenuButton"
-							Click="TogglePane"
-							Background="Transparent" BorderThickness="0"
-							Width="54" Height="54"
-							FontSize="22" Foreground="White"
-							Content="&#9776;"/>
-					<TextBlock Grid.Column="1"
-							   VerticalAlignment="Center"
-							   FontSize="15" FontWeight="Bold" Foreground="White" Opacity="0.85"
-							   Text="{Binding #Nav.SelectedItem, Converter={x:Static views:ListBoxItemContentConverter.Instance}}"/>
-				</Grid>
-
-				<!-- Only the selected tool is shown; no desktop tab strip -->
-				<Carousel Grid.Row="1" x:Name="Pages"
+				<!-- app bar (no window chrome on mobile) -->
+				<Border Grid.Row="0" Background="{DynamicResource Bg.Sidebar}"
+						BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1">
+					<Grid Height="60" ColumnDefinitions="Auto,*" Margin="8,0,16,0">
+						<Button Grid.Column="0" x:Name="MenuButton" Click="TogglePane" Width="46" Height="46"
+								AutomationProperties.Name="Open navigation">
+							<Path Data="M4 7h16 M4 12h16 M4 17h16" Stroke="{DynamicResource Text.Primary}" StrokeThickness="1.8"
+								  StrokeLineCap="Round" Width="24" Height="24" Stretch="None"/>
+						</Button>
+						<StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0" Spacing="1">
+							<TextBlock Text="{Binding $parent[views:MobileShellView].PageTitle}" FontSize="17" FontWeight="SemiBold"
+									   Foreground="{DynamicResource Text.Primary}" TextTrimming="CharacterEllipsis"/>
+							<TextBlock Text="{Binding $parent[views:MobileShellView].PageSubtitle}" FontSize="12"
+									   Foreground="{DynamicResource Text.Muted}" TextTrimming="CharacterEllipsis"/>
+						</StackPanel>
+					</Grid>
+				</Border>
+				<!-- Only the selected tool is shown -->
+				<Carousel Grid.Row="1" x:Name="Pages" Margin="12,12,12,10"
 						  SelectedIndex="{Binding #Nav.SelectedIndex}"
 						  PageTransition="{x:Null}">
-					<!-- Order MUST match the Nav ListBox above (Carousel is index-coupled to it). -->
-					<views:PingView DataContext="{Binding PingVM}"/>
-					<views:DnsView DataContext="{Binding DnsVM}"/>
-					<views:PortScannerView DataContext="{Binding PortScannerVM}"/>
-					<views:NetworkInfoView DataContext="{Binding NetworkVM}"/>
-					<views:ProxyView DataContext="{Binding ProxyVM}"/>
-					<views:WebServerView DataContext="{Binding WebServerVM}"/>
-					<views:IpInfoView DataContext="{Binding IpInfoVM}"/>
-					<views:CheckHostView DataContext="{Binding CheckHostVM}"/>
-					<views:CurlView DataContext="{Binding CurlVM}"/>
-					<views:TgView>
-						<views:TgView.DataContext>
-							<vm:TgViewModel/>
-						</views:TgView.DataContext>
-					</views:TgView>
-					<views:MonitorView DataContext="{Binding MonitorVM}"/>
-					<views:CloudflareView DataContext="{Binding CloudflareVM}"/>
-					<views:SshView DataContext="{Binding SshVM}"/>
-					<views:StringLabView DataContext="{Binding StringTool}"/>
-					<views:NoteView DataContext="{Binding NoteVM}"/>
+					<!-- Order MUST match the Nav ListBox above (Carousel is index-coupled to it). Each slot is an
+					     empty host that gets the tool named by its Nav item's Tag on first visit (ToolViews in
+					     MainView.axaml.cs) and keeps that view — and its state — for the rest of the session. -->
+					<Decorator/>	<!-- PING -->
+					<Decorator/>	<!-- DOCTOR -->
+					<Decorator/>	<!-- DNS -->
+					<Decorator/>	<!-- SCANNER -->
+					<Decorator/>	<!-- CHECK-HOST -->
+					<Decorator/>	<!-- MONITOR -->
+					<Decorator/>	<!-- NETWORK -->
+					<Decorator/>	<!-- SPEED TEST -->
+					<Decorator/>	<!-- CURL -->
+					<Decorator/>	<!-- TLS -->
+					<Decorator/>	<!-- IP INFO -->
+					<Decorator/>	<!-- CLOUDFLARE -->
+					<Decorator/>	<!-- TELEGRAM BOT -->
+					<Decorator/>	<!-- SSH -->
+					<Decorator/>	<!-- SOCKET -->
+					<Decorator/>	<!-- WEB SERVER -->
+					<Decorator/>	<!-- PROXY -->
+					<Decorator/>	<!-- STRING LAB -->
+					<Decorator/>	<!-- NOTES -->
 					<!-- DATA: HISTORY + BACKUP merged into one page (index-aligned with the Nav list) -->
-					<TabControl Padding="0,2,0,0">
-						<TabItem Header="HISTORY"><views:HistoryView DataContext="{Binding HistoryVM}"/></TabItem>
-						<TabItem Header="BACKUP"><views:BackupView DataContext="{Binding BackupVM}"/></TabItem>
+					<TabControl Padding="0">
+						<TabItem Header="History"><Decorator x:Name="HistoryHost"/></TabItem>
+						<TabItem Header="Backup"><Decorator x:Name="BackupHost"/></TabItem>
 					</TabControl>
 				</Carousel>
 			</Grid>
 		</SplitView.Content>
 	</SplitView>
+	<!-- the About box, over the drawer and the page -->
+	<views:AboutView IsVisible="{Binding IsAboutOpen}"/>
+	</Panel>
 </UserControl>

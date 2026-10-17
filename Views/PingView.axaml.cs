@@ -1,8 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Input;
-using Avalonia.Interactivity;
-using Echoes.Helpers;
-using Echoes.ViewModels;
 using System.Collections.Specialized;
 
 namespace Echoes.Views;
@@ -25,22 +21,9 @@ public partial class PingView : UserControl
             };
         }
 
-        // Intercept Ctrl+V on the host box (tunnel: before the inner TextBox pastes) and drop in
-        // the bare host extracted from whatever was on the clipboard.
-        var hostBox = this.FindControl<AutoCompleteBox>("HostBox");
-        hostBox?.AddHandler(KeyDownEvent, OnHostPaste, RoutingStrategies.Tunnel);
-    }
-
-    private async void OnHostPaste(object? sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.V || !e.KeyModifiers.HasFlag(KeyModifiers.Control)) return;
-        e.Handled = true;  // suppress the raw paste; we set the cleaned value ourselves
-        try
-        {
-            string? text = await ClipboardHelper.GetTextAsync();
-            if (string.IsNullOrWhiteSpace(text)) return;
-            if (DataContext is PingViewModel vm) vm.TargetHost = HostExtractor.Extract(text);
-        }
-        catch { /* clipboard held by another process — don't crash the async void handler */ }
+        // Paste-to-host and select-all-on-focus for the host box are declared in XAML via
+        // helpers:InputAssist (HostPaste / SelectAllOnFocus; in TCP mode PortTarget sends a pasted port to the Port box).
+        // The placeholder comes from the view-model (PingViewModel.HostPlaceholder): shorter on a phone, where the
+        // narrower box (Start beside it) cut the example off mid-address ("e.g. 8").
     }
 }

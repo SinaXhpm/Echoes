@@ -9,6 +9,7 @@
       TextBlock does, so the colour has to be set through Stroke.
     -->
     <StreamGeometry x:Key="IcoPing">M4.5 11 a10.6 10.6 0 0 1 15 0 M7.5 14 a6.4 6.4 0 0 1 9 0 M10.5 17 a2.2 2.2 0 0 1 3 0</StreamGeometry>
+    <StreamGeometry x:Key="IcoDoctor">M6 3.5 V8.5 A4.5 4.5 0 0 0 15 8.5 V3.5 M4.8 3.5 H7.2 M13.8 3.5 H16.2 M10.5 13 V15.5 A4 4 0 0 0 18.5 15.5 V13.5 M18.5 13.5 A2 2 0 1 0 18.5 9.5 A2 2 0 1 0 18.5 13.5 Z</StreamGeometry>
     <StreamGeometry x:Key="IcoDns">M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M3 12 H21 M12 3 A5.5 9 0 0 0 12 21 M12 3 A5.5 9 0 0 1 12 21</StreamGeometry>
     <StreamGeometry x:Key="IcoScanner">M11 4 A7 7 0 1 0 11 18 A7 7 0 1 0 11 4 Z M16 16 L21 21</StreamGeometry>
     <StreamGeometry x:Key="IcoNetwork">M9.5 3 h5 v4 h-5 Z M2.5 17 h5 v4 h-5 Z M16.5 17 h5 v4 h-5 Z M12 7 v3.5 M5 17 v-2.5 h14 v2.5 M12 10.5 v4</StreamGeometry>
@@ -26,4 +27,11 @@
     <StreamGeometry x:Key="IcoBackup">M3.5 4.5 h17 v4 h-17 Z M5 8.5 v11 h14 v-11 M12 11 v5 M9.5 13.5 L12 16 l2.5 -2.5</StreamGeometry>
     <StreamGeometry x:Key="IcoHistory">M12 3 A9 9 0 1 1 3.6 15 M3 4 v5 h5 M12 7.5 V12.5 L15.5 14.5</StreamGeometry>
     <StreamGeometry x:Key="IcoAbout">M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M12 11 V16.5 M12 7.3 V8.8</StreamGeometry>
+    <!-- speed test: a gauge with its needle -->
+    <StreamGeometry x:Key="IcoSpeed">M4.5 17 A8.5 8.5 0 1 1 19.5 17 M12 13 L16 9 M12 13 m-1.3 0 a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0</StreamGeometry>
+    <!-- TLS inspector: a padlock -->
+    <StreamGeometry x:Key="IcoTls">M5.5 11 h13 v9.5 h-13 Z M8.5 11 V7.5 a3.5 3.5 0 0 1 7 0 V11 M12 14.5 v2.5</StreamGeometry>
+    <!-- socket tool: a plug -->
+    <StreamGeometry x:Key="IcoSocket">M9 3 v4 M15 3 v4 M6.5 7 h11 v4 a5.5 5.5 0 0 1 -11 0 Z M12 16.5 V21</StreamGeometry>
+    <!-- (the light / dark switch's sun / moon is IcoThemeToggle in Styles/Tokens.axaml: a per-theme resource) -->
 </ResourceDictionary>

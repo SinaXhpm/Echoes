@@ -1,0 +1,105 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             x:Class="Echoes.Views.AboutView"
+             x:DataType="vm:MainViewModel"
+             Background="Transparent">
+	<!-- The About box, over the whole shell (desktop and phone). The backdrop is only an invisible hit-test fill: it keeps
+	     clicks off the tool behind and a press on it closes the box. No dimming (solid colours only); the box stands out
+	     by its raised surface and strong border. Esc / Android back close it too (code-behind). -->
+	<UserControl.Styles>
+		<Style Selector="TextBlock.aboutKey">
+			<Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+			<Setter Property="Margin" Value="0,0,12,0"/>
+		</Style>
+		<Style Selector="SelectableTextBlock.aboutValue">
+			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+			<Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+		</Style>
+	</UserControl.Styles>
+
+	<Border Name="Card" Classes="card" MaxWidth="420" Margin="12" Padding="18,16"
+			HorizontalAlignment="Center" VerticalAlignment="Center"
+			Background="{DynamicResource Bg.Raised}" BorderBrush="{DynamicResource Border.Strong}"
+			KeyboardNavigation.TabNavigation="Cycle">
+		<ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+			<StackPanel Spacing="12">
+				<!-- name + version -->
+				<Grid ColumnDefinitions="Auto,*,Auto">
+					<Image Source="avares://Echoes/Assets/logo-256.png" Width="40" Height="40" VerticalAlignment="Center"
+						   RenderOptions.BitmapInterpolationMode="HighQuality"/>
+					<StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center" Spacing="1">
+						<TextBlock Text="Echoes" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"/>
+						<TextBlock Classes="muted" Text="{Binding CurrentVersion, StringFormat='Network toolkit · v{0}'}"/>
+					</StackPanel>
+					<Button Grid.Column="2" Name="CloseButton" Classes="icon" VerticalAlignment="Top"
+							Command="{Binding CloseAboutCommand}" ToolTip.Tip="Close (Esc)" AutomationProperties.Name="Close">
+						<Path Data="M7 7 L17 17 M17 7 L7 17" StrokeThickness="1.8" StrokeLineCap="Round"
+							  Width="24" Height="24" Stretch="None"/>
+					</Button>
+				</Grid>
+
+				<Border Classes="divider"/>
+
+				<!-- updates -->
+				<StackPanel Spacing="8">
+					<Grid ColumnDefinitions="Auto,Auto,*,Auto">
+						<TextBlock Text="Updates" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource Text.Primary}"/>
+						<Border Grid.Column="1" Classes="badge" Margin="8,0,0,0"
+								Classes.success="{Binding IsUpToDate}" Classes.accent="{Binding IsUpdateBadgeAccent}"
+								Classes.danger="{Binding IsUpdateCheckFailed}">
+							<TextBlock Text="{Binding UpdateBadge}"/>
+						</Border>
+						<Button Grid.Column="3" Classes="secondary" Content="Check now"
+								Command="{Binding CheckUpdatesNowCommand}" IsEnabled="{Binding !IsCheckingUpdate}"
+								ToolTip.Tip="Ask GitHub for the latest release"/>
+					</Grid>
+					<TextBlock Classes="muted" Text="{Binding UpdateDetail}" TextWrapping="Wrap"
+							   ToolTip.Tip="{Binding UpdateDetailTip}"/>
+					<Button Classes="primary" HorizontalAlignment="Stretch" IsVisible="{Binding IsUpdateAvailable}"
+							Command="{Binding OpenReleasesCommand}" ToolTip.Tip="Opens the release page on GitHub"
+							Content="{Binding LatestVersion, StringFormat='Download v{0}'}"/>
+				</StackPanel>
+
+				<Border Classes="divider"/>
+
+				<!-- details -->
+				<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6">
+					<TextBlock Grid.Row="0" Classes="aboutKey" Text="Platform"/>
+					<SelectableTextBlock Grid.Row="0" Grid.Column="1" Classes="aboutValue" Text="{Binding PlatformText}"/>
+					<TextBlock Grid.Row="1" Classes="aboutKey" Text="Runtime"/>
+					<SelectableTextBlock Grid.Row="1" Grid.Column="1" Classes="aboutValue" Text="{Binding RuntimeText}"/>
+					<TextBlock Grid.Row="2" Classes="aboutKey" Text="UI"/>
+					<SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="aboutValue" Text="{Binding UiText}"/>
+					<TextBlock Grid.Row="3" Classes="aboutKey" Text="Data" IsVisible="{Binding CanOpenDataFolder}"/>
+					<Grid Grid.Row="3" Grid.Column="1" ColumnDefinitions="*,Auto" IsVisible="{Binding CanOpenDataFolder}">
+						<SelectableTextBlock Classes="aboutValue" Text="{Binding DataFolder}" ToolTip.Tip="{Binding DataFolder}"/>
+						<Button Grid.Column="1" Classes="ghost" Content="Open" Margin="8,0,0,0"
+								Command="{Binding OpenDataFolderInShellCommand}" ToolTip.Tip="Show the settings and history folder"/>
+					</Grid>
+				</Grid>
+
+				<Border Classes="divider"/>
+
+				<!-- links -->
+				<UniformGrid Columns="2" ColumnSpacing="8" RowSpacing="8">
+					<Button Classes="secondary" HorizontalAlignment="Stretch" Content="GitHub"
+							Command="{Binding OpenGitHubCommand}" ToolTip.Tip="Source code and README"/>
+					<Button Classes="secondary" HorizontalAlignment="Stretch" Content="Releases"
+							Command="{Binding OpenReleasesCommand}" ToolTip.Tip="Downloads and changelog"/>
+					<Button Classes="secondary" HorizontalAlignment="Stretch" Content="Report a bug"
+							Command="{Binding OpenIssuesCommand}" ToolTip.Tip="Open a GitHub issue (Copy info first)"/>
+					<Button Classes="secondary" HorizontalAlignment="Stretch" Content="{Binding CopyInfoLabel}"
+							Command="{Binding CopyInfoCommand}" ToolTip.Tip="Version, platform and runtime, for a bug report"/>
+				</UniformGrid>
+
+				<Button Classes="ghost" HorizontalAlignment="Center" BorderThickness="0" Command="{Binding OpenLicenseCommand}"
+						ToolTip.Tip="Free and open source (opens the license)">
+					<TextBlock Classes="muted" Text="MIT License · © 2026 Echoes contributors"/>
+				</Button>
+			</StackPanel>
+		</ScrollViewer>
+	</Border>
+</UserControl>

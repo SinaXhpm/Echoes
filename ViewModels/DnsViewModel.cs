@@ -2,12 +2,11 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DnsClient;
-using DnsClient.Protocol;
 using Echoes.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -18,16 +17,11 @@ using System.Threading.Tasks;
 
 namespace Echoes.ViewModels;
 
-/// <summary>One DNS answer (or a status line) shown as a card in the results list.</summary>
-public sealed class DnsRecordRow
-{
-    public string Type { get; init; } = "";
-    public string Value { get; init; } = "";
-    public string Server { get; init; } = "";
-    public bool IsStatus { get; init; }            // "no records" / "timeout" — not a real, copyable record
-    public bool IsRecord => !IsStatus;
-}
-
+/// <summary>
+/// DNS &amp; WHOIS: three modes on one page. Lookup — any record types through the user's resolvers (plain, DoH, DoT,
+/// recognised from what is typed) plus RDAP/WHOIS; Compare — one name against many resolvers, speed + tampering checks
+/// (DnsViewModel.Compare.cs); Email check — MX / SPF / DMARC / DKIM / MTA-STS / TLS-RPT / blocklists (DnsViewModel.Email.cs).
+/// </summary>
 public partial class DnsViewModel : ObservableObject
 {
     [ObservableProperty] private string _domainName = string.Empty;
@@ -35,7 +29,52 @@ public partial class DnsViewModel : ObservableObject
     [ObservableProperty] private bool _isWorking;
     [ObservableProperty] private string _dnsServersText = string.Empty;
 
-    // DNS lookups render as record cards (Records); WHOIS renders as freeform text (LogText).
+    // ---------------------------------------------------------------- mode: Lookup | Compare | Email check
+    public const int ModeLookup = 0, ModeCompare = 1, ModeEmail = 2;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLookupMode), nameof(IsCompareMode), nameof(IsEmailMode), nameof(ResolverText),
+                              nameof(ResolverHint), nameof(PrimaryText), nameof(PrimaryTip))]
+    private int _modeIndex;
+
+    public bool IsLookupMode => ModeIndex == ModeLookup;
+    public bool IsCompareMode => ModeIndex == ModeCompare;
+    public bool IsEmailMode => ModeIndex == ModeEmail;
+
+    partial void OnModeIndexChanged(int value)
+    {
+        RefreshPresetMarks();
+        if (_loaded) ProfileService.Instance.SetSetting("dns.mode", value.ToString(CultureInfo.InvariantCulture));
+    }
+
+    public string PrimaryText => ModeIndex switch { ModeCompare => "Compare", ModeEmail => "Check", _ => "Look up" };
+    public string PrimaryTip => ModeIndex switch
+    {
+        ModeCompare => "Ask every resolver in the list a few times: speed, reliability, and answers checked against the encrypted ones",
+        ModeEmail => "Check the domain's mail setup: MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT and blocklists",
+        _ => "Query the record types through every resolver in the list",
+    };
+
+    /// <summary>The resolver box: the lookup list in Lookup / Email check (the email check asks the first that answers),
+    /// its own list in Compare.</summary>
+    public string ResolverText
+    {
+        get => IsCompareMode ? CompareServersText : DnsServersText;
+        set
+        {
+            if (IsCompareMode) CompareServersText = value ?? "";
+            else DnsServersText = value ?? "";
+        }
+    }
+
+    public string ResolverHint => ModeIndex switch
+    {
+        ModeCompare => "Resolvers to compare, one per line: an IP, https://host/dns-query (DoH), tls://host (DoT) or system",
+        ModeEmail => "Resolvers, one per line — the check uses the first that answers. Spamhaus refuses big public resolvers: put system first to check it.",
+        _ => "Resolvers, one per line: an IP or IP:port (plain DNS), https://host/dns-query (DoH), tls://host or host:853 (DoT), or system",
+    };
+
+    // DNS lookups render as record rows (Records); WHOIS renders as freeform text (LogText).
     public ObservableCollection<DnsRecordRow> Records { get; } = new();
     [ObservableProperty] private bool _showRecords;
 
@@ -64,7 +103,7 @@ public partial class DnsViewModel : ObservableObject
 
     public ObservableCollection<string> DomainHistory => HistoryService.Instance.Get("dns.domain");
 
-    // Compact summary shown on the RECORD TYPES dropdown button (kept in sync with the checkboxes).
+    // Compact summary shown on the Record types dropdown button (kept in sync with the checkboxes).
     public string SelectedTypesSummary
     {
         get
@@ -81,36 +120,106 @@ public partial class DnsViewModel : ObservableObject
     {
         base.OnPropertyChanged(e);
         if (e.PropertyName is { } n && n.StartsWith("Type", StringComparison.Ordinal))
+        {
             OnPropertyChanged(nameof(SelectedTypesSummary));
+            if (_loaded) ProfileService.Instance.SetSetting(TypesKey, string.Join(",", GetSelectedTypes()));
+        }
+    }
+
+    // The ticked record types, remembered as "A,MX,TXT" (empty: none ticked). Not saved yet: A only.
+    private const string TypesKey = "dns.types";
+
+    private void RestoreTypes()
+    {
+        if (ProfileService.Instance.GetSetting(TypesKey) is not { } saved) return;
+        var on = new HashSet<string>(saved.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+                                     StringComparer.OrdinalIgnoreCase);
+        TypeA = on.Contains("A");
+        TypeAAAA = on.Contains("AAAA");
+        TypeMX = on.Contains("MX");
+        TypeNS = on.Contains("NS");
+        TypeTXT = on.Contains("TXT");
+        TypeCNAME = on.Contains("CNAME");
+        TypeSOA = on.Contains("SOA");
+        TypeSRV = on.Contains("SRV");
+        TypeCAA = on.Contains("CAA");
+        TypePTR = on.Contains("PTR");
     }
 
     public DnsViewModel()
     {
+        PresetGroups = BuildPresets();
         LoadServers();
         if (HistoryService.Instance.Last("dns.domain") is { } last) DomainName = last;
         WrapResult = ProfileService.Instance.GetBool("dns.wrap", true);
+        RestoreTypes();
+        string? ct = ProfileService.Instance.GetSetting("dns.compareType");
+        if (ct != null && CompareTypes.Contains(ct)) CompareType = ct;
+        int mode = ProfileService.Instance.GetInt("dns.mode", ModeLookup);
+        ModeIndex = mode is ModeCompare or ModeEmail ? mode : ModeLookup;
+        RefreshPresetMarks();
         _loaded = true;
     }
 
     private void LoadServers()
     {
         DnsServersText = ProfileService.Instance.GetSetting("dns.servers") ?? string.Empty;
-
         if (string.IsNullOrWhiteSpace(DnsServersText))
         {
-            DnsServersText = "1.1.1.1" + Environment.NewLine + "8.8.8.8";
+            // two plain resolvers and an encrypted one: where plain DNS to foreign servers is filtered, the DoH line still
+            // answers (and the email check falls back to it by itself)
+            DnsServersText = string.Join(Environment.NewLine, "1.1.1.1", "8.8.8.8", "https://cloudflare-dns.com/dns-query");
             SaveServers();
         }
+        string? cmp = ProfileService.Instance.GetSetting("dns.compare");
+        CompareServersText = string.IsNullOrWhiteSpace(cmp) ? ResolverPresets.DefaultCompareList() : cmp;
     }
 
     private void SaveServers()
         => ProfileService.Instance.SetSetting("dns.servers", DnsServersText);
 
-    // Cancels an in-flight lookup or WHOIS.
+    // Persist resolver edits as they happen: saved only by a lookup, an edit followed by WHOIS (or nothing) and
+    // closing the app was lost. Cheap — the profile coalesces writes in the background.
+    partial void OnDnsServersTextChanged(string value)
+    {
+        if (!IsCompareMode) { OnPropertyChanged(nameof(ResolverText)); RefreshPresetMarks(); }
+        if (_loaded) SaveServers();
+    }
+
+    // Cancels an in-flight lookup / comparison / check / WHOIS.
     private CancellationTokenSource? _cts;
+
+    private CancellationToken NewRun()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        return _cts.Token;
+    }
+
+    // The resolver decides how many answers come back: a hostile or broken one (any IP can be listed as a resolver)
+    // sent 4,000 A records in one TCP answer, and every answer is a row in the results list, which isn't virtualized.
+    // Real answers are a handful; past this many per server and type, the rest are counted in one status line.
+    private const int MaxAnswersPerQuery = 100;
+    // Lookup asks every listed resolver for every type at once: a pasted list of hundreds is cut here.
+    private const int MaxLookupResolvers = 20;
+
+    // RDAP answers are a few KB. rdap.org redirects to whichever registry serves the name, so the body is a third
+    // party's: it was buffered whole (100 MB in 1.4 s on loopback took ~350 MB of memory) and then parsed on the UI thread.
+    private const int MaxRdapBytes = 2 * 1024 * 1024;
+    private static readonly TimeSpan RdapTimeout = TimeSpan.FromSeconds(10);
 
     [RelayCommand]
     private void Stop() => _cts?.Cancel();
+
+    /// <summary>Enter in the domain box / the primary button: the current mode's action.</summary>
+    [RelayCommand]
+    private Task RunPrimary() => ModeIndex switch
+    {
+        ModeCompare => RunCompare(),
+        ModeEmail => RunEmail(),
+        _ => RunLookup(),
+    };
 
     [RelayCommand]
     private async Task RunLookup()
@@ -119,65 +228,82 @@ public partial class DnsViewModel : ObservableObject
         DomainName = HostExtractor.Extract(DomainName);
         if (string.IsNullOrWhiteSpace(DomainName) || IsWorking) return;
 
-        _cts?.Cancel();
-        _cts?.Dispose();
-        _cts = new CancellationTokenSource();
-        var token = _cts.Token;
-
+        var token = NewRun();
         HistoryService.Instance.Add("dns.domain", DomainName);
         SaveServers();
         IsWorking = true;
         LogText = string.Empty;
         ShowRecords = true;
-        Dispatcher.UIThread.Post(() => Records.Clear());
+        Records.Clear();
+        _rowBudget = MaxLookupRows;
+        _charBudget = MaxShownChars;
 
-        var servers = DnsServersText.Split(new[] { '\n', '\r', ',' }, StringSplitOptions.RemoveEmptyEntries)
-            .Select(s => s.Trim()).Where(s => IPAddress.TryParse(s, out _)).ToList();
+        // Resolvers: IP / ip:port (plain), https://… (DoH), tls://… or host:853 (DoT), "system"; anything else is listed
+        // as skipped instead of silently vanishing, so an all-invalid list doesn't just leave a blank pane.
+        var skipped = new List<(string line, string reason)>();
+        var specs = ResolverSpec.ParseList(DnsServersText, skipped);
+        foreach (var (line, reason) in skipped)
+            AddRow(new DnsRecordRow { Type = "SKIP", Value = reason, Server = line, IsStatus = true });
+        if (specs.Count > MaxLookupResolvers)
+        {
+            AddRow(new DnsRecordRow { Type = "SKIP", IsStatus = true, Value = $"only the first {MaxLookupResolvers} resolvers are asked ({specs.Count - MaxLookupResolvers} more in the list)" });
+            specs = specs.Take(MaxLookupResolvers).ToList();
+        }
 
         var selectedTypes = GetSelectedTypes();
-        if (!selectedTypes.Any() || !servers.Any())
+        if (selectedTypes.Count == 0 || specs.Count == 0)
         {
+            AddRow(new DnsRecordRow
+            {
+                Type = "ERR", IsStatus = true,
+                Value = specs.Count == 0 ? "No valid resolver — add one per line, e.g. 1.1.1.1 or https://cloudflare-dns.com/dns-query" : "No record type selected — pick one under Record types",
+            });
             IsWorking = false;
             return;
         }
 
         string host = DomainName.Trim();
-        string asciiHost = ToAscii(host);   // punycode for internationalized (non-ASCII) domains
+        string asciiHost = SecureDns.ToAscii(host);   // punycode for internationalized (non-ASCII) domains
+        IPAddress? revIp = IPAddress.TryParse(host, out var parsedIp) ? parsedIp : null;
 
-        var tasks = servers.Select(async server =>
+        var tasks = specs.Select(spec => Task.Run(async () =>
         {
-            // One client per server, reused for every record type (creating one per query
-            // needlessly re-allocates sockets/parser state).
-            var options = new LookupClientOptions(IPAddress.Parse(server)) { Timeout = TimeSpan.FromSeconds(3), Retries = 0 };
-            var client = new LookupClient(options);
-
+            // One session per resolver for every record type: the DoT connection / DoH pool / DnsClient instance is reused.
+            using var session = new DnsSession(spec);
             foreach (var type in selectedTypes)
             {
                 if (token.IsCancellationRequested) return;
-                try
-                {
-                    // PTR on an IP → reverse lookup; everything else is a forward query.
-                    var result = (type == QueryType.PTR && IPAddress.TryParse(host, out var revIp))
-                        ? await client.QueryReverseAsync(revIp, token)
-                        : await client.QueryAsync(asciiHost, type, QueryClass.IN, token);
-
-                    if (result.Answers.Any())
-                    {
-                        foreach (var record in result.Answers)
-                            AddRow(new DnsRecordRow { Type = type.ToString(), Value = RecordValue(record), Server = server });
-                    }
-                    else
-                    {
-                        AddRow(new DnsRecordRow { Type = type.ToString(), Value = "no records", Server = server, IsStatus = true });
-                    }
-                }
+                // PTR on an IP → the reverse name; everything else is a forward query.
+                string qname = type == QueryType.PTR && revIp != null ? DnsWire.ArpaName(revIp) : asciiHost;
+                DnsResult r;
+                try { r = await session.QueryAsync(qname, type, token).ConfigureAwait(false); }
                 catch (OperationCanceledException) { return; }   // user hit Stop — leave what we have
-                catch
+                if (token.IsCancellationRequested) return;
+
+                string meta = $"{r.Via} · {DnsCompare.Ms(r.RttMs)}";
+                string server = spec.Transport == DnsTransport.System ? "" : spec.Short;   // "system (192.168.1.1)" is in the meta already
+                if (r.Answers.Count > 0)
                 {
-                    AddRow(new DnsRecordRow { Type = type.ToString(), Value = "timeout", Server = server, IsStatus = true });
+                    // Label each answer with its OWN type: an A/AAAA query behind an alias also returns
+                    // the CNAME chain, which must not show (or copy) as an "A" record.
+                    int shown = 0;
+                    foreach (var a in r.Answers)
+                    {
+                        if (shown++ == MaxAnswersPerQuery) break;
+                        AddRow(new DnsRecordRow { Type = a.Type, Value = a.Value, Server = server, Meta = meta, ServerTip = spec.Text });
+                    }
+                    if (r.AnswerCount > MaxAnswersPerQuery)
+                        AddRow(new DnsRecordRow { Type = type.ToString(), Server = server, Meta = meta, ServerTip = spec.Text, IsStatus = true,
+                                                  Value = $"{r.AnswerCount - MaxAnswersPerQuery:N0} more answers not shown" });
+                }
+                else
+                {
+                    // An error reply (NXDOMAIN / SERVFAIL / REFUSED) also has no answers, but it isn't "no records":
+                    // a SERVFAIL (e.g. broken DNSSEC) or a resolver that refuses recursion must not read as such.
+                    AddRow(new DnsRecordRow { Type = type.ToString(), Value = r.StatusText, Server = server, Meta = meta, ServerTip = spec.Text, IsStatus = true });
                 }
             }
-        });
+        }, token));
 
         try { await Task.WhenAll(tasks); }
         catch (OperationCanceledException) { }
@@ -190,11 +316,7 @@ public partial class DnsViewModel : ObservableObject
         DomainName = HostExtractor.Extract(DomainName);
         if (string.IsNullOrWhiteSpace(DomainName) || IsWorking) return;
 
-        _cts?.Cancel();
-        _cts?.Dispose();
-        _cts = new CancellationTokenSource();
-        var token = _cts.Token;
-
+        var token = NewRun();
         HistoryService.Instance.Add("dns.domain", DomainName);
         IsWorking = true;
         ShowRecords = false;   // WHOIS/RDAP is freeform text
@@ -203,10 +325,10 @@ public partial class DnsViewModel : ObservableObject
 
         // rdap.org is the IANA bootstrap — it follows to the authoritative RDAP server for any
         // TLD/registry, and also covers IPs and ASNs. Pick the right object type from the input.
+        // ASN test first: IPAddress.TryParse takes a bare number ("13335") as legacy IPv4 (0.0.52.23).
         string kind =
-            System.Net.IPAddress.TryParse(query, out _) ? "ip" :
-            System.Text.RegularExpressions.Regex.IsMatch(query, @"^(AS)?\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
-                ? "autnum" : "domain";
+            System.Text.RegularExpressions.Regex.IsMatch(query, @"^(AS)?\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? "autnum" :
+            System.Net.IPAddress.TryParse(query, out _) ? "ip" : "domain";
         string key = kind == "autnum" ? query.TrimStart('A', 'S', 'a', 's') : query;
 
         var providers = new List<string> { $"https://rdap.org/{kind}/{key}" };
@@ -226,16 +348,24 @@ public partial class DnsViewModel : ObservableObject
 
                 if (status is >= 200 and < 300 && body.TrimStart().StartsWith('{'))
                 {
-                    using var doc = JsonDocument.Parse(body);
-                    var sb = new StringBuilder();
-                    ParseElement(doc.RootElement, sb);
-                    LogText = TextLimit.Cap(sb.ToString());
+                    // Up to 2 MB of JSON flattens into a lot of lines: parse and flatten off the UI thread.
+                    string text = await Task.Run(() =>
+                    {
+                        using var doc = JsonDocument.Parse(body);
+                        var sb = new StringBuilder();
+                        ParseElement(doc.RootElement, sb);
+                        return TextLimit.Cap(sb.ToString());
+                    }, token);
+                    LogText = text;
                     IsWorking = false;
                     return;
                 }
                 lastError = $"HTTP {status}";
             }
-            catch (OperationCanceledException) { LogText = "cancelled."; IsWorking = false; return; }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { LogText = "cancelled."; IsWorking = false; return; }
+            // HttpClient.Timeout also surfaces as a cancellation: a slow / filtered rdap.org is a failed provider
+            // (try the next one), not a Stop — it used to end the whole WHOIS with "cancelled.".
+            catch (OperationCanceledException) { lastError = "timed out"; }
             catch (Exception ex) { lastError = ex.Message; }
         }
         LogText = "No RDAP data — " + (lastError ?? "request failed / timed out") + ".";
@@ -244,15 +374,30 @@ public partial class DnsViewModel : ObservableObject
 
     private static async Task<(string body, int status)> FetchRdap(string url, CancellationToken token)
     {
-        using var client = HttpHelper.Create(timeout: TimeSpan.FromSeconds(10));
+        using var client = HttpHelper.Create(timeout: RdapTimeout);
         client.DefaultRequestHeaders.Accept.ParseAdd("application/rdap+json");
         client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 
-        using var response = await client.GetAsync(url, token);
-        return (await response.Content.ReadAsStringAsync(token), (int)response.StatusCode);
+        // Headers first, then the body read with a ceiling (decompressed bytes, so a gzip bomb stops there too). The
+        // client's Timeout ends with the headers, so the body gets the same deadline; it surfaces as "timed out".
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+        deadline.CancelAfter(RdapTimeout);
+        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
+        await using var stream = await response.Content.ReadAsStreamAsync(deadline.Token);
+        using var ms = new MemoryStream();
+        byte[] buf = new byte[16 * 1024];
+        int n;
+        while ((n = await stream.ReadAsync(buf, deadline.Token)) > 0)
+        {
+            if (ms.Length + n > MaxRdapBytes) throw new InvalidDataException($"the answer is larger than {MaxRdapBytes / (1024 * 1024)} MB");
+            ms.Write(buf, 0, n);
+        }
+        // RDAP is JSON, so UTF-8 (RFC 8259); a BOM is skipped as ReadAsStringAsync did.
+        int skip = ms.Length >= 3 && ms.GetBuffer()[0] == 0xEF && ms.GetBuffer()[1] == 0xBB && ms.GetBuffer()[2] == 0xBF ? 3 : 0;
+        return (Encoding.UTF8.GetString(ms.GetBuffer(), skip, (int)ms.Length - skip), (int)response.StatusCode);
     }
 
-    private void ParseElement(JsonElement element, StringBuilder sb)
+    private static void ParseElement(JsonElement element, StringBuilder sb)
     {
         if (element.ValueKind == JsonValueKind.Object)
         {
@@ -268,15 +413,6 @@ public partial class DnsViewModel : ObservableObject
         {
             foreach (var item in element.EnumerateArray()) ParseElement(item, sb);
         }
-    }
-
-    // Convert an internationalized domain (Unicode) to its ASCII/punycode form for the query.
-    // Leaves IPs and already-ASCII names unchanged; never throws.
-    private static string ToAscii(string host)
-    {
-        if (string.IsNullOrEmpty(host) || IPAddress.TryParse(host, out _)) return host;
-        try { return new System.Globalization.IdnMapping().GetAscii(host.TrimEnd('.')); }
-        catch { return host; }
     }
 
     private List<QueryType> GetSelectedTypes()
@@ -295,40 +431,111 @@ public partial class DnsViewModel : ObservableObject
         return types;
     }
 
-    // Copy the whole result set: record cards (lookup) or the freeform text (WHOIS).
+    // Copy the whole result set of the current mode: record rows / WHOIS text, the comparison, the email report.
     [RelayCommand]
     private async Task CopyResult()
     {
-        string text = ShowRecords
-            ? string.Join(Environment.NewLine, Records.Where(r => r.IsRecord).Select(r => $"{r.Type}\t{r.Value}\t{r.Server}"))
-            : LogText;
+        string text = ModeIndex switch
+        {
+            ModeCompare => CompareReport(),
+            ModeEmail => MailReport(),
+            _ => ShowRecords
+                ? string.Join(Environment.NewLine, Records.Where(r => r.IsRecord).Select(r => $"{r.Type}\t{r.CopyValue}\t{r.Server}\t{r.Meta}"))
+                : LogText,
+        };
         if (string.IsNullOrWhiteSpace(text)) return;
         await ClipboardHelper.SetTextAsync(text);
     }
 
-    // Copy a single record's value (the ⧉ button on each card).
+    // Copy a single record's value (the copy button on each row).
     [RelayCommand]
     private async Task CopyRow(DnsRecordRow? row)
     {
-        if (row is null || string.IsNullOrEmpty(row.Value)) return;
-        await ClipboardHelper.SetTextAsync(row.Value);
+        if (row is null || string.IsNullOrEmpty(row.CopyValue)) return;
+        await ClipboardHelper.SetTextAsync(row.CopyValue);
     }
 
-    private void AddRow(DnsRecordRow row) => Dispatcher.UIThread.Post(() => Records.Add(row));
+    // The results list isn't virtualized: 20 resolvers × 10 types × 100 answers would be 20,000 rows. Past this many in one
+    // lookup, one status line says so and the rest is dropped.
+    private const int MaxLookupRows = 600;
+    private int _rowBudget = MaxLookupRows;
+    // Characters shown over one lookup's rows (each row shows at most DnsRecordRow.MaxShown): laying out long values
+    // costs more than linear time, so past this budget a long value shows only its start (Copy still has it all).
+    private const int MaxShownChars = 32 * 1024, ShownPastBudget = 160;
+    private int _charBudget = MaxShownChars;
 
-    // Extract the clean value of a DNS answer (strongly-typed where possible, else the raw record).
-    private static string RecordValue(DnsResourceRecord r) => r switch
+    private void AddRow(DnsRecordRow row)
     {
-        ARecord a => a.Address.ToString(),
-        AaaaRecord a => a.Address.ToString(),
-        CNameRecord c => c.CanonicalName.ToString(),
-        MxRecord m => $"{m.Preference}  {m.Exchange}",
-        NsRecord n => n.NSDName.ToString(),
-        PtrRecord p => p.PtrDomainName.ToString(),
-        TxtRecord t => string.Join(" ", t.Text),
-        SoaRecord s => $"{s.MName} {s.RName} (serial {s.Serial})",
-        SrvRecord s => $"{s.Priority} {s.Weight} {s.Port} {s.Target}",
-        CaaRecord c => $"{c.Flags} {c.Tag} {c.Value}",
-        _ => r.ToString()
-    };
+        int left = Interlocked.Decrement(ref _rowBudget);
+        if (left < -1) return;
+        if (left == -1)
+            row = new DnsRecordRow { Type = "MORE", IsStatus = true, Value = $"more than {MaxLookupRows} rows — the rest isn't shown (ask fewer resolvers or types)" };
+        else if (row.Value.Length > ShownPastBudget && Interlocked.Add(ref _charBudget, -row.Value.Length) < 0)
+            row.ShowAtMost(ShownPastBudget);
+        Dispatcher.UIThread.Post(() => Records.Add(row));
+    }
+
+    // ---------------------------------------------------------------- presets
+
+    /// <summary>The presets menu: each provider with its plain / DoH / DoT forms as toggles.</summary>
+    public IReadOnlyList<PresetGroup> PresetGroups { get; }
+
+    private List<PresetGroup> BuildPresets()
+    {
+        var groups = new List<PresetGroup>
+        {
+            new("System", "this device", new[] { new PresetChip("system", "system", "The resolver this device is set to use (usually the router's or the ISP's)", TogglePreset) }),
+        };
+        foreach (var p in ResolverPresets.Providers)
+        {
+            var chips = new List<PresetChip>();
+            int plain = p.Note == "Iran" ? 2 : 1;
+            foreach (string a in p.Addresses.Take(plain)) chips.Add(new PresetChip(a, a, $"Plain DNS (UDP) to {a}", TogglePreset));
+            if (p.Doh != null) chips.Add(new PresetChip("DoH", p.Doh, "DNS-over-HTTPS: " + p.Doh, TogglePreset));
+            if (p.Dot != null) chips.Add(new PresetChip("DoT", p.Dot, "DNS-over-TLS: " + p.Dot, TogglePreset));
+            groups.Add(new PresetGroup(p.Name, p.Note, chips));
+        }
+        return groups;
+    }
+
+    /// <summary>Adds the preset's line to the resolver list, or takes it out when it is already there.</summary>
+    [RelayCommand]
+    private void TogglePreset(PresetChip? chip)
+    {
+        if (chip is null || IsWorking) return;
+        var lines = SplitLines(ResolverText);
+        int before = lines.Count;
+        lines.RemoveAll(l => string.Equals(Canonical(l), chip.Canonical, StringComparison.OrdinalIgnoreCase));
+        if (lines.Count == before) lines.Add(chip.Line);
+        ResolverText = string.Join(Environment.NewLine, lines);
+    }
+
+    /// <summary>Every preset, in each form it offers.</summary>
+    [RelayCommand]
+    private void UseAllPresets()
+    {
+        if (IsWorking) return;
+        ResolverText = ResolverPresets.DefaultCompareList();
+    }
+
+    [RelayCommand]
+    private void ClearResolvers()
+    {
+        if (IsWorking) return;
+        ResolverText = "";
+    }
+
+    private void RefreshPresetMarks()
+    {
+        if (PresetGroups is null) return;
+        var present = new HashSet<string>(SplitLines(ResolverText).Select(Canonical), StringComparer.OrdinalIgnoreCase);
+        foreach (var g in PresetGroups)
+            foreach (var c in g.Chips) c.IsOn = present.Contains(c.Canonical);
+    }
+
+    private static List<string> SplitLines(string? text)
+        => (text ?? "").Split(new[] { '\n', '\r', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                       .Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+
+    private static string Canonical(string line) => ResolverSpec.TryParse(line, out var s, out _) ? s.Text : line;
 }

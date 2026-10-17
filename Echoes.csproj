@@ -9,9 +9,7 @@
     <!-- The Android head lives in a subfolder with its own project; keep it out of the desktop build. -->
     <DefaultItemExcludes>$(DefaultItemExcludes);Echoes.Android\**</DefaultItemExcludes>
 
-    <Version>0.3.7</Version>
-    <AssemblyVersion>0.3.7.0</AssemblyVersion>
-    <FileVersion>0.3.7.0</FileVersion>
+    <Version>0.4.0</Version>
     <Description>Small utilities for network, API, and string tasks; throwing packets from a distant time, just to see what comes willowing back across the sand.</Description>
     
     <ApplicationIcon>Assets\echoes.ico</ApplicationIcon>
@@ -46,13 +44,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="12.0.2" />
-    <PackageReference Include="Avalonia.Desktop" Version="12.0.2" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.2" />
-    <PackageReference Include="Avalonia.Controls.WebView" Version="12.0.1" />
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Controls.WebView" Version="12.1.1" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="DnsClient" Version="1.8.0" />
-    <PackageReference Include="SSH.NET" Version="2025.1.0" />
+    <PackageReference Include="SSH.NET" Version="2026.0.0" />
   </ItemGroup>
 
   <!-- SSH.NET and DnsClient use reflection to register cipher/kex/HMAC and DNS record types.
@@ -67,6 +66,10 @@
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
     <AvaloniaResource Remove="Assets\echoes.ico" />
+    <!-- Not loaded at runtime: the full-size logo.png / logo.icns are only read from disk by the release
+         packaging (AppImage / .app icon); the app itself uses the 256px logo-256.png. Embedding them
+         added ~7 MB to every build. echoes.mp4 and avalonia-logo.ico are unused. -->
+    <AvaloniaResource Remove="Assets\logo.png;Assets\logo.icns;Assets\echoes.mp4;Assets\avalonia-logo.ico" />
   </ItemGroup>
 
   <ItemGroup>

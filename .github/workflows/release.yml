@@ -16,7 +16,7 @@ jobs:
         include:
           - os: windows-latest
             rid: win-x64
-          - os: ubuntu-latest
+          - os: ubuntu-22.04   # glibc 2.35: the AOT binary then also runs on Ubuntu 22.04+, Debian 12+, Fedora 36+ (24.04 would need 2.39)
             rid: linux-x64
           - os: macos-latest
             rid: osx-x64
@@ -26,23 +26,27 @@ jobs:
     steps:
     - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
     
+    # The app targets net8.0, but Avalonia 12.1's XAML / name generators need a newer compiler (SDK 9.0.300+);
+    # SDK 10 builds net8 exactly like the local builds do.
     - name: Setup .NET
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
       with:
-        dotnet-version: 8.0.x
+        dotnet-version: 10.0.x
 
+    # bash on every runner (Windows' default shell is pwsh, where this line would write nothing)
     - name: Get Version
       id: get_version
+      shell: bash
       run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
     - name: Install Linux Dependencies
-      if: matrix.os == 'ubuntu-latest'
+      if: runner.os == 'Linux'
       run: |
         sudo apt-get update
         sudo apt-get install -y clang zlib1g-dev libfuse2 binutils rpm
 
     - name: Publish
-      run: dotnet publish -c Release -r ${{ matrix.rid }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=copyused -p:OptimizationPreference=Size -p:StackTraceSupport=true -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
+      run: dotnet publish Echoes.csproj -c Release -r ${{ matrix.rid }} -p:Version=${{ steps.get_version.outputs.VERSION }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=copyused -p:OptimizationPreference=Size -p:StackTraceSupport=true -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
 
     - name: Package Windows
       if: matrix.os == 'windows-latest'
@@ -53,7 +57,7 @@ jobs:
         Compress-Archive -Path ./publish/* -DestinationPath ./Echoes-Windows-x64.zip
 
     - name: Package Linux
-      if: matrix.os == 'ubuntu-latest'
+      if: runner.os == 'Linux'
       run: |
         wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool
         # Verify the fetched tool before executing it (supply-chain guard). Update this hash when
@@ -97,7 +101,7 @@ jobs:
         chmod +x "dist/Echoes.app/Contents/MacOS/Echoes"
         cp Assets/logo.icns "dist/Echoes.app/Contents/Resources/icon.icns"
         
-        printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Echoes</string><key>CFBundleIconFile</key><string>icon.icns</string><key>CFBundleIdentifier</key><string>com.echoes.app</string><key>CFBundleName</key><string>Echoes</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${{ steps.get_version.outputs.VERSION }}</string><key>LSMinimumSystemVersion</key><string>10.15</string></dict></plist>' > "dist/Echoes.app/Contents/Info.plist"
+        printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Echoes</string><key>CFBundleIconFile</key><string>icon.icns</string><key>CFBundleIdentifier</key><string>com.echoes.app</string><key>CFBundleName</key><string>Echoes</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${{ steps.get_version.outputs.VERSION }}</string><key>CFBundleVersion</key><string>${{ steps.get_version.outputs.VERSION }}</string><key>LSMinimumSystemVersion</key><string>12.0</string><key>NSHighResolutionCapable</key><true/><key>NSLocalNetworkUsageDescription</key><string>Echoes reaches devices on your local network when you scan, ping or share files with them.</string></dict></plist>' > "dist/Echoes.app/Contents/Info.plist"
         
         printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>com.apple.security.network.client</key><true/><key>com.apple.security.network.server</key><true/><key>com.apple.security.cs.allow-jit</key><true/><key>com.apple.security.cs.disable-library-validation</key><true/></dict></plist>' > entitlements.plist
         
@@ -183,10 +187,15 @@ jobs:
       with:
         path: ./artifacts
 
+    # Every release starts as a PRE-release: not marked "Latest", so the in-app update check (GitHub's releases/latest)
+    # doesn't offer it yet. Test the builds, then on GitHub edit the release: untick "Set as a pre-release" and tick
+    # "Set as the latest release".
     - name: Create Release
       uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
       with:
         files: ./artifacts/**/*
         tag_name: ${{ github.ref_name }}
+        prerelease: true
+        make_latest: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

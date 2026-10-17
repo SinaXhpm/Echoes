@@ -2,130 +2,918 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
              xmlns:helpers="using:Echoes.Helpers"
+             xmlns:ctl="using:Echoes.Views.Controls"
              x:Class="Echoes.Views.CheckHostView"
              x:DataType="vm:CheckHostViewModel">
 
+    <UserControl.Resources>
+        <!-- stroked glyphs on the 24x24 grid the nav icons use -->
+        <StreamGeometry x:Key="ChIcoCopy">M10 8 H18 A2 2 0 0 1 20 10 V18 A2 2 0 0 1 18 20 H10 A2 2 0 0 1 8 18 V10 A2 2 0 0 1 10 8 Z M5 16 A1.5 1.5 0 0 1 4 14.5 V5.5 A1.5 1.5 0 0 1 5.5 4 H14.5 A1.5 1.5 0 0 1 16 5</StreamGeometry>
+        <StreamGeometry x:Key="ChIcoSearch">M10.5 4 A6.5 6.5 0 1 0 10.5 17 A6.5 6.5 0 1 0 10.5 4 Z M15.5 15.5 L20 20</StreamGeometry>
+        <StreamGeometry x:Key="ChIcoClear">M7 7 L17 17 M17 7 L7 17</StreamGeometry>
+        <StreamGeometry x:Key="ChIcoAlert">M12 3.5 L21 19.5 H3 Z M12 10 V14 M12 16.8 V17.2</StreamGeometry>
+        <StreamGeometry x:Key="ChIcoDown">M6.5 9.5 L12 15 L17.5 9.5</StreamGeometry>
+        <StreamGeometry x:Key="ChIcoLink">M14 4.5 H19.5 V10 M19.5 4.5 L11 13 M17 13.5 V18.5 A1.5 1.5 0 0 1 15.5 20 H5.5 A1.5 1.5 0 0 1 4 18.5 V8.5 A1.5 1.5 0 0 1 5.5 7 H10.5</StreamGeometry>
+        <StreamGeometry x:Key="ChIcoSort">M7 5 V19 M4 16 L7 19 L10 16 M17 19 V5 M14 8 L17 5 L20 8</StreamGeometry>
+        <StreamGeometry x:Key="ChIcoCheck">M5 12.5 L9.5 17 L19 7.5</StreamGeometry>
+
+        <!-- the panel under an expanded node: everything it reported, as selectable text (built only when opened) -->
+        <DataTemplate x:Key="ChNodeDetails" x:DataType="vm:CheckHostNodeRow">
+            <Border Classes="detail">
+                <ItemsControl ItemsSource="{Binding Details}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CheckHostDetail">
+                            <Grid Classes="kv" ColumnDefinitions="Auto, *" Margin="0,0,0,5">
+                                <TextBlock Classes="k" Text="{Binding Key}"/>
+                                <SelectableTextBlock Grid.Column="1" Classes="v" Classes.mono="{Binding Mono}"
+                                                     Classes.ok="{Binding IsOk}" Classes.warn="{Binding IsWarn}" Classes.bad="{Binding IsBad}"
+                                                     Text="{Binding Value}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
     <UserControl.Styles>
-        <Style Selector="Border.pill">
-            <Setter Property="CornerRadius" Value="5"/>
-            <Setter Property="Padding" Value="9,3"/>
-            <Setter Property="MinWidth" Value="118"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Background" Value="#26272E"/>
+        <!-- ===== page: a desktop page fits its window (the node list scrolls inside); a phone scrolls the page ===== -->
+        <Style Selector="ScrollViewer#ChScroll.wide"><Setter Property="VerticalScrollBarVisibility" Value="Disabled"/></Style>
+        <Style Selector="ScrollViewer#ChScroll.narrow"><Setter Property="VerticalScrollBarVisibility" Value="Auto"/></Style>
+
+        <!-- ===== form. Wide: one row [target | check | max nodes | run]. Narrow (phone): the target gets
+             its own row and check / max nodes / run share the next one, where the check box takes the slack
+             (fixed columns overflowed a 360px phone). Rows are spaced with margins so the row that is empty
+             in the wide layout adds no gap. ===== -->
+        <Style Selector="Grid#ChForm.wide > StackPanel#ChTarget">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
         </Style>
-        <Style Selector="Border.pill.ok"><Setter Property="Background" Value="#16311F"/></Style>
-        <Style Selector="Border.pill.fail"><Setter Property="Background" Value="#2C1B1D"/></Style>
-        <Style Selector="Border.pill.pending"><Setter Property="Background" Value="#26272E"/></Style>
-        <Style Selector="Border.pill TextBlock">
-            <Setter Property="FontSize" Value="10.5"/>
+        <Style Selector="Grid#ChForm.narrow > StackPanel#ChTarget">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#ChForm.wide > Grid#ChOptions">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Width" Value="332"/>   <!-- check 140 | max nodes 88 | run 88 -->
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+        <Style Selector="Grid#ChForm.narrow > Grid#ChOptions">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+
+        <!-- nodes + proxy + status. Wide: one line; narrow: the status goes under the buttons -->
+        <Style Selector="Grid#ChMore.wide > Panel#ChStatus">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Margin" Value="16,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#ChMore.narrow > Panel#ChStatus">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/><Setter Property="Margin" Value="2,10,0,0"/>
+        </Style>
+        <Style Selector="Grid#ChMore.narrow TextBlock.status">
+            <Setter Property="TextWrapping" Value="Wrap"/><Setter Property="TextTrimming" Value="None"/>
+        </Style>
+        <!-- the nodes button beside "Use a proxy" on a 360 px phone: the globe says what it is, the choice is capped -->
+        <Style Selector="TextBlock#ChNodesValue"><Setter Property="MaxWidth" Value="180"/></Style>
+        <Style Selector="Grid#ChMore.narrow TextBlock#ChNodesLabel"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#ChMore.narrow TextBlock#ChNodesValue"><Setter Property="MaxWidth" Value="112"/></Style>
+
+        <!-- proxy fields. Wide: [address | user | password]. Narrow: the address on its own row. -->
+        <Style Selector="Grid#ChProxy.wide > StackPanel#ChProxyUser">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+        <Style Selector="Grid#ChProxy.narrow > StackPanel#ChProxyUser">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#ChProxy.wide > StackPanel#ChProxyPass">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+        <Style Selector="Grid#ChProxy.narrow > StackPanel#ChProxyPass">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#ChProxy.wide > StackPanel#ChProxyAddr">
+            <Setter Property="Grid.ColumnSpan" Value="1"/>
+        </Style>
+        <Style Selector="Grid#ChProxy.narrow > StackPanel#ChProxyAddr">
+            <Setter Property="Grid.ColumnSpan" Value="3"/>
+        </Style>
+
+        <!-- ===== shared bits ===== -->
+        <Style Selector="Path.btnIco">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.7"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button:pointerover Path.btnIco">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Path.chev">
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="12"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.8"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Path.inIco">
+            <Setter Property="Width" Value="13"/>
+            <Setter Property="Height" Value="13"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.8"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="11,0,0,0"/>
+        </Style>
+        <!-- the clear (x) button inside a search box -->
+        <Style Selector="Button.clear">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Margin" Value="0,0,3,0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.clear:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedHover}"/>
+        </Style>
+        <Style Selector="Button.clear Path">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Height" Value="10"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.8"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="TextBlock.status">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.hint">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <!-- the node choice button: "Nodes  Automatic ⌄" -->
+        <Style Selector="Button.nodes">
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+        <Style Selector="Button.link">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontFamily" Value="Cascadia Code,Consolas"/>
-            <Setter Property="Foreground" Value="#9E9FA8"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Button.link Path">
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="12"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.8"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- the one clear error (solid tinted surface) -->
+        <Style Selector="Border.callout">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Padding" Value="12,9"/>
+        </Style>
+        <Style Selector="Border.callout SelectableTextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.callout Path">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.7"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Margin" Value="0,1,0,0"/>
+        </Style>
+
+        <!-- ===== summary tiles: five across, or [reach] over two rows of pairs on a phone ===== -->
+        <Style Selector="Border.tile">
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="TextBlock.tileCap">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.tileVal">
+            <Setter Property="FontSize" Value="{StaticResource Font.Title}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.tileSub">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Image.tileFlag">
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Height" Value="13"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+        </Style>
+        <Style Selector="ctl|ChStatusBar">
+            <Setter Property="OkBrush" Value="{DynamicResource Success}"/>
+            <Setter Property="WarningBrush" Value="{DynamicResource Warning}"/>
+            <Setter Property="FailedBrush" Value="{DynamicResource Danger}"/>
+            <Setter Property="RestBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="Height" Value="6"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="10,1,0,0"/>
+        </Style>
+        <!-- wide: one row, a hairline between tiles -->
+        <Style Selector="Grid#ChTiles.wide > Border.t1"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/></Style>
+        <Style Selector="Grid#ChTiles.wide > Border.t2"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="BorderThickness" Value="1,0,0,0"/></Style>
+        <Style Selector="Grid#ChTiles.wide > Border.t3"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="4"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="BorderThickness" Value="1,0,0,0"/></Style>
+        <Style Selector="Grid#ChTiles.wide > Border.t4"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="6"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="BorderThickness" Value="1,0,0,0"/></Style>
+        <Style Selector="Grid#ChTiles.wide > Border.t5"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="8"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="BorderThickness" Value="1,0,0,0"/></Style>
+        <!-- narrow: the reach tile across, then [spread | countries] and [fastest | slowest] -->
+        <Style Selector="Grid#ChTiles.narrow > Border.t1"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="10"/></Style>
+        <Style Selector="Grid#ChTiles.narrow > Border.t2"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="5"/><Setter Property="BorderThickness" Value="0,1,0,0"/></Style>
+        <Style Selector="Grid#ChTiles.narrow > Border.t5"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="5"/><Setter Property="Grid.ColumnSpan" Value="5"/><Setter Property="BorderThickness" Value="1,1,0,0"/></Style>
+        <Style Selector="Grid#ChTiles.narrow > Border.t3"><Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="5"/><Setter Property="BorderThickness" Value="0,1,0,0"/></Style>
+        <Style Selector="Grid#ChTiles.narrow > Border.t4"><Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="5"/><Setter Property="Grid.ColumnSpan" Value="5"/><Setter Property="BorderThickness" Value="1,1,0,0"/></Style>
+        <Style Selector="Grid#ChTiles.narrow Border.tile"><Setter Property="Padding" Value="12,7"/></Style>
+
+        <!-- ===== toolbar: filter, view chips, sort, copy. Wide: one line; narrow: [filter | copy] over [chips | sort] ===== -->
+        <Style Selector="Button.chip">
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="11,0"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.CardHover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.chip.on">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Button.chip.on:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent.SoftHover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Run.n"><Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/></Style>
+        <Style Selector="Button.chip.on Run.n"><Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/></Style>
+
+        <!-- narrow: [filter | sort | copy] over the view chips (four chips with counts fill a 360 px phone by themselves) -->
+        <Style Selector="Grid#ChTools.wide > TextBox#ChFilter"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/></Style>
+        <Style Selector="Grid#ChTools.narrow > TextBox#ChFilter"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/></Style>
+        <Style Selector="Grid#ChTools.wide > WrapPanel#ChChips"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Margin" Value="10,0,0,0"/></Style>
+        <Style Selector="Grid#ChTools.narrow > WrapPanel#ChChips"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/><Setter Property="Margin" Value="0,8,0,0"/></Style>
+        <Style Selector="Grid#ChTools.wide > ComboBox#ChSort"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Margin" Value="10,0,0,0"/></Style>
+        <Style Selector="Grid#ChTools.narrow > ComboBox#ChSort"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#ChTools.wide > Button#ChSortNarrow"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#ChTools.narrow > Button#ChSortNarrow"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Margin" Value="8,0,0,0"/></Style>
+        <Style Selector="Grid#ChTools.wide > Button#ChCopy"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Margin" Value="10,0,0,0"/></Style>
+        <Style Selector="Grid#ChTools.narrow > Button#ChCopy"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#ChTools.wide > Button#ChCopyNarrow"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#ChTools.narrow > Button#ChCopyNarrow"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Margin" Value="8,0,0,0"/></Style>
+        <Style Selector="MenuItem Path.mark">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="2"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+
+        <!-- ===== node list ===== -->
+        <Style Selector="TextBlock.colhead">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.colhead">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.colhead:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Button.colhead:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+        </Style>
+        <!-- head widths: the drawn lines (ChNodeLines.cs) use the same numbers -->
+        <Style Selector="Button.cLoc"><Setter Property="Width" Value="{x:Static ctl:ChLine.LocationColumn}"/></Style>
+        <Style Selector="Button.cNode"><Setter Property="Width" Value="{x:Static ctl:ChLine.NodeColumn}"/></Style>
+        <Style Selector="Button.cRes"><Setter Property="Width" Value="{x:Static ctl:ChLine.ResultColumn}"/></Style>
+        <Style Selector="Button.cLat">
+            <Setter Property="Width" Value="{x:Static ctl:ChLine.LatencyColumn}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Right"/>
+        </Style>
+        <Style Selector="TextBlock#ColDetails"><Setter Property="Margin" Value="14,0,0,0"/></Style>
+        <Style Selector="Grid#ListRoot.narrow StackPanel#ColHead, Grid#ListRoot.narrow Border#ColRule"><Setter Property="IsVisible" Value="False"/></Style>
+
+        <Style Selector="ListBox.results ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="ListBox.results ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="ListBox.results ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="ListBox.results ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <!-- a desktop list scrolls by itself and virtualizes; a phone scrolls the page, so the list lays out every line
+             (at most ~100 drawn lines) -->
+        <Style Selector="ScrollViewer#ChScroll.wide ListBox#ChNodes">
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="ItemsPanel">
+                <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="ScrollViewer#ChScroll.narrow ListBox#ChNodes">
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ItemsPanel">
+                <ItemsPanelTemplate><StackPanel/></ItemsPanelTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="ScrollViewer#ChScroll.narrow Border#ChList"><Setter Property="MinHeight" Value="220"/></Style>
+
+        <!-- the drawn lines' colors: design tokens, re-resolved on a theme switch -->
+        <Style Selector=":is(ctl|ChLine)">
+            <Setter Property="PrimaryBrush" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="SecondaryBrush" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="MutedBrush" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="SuccessBrush" Value="{DynamicResource Success}"/>
+            <Setter Property="SuccessSoftBrush" Value="{DynamicResource Success.Soft}"/>
+            <Setter Property="SuccessBorderBrush" Value="{DynamicResource Success.Border}"/>
+            <Setter Property="WarningBrush" Value="{DynamicResource Warning}"/>
+            <Setter Property="WarningSoftBrush" Value="{DynamicResource Warning.Soft}"/>
+            <Setter Property="WarningBorderBrush" Value="{DynamicResource Warning.Border}"/>
+            <Setter Property="DangerBrush" Value="{DynamicResource Danger}"/>
+            <Setter Property="DangerSoftBrush" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="DangerBorderBrush" Value="{DynamicResource Danger.Border}"/>
+            <Setter Property="NeutralSoftBrush" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="NeutralBorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="RuleBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="HeaderBrush" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="HoverBrush" Value="{DynamicResource Bg.Hover}"/>
+            <Setter Property="PressedBrush" Value="{DynamicResource Bg.Pressed}"/>
+            <Setter Property="SelectedBrush" Value="{DynamicResource Bg.Selected}"/>
+            <Setter Property="SelectedHoverBrush" Value="{DynamicResource Bg.SelectedHover}"/>
+        </Style>
+
+        <!-- expanded details under a node -->
+        <Style Selector="Border.detail">
+            <Setter Property="Margin" Value="54,0,12,8"/>
+            <Setter Property="Padding" Value="12,8,12,4"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        </Style>
+        <Style Selector="Grid#ListRoot.narrow Border.detail"><Setter Property="Margin" Value="12,0,10,8"/></Style>
+        <Style Selector="Grid.kv > TextBlock.k">
+            <Setter Property="Width" Value="84"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Margin" Value="0,1,0,0"/>
+        </Style>
+        <Style Selector="Grid#ListRoot.narrow Grid.kv > TextBlock.k"><Setter Property="Width" Value="72"/></Style>
+        <Style Selector="SelectableTextBlock.v">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.v.mono"><Setter Property="FontFamily" Value="{StaticResource MonoFont}"/></Style>
+        <Style Selector="SelectableTextBlock.v.ok"><Setter Property="Foreground" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="SelectableTextBlock.v.warn"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="SelectableTextBlock.v.bad"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+
+        <!-- empty state -->
+        <Style Selector="Path.emptyIco">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
-        <Style Selector="Border.pill.ok TextBlock"><Setter Property="Foreground" Value="#7FCBA6"/></Style>
-        <Style Selector="Border.pill.fail TextBlock"><Setter Property="Foreground" Value="#E5716F"/></Style>
+        <Style Selector="TextBlock.emptyTitle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.emptyText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ===== node picker (in a flyout) ===== -->
+        <Style Selector="TextBlock.pickTitle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="TextBlock.pickHead">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="Margin" Value="2,10,0,4"/>
+        </Style>
+        <Style Selector="CheckBox.pick">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="8,0,0,0"/>
+            <Setter Property="MinHeight" Value="34"/>
+        </Style>
+        <Style Selector="TextBlock.pickLoc">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.pickMeta">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Image.pickFlag">
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Height" Value="13"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+        <Style Selector="TextBlock.pickError">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
     </UserControl.Styles>
 
-    <Grid Margin="14" RowDefinitions="Auto, Auto, Auto, Auto, *" RowSpacing="0">
+    <ScrollViewer x:Name="ChScroll" helpers:Responsive.BreakWidth="560" HorizontalScrollBarVisibility="Disabled">
+        <Grid x:Name="ChRoot" RowDefinitions="Auto, Auto, Auto, Auto, *">
 
-        <!-- host + RUN -->
-        <StackPanel Grid.Row="0">
-            <TextBlock Classes="fieldLabel" Text="TARGET HOST / IP / URL"/>
-            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
-                <AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Host}"
-                                 PlaceholderText="example.com  ·  1.2.3.4  ·  host:port  ·  https://url"
-                                 FontFamily="Cascadia Code,Consolas"
-                                 ItemsSource="{Binding HostHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0">
-                    <AutoCompleteBox.KeyBindings>
-                        <KeyBinding Gesture="Enter" Command="{Binding ToggleRunCommand}"/>
-                    </AutoCompleteBox.KeyBindings>
-                </AutoCompleteBox>
-                <Button Grid.Column="1" Classes="toggle" Command="{Binding ToggleRunCommand}" Classes.active="{Binding IsWorking}"
-                        Height="34" Width="94">
-                    <Panel>
-                        <TextBlock Text="RUN" IsVisible="{Binding !IsWorking}" FontSize="12" FontWeight="Bold"/>
-                        <TextBlock Text="STOP" IsVisible="{Binding IsWorking}" FontSize="12" FontWeight="Bold"/>
-                    </Panel>
+            <!-- ===================== target, check settings, nodes, optional proxy ===================== -->
+            <Border Grid.Row="0" Classes="card" Padding="12">
+                <StackPanel Spacing="12">
+                    <Grid x:Name="ChForm" helpers:Responsive.BreakWidth="600"
+                          ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="8">
+                        <StackPanel x:Name="ChTarget">
+                            <TextBlock Classes="fieldLabel" Text="Target"/>
+                            <AutoCompleteBox Classes="field" helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Endpoint"
+                                             helpers:InputAssist.PasteButton="True" Text="{Binding Host}"
+                                             PlaceholderText="{Binding TargetPlaceholder}"
+                                             FontFamily="{StaticResource MonoFont}"
+                                             ItemsSource="{Binding HostHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0">
+                                <AutoCompleteBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding ToggleRunCommand}"/>
+                                </AutoCompleteBox.KeyBindings>
+                            </AutoCompleteBox>
+                        </StackPanel>
+
+                        <Grid x:Name="ChOptions" ColumnDefinitions="*, 88, Auto" ColumnSpacing="8">
+                            <StackPanel x:Name="ChType">
+                                <TextBlock Classes="fieldLabel" Text="Check"/>
+                                <ComboBox Classes="field" ItemsSource="{Binding CheckTypes}" SelectedIndex="{Binding SelectedTypeIndex}"
+                                          ToolTip.Tip="What each node tests: ping, an HTTP request, a TCP connect, a UDP probe or a DNS lookup"/>
+                            </StackPanel>
+
+                            <StackPanel x:Name="ChMax" Grid.Column="1">
+                                <TextBlock Classes="fieldLabel" Text="Max nodes" ToolTip.Tip="How many nodes run the check"/>
+                                <NumericUpDown Classes="field" Value="{Binding MaxNodes}" Minimum="1" Maximum="100" ShowButtonSpinner="False"
+                                               HorizontalContentAlignment="Center" FormatString="0"
+                                               ToolTip.Tip="How many nodes run the check (1 – 100)"/>
+                            </StackPanel>
+
+                            <Button x:Name="ChRun" Grid.Column="2" Classes="toggle" MinWidth="88" VerticalAlignment="Bottom"
+                                    Command="{Binding ToggleRunCommand}" Classes.active="{Binding IsWorking}">
+                                <Panel>
+                                    <TextBlock Text="Run" IsVisible="{Binding !IsWorking}"/>
+                                    <TextBlock Text="Stop" IsVisible="{Binding IsWorking}"/>
+                                </Panel>
+                            </Button>
+                        </Grid>
+                    </Grid>
+
+                    <!-- where the check runs from, the proxy switch, and how the run went -->
+                    <Grid x:Name="ChMore" helpers:Responsive.BreakWidth="600" ColumnDefinitions="Auto, Auto, *" RowDefinitions="Auto, Auto">
+                        <Button x:Name="ChNodesBtn" Grid.Column="0" Classes="ghost nodes"
+                                ToolTip.Tip="Which check-host.net nodes run the check: picked automatically, by region, or one by one">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <Path Classes="btnIco" Data="{StaticResource IcoDns}"/>
+                                <TextBlock x:Name="ChNodesLabel" Text="Nodes" VerticalAlignment="Center" Foreground="{DynamicResource Text.Muted}" FontWeight="Normal"/>
+                                <TextBlock x:Name="ChNodesValue" Text="{Binding NodeChoiceText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                           Foreground="{DynamicResource Text.Primary}"/>
+                                <Path Classes="chev" Data="{StaticResource ChIcoDown}"/>
+                            </StackPanel>
+                            <Button.Flyout>
+                                <Flyout Placement="BottomEdgeAlignedLeft" Opened="NodesFlyout_Opened">
+                                    <Grid Width="316" RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto">
+                                        <TextBlock Grid.Row="0" Classes="pickTitle" Text="Run the check from"/>
+                                        <!-- presets: Automatic, or whole regions -->
+                                        <WrapPanel Grid.Row="1" Margin="0,8,0,0" ItemSpacing="6" LineSpacing="6">
+                                            <Button Classes="chip" Classes.on="{Binding PickIsAuto}" Command="{Binding PickAutomaticCommand}" Content="Automatic"
+                                                    ToolTip.Tip="check-host.net picks the nodes (up to Max nodes)"/>
+                                            <ItemsControl ItemsSource="{Binding PickRegions}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6"/></ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:CheckHostPickRegion">
+                                                        <Button Classes="chip" Classes.on="{Binding IsOn}" Command="{Binding ToggleCommand}">
+                                                            <TextBlock><Run Text="{Binding Name}"/><Run Text=" "/><Run Classes="n" Text="{Binding Count}"/></TextBlock>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </WrapPanel>
+                                        <!-- or nodes one by one -->
+                                        <Grid Grid.Row="2" ColumnDefinitions="*, Auto" ColumnSpacing="8" Margin="0,12,0,0" IsVisible="{Binding PickReady}">
+                                            <TextBox Classes="field" Text="{Binding PickFilter}" Padding="6,0,4,0"
+                                                     PlaceholderText="Country, city, node or ASN">
+                                                <TextBox.InnerLeftContent>
+                                                    <Path Classes="inIco" Data="{StaticResource ChIcoSearch}"/>
+                                                </TextBox.InnerLeftContent>
+                                                <TextBox.InnerRightContent>
+                                                    <Button Classes="clear" Command="{Binding ClearPickFilterCommand}" ToolTip.Tip="Clear"
+                                                            IsVisible="{Binding PickFilter, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                        <Path Data="{StaticResource ChIcoClear}"/>
+                                                    </Button>
+                                                </TextBox.InnerRightContent>
+                                            </TextBox>
+                                            <Button Grid.Column="1" Classes="secondary" Content="Tick shown" Command="{Binding PickShownCommand}"
+                                                    IsVisible="{Binding PickFilter, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                    ToolTip.Tip="Tick every node the search shows"/>
+                                        </Grid>
+                                        <StackPanel Grid.Row="3" Margin="2,10,0,0" Spacing="4">
+                                            <TextBlock Classes="hint" Text="Loading check-host.net's node list…" IsVisible="{Binding PickLoading}"/>
+                                            <TextBlock Classes="pickError" Text="{Binding PickError}" IsVisible="{Binding HasPickError}"/>
+                                        </StackPanel>
+                                        <ScrollViewer Grid.Row="4" Height="236" Margin="0,2,0,0" IsVisible="{Binding PickReady}"
+                                                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                            <ItemsControl ItemsSource="{Binding PickItems}" Margin="0,0,8,0">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.DataTemplates>
+                                                    <DataTemplate DataType="vm:CheckHostPickHeader">
+                                                        <TextBlock Classes="pickHead" Text="{Binding Text}"/>
+                                                    </DataTemplate>
+                                                    <DataTemplate DataType="vm:CheckHostPickNode">
+                                                        <CheckBox Classes="pick" IsChecked="{Binding IsChecked}">
+                                                            <Grid ColumnDefinitions="Auto, *">
+                                                                <Image Classes="pickFlag" IsVisible="{Binding HasFlag}"
+                                                                       Source="{Binding CountryCode, Converter={x:Static helpers:CountryFlagConverter.Instance}}"/>
+                                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                    <TextBlock Classes="pickLoc" Text="{Binding Location}"/>
+                                                                    <TextBlock Classes="pickMeta" Text="{Binding Meta}"/>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </CheckBox>
+                                                    </DataTemplate>
+                                                </ItemsControl.DataTemplates>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                        <TextBlock Grid.Row="5" Classes="hint" Margin="2,10,0,0" Text="{Binding PickSummary}"/>
+                                    </Grid>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+
+                        <CheckBox Grid.Column="1" IsChecked="{Binding UseProxy}" Name="ProxyToggle" Content="Use a proxy" Margin="16,0,0,0"
+                                  ToolTip.Tip="Tunnel the check-host.net API calls through a proxy (useful if it's filtered on your network)"/>
+
+                        <!-- (a DockPanel, so the text trims on a desktop and wraps on a phone; the report link stays whole) -->
+                        <Panel x:Name="ChStatus">
+                            <DockPanel IsVisible="{Binding HasStatus}">
+                                <Button DockPanel.Dock="Right" Classes="link" Margin="6,0,0,0" Command="{Binding OpenPermalinkCommand}"
+                                        IsVisible="{Binding HasPermalink}" ToolTip.Tip="{Binding Permalink}">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="Report" VerticalAlignment="Center"/>
+                                        <Path Data="{StaticResource ChIcoLink}"/>
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Classes="status" Text="{Binding StatusMessage}" ToolTip.Tip="{Binding StatusMessage}"/>
+                            </DockPanel>
+                        </Panel>
+                    </Grid>
+
+                    <!-- proxy credentials -->
+                    <Grid x:Name="ChProxy" helpers:Responsive.BreakWidth="520" IsVisible="{Binding UseProxy}"
+                          ColumnDefinitions="2*, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="8">
+                        <StackPanel x:Name="ChProxyAddr" Grid.Column="0">
+                            <TextBlock Classes="fieldLabel" Text="Proxy"/>
+                            <AutoCompleteBox Classes="field" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding ProxyAddress}" PlaceholderText="host:port"
+                                             ToolTip.Tip="The proxy's host:port, e.g. 127.0.0.1:8080" AutomationProperties.Name="Proxy address"
+                                             FontFamily="{StaticResource MonoFont}"
+                                             ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"/>
+                        </StackPanel>
+                        <StackPanel x:Name="ChProxyUser">
+                            <TextBlock Classes="fieldLabel" Text="User"/>
+                            <TextBox Classes="field" Text="{Binding ProxyUser}" PlaceholderText="Optional" AutomationProperties.Name="Proxy user"/>
+                        </StackPanel>
+                        <StackPanel x:Name="ChProxyPass">
+                            <TextBlock Classes="fieldLabel" Text="Password"/>
+                            <TextBox Classes="field" Text="{Binding ProxyPass}" PlaceholderText="Optional" IsUndoEnabled="False" PasswordChar="*"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ===================== the one clear error ===================== -->
+            <Border Grid.Row="1" Classes="callout" Margin="0,12,0,0" IsVisible="{Binding HasError}">
+                <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10">
+                    <Path Data="{StaticResource ChIcoAlert}"/>
+                    <SelectableTextBlock Grid.Column="1" Text="{Binding ErrorText}"/>
+                </Grid>
+            </Border>
+
+            <!-- ===================== summary over all nodes ===================== -->
+            <Border Grid.Row="2" Classes="card" Margin="0,12,0,0" IsVisible="{Binding HasRun}">
+                <Grid x:Name="ChTiles" helpers:Responsive.BreakWidth="560"
+                      ColumnDefinitions="*, *, *, *, *, *, *, *, *, *" RowDefinitions="Auto, Auto, Auto">
+                    <Border Classes="tile t1" ToolTip.Tip="{Binding ReachCounts}">
+                        <StackPanel Spacing="2">
+                            <TextBlock Classes="tileCap" Text="{Binding ReachCaption}"/>
+                            <Grid ColumnDefinitions="Auto, *">
+                                <TextBlock Classes="tileVal" Text="{Binding ReachValue}"/>
+                                <ctl:ChStatusBar Grid.Column="1" Ok="{Binding OkCount}" Warning="{Binding WarningCount}" Failed="{Binding FailedCount}"
+                                                 Rest="{Binding RestCount}" AutomationProperties.Name="{Binding ReachCounts}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="tile t2" ToolTip.Tip="{Binding SpreadTip}">
+                        <StackPanel Spacing="2">
+                            <TextBlock Classes="tileCap" Text="{Binding SpreadCaption}"/>
+                            <TextBlock Classes="tileVal" Text="{Binding SpreadValue}"/>
+                        </StackPanel>
+                    </Border>
+                    <!-- fastest / slowest: [flag] time, then the place in muted text (it trims first) -->
+                    <Border Classes="tile t3" ToolTip.Tip="{Binding BestTip}">
+                        <StackPanel Spacing="2">
+                            <TextBlock Classes="tileCap" Text="{Binding BestCaption}"/>
+                            <Grid ColumnDefinitions="Auto, Auto, *">
+                                <Image Classes="tileFlag" IsVisible="{Binding BestFlag, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       Source="{Binding BestFlag, Converter={x:Static helpers:CountryFlagConverter.Instance}}"/>
+                                <TextBlock Grid.Column="1" Classes="tileVal" Text="{Binding BestValue}"/>
+                                <TextBlock Grid.Column="2" Classes="tileSub" Margin="6,1,0,0" Text="{Binding BestPlace}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="tile t4" ToolTip.Tip="{Binding WorstTip}">
+                        <StackPanel Spacing="2">
+                            <TextBlock Classes="tileCap" Text="{Binding WorstCaption}"/>
+                            <Grid ColumnDefinitions="Auto, Auto, *">
+                                <Image Classes="tileFlag" IsVisible="{Binding WorstFlag, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       Source="{Binding WorstFlag, Converter={x:Static helpers:CountryFlagConverter.Instance}}"/>
+                                <TextBlock Grid.Column="1" Classes="tileVal" Text="{Binding WorstValue}"/>
+                                <TextBlock Grid.Column="2" Classes="tileSub" Margin="6,1,0,0" Text="{Binding WorstPlace}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="tile t5" ToolTip.Tip="{Binding CountriesTip}">
+                        <StackPanel Spacing="2">
+                            <TextBlock Classes="tileCap" Text="Countries"/>
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Classes="tileVal" Text="{Binding CountriesValue}"/>
+                                <TextBlock Classes="tileSub" Text="{Binding RegionsText}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- ===================== filter, views, sort, copy ===================== -->
+            <Grid Grid.Row="3" x:Name="ChTools" helpers:Responsive.BreakWidth="560" Margin="0,12,0,0" IsVisible="{Binding HasRun}"
+                  ColumnDefinitions="*, Auto, Auto, Auto" RowDefinitions="Auto, Auto">
+                <TextBox x:Name="ChFilter" Classes="field" Text="{Binding FilterText}" Padding="6,0,4,0"
+                         PlaceholderText="{Binding FilterPlaceholder}">
+                    <TextBox.InnerLeftContent>
+                        <Path Classes="inIco" Data="{StaticResource ChIcoSearch}"/>
+                    </TextBox.InnerLeftContent>
+                    <TextBox.InnerRightContent>
+                        <Button Classes="clear" Command="{Binding ClearFilterCommand}" ToolTip.Tip="Clear the filter"
+                                IsVisible="{Binding FilterText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                            <Path Data="{StaticResource ChIcoClear}"/>
+                        </Button>
+                    </TextBox.InnerRightContent>
+                </TextBox>
+
+                <WrapPanel x:Name="ChChips" ItemSpacing="6" LineSpacing="6" VerticalAlignment="Center">
+                    <Button Classes="chip" Classes.on="{Binding ViewAll}" Command="{Binding SetViewCommand}" CommandParameter="all">
+                        <TextBlock><Run Text="All "/><Run Classes="n" Text="{Binding TotalCount}"/></TextBlock>
+                    </Button>
+                    <Button Classes="chip" Classes.on="{Binding ViewOk}" Command="{Binding SetViewCommand}" CommandParameter="ok">
+                        <TextBlock><Run Text="OK "/><Run Classes="n" Text="{Binding OkCount}"/></TextBlock>
+                    </Button>
+                    <Button Classes="chip" Classes.on="{Binding ViewWarning}" Command="{Binding SetViewCommand}" CommandParameter="warning"
+                            IsVisible="{Binding HasWarnings}">
+                        <TextBlock><Run Text="Warning "/><Run Classes="n" Text="{Binding WarningCount}"/></TextBlock>
+                    </Button>
+                    <Button Classes="chip" Classes.on="{Binding ViewFailed}" Command="{Binding SetViewCommand}" CommandParameter="failed">
+                        <TextBlock><Run Text="Failed "/><Run Classes="n" Text="{Binding FailedCount}"/></TextBlock>
+                    </Button>
+                </WrapPanel>
+
+                <ComboBox x:Name="ChSort" Classes="field" Width="146" ItemsSource="{Binding SortOptions}" SelectedIndex="{Binding SortIndex}"
+                          ToolTip.Tip="Order of the nodes (Region groups them under their region)"/>
+                <Button x:Name="ChSortNarrow" Classes="icon" ToolTip.Tip="Sort the nodes">
+                    <Path Classes="btnIco" Data="{StaticResource ChIcoSort}"/>
+                    <Button.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                            <MenuItem Header="Group by region" Command="{Binding SetSortCommand}" CommandParameter="region">
+                                <MenuItem.Icon><Path Classes="mark" Data="{StaticResource ChIcoCheck}" IsVisible="{Binding SortIsRegion}"/></MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Sort by country" Command="{Binding SetSortCommand}" CommandParameter="country">
+                                <MenuItem.Icon><Path Classes="mark" Data="{StaticResource ChIcoCheck}" IsVisible="{Binding SortIsCountry}"/></MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Fastest first" Command="{Binding SetSortCommand}" CommandParameter="fastest">
+                                <MenuItem.Icon><Path Classes="mark" Data="{StaticResource ChIcoCheck}" IsVisible="{Binding SortIsFastest}"/></MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Slowest first" Command="{Binding SetSortCommand}" CommandParameter="slowest">
+                                <MenuItem.Icon><Path Classes="mark" Data="{StaticResource ChIcoCheck}" IsVisible="{Binding SortIsSlowest}"/></MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Failures first" Command="{Binding SetSortCommand}" CommandParameter="status">
+                                <MenuItem.Icon><Path Classes="mark" Data="{StaticResource ChIcoCheck}" IsVisible="{Binding SortIsStatus}"/></MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Sort by node" Command="{Binding SetSortCommand}" CommandParameter="node">
+                                <MenuItem.Icon><Path Classes="mark" Data="{StaticResource ChIcoCheck}" IsVisible="{Binding SortIsNode}"/></MenuItem.Icon>
+                            </MenuItem>
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+
+                <Button x:Name="ChCopy" Classes="secondary" Padding="12,0" ToolTip.Tip="Copy or save the result">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Path Classes="btnIco" Data="{StaticResource ChIcoCopy}"/>
+                        <TextBlock Text="Copy" VerticalAlignment="Center"/>
+                        <Path Classes="chev" Data="{StaticResource ChIcoDown}"/>
+                    </StackPanel>
+                    <Button.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                            <MenuItem Header="Copy report — aligned text" Command="{Binding CopyReportCommand}"/>
+                            <MenuItem Header="Copy as CSV" Command="{Binding CopyCsvCommand}"/>
+                            <MenuItem Header="Copy as JSON" Command="{Binding CopyJsonCommand}"/>
+                            <MenuItem Header="Copy check-host.net link" Command="{Binding CopyPermalinkCommand}" IsEnabled="{Binding HasPermalink}"/>
+                            <Separator/>
+                            <MenuItem Header="Save report…" Click="SaveText_Click"/>
+                            <MenuItem Header="Save CSV…" Click="SaveCsv_Click"/>
+                            <MenuItem Header="Save JSON…" Click="SaveJson_Click"/>
+                            <Separator/>
+                            <MenuItem Header="Open on check-host.net" Command="{Binding OpenPermalinkCommand}" IsEnabled="{Binding HasPermalink}"/>
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+                <Button x:Name="ChCopyNarrow" Classes="icon" ToolTip.Tip="Copy or save the result">
+                    <Path Classes="btnIco" Data="{StaticResource ChIcoCopy}"/>
+                    <Button.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                            <MenuItem Header="Copy report — aligned text" Command="{Binding CopyReportCommand}"/>
+                            <MenuItem Header="Copy as CSV" Command="{Binding CopyCsvCommand}"/>
+                            <MenuItem Header="Copy as JSON" Command="{Binding CopyJsonCommand}"/>
+                            <MenuItem Header="Copy check-host.net link" Command="{Binding CopyPermalinkCommand}" IsEnabled="{Binding HasPermalink}"/>
+                            <Separator/>
+                            <MenuItem Header="Save report…" Click="SaveText_Click"/>
+                            <MenuItem Header="Save CSV…" Click="SaveCsv_Click"/>
+                            <MenuItem Header="Save JSON…" Click="SaveJson_Click"/>
+                            <Separator/>
+                            <MenuItem Header="Open on check-host.net" Command="{Binding OpenPermalinkCommand}" IsEnabled="{Binding HasPermalink}"/>
+                        </MenuFlyout>
+                    </Button.Flyout>
                 </Button>
             </Grid>
-        </StackPanel>
 
-        <!-- check type + max nodes + proxy toggle -->
-        <Border Grid.Row="1" Classes="card" Padding="12,7" Margin="0,10,0,0">
-            <WrapPanel>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,20,3">
-                    <TextBlock Text="Check" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <ComboBox ItemsSource="{Binding CheckTypes}" SelectedIndex="{Binding SelectedTypeIndex}"
-                              MinHeight="30" Height="30" Width="110" FontSize="11.5" CornerRadius="6"
-                              Background="#1D1E25" BorderBrush="#3B3D47" Foreground="#ECECEF"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,20,3">
-                    <TextBlock Text="Max nodes" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,8,0"
-                               ToolTip.Tip="How many worldwide nodes to probe from"/>
-                    <NumericUpDown Value="{Binding MaxNodes}" Minimum="1" Maximum="100" ShowButtonSpinner="False"
-                                   Height="30" Width="58" FontSize="11.5" HorizontalContentAlignment="Center" CornerRadius="6"
-                                   Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
-                </StackPanel>
-                <CheckBox IsChecked="{Binding UseProxy}" Name="ProxyToggle" Content="Proxy" FontSize="11.5"
-                          FontWeight="SemiBold" Foreground="#ECECEF" VerticalAlignment="Center" Margin="0,3,0,3"
-                          ToolTip.Tip="Tunnel the check-host.net API calls through a proxy (useful if it's filtered on your network)"/>
-            </WrapPanel>
-        </Border>
+            <!-- ===================== the nodes ===================== -->
+            <Border Grid.Row="4" x:Name="ChList" Classes="card output" ClipToBounds="True" Margin="0,12,0,0">
+                <!-- narrow / wide for the column heads; the drawn lines switch by themselves at the same width -->
+                <Grid x:Name="ListRoot" RowDefinitions="Auto, Auto, *" helpers:Responsive.BreakWidth="{x:Static ctl:ChLine.NarrowBelow}">
+                    <!-- (HasRun on a wrapper: a local binding on the heads themselves would outrank the phone style that hides them) -->
+                    <Panel Grid.Row="0" IsVisible="{Binding HasRun}">
+                    <StackPanel x:Name="ColHead" Orientation="Horizontal" MinHeight="30"
+                                Margin="{x:Static ctl:ChLine.HeadMargin}">
+                        <Button Classes="colhead cLoc" Content="{Binding LocationHead}" Command="{Binding SortByCommand}" CommandParameter="location"
+                                ToolTip.Tip="Group by region, or sort by country"/>
+                        <Button Classes="colhead cNode" Content="{Binding NodeHead}" Command="{Binding SortByCommand}" CommandParameter="node"
+                                ToolTip.Tip="Sort by node name"/>
+                        <Button Classes="colhead cRes" Content="{Binding ResultHead}" Command="{Binding SortByCommand}" CommandParameter="result"
+                                ToolTip.Tip="Failures first"/>
+                        <Button Classes="colhead cLat" Content="{Binding LatencyHead}" Command="{Binding SortByCommand}" CommandParameter="latency"
+                                ToolTip.Tip="Fastest first, or slowest first"/>
+                        <TextBlock x:Name="ColDetails" Classes="colhead" Text="Details"/>
+                    </StackPanel>
+                    </Panel>
+                    <Panel Grid.Row="1" IsVisible="{Binding HasRun}">
+                        <Border x:Name="ColRule" Classes="divider"/>
+                    </Panel>
 
-        <!-- proxy credentials -->
-        <StackPanel Grid.Row="2" Spacing="8" Margin="0,10,0,0" IsVisible="{Binding UseProxy}">
-            <AutoCompleteBox Classes="field" Text="{Binding ProxyAddress}" PlaceholderText="Proxy Host:Port (127.0.0.1:8080)"
-                             FontFamily="Cascadia Code,Consolas"
-                             ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"/>
-            <Grid ColumnDefinitions="*, *">
-                <TextBox Grid.Column="0" Classes="field" Text="{Binding ProxyUser}" PlaceholderText="User (optional)" Margin="0,0,4,0"/>
-                <TextBox Grid.Column="1" Classes="field" Text="{Binding ProxyPass}" PlaceholderText="Pass (optional)" PasswordChar="*" Margin="4,0,0,0"/>
-            </Grid>
-        </StackPanel>
+                    <!-- Lines are drawn by ChNodeLine / ChGroupLine (Views/Controls/ChNodeLines.cs). Click a node for everything
+                         it reported; right-click or long-press for the copy menu; Enter / Ctrl+C work on the selected row. -->
+                    <!-- (no local ItemsPanel / vertical scroll mode: the page styles pick them per width) -->
+                    <ListBox x:Name="ChNodes" Grid.Row="2" Classes="results" ItemsSource="{Binding Rows}"
+                             Background="Transparent" BorderThickness="0" Padding="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.DataTemplates>
+                            <DataTemplate DataType="vm:CheckHostGroupRow"><ctl:ChGroupLine/></DataTemplate>
+                            <DataTemplate DataType="vm:CheckHostNodeRow"><ctl:ChNodeLine DetailsTemplate="{StaticResource ChNodeDetails}"/></DataTemplate>
+                        </ListBox.DataTemplates>
+                    </ListBox>
 
-        <!-- status line -->
-        <TextBlock Grid.Row="3" Text="{Binding StatusMessage}" FontSize="10.5" Foreground="#42B883"
-                   FontFamily="Cascadia Code,Consolas" Margin="2,11,2,7" TextTrimming="CharacterEllipsis"/>
-
-        <!-- node results -->
-        <Border Grid.Row="4" Classes="card output" Padding="0">
-            <Panel>
-                <TextBlock Text="Results from worldwide nodes appear here." FontSize="11.5" Foreground="#6B6C74"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                           IsVisible="{Binding !TotalCount}"/>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <ItemsControl ItemsSource="{Binding Nodes}" Margin="8">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:CheckHostNodeRow">
-                                <Border Background="#191A1F" BorderBrush="#2A2C33" BorderThickness="1" CornerRadius="7"
-                                        Padding="10,7" Margin="0,0,0,6">
-                                    <Grid ColumnDefinitions="Auto, *, Auto">
-                                        <Panel Grid.Column="0" Width="26" Height="19" Margin="0,0,11,0" VerticalAlignment="Center">
-                                            <TextBlock Text="🌐" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                       IsVisible="{Binding !HasFlag}"/>
-                                            <Border CornerRadius="3" ClipToBounds="True" IsVisible="{Binding HasFlag}">
-                                                <Image Source="{Binding CountryCode, Converter={x:Static helpers:CountryFlagConverter.Instance}}"
-                                                       Stretch="Uniform"/>
-                                            </Border>
-                                        </Panel>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Location}" FontSize="12" Foreground="#ECECEF" FontWeight="SemiBold"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding NodeHost}" FontSize="9.5" Foreground="#6B6C74"
-                                                       FontFamily="Cascadia Code,Consolas" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
-                                        </StackPanel>
-                                        <Border Grid.Column="2" Classes="pill"
-                                                Classes.ok="{Binding IsOk}" Classes.fail="{Binding IsFail}" Classes.pending="{Binding IsPending}">
-                                            <TextBlock Text="{Binding ResultText}"/>
-                                        </Border>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </Panel>
-        </Border>
-    </Grid>
+                    <!-- empty states -->
+                    <StackPanel Grid.Row="2" IsVisible="{Binding ShowEmpty}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Spacing="8" Margin="24" MaxWidth="420">
+                        <Path Classes="emptyIco" Data="{StaticResource IcoCheckHost}"/>
+                        <TextBlock Classes="emptyTitle" Text="{Binding EmptyTitle}"/>
+                        <TextBlock Classes="emptyText" Text="{Binding EmptyText}"/>
+                        <Button Classes="ghost" HorizontalAlignment="Center" Content="Clear the filter" Command="{Binding ClearFilterCommand}"
+                                IsVisible="{Binding FilterText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </ScrollViewer>
 </UserControl>

@@ -233,12 +233,37 @@ public static class NetTables
     private const int AF_INET = 2, AF_INET6 = 23;
     private const int TCP_TABLE_OWNER_PID_ALL = 5, UDP_TABLE_OWNER_PID = 1;
 
+    private delegate uint TableCall(IntPtr buffer, ref int size);
+
+    // All four iphlpapi readers use "probe the size, allocate, fetch" — but the table is live: a socket
+    // (or ARP / route entry) added between the probe and the fetch fails the fetch with
+    // ERROR_INSUFFICIENT_BUFFER, which used to drop that whole table (e.g. every IPv4 TCP row) while the
+    // tab still reported it as supported. Allocate with slack and retry with the size the API reports.
+    // Returns the filled buffer (caller frees it), or IntPtr.Zero when the table is empty/unavailable;
+    // throws if it never fits, so the caller reports a failure instead of a silently partial table.
+    private static IntPtr FetchTable(TableCall call, int rowSize)
+    {
+        int size = 0;
+        if (call(IntPtr.Zero, ref size) != ERROR_INSUFFICIENT_BUFFER || size <= 0) return IntPtr.Zero;
+
+        for (int attempt = 0; attempt < 5; attempt++)
+        {
+            size += 16 * rowSize;                 // room for rows added before the next call
+            IntPtr buf = Marshal.AllocHGlobal(size);
+            uint rc = call(buf, ref size);        // on 122, size now holds the current requirement
+            if (rc == 0) return buf;
+            Marshal.FreeHGlobal(buf);
+            if (rc != ERROR_INSUFFICIENT_BUFFER) return IntPtr.Zero;
+        }
+        throw new InvalidOperationException("The table kept growing while it was being read.");
+    }
+
     // Windows: the *_OWNER_PID tables give every endpoint plus the PID that owns it, which we resolve
     // to a process name. Any failure here bubbles up so GetPorts() can fall back to the managed list.
     private static List<PortEntry> WindowsPortsWithPid()
     {
         var rows = new List<PortEntry>();
-        var nameCache = new Dictionary<int, string>();
+        var nameCache = ProcessNames();
         ReadTcpTable(AF_INET, false, rows, nameCache);
         ReadTcpTable(AF_INET6, true, rows, nameCache);
         ReadUdpTable(AF_INET, false, rows, nameCache);
@@ -248,15 +273,12 @@ public static class NetTables
 
     private static void ReadTcpTable(int af, bool v6, List<PortEntry> rows, Dictionary<int, string> cache)
     {
-        int size = 0;
-        GetExtendedTcpTable(IntPtr.Zero, ref size, true, af, TCP_TABLE_OWNER_PID_ALL, 0);
-        if (size == 0) return;
-        IntPtr buf = Marshal.AllocHGlobal(size);
+        int rowSize = v6 ? 56 : 24;
+        IntPtr buf = FetchTable((IntPtr b, ref int s) => GetExtendedTcpTable(b, ref s, true, af, TCP_TABLE_OWNER_PID_ALL, 0), rowSize);
+        if (buf == IntPtr.Zero) return;
         try
         {
-            if (GetExtendedTcpTable(buf, ref size, true, af, TCP_TABLE_OWNER_PID_ALL, 0) != 0) return;
             int count = Marshal.ReadInt32(buf);
-            int rowSize = v6 ? 56 : 24;
             for (int i = 0; i < count; i++)
             {
                 long p = buf.ToInt64() + 4 + (long)i * rowSize;
@@ -295,15 +317,12 @@ public static class NetTables
 
     private static void ReadUdpTable(int af, bool v6, List<PortEntry> rows, Dictionary<int, string> cache)
     {
-        int size = 0;
-        GetExtendedUdpTable(IntPtr.Zero, ref size, true, af, UDP_TABLE_OWNER_PID, 0);
-        if (size == 0) return;
-        IntPtr buf = Marshal.AllocHGlobal(size);
+        int rowSize = v6 ? 28 : 12;
+        IntPtr buf = FetchTable((IntPtr b, ref int s) => GetExtendedUdpTable(b, ref s, true, af, UDP_TABLE_OWNER_PID, 0), rowSize);
+        if (buf == IntPtr.Zero) return;
         try
         {
-            if (GetExtendedUdpTable(buf, ref size, true, af, UDP_TABLE_OWNER_PID, 0) != 0) return;
             int count = Marshal.ReadInt32(buf);
-            int rowSize = v6 ? 28 : 12;
             for (int i = 0; i < count; i++)
             {
                 long p = buf.ToInt64() + 4 + (long)i * rowSize;
@@ -338,8 +357,28 @@ public static class NetTables
         10 => "LAST_ACK", 11 => "TIME_WAIT", 12 => "DELETE_TCB", _ => s.ToString(),
     };
 
-    // Resolve a PID to a process name, cached. Never throws — access-denied / exited processes just
-    // show "pid N" so a locked-down box or a race with a closing process can't crash the list.
+    // PID → name for every running process, from one snapshot. Process.GetProcessById(pid).ProcessName takes a whole
+    // process snapshot of its own on Windows: ~150 ms of CPU per refresh for 50 PIDs, against ~15 ms for one snapshot.
+    private static Dictionary<int, string> ProcessNames()
+    {
+        var names = new Dictionary<int, string>();
+        try
+        {
+            foreach (var p in System.Diagnostics.Process.GetProcesses())
+            {
+                using (p)
+                {
+                    try { names[p.Id] = p.ProcessName; } catch { /* exited meanwhile: ProcName asks again */ }
+                }
+            }
+        }
+        catch { /* no snapshot: ProcName resolves each PID itself */ }
+        return names;
+    }
+
+    // Resolve a PID to a process name, cached (pre-filled by ProcessNames; a process started since is looked up on its
+    // own). Never throws — access-denied / exited processes just show "pid N" so a locked-down box or a race with a
+    // closing process can't crash the list.
     private static string ProcName(int pid, Dictionary<int, string> cache)
     {
         if (pid == 0) return "System Idle";
@@ -356,16 +395,13 @@ public static class NetTables
     {
         var rows = new List<Neighbor>();
         var names = IfIndexNames();
-        int size = 0;
-        if (GetIpNetTable(IntPtr.Zero, ref size, false) != ERROR_INSUFFICIENT_BUFFER || size == 0) return rows;
-
-        IntPtr buf = Marshal.AllocHGlobal(size);
+        // MIB_IPNETROW: dwIndex(4) dwPhysAddrLen(4) bPhysAddr(8) dwAddr(4) dwType(4) = 24 bytes
+        const int rowSize = 24;
+        IntPtr buf = FetchTable((IntPtr b, ref int s) => (uint)GetIpNetTable(b, ref s, false), rowSize);
+        if (buf == IntPtr.Zero) return rows;
         try
         {
-            if (GetIpNetTable(buf, ref size, false) != 0) return rows;
             int count = Marshal.ReadInt32(buf);
-            // MIB_IPNETROW: dwIndex(4) dwPhysAddrLen(4) bPhysAddr(8) dwAddr(4) dwType(4) = 24 bytes
-            const int rowSize = 24;
             for (int i = 0; i < count; i++)
             {
                 long p = buf.ToInt64() + 4 + (long)i * rowSize;
@@ -397,17 +433,14 @@ public static class NetTables
     {
         var rows = new List<RouteEntry>();
         var names = IfIndexNames();
-        int size = 0;
-        if (GetIpForwardTable(IntPtr.Zero, ref size, true) != ERROR_INSUFFICIENT_BUFFER || size == 0) return rows;
-
-        IntPtr buf = Marshal.AllocHGlobal(size);
+        // MIB_IPFORWARDROW: dest, mask, policy, nexthop, ifindex, type, proto, age, nexthopAS,
+        // metric1..5 = 14 DWORDs = 56 bytes. We read dest(0) mask(4) nexthop(12) ifindex(16) metric1(36).
+        const int rowSize = 56;
+        IntPtr buf = FetchTable((IntPtr b, ref int s) => (uint)GetIpForwardTable(b, ref s, true), rowSize);
+        if (buf == IntPtr.Zero) return rows;
         try
         {
-            if (GetIpForwardTable(buf, ref size, true) != 0) return rows;
             int count = Marshal.ReadInt32(buf);
-            // MIB_IPFORWARDROW: dest, mask, policy, nexthop, ifindex, type, proto, age, nexthopAS,
-            // metric1..5 = 14 DWORDs = 56 bytes. We read dest(0) mask(4) nexthop(12) ifindex(16) metric1(36).
-            const int rowSize = 56;
             for (int i = 0; i < count; i++)
             {
                 long p = buf.ToInt64() + 4 + (long)i * rowSize;

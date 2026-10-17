@@ -2,306 +2,405 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
              xmlns:views="using:Echoes.Views"
+             xmlns:ctl="using:Echoes.Views.Controls"
+             xmlns:helpers="using:Echoes.Helpers"
              xmlns:chrome="using:Avalonia.Controls.Chrome"
              x:Class="Echoes.Views.MainView"
              x:DataType="vm:MainViewModel"
-             Background="#0F1012">
+             Background="{DynamicResource Bg.App}" FontSize="12.5">
 
 	<UserControl.Styles>
-		<!-- The tab rail is a fixed vertical stack; once the window is shorter than the whole list
-		     the last tabs were simply unreachable. Re-template the TabControl so the tab strip lives
-		     in its own ScrollViewer (content host untouched) and the rail can scroll. -->
+		<!-- ===== Shell layout: [sidebar | page]. The TabControl IS the shell: its strip is the sidebar
+		     nav, its content host the page (each tab's content is a lazily-filled tool host, see
+		     ToolViews in MainView.axaml.cs). The sidebar always shows its labels (the user wants the menu
+		     open at every size); it's kept narrow and dense instead, so the window can stay small: it opens
+		     860 wide and exactly as tall as this list (MainWindow). ===== -->
 		<Style Selector="TabControl#MainTabs">
+			<Setter Property="Padding" Value="18,2,18,12"/>
 			<Setter Property="Template">
 				<ControlTemplate>
-					<Border Background="{TemplateBinding Background}"
-							BorderBrush="{TemplateBinding BorderBrush}"
-							BorderThickness="{TemplateBinding BorderThickness}"
-							CornerRadius="{TemplateBinding CornerRadius}">
-						<DockPanel>
-							<ScrollViewer DockPanel.Dock="{TemplateBinding TabStripPlacement}"
-										  VerticalScrollBarVisibility="Auto"
-										  HorizontalScrollBarVisibility="Disabled"
-										  AllowAutoHide="True">
-								<ItemsPresenter Name="PART_ItemsPresenter"
-												ItemsPanel="{TemplateBinding ItemsPanel}"/>
-							</ScrollViewer>
-							<ContentPresenter Name="PART_SelectedContentHost"
-											  Margin="{TemplateBinding Padding}"
-											  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-											  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
-											  Content="{TemplateBinding SelectedContent}"
-											  ContentTemplate="{TemplateBinding SelectedContentTemplate}"/>
-						</DockPanel>
-					</Border>
+					<Grid ColumnDefinitions="Auto,*" x:DataType="vm:MainViewModel">
+						<!-- SIDEBAR -->
+						<Border Name="PART_Sidebar" Grid.Column="0" Width="172"
+								Background="{DynamicResource Bg.Sidebar}"
+								BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,1,0">
+							<Grid RowDefinitions="Auto,Auto,*,Auto">
+								<!-- Window drag areas (TitleBar role): they need a background to be hit-testable at all, else a
+								     press falls through to the content and the window can't be moved. Solid, the colour already
+								     under them; their texts are not hit-testable, so a press anywhere on them drags. -->
+								<!-- macOS draws the traffic lights over the top-left corner -->
+								<Border Grid.Row="0" Height="22" IsVisible="{Binding IsMac}" Background="{DynamicResource Bg.Sidebar}"
+										chrome:WindowDecorationProperties.ElementRole="TitleBar"/>
+								<!-- brand row: the name (a drag area) and, beside it, About + the light / dark switch — up here
+								     rather than in a footer, so the list can breathe without making the window taller. The
+								     buttons are siblings of the TitleBar-role border, not children, so they stay clickable. -->
+								<Grid Grid.Row="1" ColumnDefinitions="*,Auto" Background="{DynamicResource Bg.Sidebar}">
+									<Border Name="PART_Brand" Padding="13,9,4,9" Background="{DynamicResource Bg.Sidebar}"
+											chrome:WindowDecorationProperties.ElementRole="TitleBar">
+										<StackPanel Orientation="Horizontal" Spacing="9" IsHitTestVisible="False">
+											<Image Source="avares://Echoes/Assets/logo-256.png" Width="20" Height="20"
+												   RenderOptions.BitmapInterpolationMode="HighQuality"/>
+											<TextBlock Text="Echoes" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"
+													   Foreground="{DynamicResource Text.Primary}"/>
+										</StackPanel>
+									</Border>
+									<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" Margin="0,0,8,0" VerticalAlignment="Center">
+										<Button Name="PART_About" Classes="sideLink headBtn" Command="{Binding OpenAboutCommand}"
+												ToolTip.Tip="{Binding CurrentVersion, StringFormat='About Echoes v{0}, updates'}"
+												AutomationProperties.Name="About Echoes">
+											<Path Classes="ico" Data="{StaticResource IcoAbout}"/>
+										</Button>
+										<!-- light / dark: the icon (a sun in the dark theme, a moon in the light one) and the tip are
+										     per-theme resources (Styles/Tokens.axaml), so the switch needs no state of its own -->
+										<Button Name="PART_ThemeToggle" Classes="sideLink headBtn"
+												Command="{Binding ToggleThemeCommand}" ToolTip.Tip="{DynamicResource Theme.ToggleTip}"
+												AutomationProperties.Name="Switch between the light and dark theme">
+											<Path Classes="ico" Data="{DynamicResource IcoThemeToggle}"/>
+										</Button>
+									</StackPanel>
+								</Grid>
+								<!-- nav -->
+								<ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
+											  HorizontalScrollBarVisibility="Disabled" AllowAutoHide="True">
+									<ItemsPresenter Name="PART_ItemsPresenter" Margin="8,0,8,6"
+													ItemsPanel="{TemplateBinding ItemsPanel}"/>
+								</ScrollViewer>
+								<!-- footer: only the update pill, when there is one -->
+								<StackPanel Grid.Row="3" Name="PART_SideFooter" Margin="8,0,8,8" IsVisible="{Binding IsUpdateAvailable}">
+									<Button Classes="updatePill" Command="{Binding OpenReleasesCommand}"
+											ToolTip.Tip="{Binding LatestVersion, StringFormat='Version {0} is available — click to download'}">
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<Ellipse Width="7" Height="7" Fill="{DynamicResource Accent}" VerticalAlignment="Center"/>
+											<TextBlock Classes="sideLabel" Text="{Binding LatestVersion, StringFormat='Update to v{0}'}"
+													   VerticalAlignment="Center"/>
+										</StackPanel>
+									</Button>
+								</StackPanel>
+							</Grid>
+						</Border>
+
+						<!-- PAGE: fills the height but asks for none, so the window opens fitted to the nav (MainWindow) -->
+						<ctl:HeightNeutral Grid.Column="1">
+							<Grid RowDefinitions="Auto,*" Background="{DynamicResource Bg.App}">
+								<Border Grid.Row="0" Name="PART_PageHeader" Padding="18,10,18,7" Background="{DynamicResource Bg.App}"
+										chrome:WindowDecorationProperties.ElementRole="TitleBar">
+									<StackPanel Spacing="2" IsHitTestVisible="False">
+										<TextBlock Classes="pageTitle" Text="{Binding $parent[views:MainView].PageTitle}"/>
+										<TextBlock Classes="pageSubtitle" Text="{Binding $parent[views:MainView].PageSubtitle}"/>
+									</StackPanel>
+								</Border>
+								<ContentPresenter Grid.Row="1" Name="PART_SelectedContentHost"
+												  Margin="{TemplateBinding Padding}"
+												  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+												  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+												  Content="{TemplateBinding SelectedContent}"
+												  ContentTemplate="{TemplateBinding SelectedContentTemplate}"/>
+							</Grid>
+						</ctl:HeightNeutral>
+					</Grid>
 				</ControlTemplate>
 			</Setter>
+		</Style>
+
+		<!-- ===== Sidebar nav item: [section label] + a pill with an accent indicator ===== -->
+		<Style Selector="TabItem.navtab">
+			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+			<Setter Property="FontSize" Value="12.5"/>
+			<Setter Property="FontWeight" Value="Medium"/>
+			<Setter Property="Margin" Value="0"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="MinHeight" Value="0"/>
+			<Setter Property="Template">
+				<ControlTemplate TargetType="ctl:NavTabItem">
+					<StackPanel>
+						<TextBlock Name="PART_GroupLabel" Classes="navgroup" Text="{TemplateBinding Group}"
+								   IsHitTestVisible="False"
+								   IsVisible="{TemplateBinding Group, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+						<Border Name="PART_Pill" Height="24" CornerRadius="6" Padding="9,0"
+								Background="{DynamicResource Bg.Sidebar}">
+							<Panel>
+								<Border Name="PART_Indicator" Width="3" Height="14" CornerRadius="2" Margin="-9,0,0,0"
+										HorizontalAlignment="Left" VerticalAlignment="Center"
+										Background="{DynamicResource Accent}" IsVisible="False"/>
+								<ContentPresenter Name="PART_ContentPresenter" VerticalAlignment="Center"
+												  Content="{TemplateBinding Header}"
+												  ContentTemplate="{TemplateBinding HeaderTemplate}"
+												  Foreground="{TemplateBinding Foreground}"/>
+							</Panel>
+						</Border>
+					</StackPanel>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+		<Style Selector="TabItem.navtab:pointerover /template/ Border#PART_Pill">
+			<Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+		</Style>
+		<Style Selector="TabItem.navtab:pointerover">
+			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+		</Style>
+		<Style Selector="TabItem.navtab:selected /template/ Border#PART_Pill">
+			<Setter Property="Background" Value="{DynamicResource Bg.Selected}"/>
+		</Style>
+		<Style Selector="TabItem.navtab:selected:pointerover /template/ Border#PART_Pill">
+			<Setter Property="Background" Value="{DynamicResource Bg.SelectedHover}"/>
+		</Style>
+		<Style Selector="TabItem.navtab:selected /template/ Border#PART_Indicator">
+			<Setter Property="IsVisible" Value="True"/>
+		</Style>
+		<Style Selector="TabItem.navtab:selected">
+			<Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+		</Style>
+		<!-- A Path doesn't inherit Foreground: glyphs follow the state through Stroke. Child selectors on
+		     purpose: the header panel is the item's direct child, while the open tool (also a logical
+		     descendant of the item) must keep its own icon colours. -->
+		<Style Selector="TabItem.navtab > StackPanel > Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+		</Style>
+		<!-- Sidebar glyphs at 18px: the shared 24-unit icons drawn three quarters size (a thicker stroke keeps the
+		     line weight the same), with the -3 margins shrinking their layout box to match. Smaller glyphs are most of
+		     what makes the list read as separate rows instead of a packed column. -->
+		<Style Selector="TabItem.navtab > StackPanel > Path.ico, Button.headBtn > Path.ico">
+			<Setter Property="RenderTransform" Value="scale(0.75)"/>
+			<Setter Property="Margin" Value="-3"/>
+			<Setter Property="StrokeThickness" Value="2"/>
+		</Style>
+		<Style Selector="TabItem.navtab:pointerover > StackPanel > Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+		</Style>
+		<Style Selector="TabItem.navtab:selected > StackPanel > Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+		</Style>
+		<Style Selector="TabItem.navtab:focus-visible /template/ Border#PART_Pill">
+			<Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+		</Style>
+		<!-- the brand row's About / theme buttons: small square icon buttons (the shared .sideLink is a wide row;
+		     its class style outranks template values, so this one needs a class in its selector too) -->
+		<Style Selector="Button.sideLink.headBtn">
+			<Setter Property="Padding" Value="5"/>
+			<Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+			<Setter Property="HorizontalAlignment" Value="Left"/>
+		</Style>
+		<!-- section labels: a clear gap above each group, a small one before its first item -->
+		<Style Selector="TabItem.navtab /template/ TextBlock#PART_GroupLabel">
+			<Setter Property="Margin" Value="10,7,0,4"/>
+		</Style>
+		<Style Selector="TabItem.navtab:nth-child(1) /template/ TextBlock#PART_GroupLabel">
+			<Setter Property="Margin" Value="10,2,0,4"/>
 		</Style>
 	</UserControl.Styles>
 
 	<Panel>
-		<Grid RowDefinitions="Auto, *, Auto">
+	<TabControl x:Name="MainTabs" TabStripPlacement="Left"
+				SelectionChanged="OnTabSelectionChanged">
+		<TabControl.ItemsPanel>
+			<ItemsPanelTemplate>
+				<!-- a hairline of space between rows, so hover / selection pills never touch -->
+				<StackPanel Spacing="2"/>
+			</ItemsPanelTemplate>
+		</TabControl.ItemsPanel>
 
-			<Border Grid.Row="0" Background="Transparent"
-					chrome:WindowDecorationProperties.ElementRole="TitleBar">
-				<StackPanel Orientation="Horizontal" Margin="16,12,15,7" Spacing="8" VerticalAlignment="Center">
-					<Border Width="80" IsVisible="{Binding IsMac}"/>
-					<Border Width="9" Height="9" CornerRadius="2.5" Background="#42B883" VerticalAlignment="Center"/>
-					<TextBlock Text="Echoes"
-							   FontSize="15"
-							   FontWeight="Bold"
-							   Foreground="#E7E7EA"
-							   LetterSpacing="-0.3"
-							   VerticalAlignment="Center"/>
+		<!-- Grouped by what you're doing. Each tab's content is an empty host that gets its tool view
+		     (and view-model) on first visit — see ToolViews in MainView.axaml.cs — and keeps it, so a
+		     tool's state survives switching tabs. Tag = the tool id (code-behind keys on it). -->
+
+		<!-- DIAGNOSE -->
+		<ctl:NavTabItem Classes="navtab" Tag="PING" Group="Diagnose" Title="Ping"
+						Subtitle="Live stats, TCP ping, traceroute and MTR"
+						AutomationProperties.Name="Ping">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoPing}"/>
+					<TextBlock Classes="navlabel" Text="Ping"/>
 				</StackPanel>
-			</Border>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="DOCTOR" Title="Doctor"
+						Subtitle="Why a site won't open for you"
+						AutomationProperties.Name="Doctor">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoDoctor}"/>
+					<TextBlock Classes="navlabel" Text="Doctor"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="DNS" Title="DNS &amp; WHOIS"
+						Subtitle="DoH / DoT lookups, mail check, WHOIS"
+						AutomationProperties.Name="DNS">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoDns}"/>
+					<TextBlock Classes="navlabel" Text="DNS"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="SCANNER" Title="Port Scanner"
+						Subtitle="TCP / UDP scan, service detection"
+						AutomationProperties.Name="Port Scanner">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoScanner}"/>
+					<TextBlock Classes="navlabel" Text="Scanner"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="CHECK-HOST" Title="Check Host"
+						Subtitle="Checks from nodes around the world"
+						AutomationProperties.Name="Check Host">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoCheckHost}"/>
+					<TextBlock Classes="navlabel" Text="Check Host"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="MONITOR" Title="Monitor"
+						Subtitle="Uptime, expiry checks, Telegram alerts"
+						AutomationProperties.Name="Monitor">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoMonitor}"/>
+					<TextBlock Classes="navlabel" Text="Monitor"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="NETWORK" Title="Network"
+						Subtitle="Interfaces, Wi-Fi, ports and routes"
+						AutomationProperties.Name="Network">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoNetwork}"/>
+					<TextBlock Classes="navlabel" Text="Network"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="SPEED TEST" Title="Speed Test"
+						Subtitle="Internet speed and latency"
+						AutomationProperties.Name="Speed Test">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoSpeed}"/>
+					<TextBlock Classes="navlabel" Text="Speed Test"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
 
-			<TabControl Grid.Row="1" Margin="8,0,8,4" TabStripPlacement="Left"
-						x:Name="MainTabs" SelectionChanged="OnTabSelectionChanged">
-				<!-- Single vertical column — never wrap tabs into a second column -->
-				<TabControl.ItemsPanel>
-					<ItemsPanelTemplate>
-						<StackPanel/>
-					</ItemsPanelTemplate>
-				</TabControl.ItemsPanel>
-				<TabControl.Styles>
-					<Style Selector="TabItem.navtab">
-						<Setter Property="FontSize" Value="11.5"/>
-						<Setter Property="FontWeight" Value="Medium"/>
-						<Setter Property="Foreground" Value="#9E9FA8"/>
-						<Setter Property="Margin" Value="0,1"/>
-						<!-- Sized to fit a 24px glyph plus the longest label ("TELEGRAM BOT"). -->
-						<Setter Property="Padding" Value="10,0"/>
-						<Setter Property="Height" Value="31"/>
-						<Setter Property="MinHeight" Value="31"/>
-						<Setter Property="Width" Value="150"/>
-						<Setter Property="CornerRadius" Value="6"/>
-						<Setter Property="HorizontalContentAlignment" Value="Left"/>
-						<Setter Property="VerticalContentAlignment" Value="Center"/>
-					</Style>
+		<!-- WEB & API -->
+		<ctl:NavTabItem Classes="navtab" Tag="CURL" Group="Web &amp; API" Title="cURL"
+						Subtitle="HTTP requests, responses and TLS"
+						AutomationProperties.Name="cURL">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoCurl}"/>
+					<TextBlock Classes="navlabel" Text="cURL"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="TLS" Title="TLS Inspector"
+						Subtitle="Certificates, expiry, versions, ciphers"
+						AutomationProperties.Name="TLS Inspector">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoTls}"/>
+					<TextBlock Classes="navlabel" Text="TLS Inspector"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="IP INFO" Title="IP Info"
+						Subtitle="Public IP and GeoIP lookups"
+						AutomationProperties.Name="IP Info">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoIpInfo}"/>
+					<TextBlock Classes="navlabel" Text="IP Info"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="CLOUDFLARE" Title="Cloudflare"
+						Subtitle="DNS, DDNS, SSL/TLS, security, rules"
+						AutomationProperties.Name="Cloudflare">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoCloudflare}"/>
+					<TextBlock Classes="navlabel" Text="Cloudflare"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="TELEGRAM BOT" Title="Telegram Bot"
+						Subtitle="Bot API calls, uploads, updates"
+						AutomationProperties.Name="Telegram Bot">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoTelegram}"/>
+					<TextBlock Classes="navlabel" Text="Telegram Bot"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
 
-					<!-- Paint our own background on the template root so the theme's
-					     default hover/selected brushes don't override it. -->
-					<Style Selector="TabItem.navtab /template/ Border#PART_LayoutRoot">
-						<Setter Property="Background" Value="Transparent"/>
-						<Setter Property="CornerRadius" Value="6"/>
-						<Setter Property="Transitions">
-							<Transitions>
-								<BrushTransition Property="Background" Duration="0:0:0.12"/>
-							</Transitions>
-						</Setter>
-					</Style>
+		<!-- SERVE & CONNECT -->
+		<ctl:NavTabItem Classes="navtab" Tag="SSH" Group="Serve &amp; Connect" Title="SSH"
+						Subtitle="Terminal, files, forwards, health"
+						AutomationProperties.Name="SSH">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoSsh}"/>
+					<TextBlock Classes="navlabel" Text="SSH"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="SOCKET" Title="Socket"
+						Subtitle="TCP / UDP client and server, WebSocket"
+						AutomationProperties.Name="Socket">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoSocket}"/>
+					<TextBlock Classes="navlabel" Text="Socket"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="WEB SERVER" Title="Web Server"
+						Subtitle="Share files or catch webhooks"
+						AutomationProperties.Name="Web Server">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoWebServer}"/>
+					<TextBlock Classes="navlabel" Text="Web Server"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="PROXY" Title="Proxy"
+						Subtitle="SOCKS5 / HTTP server and checker"
+						AutomationProperties.Name="Proxy">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoProxy}"/>
+					<TextBlock Classes="navlabel" Text="Proxy"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
 
-					<!-- Hover (non-selected): subtle neutral fill + brighter text -->
-					<Style Selector="TabItem.navtab:pointerover /template/ Border#PART_LayoutRoot">
-						<Setter Property="Background" Value="#12FFFFFF"/>
-					</Style>
-					<Style Selector="TabItem.navtab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-						<Setter Property="Foreground" Value="#D7D8DE"/>
-					</Style>
-
-					<!-- Selected: neutral surface + accent-green text (Linear-style) -->
-					<Style Selector="TabItem.navtab:selected /template/ Border#PART_LayoutRoot">
-						<Setter Property="Background" Value="#2A2B33"/>
-					</Style>
-					<Style Selector="TabItem.navtab:selected /template/ ContentPresenter#PART_ContentPresenter">
-						<Setter Property="Foreground" Value="#55C795"/>
-					</Style>
-
-					<Style Selector="TabItem.navtab:selected:pointerover /template/ Border#PART_LayoutRoot">
-						<Setter Property="Background" Value="#32333C"/>
-					</Style>
-
-					<Style Selector="TabItem.navtab:selected /template/ Border#PART_SelectedPipe">
-						<Setter Property="IsVisible" Value="False"/>
-					</Style>
-
-					<!-- Glyphs track the tab state via Stroke: the ContentPresenter Foreground rules
-					     above only reach the label, since a Path does not inherit Foreground. -->
-					<Style Selector="TabItem.navtab:pointerover Path.ico">
-						<Setter Property="Stroke" Value="#D7D8DE"/>
-					</Style>
-					<Style Selector="TabItem.navtab:selected Path.ico">
-						<Setter Property="Stroke" Value="#55C795"/>
-					</Style>
-				</TabControl.Styles>
-
-				<!-- Ordered by importance -->
-				<TabItem Classes="navtab" Tag="PING" AutomationProperties.Name="PING">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoPing}"/>
-							<TextBlock Text="PING" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:PingView DataContext="{Binding PingVM}"/></TabItem>
-				<TabItem Classes="navtab" Tag="DNS" AutomationProperties.Name="DNS">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoDns}"/>
-							<TextBlock Text="DNS" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:DnsView DataContext="{Binding DnsVM}"/></TabItem>
-				<TabItem Classes="navtab" Tag="CURL" AutomationProperties.Name="CURL">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoCurl}"/>
-							<TextBlock Text="CURL" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:CurlView DataContext="{Binding CurlVM}"/></TabItem>
-				<TabItem Classes="navtab" Tag="IP INFO" AutomationProperties.Name="IP INFO">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoIpInfo}"/>
-							<TextBlock Text="IP INFO" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:IpInfoView DataContext="{Binding IpInfoVM}"/></TabItem>
-				<TabItem Classes="navtab" Tag="CHECK-HOST" AutomationProperties.Name="CHECK-HOST">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoCheckHost}"/>
-							<TextBlock Text="CHECK-HOST" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:CheckHostView DataContext="{Binding CheckHostVM}"/></TabItem>
-				<TabItem Classes="navtab" Tag="CLOUDFLARE" AutomationProperties.Name="CLOUDFLARE">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoCloudflare}"/>
-							<TextBlock Text="CLOUDFLARE" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:CloudflareView DataContext="{Binding CloudflareVM}"/></TabItem>
-				<TabItem Classes="navtab" Tag="SCANNER" AutomationProperties.Name="SCANNER">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoScanner}"/>
-							<TextBlock Text="SCANNER" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:PortScannerView DataContext="{Binding PortScannerVM}"/></TabItem>
-				<TabItem Classes="navtab" Tag="WEB SERVER" AutomationProperties.Name="WEB SERVER">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoWebServer}"/>
-							<TextBlock Text="WEB SERVER" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:WebServerView DataContext="{Binding WebServerVM}"/></TabItem>
-				<TabItem Classes="navtab" Tag="PROXY" AutomationProperties.Name="PROXY">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoProxy}"/>
-							<TextBlock Text="PROXY" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:ProxyView DataContext="{Binding ProxyVM}"/></TabItem>
-				<TabItem Classes="navtab" Tag="NETWORK" AutomationProperties.Name="NETWORK">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoNetwork}"/>
-							<TextBlock Text="NETWORK" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:NetworkInfoView DataContext="{Binding NetworkVM}"/></TabItem>
-				<TabItem Classes="navtab" Tag="MONITOR" AutomationProperties.Name="MONITOR">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoMonitor}"/>
-							<TextBlock Text="MONITOR" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:MonitorView DataContext="{Binding MonitorVM}"/></TabItem>
-				<TabItem Classes="navtab" Tag="SSH" AutomationProperties.Name="SSH">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoSsh}"/>
-							<TextBlock Text="SSH" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:SshView DataContext="{Binding SshVM}"/></TabItem>
-				<TabItem Classes="navtab" Tag="TELEGRAM BOT" AutomationProperties.Name="TELEGRAM BOT">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoTelegram}"/>
-							<TextBlock Text="TELEGRAM BOT" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header>
-					<views:TgView>
-						<views:TgView.DataContext>
-							<vm:TgViewModel/>
-						</views:TgView.DataContext>
-					</views:TgView>
-				</TabItem>
-				<TabItem Classes="navtab" Tag="STRING LAB" AutomationProperties.Name="STRING LAB">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoStringLab}"/>
-							<TextBlock Text="STRING LAB" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:StringLabView DataContext="{Binding StringTool}"/></TabItem>
-				<TabItem Classes="navtab" Tag="NOTES" AutomationProperties.Name="NOTES">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoNotes}"/>
-							<TextBlock Text="NOTES" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header><views:NoteView DataContext="{Binding NoteVM}"/></TabItem>
-				<!-- HISTORY + BACKUP merged into one nav entry with two sub-tabs -->
-				<TabItem Classes="navtab" Tag="DATA" AutomationProperties.Name="DATA">
-					<TabItem.Header>
-						<StackPanel Orientation="Horizontal" Spacing="9">
-							<Path Classes="ico" Data="{StaticResource IcoBackup}"/>
-							<TextBlock Text="DATA" VerticalAlignment="Center"/>
-						</StackPanel>
-					</TabItem.Header>
-					<TabControl Padding="0,4,0,0">
-						<TabItem Header="HISTORY"><views:HistoryView DataContext="{Binding HistoryVM}"/></TabItem>
-						<TabItem Header="BACKUP"><views:BackupView DataContext="{Binding BackupVM}"/></TabItem>
-					</TabControl>
-				</TabItem>
+		<!-- WORKSPACE -->
+		<ctl:NavTabItem Classes="navtab" Tag="STRING LAB" Group="Workspace" Title="String Lab"
+						Subtitle="Encode, hash, convert, diff, generate"
+						AutomationProperties.Name="String Lab">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoStringLab}"/>
+					<TextBlock Classes="navlabel" Text="String Lab"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="NOTES" Title="Notes"
+						Subtitle="Encrypted notes"
+						AutomationProperties.Name="Notes">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoNotes}"/>
+					<TextBlock Classes="navlabel" Text="Notes"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<!-- HISTORY + BACKUP share one nav entry with two sub-tabs -->
+		<ctl:NavTabItem Classes="navtab" Tag="DATA" Title="History &amp; Backup"
+						Subtitle="Recent inputs and encrypted backups"
+						AutomationProperties.Name="History and Backup">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoBackup}"/>
+					<TextBlock Classes="navlabel" Text="History &amp; Backup"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header>
+			<TabControl Padding="0">
+				<TabItem Header="History"><Decorator x:Name="HistoryHost"/></TabItem>
+				<TabItem Header="Backup"><Decorator x:Name="BackupHost"/></TabItem>
 			</TabControl>
-
-			<Border Grid.Row="2" Height="22" Background="#0C0D0F" BorderBrush="#1C1D22" BorderThickness="0,1,0,0">
-				<Grid ColumnDefinitions="*, Auto, Auto">
-
-					<StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0" Opacity="0.3">
-						<TextBlock FontSize="9">
-							<Run Text="v"/>
-							<Run Text="{Binding CurrentVersion}"/>
-						</TextBlock>
-					</StackPanel>
-
-					<Button Grid.Column="1"
-							Command="{Binding OpenGitHubCommand}"
-							Background="Transparent"
-							BorderThickness="0"
-							Padding="12,0"
-							Cursor="Hand"
-							VerticalAlignment="Stretch">
-						<Button.Styles>
-							<Style Selector="Button:pointerover TextBlock">
-								<Setter Property="Foreground" Value="#42B883"/>
-								<Setter Property="Opacity" Value="1"/>
-							</Style>
-						</Button.Styles>
-						<TextBlock Text="ABOUT"
-								   FontSize="8"
-								   FontWeight="Black"
-								   Foreground="White"
-								   Opacity="0.4"
-								   VerticalAlignment="Center"/>
-					</Button>
-
-					<Button Grid.Column="2"
-							Command="{Binding OpenReleasesCommand}"
-							IsVisible="{Binding IsUpdateAvailable}"
-							Background="Transparent"
-							BorderThickness="0"
-							Padding="10,0"
-							Cursor="Hand"
-							VerticalAlignment="Stretch"
-							ToolTip.Tip="{Binding LatestVersion, StringFormat='Version {0} is available — click to download'}">
-						<StackPanel Orientation="Horizontal" Spacing="6">
-							<Ellipse Width="5" Height="5" Fill="#FF9D00" VerticalAlignment="Center"/>
-							<TextBlock FontSize="8" FontWeight="Black" Foreground="#FF9D00" VerticalAlignment="Center">
-								<Run Text="UPDATE TO v"/><Run Text="{Binding LatestVersion}"/>
-							</TextBlock>
-						</StackPanel>
-					</Button>
-				</Grid>
-			</Border>
-		</Grid>
+		</ctl:NavTabItem>
+	</TabControl>
+	<!-- the About box, over sidebar and page; height-neutral so the window stays fitted to the nav -->
+	<ctl:HeightNeutral>
+		<views:AboutView IsVisible="{Binding IsAboutOpen}"/>
+	</ctl:HeightNeutral>
 	</Panel>
 </UserControl>

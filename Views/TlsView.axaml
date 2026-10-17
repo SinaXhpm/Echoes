@@ -1,0 +1,741 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
+             x:Class="Echoes.Views.TlsView"
+             x:DataType="vm:TlsViewModel"
+             x:CompileBindings="True">
+
+    <UserControl.Resources>
+        <!-- stroked glyphs on the 24x24 grid the nav icons use -->
+        <StreamGeometry x:Key="TlIcoCopy">M10 8 H18 A2 2 0 0 1 20 10 V18 A2 2 0 0 1 18 20 H10 A2 2 0 0 1 8 18 V10 A2 2 0 0 1 10 8 Z M5 16 A1.5 1.5 0 0 1 4 14.5 V5.5 A1.5 1.5 0 0 1 5.5 4 H14.5 A1.5 1.5 0 0 1 16 5</StreamGeometry>
+        <StreamGeometry x:Key="TlIcoSave">M12 4 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19</StreamGeometry>
+        <StreamGeometry x:Key="TlIcoClear">M4.5 7 H19.5 M9.5 7 V4.5 H14.5 V7 M6.5 7 L7.5 19.5 H16.5 L17.5 7</StreamGeometry>
+        <StreamGeometry x:Key="TlIcoCheck">M5 12.5 L9.5 17 L19 7.5</StreamGeometry>
+        <StreamGeometry x:Key="TlIcoCross">M7 7 L17 17 M17 7 L7 17</StreamGeometry>
+        <StreamGeometry x:Key="TlIcoDown">M6.5 9.5 L12 15 L17.5 9.5</StreamGeometry>
+        <StreamGeometry x:Key="TlIcoRight">M9.5 6.5 L15 12 L9.5 17.5</StreamGeometry>
+        <StreamGeometry x:Key="TlIcoAlert">M12 3.5 L21 19.5 H3 Z M12 10 V14 M12 16.8 V17.2</StreamGeometry>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- ===== shared bits ===== -->
+        <Style Selector="TextBlock.hint">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="Path.glyph">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.7"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.ghost Path.glyph, Button.secondary Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+        </Style>
+        <Style Selector="Button.ghost:pointerover Path.glyph, Button.secondary:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Path.emptyIcon">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.val">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.val.mono">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+        </Style>
+        <Style Selector="TextBlock.key">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Margin" Value="0,1,0,0"/>
+        </Style>
+
+        <!-- ===== inspect form. Wide: [host][sni][starttls][inspect]; narrow: host / [sni][starttls] / inspect ===== -->
+        <Style Selector="Grid#InForm.wide > StackPanel#InSni">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Width" Value="170"/><Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#InForm.wide > StackPanel#InStart">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Width" Value="140"/><Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#InForm.wide > Button#InGo">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="8,0,0,0"/><Setter Property="MinWidth" Value="104"/>
+        </Style>
+        <Style Selector="Grid#InForm.narrow > StackPanel#InHost">
+            <Setter Property="Grid.ColumnSpan" Value="4"/>
+        </Style>
+        <Style Selector="Grid#InForm.narrow > StackPanel#InSni">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#InForm.narrow > StackPanel#InStart">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+            <Setter Property="Width" Value="128"/><Setter Property="Margin" Value="8,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#InForm.narrow > Button#InGo">
+            <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+
+        <!-- ===== result ===== -->
+        <Style Selector="Border.callout">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Padding" Value="12,10"/>
+        </Style>
+        <Style Selector="Border.callout SelectableTextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="Border.callout Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Margin" Value="0,1,0,0"/>
+        </Style>
+        <Style Selector="Border.badge.verdict">
+            <Setter Property="Padding" Value="10,3"/>
+        </Style>
+        <Style Selector="Border.badge.verdict TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.endpoint">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Title}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.summary">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="Grid#ResHead.wide > StackPanel#ResActions">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#ResHead.narrow > StackPanel#ResActions">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+        <!-- problems: a colored dot per line -->
+        <Style Selector="Ellipse.sev">
+            <Setter Property="Width" Value="7"/>
+            <Setter Property="Height" Value="7"/>
+            <Setter Property="Margin" Value="0,6,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Fill" Value="{DynamicResource Info}"/>
+        </Style>
+        <Style Selector="Ellipse.sev.warn"><Setter Property="Fill" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="Ellipse.sev.bad"><Setter Property="Fill" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="SelectableTextBlock.problem">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <!-- facts: label | value, the value tinted by how good it is -->
+        <Style Selector="Grid.fact > TextBlock.key">
+            <Setter Property="Width" Value="112"/>
+        </Style>
+        <Style Selector="Grid#InRoot.narrow Grid.fact > TextBlock.key">
+            <Setter Property="Width" Value="92"/>
+        </Style>
+        <Style Selector="Grid.fact.ok SelectableTextBlock.val"><Setter Property="Foreground" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="Grid.fact.warn SelectableTextBlock.val"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="Grid.fact.bad SelectableTextBlock.val"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+        <!-- TLS version chips -->
+        <Style Selector="Border.chip">
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="7,2,9,2"/>
+            <Setter Property="Margin" Value="0,0,6,6"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+        </Style>
+        <Style Selector="Border.chip TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.chip Path.glyph">
+            <Setter Property="Width" Value="11"/>
+            <Setter Property="Height" Value="11"/>
+            <Setter Property="StrokeThickness" Value="2"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Border.chip.good">
+            <Setter Property="Background" Value="{DynamicResource Success.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Success.Border}"/>
+        </Style>
+        <Style Selector="Border.chip.good TextBlock"><Setter Property="Foreground" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="Border.chip.good Path.glyph"><Setter Property="Stroke" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="Border.chip.old">
+            <Setter Property="Background" Value="{DynamicResource Warning.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Warning.Border}"/>
+        </Style>
+        <Style Selector="Border.chip.old TextBlock"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="Border.chip.old Path.glyph"><Setter Property="Stroke" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="Border.chip.unknown">
+            <Setter Property="Background" Value="{DynamicResource Info.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Info.Border}"/>
+        </Style>
+        <Style Selector="Border.chip.unknown TextBlock"><Setter Property="Foreground" Value="{DynamicResource Info}"/></Style>
+
+        <!-- ===== certificate cards ===== -->
+        <Style Selector="Button.certHead">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.certHead:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.CardHover}"/>
+        </Style>
+        <Style Selector="Button.certHead:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.CardHover}"/>
+        </Style>
+        <Style Selector="Button.certHead Path.chev">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.7"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.certName">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.certSub">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Border.badge.role">
+            <Setter Property="Padding" Value="7,1"/>
+            <Setter Property="MinWidth" Value="84"/>
+        </Style>
+        <Style Selector="Border.badge.role TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.badge.expiry">
+            <Setter Property="Padding" Value="7,1"/>
+            <Setter Property="Margin" Value="8,0,8,0"/>
+        </Style>
+        <Style Selector="Grid#InRoot.narrow Border.badge.role">
+            <Setter Property="MinWidth" Value="0"/>
+        </Style>
+        <Style Selector="Border.certBody">
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+            <Setter Property="Padding" Value="12,10,12,12"/>
+        </Style>
+        <Style Selector="Grid.kv > TextBlock.key">
+            <Setter Property="Width" Value="72"/>
+        </Style>
+        <!-- phone: the issuer line under the name is enough; the expiry badge moves under it too -->
+        <Style Selector="Grid#InRoot.narrow Grid.certRow > Border.expiry">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/><Setter Property="Margin" Value="10,6,0,0"/>
+        </Style>
+
+        <!-- ===== bulk ===== -->
+        <Style Selector="Grid#BkRoot.wide > Border#BkInput">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.RowSpan" Value="2"/><Setter Property="Grid.Column" Value="0"/>
+            <Setter Property="Width" Value="272"/>
+        </Style>
+        <Style Selector="Grid#BkRoot.wide > Border#BkResults">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.RowSpan" Value="2"/><Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#BkRoot.narrow > Border#BkInput">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#BkRoot.narrow > Border#BkResults">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#BkRoot.narrow TextBox#BkHosts">
+            <Setter Property="Height" Value="112"/>
+        </Style>
+        <Style Selector="TextBlock.bkError">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="Button.colhead">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.colhead:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Button.colhead:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="ListBox.bk ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+        </Style>
+        <Style Selector="ListBox.bk ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Selected}"/>
+        </Style>
+        <Style Selector="Border.bkRow">
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="TextBlock.cell">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style Selector="TextBlock.cell.mono">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+        </Style>
+        <Style Selector="TextBlock.cell.host">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Border.badge.status">
+            <Setter Property="Padding" Value="7,1"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="MaxWidth" Value="150"/>
+        </Style>
+        <Style Selector="Border.badge.status TextBlock">
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <!-- header captions sit exactly over their cells (which keep a 10px gap on the right) -->
+        <Style Selector="Panel.colRow Button.colhead">
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style Selector="TextBlock.cell.daysWarn"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="TextBlock.cell.daysBad"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+        <!-- column widths (header + rows), and the phone's two-line rows -->
+        <Style Selector=":is(Control).cExp"><Setter Property="Width" Value="84"/></Style>
+        <Style Selector=":is(Control).cDays"><Setter Property="Width" Value="44"/></Style>
+        <Style Selector=":is(Control).cStatus"><Setter Property="Width" Value="140"/></Style>
+        <Style Selector="Grid#BkRoot TextBlock.subline">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#BkRoot.narrow TextBlock.subline">
+            <Setter Property="IsVisible" Value="True"/>
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="5"/>
+            <Setter Property="Margin" Value="0,3,0,0"/>
+        </Style>
+        <Style Selector="Grid#BkRoot.narrow :is(Control).cExp, Grid#BkRoot.narrow :is(Control).cDays, Grid#BkRoot.narrow :is(Control).cIssuer">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#BkRoot.narrow :is(Control).cHost">
+            <Setter Property="Grid.ColumnSpan" Value="4"/>
+        </Style>
+        <Style Selector="Grid#BkRoot.narrow :is(Control).cStatus">
+            <Setter Property="Width" Value="NaN"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+        <Style Selector="Grid#BkRoot.narrow Panel.colRow">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#BkRoot.wide StackPanel.sortRow">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+    </UserControl.Styles>
+
+    <!-- Padding 0: the shell already pads the page -->
+    <TabControl x:Name="TlsTabs" Padding="0" SelectedIndex="{Binding TabIndex}">
+
+        <!-- ============================ INSPECT ============================ -->
+        <TabItem Header="Inspect">
+            <Grid x:Name="InRoot" helpers:Responsive.BreakWidth="600" RowDefinitions="Auto, *" Margin="0,12,0,0">
+                <Border Grid.Row="0" Classes="card" Padding="12">
+                    <Grid x:Name="InForm" helpers:Responsive.BreakWidth="700" ColumnDefinitions="*, Auto, Auto, Auto" RowDefinitions="Auto, Auto, Auto">
+                        <StackPanel x:Name="InHost">
+                            <TextBlock Classes="fieldLabel" Text="Host"/>
+                            <AutoCompleteBox x:Name="TargetBox" Classes="field"
+                                             ToolTip.Tip="A host name, host:port or URL, e.g. mail.example.com:587"
+                                             AutomationProperties.Name="Host, host:port or URL"
+                                             helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Endpoint"
+                                             helpers:InputAssist.PasteButton="True"
+                                             Text="{Binding Target}" ItemsSource="{Binding TargetHistory}"
+                                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                             FontFamily="{StaticResource MonoFont}"
+                                             PlaceholderText="example.com, host:port or URL">
+                                <AutoCompleteBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding InspectCommand}"/>
+                                </AutoCompleteBox.KeyBindings>
+                            </AutoCompleteBox>
+                        </StackPanel>
+                        <StackPanel x:Name="InSni">
+                            <TextBlock Classes="fieldLabel" Text="SNI"/>
+                            <TextBox Classes="field mono" Text="{Binding Sni}" PlaceholderText="Automatic"
+                                     helpers:InputAssist.SelectAllOnFocus="True" AutomationProperties.Name="Server name (SNI)"
+                                     ToolTip.Tip="Server name (SNI). Leave empty to send the host name. Set it to test another name on the same address.">
+                                <TextBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding InspectCommand}"/>
+                                </TextBox.KeyBindings>
+                            </TextBox>
+                        </StackPanel>
+                        <StackPanel x:Name="InStart">
+                            <TextBlock Classes="fieldLabel" Text="STARTTLS"/>
+                            <ComboBox Classes="field" ItemsSource="{Binding StartTlsOptions}" SelectedIndex="{Binding StartTlsIndex}"
+                                      ToolTip.Tip="Automatic: SMTP on 25 / 587, IMAP on 143, POP3 on 110, FTP on 21; TLS from the first byte on every other port"/>
+                        </StackPanel>
+                        <Button x:Name="InGo" Classes="toggle" Classes.active="{Binding IsBusy}" VerticalAlignment="Bottom"
+                                Command="{Binding InspectCommand}">
+                            <TextBlock Text="{Binding InspectText}" HorizontalAlignment="Center"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <Panel Grid.Row="1" Margin="0,12,0,0">
+                    <!-- empty state -->
+                    <StackPanel Spacing="6" Margin="24" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                IsVisible="{Binding ShowEmpty}">
+                        <Path Classes="emptyIcon" Data="{StaticResource IcoTls}"/>
+                        <TextBlock Text="Inspect a TLS endpoint" HorizontalAlignment="Center" FontSize="{StaticResource Font.Body}"
+                                   FontWeight="SemiBold" Foreground="{DynamicResource Text.Secondary}"/>
+                        <TextBlock Classes="hint" HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="400"
+                                   Text="Chain, TLS versions, cipher, ALPN, OCSP, revocation and HSTS."/>
+                    </StackPanel>
+                    <!-- working -->
+                    <StackPanel Spacing="6" Margin="24" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                IsVisible="{Binding IsBusy}">
+                        <Path Classes="emptyIcon" Data="{StaticResource IcoTls}"/>
+                        <TextBlock Text="{Binding Progress}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                                   FontSize="{StaticResource Font.Body}" Foreground="{DynamicResource Text.Secondary}"/>
+                    </StackPanel>
+
+                    <ScrollViewer x:Name="InScroll" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding IsIdle}">
+                        <StackPanel Spacing="12">
+                            <!-- the one clear error -->
+                            <Border Classes="callout" IsVisible="{Binding HasError}" ToolTip.Tip="{Binding ErrorDetail}">
+                                <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10">
+                                    <Path Classes="glyph" Data="{StaticResource TlIcoAlert}"/>
+                                    <SelectableTextBlock Grid.Column="1" Text="{Binding Error}"/>
+                                    <Button Grid.Column="2" Classes="ghost" Padding="10,0" VerticalAlignment="Top"
+                                            Command="{Binding CopyErrorCommand}" ToolTip.Tip="Copy the error">
+                                        <Path Classes="glyph" Data="{StaticResource TlIcoCopy}"/>
+                                    </Button>
+                                </Grid>
+                            </Border>
+
+                            <!-- summary -->
+                            <Border Classes="card" Padding="12" IsVisible="{Binding HasResult}">
+                                <StackPanel Spacing="10">
+                                    <Grid x:Name="ResHead" helpers:Responsive.BreakWidth="560" ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto, Auto">
+                                        <Border Grid.Column="0" Classes="badge verdict" Classes.success="{Binding VerdictOk}"
+                                                Classes.warning="{Binding VerdictWarn}" Classes.danger="{Binding VerdictBad}">
+                                            <TextBlock Text="{Binding VerdictText}"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                            <SelectableTextBlock Classes="endpoint" Text="{Binding EndpointText}"/>
+                                            <TextBlock Classes="hint" Text="{Binding AddressText}"
+                                                       IsVisible="{Binding AddressText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                        </StackPanel>
+                                        <StackPanel x:Name="ResActions" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                            <Button Classes="ghost" Command="{Binding CopyReportCommand}" ToolTip.Tip="Copy everything below as text">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <Path Classes="glyph" Data="{StaticResource TlIcoCopy}"/>
+                                                    <TextBlock Text="Report" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Classes="ghost" Command="{Binding CopyChainPemCommand}" IsEnabled="{Binding HasChain}"
+                                                    ToolTip.Tip="Copy the whole chain as PEM">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <Path Classes="glyph" Data="{StaticResource TlIcoCopy}"/>
+                                                    <TextBlock Text="Chain PEM" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <SelectableTextBlock Classes="summary" Text="{Binding SummaryText}"
+                                                         IsVisible="{Binding SummaryText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                                    <ItemsControl ItemsSource="{Binding Problems}" IsVisible="{Binding HasProblems}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="helpers:TlsProblem">
+                                                <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10" Margin="2,0,0,4">
+                                                    <Ellipse Classes="sev" Classes.warn="{Binding IsWarning}" Classes.bad="{Binding IsError}"/>
+                                                    <SelectableTextBlock Grid.Column="1" Classes="problem" Text="{Binding Text}"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <Border Classes="divider"/>
+
+                                    <StackPanel Spacing="6">
+                                        <Grid Classes="fact" ColumnDefinitions="Auto, *" IsVisible="{Binding HasVersions}">
+                                            <TextBlock Classes="key" Text="Versions" Margin="0,4,0,0"/>
+                                            <ItemsControl Grid.Column="1" ItemsSource="{Binding Versions}" Margin="0,0,0,-6">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:TlsVersionChip">
+                                                        <Border Classes="chip" Classes.good="{Binding IsGood}" Classes.old="{Binding IsOld}"
+                                                                Classes.unknown="{Binding IsUnknown}" ToolTip.Tip="{Binding Detail}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                                <Panel>
+                                                                    <Path Classes="glyph" Data="{StaticResource TlIcoCheck}" IsVisible="{Binding IsSupported}"/>
+                                                                    <Path Classes="glyph" Data="{StaticResource TlIcoCross}" IsVisible="{Binding IsOff}"/>
+                                                                    <TextBlock Text="?" FontWeight="Bold" IsVisible="{Binding IsUnknown}"/>
+                                                                </Panel>
+                                                                <TextBlock Text="{Binding Name}"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Grid>
+                                        <ItemsControl ItemsSource="{Binding Facts}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:TlsFact">
+                                                    <Grid Classes="fact" Classes.ok="{Binding IsOk}" Classes.warn="{Binding IsWarn}" Classes.bad="{Binding IsBad}"
+                                                          ColumnDefinitions="Auto, *" Margin="0,0,0,6">
+                                                        <TextBlock Classes="key" Text="{Binding Label}"/>
+                                                        <SelectableTextBlock Grid.Column="1" Classes="val" Text="{Binding Value}" ToolTip.Tip="{Binding Tip}"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- chain -->
+                            <StackPanel Spacing="8" IsVisible="{Binding HasChain}">
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="2,0,0,0">
+                                    <TextBlock Classes="sectionTitle" Text="Certificate chain" VerticalAlignment="Center"/>
+                                    <Border Classes="badge" Padding="7,1">
+                                        <TextBlock Text="{Binding Chain.Count}" FontFamily="{StaticResource MonoFont}"/>
+                                    </Border>
+                                    <TextBlock Classes="hint" Text="{Binding ChainNote}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <ItemsControl ItemsSource="{Binding Chain}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:TlsCertView">
+                                            <Border Classes="card" Margin="0,0,0,8">
+                                                <StackPanel>
+                                                    <Button Classes="certHead" Command="{Binding ToggleExpandedCommand}">
+                                                        <Grid Classes="certRow" ColumnDefinitions="Auto, *, Auto, Auto" RowDefinitions="Auto, Auto">
+                                                            <Border Classes="badge role" Classes.accent="{Binding IsLeaf}" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Role}"/>
+                                                            </Border>
+                                                            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Spacing="1">
+                                                                <TextBlock Classes="certName" Text="{Binding Name}"/>
+                                                                <TextBlock Classes="certSub" Text="{Binding HeaderSub}" ToolTip.Tip="{Binding HeaderSub}"/>
+                                                            </StackPanel>
+                                                            <Border Grid.Column="2" Classes="badge expiry" Classes.success="{Binding ExpiryOk}"
+                                                                    Classes.warning="{Binding ExpiryWarn}" Classes.danger="{Binding ExpiryBad}">
+                                                                <TextBlock Text="{Binding ExpiryText}"/>
+                                                            </Border>
+                                                            <Panel Grid.Column="3" VerticalAlignment="Center">
+                                                                <Path Classes="chev" Data="{StaticResource TlIcoDown}" IsVisible="{Binding IsExpanded}"/>
+                                                                <Path Classes="chev" Data="{StaticResource TlIcoRight}" IsVisible="{Binding !IsExpanded}"/>
+                                                            </Panel>
+                                                        </Grid>
+                                                    </Button>
+                                                    <Border Classes="certBody" IsVisible="{Binding IsExpanded}">
+                                                        <StackPanel Spacing="10">
+                                                            <Grid Classes="kv" ColumnDefinitions="Auto, *" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                                                                  RowSpacing="5" ColumnSpacing="12">
+                                                                <TextBlock Grid.Row="0" Classes="key" Text="Subject"/>
+                                                                <SelectableTextBlock Grid.Row="0" Grid.Column="1" Classes="val" Text="{Binding Subject}"/>
+                                                                <TextBlock Grid.Row="1" Classes="key" Text="Issuer"/>
+                                                                <SelectableTextBlock Grid.Row="1" Grid.Column="1" Classes="val" Text="{Binding Issuer}"/>
+                                                                <TextBlock Grid.Row="2" Classes="key" Text="Valid"/>
+                                                                <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="val" Text="{Binding Validity}"/>
+                                                                <TextBlock Grid.Row="3" Classes="key" Text="{Binding SansLabel}" IsVisible="{Binding HasSans}"/>
+                                                                <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="val mono" Text="{Binding Sans}" IsVisible="{Binding HasSans}"/>
+                                                                <TextBlock Grid.Row="4" Classes="key" Text="Key"/>
+                                                                <SelectableTextBlock Grid.Row="4" Grid.Column="1" Classes="val" Text="{Binding KeyAndSignature}"/>
+                                                                <TextBlock Grid.Row="5" Classes="key" Text="Serial"/>
+                                                                <SelectableTextBlock Grid.Row="5" Grid.Column="1" Classes="val mono" Text="{Binding Serial}"/>
+                                                                <TextBlock Grid.Row="6" Classes="key" Text="SHA-256"/>
+                                                                <SelectableTextBlock Grid.Row="6" Grid.Column="1" Classes="val mono" Text="{Binding Sha256}"/>
+                                                                <TextBlock Grid.Row="7" Classes="key" Text="SHA-1"/>
+                                                                <SelectableTextBlock Grid.Row="7" Grid.Column="1" Classes="val mono" Text="{Binding Sha1}"/>
+                                                                <TextBlock Grid.Row="8" Classes="key" Text="Source"/>
+                                                                <SelectableTextBlock Grid.Row="8" Grid.Column="1" Classes="val" Text="{Binding Source}"/>
+                                                            </Grid>
+                                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                <Button Classes="secondary" Command="{Binding CopyPemCommand}" ToolTip.Tip="Copy this certificate as PEM">
+                                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                        <Path Classes="glyph" Data="{StaticResource TlIcoCopy}"/>
+                                                                        <TextBlock Text="PEM" VerticalAlignment="Center"/>
+                                                                    </StackPanel>
+                                                                </Button>
+                                                                <Button Classes="ghost" Command="{Binding CopyFingerprintCommand}" ToolTip.Tip="Copy the SHA-256 fingerprint">
+                                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                        <Path Classes="glyph" Data="{StaticResource TlIcoCopy}"/>
+                                                                        <TextBlock Text="SHA-256" VerticalAlignment="Center"/>
+                                                                    </StackPanel>
+                                                                </Button>
+                                                            </StackPanel>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Panel>
+            </Grid>
+        </TabItem>
+
+        <!-- ============================ BULK ============================ -->
+        <TabItem Header="Bulk check">
+            <Grid x:Name="BkRoot" helpers:Responsive.BreakWidth="640" ColumnDefinitions="Auto, *" RowDefinitions="Auto, *" Margin="0,12,0,0">
+                <Border x:Name="BkInput" Classes="card" Padding="12">
+                    <Grid RowDefinitions="Auto, *, Auto, Auto">
+                        <TextBlock Classes="fieldLabel" Text="Hosts"/>
+                        <TextBox x:Name="BkHosts" Grid.Row="1" Classes="field multiline mono" Text="{Binding BulkInput}"
+                                 ToolTip.Tip="One host, host:port or URL per line" AutomationProperties.Name="Hosts, one per line"
+                                 AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="96"
+                                 helpers:InputAssist.PasteMode="Lines" helpers:InputAssist.PasteButton="True"
+                                 PlaceholderText="example.com&#x0a;mail.example.com:587&#x0a;https://intranet.local:8443"
+                                 IsEnabled="{Binding IsBulkIdle}"/>
+                        <Button Grid.Row="2" Classes="toggle" Classes.active="{Binding IsBulkBusy}" HorizontalAlignment="Stretch"
+                                Margin="0,12,0,0" Command="{Binding RunBulkCommand}"
+                                ToolTip.Tip="One handshake per host, 8 at a time: expiry, issuer and whether the certificate is trusted">
+                            <TextBlock Text="{Binding BulkText}" HorizontalAlignment="Center"/>
+                        </Button>
+                        <TextBlock Grid.Row="3" Classes="bkError" Text="{Binding BulkError}" Margin="2,8,0,0"
+                                   IsVisible="{Binding BulkError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    </Grid>
+                </Border>
+
+                <Border x:Name="BkResults" Classes="card output">
+                    <Grid RowDefinitions="Auto, Auto, Auto, *">
+                        <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="12,8">
+                            <TextBlock Classes="hint" Text="{Binding BulkStatus}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                       MaxLines="2" Margin="0,0,8,0"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                <Button Classes="icon" Command="{Binding CopyBulkCommand}" IsEnabled="{Binding HasBulkRows}" ToolTip.Tip="Copy the table as CSV">
+                                    <Path Classes="glyph" Data="{StaticResource TlIcoCopy}"/>
+                                </Button>
+                                <Button Classes="icon" Click="OnExportClick" IsEnabled="{Binding HasBulkRows}" ToolTip.Tip="Export the table as a CSV file">
+                                    <Path Classes="glyph" Data="{StaticResource TlIcoSave}"/>
+                                </Button>
+                                <Button Classes="icon" Command="{Binding ClearBulkCommand}" IsEnabled="{Binding IsBulkIdle}" ToolTip.Tip="Clear the results">
+                                    <Path Classes="glyph" Data="{StaticResource TlIcoClear}"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                        <Border Grid.Row="1" Classes="divider"/>
+
+                        <!-- sortable column headers (wide) / a sort row (phone) -->
+                        <Panel Grid.Row="2" IsVisible="{Binding HasBulkRows}">
+                            <Panel Classes="colRow">
+                                <Grid ColumnDefinitions="1.4*, Auto, Auto, *, Auto" Margin="12,7">
+                                    <Button Grid.Column="0" Classes="colhead cHost" Content="Host" Command="{Binding SortByCommand}" CommandParameter="host" ToolTip.Tip="Sort by host"/>
+                                    <Button Grid.Column="1" Classes="colhead cExp" Content="Expires" Command="{Binding SortByCommand}" CommandParameter="days" ToolTip.Tip="Sort by expiry (soonest first)"/>
+                                    <Button Grid.Column="2" Classes="colhead cDays" Content="Days" Command="{Binding SortByCommand}" CommandParameter="days" ToolTip.Tip="Sort by days left"/>
+                                    <Button Grid.Column="3" Classes="colhead cIssuer" Content="Issuer" Command="{Binding SortByCommand}" CommandParameter="issuer" ToolTip.Tip="Sort by issuer"/>
+                                    <Button Grid.Column="4" Classes="colhead cStatus" Content="Status" Command="{Binding SortByCommand}" CommandParameter="status" ToolTip.Tip="Sort by status (problems first)"/>
+                                </Grid>
+                            </Panel>
+                            <StackPanel Classes="sortRow" Orientation="Horizontal" Spacing="16" Margin="12,8">
+                                <TextBlock Classes="hint" Text="Sort" VerticalAlignment="Center"/>
+                                <Button Classes="colhead" Content="Host" Command="{Binding SortByCommand}" CommandParameter="host"/>
+                                <Button Classes="colhead" Content="Expiry" Command="{Binding SortByCommand}" CommandParameter="days"/>
+                                <Button Classes="colhead" Content="Status" Command="{Binding SortByCommand}" CommandParameter="status"/>
+                            </StackPanel>
+                        </Panel>
+
+                        <Panel Grid.Row="3">
+                            <ListBox Classes="bk" ItemsSource="{Binding BulkRows}" Background="Transparent" BorderThickness="0" Padding="0">
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TlsBulkRow">
+                                        <Border Classes="bkRow" ToolTip.Tip="{Binding Detail}">
+                                            <Grid ColumnDefinitions="1.4*, Auto, Auto, *, Auto" RowDefinitions="Auto, Auto">
+                                                <TextBlock Grid.Column="0" Classes="cell host mono cHost" Text="{Binding Endpoint}"/>
+                                                <TextBlock Grid.Column="1" Classes="cell mono cExp" Text="{Binding ExpiresText}"/>
+                                                <TextBlock Grid.Column="2" Classes="cell mono cDays" Text="{Binding DaysText}"
+                                                           Classes.daysWarn="{Binding DaysWarn}" Classes.daysBad="{Binding DaysBad}"/>
+                                                <TextBlock Grid.Column="3" Classes="cell cIssuer" Text="{Binding Issuer}"/>
+                                                <Panel Grid.Column="4" Classes="cStatus">
+                                                    <Border Classes="badge status" Classes.success="{Binding IsOk}" Classes.warning="{Binding IsWarn}"
+                                                            Classes.danger="{Binding IsBad}">
+                                                        <TextBlock Text="{Binding StatusText}"/>
+                                                    </Border>
+                                                </Panel>
+                                                <TextBlock Classes="cell subline" Text="{Binding SubLine}" Foreground="{DynamicResource Text.Muted}"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <StackPanel Spacing="6" Margin="24" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        IsVisible="{Binding !HasBulkRows}" IsHitTestVisible="False">
+                                <Path Classes="emptyIcon" Data="{StaticResource IcoTls}"/>
+                                <TextBlock Text="No results yet" HorizontalAlignment="Center" FontSize="{StaticResource Font.Body}"
+                                           FontWeight="SemiBold" Foreground="{DynamicResource Text.Secondary}"/>
+                                <TextBlock Classes="hint" HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="320"
+                                           Text="Check many hosts: expiry, issuer and trust for each."/>
+                            </StackPanel>
+                        </Panel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </TabItem>
+    </TabControl>
+</UserControl>

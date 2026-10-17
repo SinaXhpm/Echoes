@@ -51,8 +51,11 @@ public sealed class CronExpression
             Fill(cron._dom, parts[2], 1, 31, null);
             Fill(cron._month, parts[3], 1, 12, MonthAbbr);
             FillDow(cron._dow, parts[4]);
-            cron._domRestricted = parts[2].Trim() != "*";
-            cron._dowRestricted = parts[4].Trim() != "*";
+            // Vixie / cronie decide "restricted" by the field's FIRST character: "*/2" counts as
+            // unrestricted just like "*", so "0 0 */2 * 1" means odd days that are Mondays (AND),
+            // not odd days OR Mondays. Only fields that don't start with '*' get the OR rule.
+            cron._domRestricted = !parts[2].StartsWith('*');
+            cron._dowRestricted = !parts[4].StartsWith('*');
         }
         catch (Exception ex) { cron.Error = ex.Message; }
         return cron;
@@ -98,7 +101,9 @@ public sealed class CronExpression
             }
             if (lo < min || hi > max || lo > hi)
                 throw new FormatException($"'{t}' out of range {min}-{max}.");
-            for (int v = lo; v <= hi; v += step) set[v] = true;
+            // long: an int v + a huge step ("59/2147483647") overflowed negative and surfaced as "Index was outside the
+            // bounds of the array" instead of simply ending the loop.
+            for (long v = lo; v <= hi; v += step) set[v] = true;
         }
     }
 
@@ -118,9 +123,10 @@ public sealed class CronExpression
         throw new FormatException($"'{s}' is not a valid value.");
     }
 
-    public bool Matches(DateTime dt)
+    public bool Matches(DateTime dt) => _min[dt.Minute] && _hour[dt.Hour] && _month[dt.Month] && DayMatches(dt);
+
+    private bool DayMatches(DateTime dt)
     {
-        if (!_min[dt.Minute] || !_hour[dt.Hour] || !_month[dt.Month]) return false;
         bool domOk = _dom[dt.Day];
         bool dowOk = _dow[(int)dt.DayOfWeek];
         // Vixie rule: when BOTH day fields are restricted, a match on EITHER counts.
@@ -138,8 +144,17 @@ public sealed class CronExpression
         var limit = t.AddYears(6);   // safety horizon
         while (t < limit && runs.Count < count)
         {
-            if (Matches(t)) runs.Add(t);
-            t = t.AddMinutes(1);
+            // When the month, day or hour can't match, no minute inside it can either: jump to the start
+            // of the next one. Same runs as testing every minute, which walked ~3 M minutes per keystroke
+            // for a yearly or impossible expression (≈50 ms desktop, 200 ms on a phone).
+            if (!_month[t.Month]) t = new DateTime(t.Year, t.Month, 1, 0, 0, 0, t.Kind).AddMonths(1);
+            else if (!DayMatches(t)) t = t.Date.AddDays(1);
+            else if (!_hour[t.Hour]) t = new DateTime(t.Year, t.Month, t.Day, t.Hour, 0, 0, t.Kind).AddHours(1);
+            else
+            {
+                if (_min[t.Minute]) runs.Add(t);
+                t = t.AddMinutes(1);
+            }
         }
         return runs;
     }
@@ -153,16 +168,21 @@ public sealed class CronExpression
         var clauses = new List<string> { time };
 
         string dow = DescribeDow(Fields[4]);
-        if (dow.Length > 0) clauses.Add(dow);
-
         string dom = DescribeDom(Fields[2]);
-        if (dom.Length > 0) clauses.Add(dom);
+        // Both day fields restricted → the OR rule: "30 4 1,15 * 5" runs on the 1st, the 15th AND every
+        // Friday. Listed as "on Friday, on day-of-month 1,15" it read as "Fridays that are the 1st/15th".
+        if (_domRestricted && _dowRestricted) clauses.Add($"{dom} or {dow}");
+        else
+        {
+            if (dow.Length > 0) clauses.Add(dow);
+            if (dom.Length > 0) clauses.Add(dom);
+        }
 
         string month = DescribeMonth(Fields[3]);
         if (month.Length > 0) clauses.Add(month);
 
         string s = string.Join(", ", clauses);
-        return char.ToUpper(s[0]) + s[1..] + ".";
+        return char.ToUpperInvariant(s[0]) + s[1..] + ".";
     }
 
     private static string DescribeTime(string min, string hour)

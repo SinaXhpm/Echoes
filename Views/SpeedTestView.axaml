@@ -1,0 +1,749 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
+             xmlns:ctl="using:Echoes.Views.Controls"
+             x:Class="Echoes.Views.SpeedTestView"
+             x:DataType="vm:SpeedTestViewModel"
+             x:CompileBindings="True">
+
+    <UserControl.Resources>
+        <StreamGeometry x:Key="StIcoGlobe">M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M3.5 12 H20.5 M12 3 C14.6 5.5 15.8 8.6 15.8 12 C15.8 15.4 14.6 18.5 12 21 M12 3 C9.4 5.5 8.2 8.6 8.2 12 C8.2 15.4 9.4 18.5 12 21</StreamGeometry>
+        <StreamGeometry x:Key="StIcoDown">M6.5 9.5 L12 15 L17.5 9.5</StreamGeometry>
+        <StreamGeometry x:Key="StIcoSearch">M10.5 4 A6.5 6.5 0 1 0 10.5 17 A6.5 6.5 0 1 0 10.5 4 Z M15.5 15.5 L20 20</StreamGeometry>
+        <StreamGeometry x:Key="StIcoClear">M7 7 L17 17 M17 7 L7 17</StreamGeometry>
+        <StreamGeometry x:Key="StIcoPlus">M12 5 V19 M5 12 H19</StreamGeometry>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- ===== gauge: colors are tokens; the upload phase draws in violet ===== -->
+        <Style Selector="ctl|SpeedGauge">
+            <Setter Property="TrackBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="ValueBrush" Value="{DynamicResource Accent}"/>
+            <Setter Property="KnobBrush" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="LabelBrush" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="Thickness" Value="10"/>
+            <Setter Property="LabelSize" Value="9.5"/>
+        </Style>
+        <Style Selector="ctl|SpeedGauge.upload">
+            <Setter Property="ValueBrush" Value="{DynamicResource Violet}"/>
+        </Style>
+        <Style Selector="TextBlock.bigNum">
+            <Setter Property="FontSize" Value="30"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Bright}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="LetterSpacing" Value="-0.5"/>
+        </Style>
+        <Style Selector="TextBlock.bigUnit">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.bigCaption">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.bigCaption.upload">
+            <Setter Property="Foreground" Value="{DynamicResource Violet}"/>
+        </Style>
+
+        <!-- ===== the setup row: server picker + connections ===== -->
+        <Style Selector="Button.destPick">
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="10,0,9,0"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource TextControlBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource TextControlBorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="FontSize" Value="{DynamicResource Font.Input}"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.destPick:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource TextControlBackgroundPointerOver}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource TextControlBorderBrushPointerOver}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.destPick:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource TextControlBackgroundPointerOver}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource TextControlBorderBrushFocused}"/>
+        </Style>
+        <Style Selector="Button.destPick:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource TextControlBackgroundDisabled}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource TextControlBorderBrushDisabled}"/>
+        </Style>
+        <Style Selector="Run.destMeta">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+        </Style>
+        <Style Selector="Path.chev">
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="12"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.8"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+        <Style Selector="Path.globe">
+            <Setter Property="Width" Value="15"/>
+            <Setter Property="Height" Value="15"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Image.flag">
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Height" Value="13"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="NumericUpDown#ConnBox"><Setter Property="Width" Value="64"/></Style>
+        <Style Selector="TextBlock.hint">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.hint.err">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+
+        <!-- ===== the picker (a flyout): search, grouped rows, add your own ===== -->
+        <Style Selector="Path.inIco">
+            <Setter Property="Width" Value="13"/>
+            <Setter Property="Height" Value="13"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.8"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="11,0,0,0"/>
+        </Style>
+        <Style Selector="Button.clear">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Margin" Value="0,0,3,0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.clear:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedHover}"/>
+        </Style>
+        <Style Selector="Button.clear Path">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Height" Value="10"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.8"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="TextBlock.pickTitle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="TextBlock.pickHead">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="Margin" Value="4,10,0,3"/>
+        </Style>
+        <Style Selector="Button.destRow">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.destRow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        </Style>
+        <Style Selector="Button.destRow.on">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        </Style>
+        <Style Selector="Button.destRow.on:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent.SoftHover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        </Style>
+        <Style Selector="TextBlock.pickLoc">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Button.destRow.on TextBlock.pickLoc">
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="TextBlock.pickMeta">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Button.rowX">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Margin" Value="2,0,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.rowX Path">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Height" Value="10"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.8"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+        </Style>
+        <Style Selector="Path.btnIco">
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="12"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.9"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ===== phase steps: a caption over a thin bar each ===== -->
+        <Style Selector="TextBlock.stepCap">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.stepCap.on">
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="ProgressBar.step">
+            <Setter Property="Height" Value="4"/>
+            <Setter Property="MinHeight" Value="4"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="CornerRadius" Value="2"/>
+            <Setter Property="Minimum" Value="0"/>
+            <Setter Property="Maximum" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+            <Setter Property="Background" Value="{DynamicResource Border.Default}"/>
+        </Style>
+        <Style Selector="ProgressBar.step.upload">
+            <Setter Property="Foreground" Value="{DynamicResource Violet}"/>
+        </Style>
+
+        <!-- ===== figure tiles ===== -->
+        <Style Selector="Border.tile">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Padding" Value="12,8"/>
+        </Style>
+        <Style Selector="TextBlock.tileCap">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="TextBlock.tileVal">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="TextBlock.tileVal.down"><Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/></Style>
+        <Style Selector="TextBlock.tileVal.up"><Setter Property="Foreground" Value="{DynamicResource Violet}"/></Style>
+        <Style Selector="TextBlock.tileVal.na"><Setter Property="Foreground" Value="{DynamicResource Text.Disabled}"/></Style>
+        <!-- a server without uploads: "n/a" in a slim tile (the note under the tiles says why), the reason itself in a phone's wider one -->
+        <Style Selector="TextBlock.naBig, TextBlock.naText, TextBlock#UploadNaNote"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="TextBlock.naText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,1,0,0"/>
+        </Style>
+        <Style Selector="Grid#StRoot.wide TextBlock.naBig.on, Grid#StRoot.wide TextBlock#UploadNaNote.on, Grid#StRoot.narrow TextBlock.naText.on">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="TextBlock.tileUnit">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+
+        <!-- ===== key / value lines (loaded latency, server, client) ===== -->
+        <Style Selector="TextBlock.k">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.v">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.status">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Border.errorBanner">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Padding" Value="12,8"/>
+        </Style>
+        <Style Selector="Border.errorBanner > TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="Border.grade">
+            <Setter Property="Margin" Value="10,0,0,0"/>
+            <Setter Property="Padding" Value="7,1"/>
+        </Style>
+
+        <!-- ===== history table ===== -->
+        <Style Selector="ListBox#HistList">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0,4"/>
+        </Style>
+        <Style Selector="ListBox#HistList ListBoxItem">
+            <Setter Property="Padding" Value="12,4"/>
+            <Setter Property="Margin" Value="4,0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="ListBox#HistList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+        </Style>
+        <Style Selector="Grid.hrow TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Grid.hrow TextBlock:not(.head)">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+        </Style>
+        <Style Selector="Grid.hrow > TextBlock.num">
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="Width" Value="76"/>
+        </Style>
+        <Style Selector="Grid.hrow > TextBlock.cDate"><Setter Property="Width" Value="128"/></Style>
+        <Style Selector="Grid.hrow > TextBlock.cDown:not(.head)"><Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/></Style>
+        <Style Selector="Grid.hrow > TextBlock.cUp:not(.head)"><Setter Property="Foreground" Value="{DynamicResource Violet}"/></Style>
+        <Style Selector="Grid.hrow > TextBlock.cServer">
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="20,0,0,0"/>
+        </Style>
+        <Style Selector="Grid.hrow > TextBlock.head">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+
+        <!-- ===== wide: [gauge | figures] in the card, a one-line history table ===== -->
+        <Style Selector="Grid#StRoot.wide StackPanel#GaugeCol">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/>
+        </Style>
+        <Style Selector="Panel#GaugeBox"><Setter Property="Width" Value="216"/><Setter Property="Height" Value="164"/></Style>
+        <Style Selector="StackPanel#GaugeNumber"><Setter Property="Margin" Value="0,62,0,0"/></Style>
+        <Style Selector="Grid#StRoot.wide Button#StartBtn"><Setter Property="HorizontalAlignment" Value="Center"/></Style>
+        <Style Selector="Grid#StRoot.wide Button#CopyNarrow"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#StRoot.wide StackPanel#FigCol">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Margin" Value="20,0,0,0"/>
+            <Setter Property="Spacing" Value="12"/>
+        </Style>
+        <Style Selector="Grid#StRoot.wide Border.t2"><Setter Property="Grid.Column" Value="1"/></Style>
+        <Style Selector="Grid#StRoot.wide Border.t3"><Setter Property="Grid.Column" Value="2"/></Style>
+        <Style Selector="Grid#StRoot.wide Border.t4"><Setter Property="Grid.Column" Value="3"/></Style>
+        <Style Selector="Grid#StRoot.wide Grid.hrow > TextBlock.cMeta"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#StRoot.wide Grid.hrow > TextBlock.cPing"><Setter Property="Grid.Column" Value="3"/></Style>
+        <Style Selector="Grid#StRoot.wide Grid.hrow > TextBlock.cJit"><Setter Property="Grid.Column" Value="4"/></Style>
+        <Style Selector="Grid#StRoot.wide Grid.hrow > TextBlock.cServer"><Setter Property="Grid.Column" Value="5"/></Style>
+        <Style Selector="Grid#StRoot.wide TextBlock#ConnHint"><Setter Property="TextAlignment" Value="Right"/></Style>
+
+        <!-- ===== narrow (a phone, a slim window): the gauge on top, tiles two by two, two-line history rows ===== -->
+        <Style Selector="Grid#StRoot.narrow StackPanel#GaugeCol">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#StRoot.narrow Panel#GaugeBox"><Setter Property="Width" Value="180"/><Setter Property="Height" Value="136"/></Style>
+        <Style Selector="Grid#StRoot.narrow StackPanel#GaugeNumber"><Setter Property="Margin" Value="0,47,0,0"/></Style>
+        <Style Selector="Grid#StRoot.narrow Button#StartBtn"><Setter Property="HorizontalAlignment" Value="Stretch"/></Style>
+        <Style Selector="Grid#StRoot.narrow Button#CopyWide"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#StRoot.narrow Grid#StatusRow.empty"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#StRoot.narrow Border.tile"><Setter Property="Padding" Value="10,4"/></Style>
+        <Style Selector="Grid#StRoot.narrow TextBlock.tileVal"><Setter Property="FontSize" Value="17"/></Style>
+        <Style Selector="Grid#StRoot.narrow StackPanel#FigCol">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+            <Setter Property="Spacing" Value="8"/>
+        </Style>
+        <Style Selector="Grid#StRoot.narrow Border.t2"><Setter Property="Grid.Column" Value="2"/></Style>
+        <Style Selector="Grid#StRoot.narrow Border.t3"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Margin" Value="0,8,0,0"/></Style>
+        <Style Selector="Grid#StRoot.narrow Border.t4"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Margin" Value="0,8,0,0"/></Style>
+        <Style Selector="Grid#StRoot.narrow Border.tile"><Setter Property="Grid.ColumnSpan" Value="2"/></Style>
+        <Style Selector="Grid#StRoot.narrow Grid#HistHead, Grid#StRoot.narrow Border#HistHeadRule"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#StRoot.narrow Grid.hrow > TextBlock.cPing, Grid#StRoot.narrow Grid.hrow > TextBlock.cJit, Grid#StRoot.narrow Grid.hrow > TextBlock.cServer">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#StRoot.narrow Grid.hrow > TextBlock.cMeta">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="6"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid x:Name="StRoot" RowDefinitions="Auto, Auto, *" RowSpacing="10" helpers:Responsive.BreakWidth="640">
+
+        <!-- ===== where to test, over how many connections ===== -->
+        <Grid Grid.Row="0" x:Name="SetupRow" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="10">
+            <TextBlock Classes="fieldLabel" Text="Server"/>
+            <Button Grid.Row="1" x:Name="DestBtn" Classes="destPick" IsEnabled="{Binding CanEditSetup}"
+                    ToolTip.Tip="{Binding DestTip}" AutomationProperties.Name="Server">
+                <Grid ColumnDefinitions="Auto, *, Auto">
+                    <Panel Width="18" Margin="0,0,9,0" VerticalAlignment="Center">
+                        <Image Classes="flag" IsVisible="{Binding DestHasFlag}"
+                               Source="{Binding DestCountryCode, Converter={x:Static helpers:CountryFlagConverter.Instance}}"/>
+                        <Path Classes="globe" Data="{StaticResource StIcoGlobe}" IsVisible="{Binding !DestHasFlag}"/>
+                    </Panel>
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                        <Run Text="{Binding DestTitle}"/><Run Text="   "/><Run Classes="destMeta" Text="{Binding DestMeta}"/>
+                    </TextBlock>
+                    <Path Grid.Column="2" Classes="chev" Data="{StaticResource StIcoDown}"/>
+                </Grid>
+                <Button.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedLeft" Opened="DestFlyout_Opened" Closed="DestFlyout_Closed">
+                        <Panel x:Name="PickPanel" Width="360">
+                            <!-- the list: search, the groups, add your own -->
+                            <Grid IsVisible="{Binding IsListing}" RowDefinitions="Auto, Auto, Auto">
+                                <TextBox x:Name="PickSearch" Classes="field" Text="{Binding PickFilter}" Padding="6,0,4,0"
+                                         PlaceholderText="Search: city, country or provider" AutomationProperties.Name="Search servers">
+                                    <TextBox.InnerLeftContent>
+                                        <Path Classes="inIco" Data="{StaticResource StIcoSearch}"/>
+                                    </TextBox.InnerLeftContent>
+                                    <TextBox.InnerRightContent>
+                                        <Button Classes="clear" Command="{Binding ClearPickFilterCommand}" ToolTip.Tip="Clear"
+                                                IsVisible="{Binding PickFilter, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                            <Path Data="{StaticResource StIcoClear}"/>
+                                        </Button>
+                                    </TextBox.InnerRightContent>
+                                </TextBox>
+                                <ScrollViewer Grid.Row="1" x:Name="PickScroll" Height="300" Margin="0,4,0,0"
+                                              HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl ItemsSource="{Binding PickItems}" Margin="0,0,8,0">
+                                        <ItemsControl.DataTemplates>
+                                            <DataTemplate DataType="vm:SpeedPickHeader">
+                                                <TextBlock Classes="pickHead" Text="{Binding Text}"/>
+                                            </DataTemplate>
+                                            <DataTemplate DataType="vm:SpeedPickNote">
+                                                <TextBlock Classes="hint" Classes.err="{Binding IsError}" Text="{Binding Text}"
+                                                           TextWrapping="Wrap" Margin="4,2,0,4"/>
+                                            </DataTemplate>
+                                            <DataTemplate DataType="vm:SpeedPickRow">
+                                                <Grid ColumnDefinitions="*, Auto">
+                                                    <Button Classes="destRow" Classes.on="{Binding IsSelected}" Command="{Binding PickCommand}"
+                                                            ToolTip.Tip="{Binding Tip}">
+                                                        <Grid ColumnDefinitions="Auto, *">
+                                                            <Panel Width="18" Margin="0,0,10,0" VerticalAlignment="Center">
+                                                                <Image Classes="flag" IsVisible="{Binding HasFlag}"
+                                                                       Source="{Binding CountryCode, Converter={x:Static helpers:CountryFlagConverter.Instance}}"/>
+                                                                <Path Classes="globe" Data="{StaticResource StIcoGlobe}" IsVisible="{Binding NoFlag}"/>
+                                                            </Panel>
+                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                <TextBlock Classes="pickLoc" Text="{Binding Title}"/>
+                                                                <TextBlock Classes="pickMeta" Text="{Binding Meta}"/>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Button>
+                                                    <Button Grid.Column="1" Classes="icon rowX" IsVisible="{Binding CanRemove}"
+                                                            Command="{Binding RemoveCommand}" ToolTip.Tip="Remove from the saved destinations">
+                                                        <Path Data="{StaticResource StIcoClear}"/>
+                                                    </Button>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.DataTemplates>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                                <Grid Grid.Row="2" ColumnDefinitions="*, Auto" ColumnSpacing="10" Margin="0,8,0,0">
+                                    <TextBlock Classes="hint" VerticalAlignment="Center" Text="File hosts: download only."
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip.Tip="A plain test file can't take uploads: Cloudflare and Tele2 measure upload too"/>
+                                    <Button Grid.Column="1" Classes="secondary" Command="{Binding AddDestinationCommand}" VerticalAlignment="Center"
+                                            ToolTip.Tip="Test against your own server: a big file, or a LibreSpeed, Speedtest or Cloudflare-style server">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Path Classes="btnIco" Data="{StaticResource StIcoPlus}"/>
+                                            <TextBlock Text="Add your own" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </Grid>
+
+                            <!-- add a destination -->
+                            <StackPanel x:Name="EditPanel" IsVisible="{Binding IsEditing}" Spacing="10">
+                                <TextBlock Classes="pickTitle" Text="Add a destination"/>
+                                <StackPanel>
+                                    <TextBlock Classes="fieldLabel" Text="Address"/>
+                                    <TextBox x:Name="EditAddressBox" Classes="field mono" Text="{Binding EditAddress}" AutomationProperties.Name="Address"
+                                             PlaceholderText="A big file or a server"
+                                             ToolTip.Tip="The URL of a big file (like https://example.com/1GB.bin), or of a LibreSpeed, Speedtest or Cloudflare-style server">
+                                        <TextBox.KeyBindings>
+                                            <KeyBinding Gesture="Enter" Command="{Binding SaveDestinationCommand}"/>
+                                        </TextBox.KeyBindings>
+                                    </TextBox>
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Classes="fieldLabel" Text="Upload URL"/>
+                                    <TextBox Classes="field mono" Text="{Binding EditUpload}" AutomationProperties.Name="Upload URL"
+                                             PlaceholderText="Optional: where uploads go (POST)"
+                                             ToolTip.Tip="For a file: the URL that takes uploads (an HTTP POST). Servers bring their own.">
+                                        <TextBox.KeyBindings>
+                                            <KeyBinding Gesture="Enter" Command="{Binding SaveDestinationCommand}"/>
+                                        </TextBox.KeyBindings>
+                                    </TextBox>
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Classes="fieldLabel" Text="Name"/>
+                                    <TextBox Classes="field" Text="{Binding EditName}" MaxLength="60" AutomationProperties.Name="Name"
+                                             PlaceholderText="Optional">
+                                        <TextBox.KeyBindings>
+                                            <KeyBinding Gesture="Enter" Command="{Binding SaveDestinationCommand}"/>
+                                        </TextBox.KeyBindings>
+                                    </TextBox>
+                                </StackPanel>
+                                <TextBlock Classes="hint" Text="{Binding EditDetected}" IsVisible="{Binding HasEditDetected}"/>
+                                <Border Classes="errorBanner" IsVisible="{Binding HasEditError}">
+                                    <TextBlock Text="{Binding EditError}"/>
+                                </Border>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                                    <Button Classes="ghost" Content="Cancel" Command="{Binding CancelEditCommand}"/>
+                                    <Button Classes="primary" Content="Add" MinWidth="72" Command="{Binding SaveDestinationCommand}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Panel>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+
+            <TextBlock Grid.Column="1" Classes="fieldLabel" Text="Connections"/>
+            <NumericUpDown Grid.Row="1" Grid.Column="1" x:Name="ConnBox" Classes="field" Value="{Binding Connections}"
+                           Minimum="1" Maximum="16" Increment="1" FormatString="0" ShowButtonSpinner="False"
+                           HorizontalContentAlignment="Center" IsEnabled="{Binding CanEditSetup}"
+                           AutomationProperties.Name="Parallel connections"
+                           ToolTip.Tip="{Binding ConnectionsTip}"/>
+            <TextBlock Grid.Row="2" Grid.ColumnSpan="2" x:Name="ConnHint" Classes="hint" Margin="2,4,0,0" Text="{Binding ConnectionsHint}"
+                       ToolTip.Tip="{Binding ConnectionsTip}"/>
+        </Grid>
+
+        <!-- ===== the test: gauge + Start / Stop, then the figures ===== -->
+        <Border Grid.Row="1" x:Name="TestCard" Classes="card" Padding="12">
+            <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
+
+                <StackPanel x:Name="GaugeCol" Spacing="10" VerticalAlignment="Center">
+                    <Panel x:Name="GaugeBox" HorizontalAlignment="Center">
+                        <ctl:SpeedGauge Value="{Binding GaugeValue}" Maximum="{Binding GaugeMax}" Classes.upload="{Binding GaugeIsUpload}"
+                                        AutomationProperties.Name="Speed"/>
+                        <StackPanel x:Name="GaugeNumber" VerticalAlignment="Top" HorizontalAlignment="Center" Spacing="0">
+                            <TextBlock Classes="bigNum" Text="{Binding BigNumber}"/>
+                            <TextBlock Classes="bigUnit" Text="{Binding BigUnit}"/>
+                        </StackPanel>
+                        <TextBlock Classes="bigCaption" Classes.upload="{Binding GaugeIsUpload}" Text="{Binding BigCaption}"
+                                   VerticalAlignment="Bottom" Margin="0,0,0,2"/>
+                    </Panel>
+                    <!-- Start / Stop; on a phone "Copy result" sits beside it (saves the status row's height) -->
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                        <Button x:Name="StartBtn" Classes="toggle" Classes.active="{Binding IsRunning}" Command="{Binding ToggleCommand}"
+                                MinWidth="148" ToolTip.Tip="Measure latency, then download and upload (about 25 seconds)">
+                            <Panel>
+                                <TextBlock Text="Start" IsVisible="{Binding !IsRunning}"/>
+                                <TextBlock Text="Stop" IsVisible="{Binding IsRunning}"/>
+                            </Panel>
+                        </Button>
+                        <Button x:Name="CopyNarrow" Grid.Column="1" Classes="secondary" Content="Copy result" Command="{Binding CopyResultCommand}"
+                                IsEnabled="{Binding HasResult}" ToolTip.Tip="Copy the result as text"/>
+                    </Grid>
+                </StackPanel>
+
+                <StackPanel x:Name="FigCol" VerticalAlignment="Center">
+                    <!-- where the run is: latency → download → upload -->
+                    <Grid ColumnDefinitions="*, *, *" ColumnSpacing="12">
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Classes="stepCap" Classes.on="{Binding LatencyStepOn}" Text="Latency"/>
+                            <ProgressBar Classes="step" Value="{Binding PingProgress}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Classes="stepCap" Classes.on="{Binding DownloadStepOn}" Text="Download"/>
+                            <ProgressBar Classes="step" Value="{Binding DownloadProgress}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" ToolTip.Tip="{Binding UploadTip}">
+                            <TextBlock Classes="stepCap" Classes.on="{Binding UploadStepOn}" Text="{Binding UploadStepCaption}"/>
+                            <ProgressBar Classes="step upload" Value="{Binding UploadProgress}"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- the figures: four across, or two by two -->
+                    <Grid ColumnDefinitions="*, *, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="8">
+                        <Border Classes="tile t1">
+                            <StackPanel Spacing="1">
+                                <TextBlock Classes="tileCap" Text="Download"/>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="tileVal down" Text="{Binding DownloadText}"/>
+                                    <TextBlock Classes="tileUnit" Text="Mbps"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Classes="tile t2" ToolTip.Tip="{Binding UploadTip}">
+                            <StackPanel Spacing="1">
+                                <TextBlock Classes="tileCap" Text="Upload"/>
+                                <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding UploadHasValue}">
+                                    <TextBlock Classes="tileVal up" Text="{Binding UploadText}"/>
+                                    <TextBlock Classes="tileUnit" Text="Mbps"/>
+                                </StackPanel>
+                                <TextBlock Classes="tileVal na naBig" Classes.on="{Binding UploadNa}" Text="n/a"/>
+                                <TextBlock Classes="naText" Classes.on="{Binding UploadNa}" Text="Not supported by this server"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Classes="tile t3" ToolTip.Tip="Idle latency: the median round trip to the test server">
+                            <StackPanel Spacing="1">
+                                <TextBlock Classes="tileCap" Text="Ping"/>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="tileVal" Text="{Binding PingText}"/>
+                                    <TextBlock Classes="tileUnit" Text="ms"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Classes="tile t4" ToolTip.Tip="How much the round trips vary from one to the next">
+                            <StackPanel Spacing="1">
+                                <TextBlock Classes="tileCap" Text="Jitter"/>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Classes="tileVal" Text="{Binding JitterText}"/>
+                                    <TextBlock Classes="tileUnit" Text="ms"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <TextBlock x:Name="UploadNaNote" Classes="hint" Classes.on="{Binding UploadNa}" Margin="2,-4,0,0"
+                               Text="Upload: not supported by this server."/>
+
+                    <!-- latency under load, server, client -->
+                    <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="14" RowSpacing="5">
+                        <TextBlock Grid.Row="0" Classes="k" Text="Loaded latency"/>
+                        <WrapPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" LineSpacing="4"
+                                   ToolTip.Tip="Latency while the download / upload runs: how much a busy link slows everything else (bufferbloat)">
+                            <TextBlock Classes="v">
+                                <Run Text="download "/><Run Text="{Binding LoadedDownText}"/><Run Text=" · upload "/><Run Text="{Binding LoadedUpText}"/>
+                            </TextBlock>
+                            <Border Classes="badge grade" Classes.success="{Binding GradeGood}" Classes.warning="{Binding GradeFair}"
+                                    Classes.danger="{Binding GradePoor}"
+                                    IsVisible="{Binding HasGrade}" ToolTip.Tip="{Binding GradeTip}">
+                                <TextBlock>
+                                    <Run Text="Bufferbloat "/><Run Text="{Binding Grade}"/>
+                                </TextBlock>
+                            </Border>
+                        </WrapPanel>
+                        <TextBlock Grid.Row="1" Classes="k" Text="Server"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="v" Text="{Binding ServerText}" ToolTip.Tip="{Binding ServerText}"/>
+                        <TextBlock Grid.Row="2" Classes="k" Text="Client"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="v" Text="{Binding ClientText}"
+                                   ToolTip.Tip="This connection as the server sees it (Cloudflare tells; the other servers don't)"/>
+                    </Grid>
+
+                    <!-- status + copy; one error, saying why, when the test can't run -->
+                    <Grid x:Name="StatusRow" ColumnDefinitions="*, Auto" ColumnSpacing="8" Classes.empty="{Binding !HasStatus}">
+                        <TextBlock Classes="status" Text="{Binding Status}" ToolTip.Tip="{Binding Status}"/>
+                        <Button x:Name="CopyWide" Grid.Column="1" Classes="ghost" Content="Copy result" Command="{Binding CopyResultCommand}"
+                                IsEnabled="{Binding HasResult}" ToolTip.Tip="Copy the result as text"/>
+                    </Grid>
+                    <Border Classes="errorBanner" IsVisible="{Binding HasError}">
+                        <TextBlock Text="{Binding Error}"/>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ===== history (newest first, the last 20) ===== -->
+        <Border Grid.Row="2" x:Name="HistCard" Classes="card output">
+            <Grid RowDefinitions="Auto, Auto, Auto, Auto, *">
+                <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="16,8,8,8">
+                    <TextBlock Classes="cardHeader" Text="History" Margin="0" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Classes="ghost" Content="Clear" Command="{Binding ClearHistoryCommand}"
+                            IsVisible="{Binding HasHistory}" ToolTip.Tip="Forget the saved results"/>
+                </Grid>
+                <Border Grid.Row="1" Classes="divider"/>
+
+                <Grid Grid.Row="2" x:Name="HistHead" Classes="hrow" Margin="16,6,16,6" ColumnDefinitions="Auto, Auto, Auto, Auto, Auto, *">
+                    <TextBlock Classes="head cDate" Text="Date"/>
+                    <TextBlock Grid.Column="1" Classes="head num cDown" Text="Download"/>
+                    <TextBlock Grid.Column="2" Classes="head num cUp" Text="Upload"/>
+                    <TextBlock Classes="head num cPing" Text="Ping"/>
+                    <TextBlock Classes="head num cJit" Text="Jitter"/>
+                    <TextBlock Classes="head cServer" Text="Server"/>
+                </Grid>
+                <Border Grid.Row="3" x:Name="HistHeadRule" Classes="divider"/>
+
+                <Panel Grid.Row="4">
+                    <ListBox x:Name="HistList" ItemsSource="{Binding History}">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel/>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SpeedHistoryRow">
+                                <Grid Classes="hrow" ColumnDefinitions="Auto, Auto, Auto, Auto, Auto, *" RowDefinitions="Auto, Auto"
+                                      Background="Transparent" ToolTip.Tip="{Binding Tip}">
+                                    <TextBlock Classes="cDate" Text="{Binding DateText}"/>
+                                    <TextBlock Grid.Column="1" Classes="num cDown" Text="{Binding DownloadText}"/>
+                                    <TextBlock Grid.Column="2" Classes="num cUp" Text="{Binding UploadText}"/>
+                                    <TextBlock Classes="num cPing" Text="{Binding PingText}"/>
+                                    <TextBlock Classes="num cJit" Text="{Binding JitterText}"/>
+                                    <TextBlock Classes="cServer">
+                                        <Run Text="{Binding ServerText}"/><Run Text="  "/><Run Text="{Binding IspText}" Foreground="{DynamicResource Text.Muted}"/>
+                                    </TextBlock>
+                                    <TextBlock Classes="cMeta">
+                                        <Run Text="ping "/><Run Text="{Binding PingText}"/><Run Text=" ms · jitter "/><Run Text="{Binding JitterText}"/><Run Text=" ms · "/><Run Text="{Binding ServerText}"/>
+                                    </TextBlock>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <TextBlock Classes="muted" IsHitTestVisible="False" IsVisible="{Binding !HasHistory}"
+                               Text="Finished tests show up here (the last 20)."
+                               HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                               TextWrapping="Wrap" MaxWidth="360" Margin="24"/>
+                </Panel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

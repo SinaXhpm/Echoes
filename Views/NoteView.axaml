@@ -1,138 +1,446 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.NoteView"
              x:DataType="vm:NoteViewModel">
 
-    <Grid Margin="8">
-        <!-- MaxWidth (not fixed Width) so the unlock card shrinks to fit a narrow phone screen. -->
-        <Border IsVisible="{Binding IsLocked}" VerticalAlignment="Center" HorizontalAlignment="Stretch"
-                MaxWidth="300" Padding="20" Background="#191A1F" CornerRadius="8" BorderBrush="#2F3139" BorderThickness="1">
-            <StackPanel Spacing="12">
-                <TextBlock Text="ENCRYPTED STORAGE" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#ECECEF"/>
-                <TextBox Classes="field" Text="{Binding MasterKey}" PasswordChar="*" PlaceholderText="Master Key...">
-                    <TextBox.KeyBindings>
-                        <KeyBinding Command="{Binding UnlockCommand}" Gesture="Enter"/>
-                    </TextBox.KeyBindings>
-                </TextBox>
-                <Button Classes="primary" Command="{Binding UnlockCommand}" Content="UNLOCK"
-                        HorizontalAlignment="Stretch"/>
-                <TextBlock Text="{Binding ErrorMessage}" Foreground="#E5484D" FontSize="10" HorizontalAlignment="Center"/>
-            </StackPanel>
-        </Border>
+    <UserControl.Resources>
+        <!-- Stroked glyphs drawn in a 16x16 box (Path.glyph), plus the 24px lock for the unlock card. -->
+        <StreamGeometry x:Key="NoteGlyphSearch">M7 2.5 A4.5 4.5 0 1 0 7 11.5 A4.5 4.5 0 1 0 7 2.5 Z M10.3 10.3 L13.5 13.5</StreamGeometry>
+        <StreamGeometry x:Key="NoteGlyphPlus">M8 3 V13 M3 8 H13</StreamGeometry>
+        <StreamGeometry x:Key="NoteGlyphLock">M4.5 7 H11.5 A1 1 0 0 1 12.5 8 V12.5 A1 1 0 0 1 11.5 13.5 H4.5 A1 1 0 0 1 3.5 12.5 V8 A1 1 0 0 1 4.5 7 Z M5.5 7 V5 A2.5 2.5 0 0 1 10.5 5 V7</StreamGeometry>
+        <StreamGeometry x:Key="NoteGlyphCheck">M3.5 8.5 L6.5 11.5 L12.5 4.5</StreamGeometry>
+        <StreamGeometry x:Key="NoteGlyphTrash">M2.5 4.5 H13.5 M6.5 4.5 V2.75 H9.5 V4.5 M4 4.5 L4.7 12.6 A1 1 0 0 0 5.7 13.5 H10.3 A1 1 0 0 0 11.3 12.6 L12 4.5 M6.75 7 V11 M9.25 7 V11</StreamGeometry>
+        <StreamGeometry x:Key="NoteHeroLock">M7.5 10.5 H16.5 A2 2 0 0 1 18.5 12.5 V18 A2 2 0 0 1 16.5 20 H7.5 A2 2 0 0 1 5.5 18 V12.5 A2 2 0 0 1 7.5 10.5 Z M8.5 10.5 V7.5 A3.5 3.5 0 0 1 15.5 7.5 V10.5 M12 14 V16.5</StreamGeometry>
+    </UserControl.Resources>
 
-        <Grid IsVisible="{Binding !IsLocked}">
-            <Grid RowDefinitions="Auto, Auto, *" IsVisible="{Binding !IsEditing}">
-                <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto, Auto" Margin="0,0,0,8">
-                    <TextBlock Grid.Column="0" Text="NOTES" FontSize="14" FontWeight="Bold" Foreground="#ECECEF" VerticalAlignment="Center"/>
-                    <TextBlock Grid.Column="1" Text="{Binding FilteredNotes.Count, StringFormat='{}{0} item(s)'}" FontSize="10"
-                               Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <Button Grid.Column="2" Command="{Binding LockAppCommand}" Content="LOCK" Background="#E5484D"
-                            Foreground="#ECECEF" FontSize="10" FontWeight="Bold" Padding="10,5" Margin="0,0,8,0"/>
-                    <Button Grid.Column="3" Command="{Binding AddNoteCommand}" Content="+ NEW" Background="#42B883"
-                            Foreground="#0F1012" FontWeight="Bold" FontSize="10" Padding="10,5"/>
+    <UserControl.Styles>
+        <!-- ===== glyphs ===== -->
+        <Style Selector="Path.glyph">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.primary Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.OnAccent}"/>
+        </Style>
+        <Style Selector="Button.primary:disabled Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.OnAccentDisabled}"/>
+        </Style>
+        <Style Selector="Button.secondary Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <!-- 48px icon tile at the top of the unlock card and the empty editor -->
+        <Style Selector="Border.hero">
+            <Setter Property="Width" Value="48"/>
+            <Setter Property="Height" Value="48"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Lg}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.hero.accent">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        </Style>
+        <Style Selector="Border.hero > Path">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.hero.accent > Path">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+
+        <!-- ===== note list =====
+             A ListBox only so the open note (SelectedNote) shows as selected; the containers draw nothing
+             themselves, the card inside does. Cards stay light: one border, three text lines, two buttons. -->
+        <Style Selector="ListBox.notes">
+            <Setter Property="Background" Value="{DynamicResource Bg.App}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="ListBox.notes > ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="ListBox.notes > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.notes > ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.notes > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.notes > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.notes > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.notes > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+
+        <!-- the whole card is one button (open); it draws no fill of its own -->
+        <Style Selector="Button.noteOpen">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.noteOpen:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                         Button.noteOpen:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Border.noteCard">
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="14,11,40,12"/>
+        </Style>
+        <Style Selector="ListBox.notes > ListBoxItem:pointerover Border.noteCard">
+            <Setter Property="Background" Value="{DynamicResource Bg.CardHover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+        </Style>
+        <Style Selector="ListBox.notes > ListBoxItem:selected Border.noteCard">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        </Style>
+        <Style Selector="ListBox.notes > ListBoxItem:selected:pointerover Border.noteCard">
+            <Setter Property="Background" Value="{DynamicResource Accent.SoftHover}"/>
+        </Style>
+        <Style Selector="TextBlock.noteTitle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.notePreview">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="MaxLines" Value="2"/>
+        </Style>
+        <Style Selector="TextBlock.noteEmpty">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontStyle" Value="Italic"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+
+        <!-- delete: a quiet icon in the card corner, red on hover (always shown: touch has no hover) -->
+        <Style Selector="Button.cardAction">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,7,7,0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.cardAction Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Button.cardAction:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+        </Style>
+        <Style Selector="Button.cardAction:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Danger.Border}"/>
+        </Style>
+        <Style Selector="Button.cardAction:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+        </Style>
+
+        <!-- inline delete confirmation: a solid danger-tinted face over the card -->
+        <Style Selector="Border.confirm">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="14,8,8,8"/>
+        </Style>
+        <Style Selector="Border.confirm Button">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="12,0"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <!-- ===== Locked: a centred unlock card ===== -->
+        <ScrollViewer IsVisible="{Binding IsLocked}"
+                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <!-- MaxWidth (not a fixed Width): centred on desktop, shrinks to fit a phone. -->
+            <Border Classes="card" MaxWidth="400" Padding="24,28,24,24" Margin="0,8"
+                    HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                <StackPanel>
+                    <Border Classes="hero accent">
+                        <Path Classes="ico" Data="{StaticResource NoteHeroLock}"/>
+                    </Border>
+                    <TextBlock Classes="sectionTitle" Text="Your notes are locked"
+                               HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,12,0,0"/>
+                    <TextBlock Text="Enter your master key to open them."
+                               FontSize="{StaticResource Font.Body}" Foreground="{DynamicResource Text.Secondary}"
+                               HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0"/>
+
+                    <TextBlock Classes="fieldLabel" Text="Master key" Margin="2,22,0,6"/>
+                    <TextBox Classes="field" Text="{Binding MasterKey}" IsUndoEnabled="False" PasswordChar="●" PlaceholderText="Master key">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Command="{Binding UnlockCommand}" Gesture="Enter"/>
+                        </TextBox.KeyBindings>
+                    </TextBox>
+
+                    <Border IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                            Margin="0,10,0,0" Padding="12,8" CornerRadius="{StaticResource Radius.Md}" BorderThickness="1"
+                            Background="{DynamicResource Danger.Soft}" BorderBrush="{DynamicResource Danger.Border}">
+                        <TextBlock Text="{Binding ErrorMessage}" FontSize="{StaticResource Font.Small}"
+                                   Foreground="{DynamicResource Danger}" TextWrapping="Wrap"/>
+                    </Border>
+
+                    <!-- The label comes from the view-model: it switches to "unlocking" (and the command disables
+                         the button) while the key is derived off the UI thread. -->
+                    <Button Classes="primary" Command="{Binding UnlockCommand}" Content="{Binding UnlockLabel}"
+                            HorizontalAlignment="Stretch" Margin="0,12,0,0"/>
+
+                    <Border Classes="divider" Margin="0,22,0,14"/>
+                    <TextBlock Classes="muted" FontSize="{StaticResource Font.Small}" TextWrapping="Wrap" LineHeight="18"
+                               Text="Encrypted on this device (AES-256-GCM). First time? The key you enter becomes your master key and can't be recovered."/>
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+
+        <!-- ===== Unlocked ===== -->
+        <DockPanel IsVisible="{Binding !IsLocked}">
+            <!-- a failed save (disk full, …) must not go unnoticed while the notes are open -->
+            <Border DockPanel.Dock="Top" Margin="0,0,0,12" Padding="12,8" CornerRadius="{StaticResource Radius.Md}" BorderThickness="1"
+                    Background="{DynamicResource Danger.Soft}" BorderBrush="{DynamicResource Danger.Border}"
+                    IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Text="{Binding ErrorMessage}" FontSize="{StaticResource Font.Small}"
+                           Foreground="{DynamicResource Danger}" TextWrapping="Wrap"/>
+            </Border>
+
+            <!-- Wide: [search | actions] over [note list | editor], side by side.
+                 Narrow (phone): search, actions and the list stack; an open note takes the whole page
+                 (Done goes back to the list). "editing" mirrors IsEditing for the styles below. -->
+            <Grid x:Name="NotesLayout" helpers:Responsive.BreakWidth="640" Classes.editing="{Binding IsEditing}"
+                  ColumnDefinitions="300, *" RowDefinitions="Auto, Auto, *" ColumnSpacing="12" RowSpacing="12">
+                <Grid.Styles>
+                    <!-- wide: the list column keeps a 12px gutter on its right for the scroll bar (the search box
+                         lines up with the cards), so it never paints over them -->
+                    <Style Selector="Grid#NotesLayout.wide > Panel#SearchCell">
+                        <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+                        <Setter Property="Margin" Value="0,0,12,0"/>
+                    </Style>
+                    <Style Selector="Grid#NotesLayout.wide ListBox.notes">
+                        <Setter Property="Padding" Value="0,0,12,0"/>
+                    </Style>
+                    <Style Selector="Grid#NotesLayout.wide Border.listEmpty">
+                        <Setter Property="Margin" Value="0,0,12,0"/>
+                    </Style>
+                    <Style Selector="Grid#NotesLayout.wide > Grid#ActionsCell">
+                        <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+                    </Style>
+                    <Style Selector="Grid#NotesLayout.wide > Panel#ListPane">
+                        <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.RowSpan" Value="2"/>
+                        <Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+                    </Style>
+                    <Style Selector="Grid#NotesLayout.wide > Border#EditorPane">
+                        <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.RowSpan" Value="2"/>
+                        <Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+                        <Setter Property="Padding" Value="16"/>
+                    </Style>
+
+                    <Style Selector="Grid#NotesLayout.narrow > Panel#SearchCell">
+                        <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+                    </Style>
+                    <Style Selector="Grid#NotesLayout.narrow > Grid#ActionsCell">
+                        <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+                    </Style>
+                    <Style Selector="Grid#NotesLayout.narrow > Panel#ListPane">
+                        <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.RowSpan" Value="1"/>
+                        <Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+                    </Style>
+                    <Style Selector="Grid#NotesLayout.narrow > Border#EditorPane">
+                        <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.RowSpan" Value="3"/>
+                        <Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+                        <Setter Property="Padding" Value="12"/>
+                    </Style>
+                    <Style Selector="Grid#NotesLayout.narrow.editing > Panel#SearchCell,
+                                     Grid#NotesLayout.narrow.editing > Grid#ActionsCell,
+                                     Grid#NotesLayout.narrow.editing > Panel#ListPane">
+                        <Setter Property="IsVisible" Value="False"/>
+                    </Style>
+                    <Style Selector="Grid#NotesLayout.narrow:not(.editing) > Border#EditorPane">
+                        <Setter Property="IsVisible" Value="False"/>
+                    </Style>
+                    <!-- touch-sized delete on phones -->
+                    <Style Selector="Grid#NotesLayout.narrow Button.cardAction">
+                        <Setter Property="Width" Value="36"/>
+                        <Setter Property="Height" Value="36"/>
+                        <Setter Property="Margin" Value="0,4,4,0"/>
+                    </Style>
+                    <Style Selector="Grid#NotesLayout.narrow Border.noteCard">
+                        <Setter Property="Padding" Value="14,11,44,12"/>
+                    </Style>
+                    <Style Selector="Grid#NotesLayout.narrow Border.confirm Button">
+                        <Setter Property="Height" Value="36"/>
+                    </Style>
+                </Grid.Styles>
+
+                <!-- search (the count of listed notes sits at its right edge) -->
+                <Panel x:Name="SearchCell">
+                    <TextBox Classes="field" Text="{Binding SearchQuery}" PlaceholderText="Search notes" Padding="8,0,8,0">
+                        <TextBox.InnerLeftContent>
+                            <Path Classes="glyph" Data="{StaticResource NoteGlyphSearch}" Stroke="{DynamicResource Text.Muted}" Margin="12,0,0,0"/>
+                        </TextBox.InnerLeftContent>
+                        <TextBox.InnerRightContent>
+                            <TextBlock Text="{Binding FilteredNotes.Count}" ToolTip.Tip="Notes shown"
+                                       FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Text.Muted}"
+                                       VerticalAlignment="Center" Margin="0,0,12,0"/>
+                        </TextBox.InnerRightContent>
+                    </TextBox>
+                </Panel>
+
+                <!-- actions -->
+                <Grid x:Name="ActionsCell" ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8">
+                    <Button Grid.Column="1" Classes="secondary" Command="{Binding LockAppCommand}"
+                            ToolTip.Tip="Lock notes (also locks the Cloudflare vault)">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Path Classes="glyph" Data="{StaticResource NoteGlyphLock}"/>
+                            <TextBlock Text="Lock" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2" Classes="primary" Command="{Binding AddNoteCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Path Classes="glyph" Data="{StaticResource NoteGlyphPlus}"/>
+                            <TextBlock Text="New note" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                 </Grid>
 
-                <TextBox Grid.Row="1" Classes="field" Text="{Binding SearchQuery}" PlaceholderText="Search titles &amp; content..."
-                         Height="34" FontSize="11.5" Margin="0,0,0,8"/>
-
-                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <ListBox ItemsSource="{Binding FilteredNotes}" Background="Transparent" BorderThickness="0" Padding="0">
-                        <ListBox.Styles>
-                            <Style Selector="ListBoxItem">
-                                <Setter Property="Padding" Value="0"/>
-                                <Setter Property="Margin" Value="0"/>
-                                <Setter Property="MinHeight" Value="0"/>
-                                <Setter Property="Background" Value="Transparent"/>
-                            </Style>
-                            <Style Selector="ListBoxItem Button#DelBtn">
-                                <Setter Property="Opacity" Value="0"/>
-                            </Style>
-                            <Style Selector="ListBoxItem:pointerover Button#DelBtn">
-                                <Setter Property="Opacity" Value="1"/>
-                            </Style>
-                            <Style Selector="ListBoxItem:pointerover Border#Card">
-                                <Setter Property="Background" Value="#1E3A2B"/>
-                                <Setter Property="BorderBrush" Value="#42B883"/>
-                            </Style>
-                        </ListBox.Styles>
-                        <ListBox.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel/>
-                            </ItemsPanelTemplate>
-                        </ListBox.ItemsPanel>
+                <!-- note list -->
+                <Panel x:Name="ListPane">
+                    <ListBox Classes="notes" ItemsSource="{Binding FilteredNotes}"
+                             SelectedItem="{Binding SelectedNote, Mode=OneWay}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:NoteItem">
-                                <Panel Width="162" Height="84" Margin="4">
-                                    <Button Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).OpenNoteCommand}"
-                                            CommandParameter="{Binding}" Padding="0"
-                                            HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                                            HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                                            Background="Transparent" BorderThickness="0">
-                                        <Border Name="Card" Background="#191A1F" BorderBrush="#2F3139" BorderThickness="1"
-                                                CornerRadius="6" Padding="10,8">
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="12" Foreground="#ECECEF"
-                                                           TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding Content}" FontSize="9.5" Foreground="#9E9FA8"
-                                                           TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" Margin="0,5,0,0"/>
+                                <Panel>
+                                    <Button Classes="noteOpen"
+                                            Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).OpenNoteCommand}"
+                                            CommandParameter="{Binding}">
+                                        <Border Name="Card" Classes="noteCard">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Classes="noteTitle" Text="{Binding Title}"/>
+                                                <TextBlock Classes="notePreview" Text="{Binding Preview}"
+                                                           IsVisible="{Binding Content, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                                <TextBlock Classes="noteEmpty" Text="Empty note"
+                                                           IsVisible="{Binding Content, Converter={x:Static StringConverters.IsNullOrEmpty}}"/>
                                             </StackPanel>
                                         </Border>
                                     </Button>
-                                    <Button Name="DelBtn"
+                                    <Button Name="DelBtn" Classes="cardAction"
                                             Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).RequestDeleteNoteCommand}"
                                             CommandParameter="{Binding}"
                                             IsVisible="{Binding !PendingDelete}"
-                                            ToolTip.Tip="Delete note"
-                                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,4,0"
-                                            Width="22" Height="22" Padding="0"
-                                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                            Background="#E5484D" BorderThickness="0" CornerRadius="11">
-                                        <!-- Vector cross — a glyph sits slightly off-centre in a 22px circle. -->
-                                        <Path Data="M0,0 L8,8 M8,0 L0,8" Stroke="#FFFFFF" StrokeThickness="1.7"
-                                              StrokeLineCap="Round" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            ToolTip.Tip="Delete note" AutomationProperties.Name="Delete note">
+                                        <Path Classes="glyph" Data="{StaticResource NoteGlyphTrash}"/>
                                     </Button>
 
-                                    <!-- Inline delete confirmation overlay -->
-                                    <Border IsVisible="{Binding PendingDelete}" Background="#121317"
-                                            BorderBrush="#E5484D" BorderThickness="1" CornerRadius="6">
-                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
-                                            <TextBlock Text="Delete this note?" Foreground="#ECECEF" FontSize="11" FontWeight="Bold"
-                                                       HorizontalAlignment="Center"/>
-                                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                                                <Button Content="Delete"
-                                                        Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).DeleteNoteCommand}"
-                                                        CommandParameter="{Binding}"
-                                                        Background="#E5484D" Foreground="#ECECEF" FontSize="10" FontWeight="Bold"
-                                                        Padding="10,4" BorderThickness="0" CornerRadius="4"/>
-                                                <Button Content="Cancel"
+                                    <!-- Inline delete confirmation -->
+                                    <Border Classes="confirm" IsVisible="{Binding PendingDelete}">
+                                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                                            <TextBlock Text="Delete this note?" VerticalAlignment="Center" TextWrapping="Wrap"
+                                                       FontSize="{StaticResource Font.Body}" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource Text.Primary}"/>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <Button Classes="secondary" Content="Cancel"
                                                         Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).CancelDeleteNoteCommand}"
-                                                        CommandParameter="{Binding}"
-                                                        Background="#1D1E25" Foreground="#C7C8CF" FontSize="10" FontWeight="Bold"
-                                                        Padding="10,4" BorderThickness="1" BorderBrush="#3B3D47" CornerRadius="4"/>
+                                                        CommandParameter="{Binding}"/>
+                                                <Button Classes="danger" Content="Delete"
+                                                        Command="{Binding $parent[UserControl].((vm:NoteViewModel)DataContext).DeleteNoteCommand}"
+                                                        CommandParameter="{Binding}"/>
                                             </StackPanel>
-                                        </StackPanel>
+                                        </Grid>
                                     </Border>
                                 </Panel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                </ScrollViewer>
-            </Grid>
 
-            <Grid RowDefinitions="Auto, *" IsVisible="{Binding IsEditing}">
-                <Grid Grid.Row="0" ColumnDefinitions="Auto, *" Margin="0,0,0,10">
-                    <Button Grid.Column="0" Classes="secondary" Command="{Binding BackToListCommand}" Content="← DONE"
-                            FontSize="11" Padding="12,0" Margin="0,0,10,0"/>
-                    <TextBox Grid.Column="1" Classes="field" Text="{Binding SelectedNote.Title, FallbackValue=''}" FontWeight="Bold"/>
-                </Grid>
+                    <!-- nothing to list: no notes yet, or none match the search -->
+                    <Border Classes="listEmpty" IsVisible="{Binding !FilteredNotes.Count}" VerticalAlignment="Top" Padding="16,18"
+                            CornerRadius="10" BorderThickness="1" BorderBrush="{DynamicResource Border.Default}">
+                        <Panel>
+                            <StackPanel IsVisible="{Binding !Notes.Count}" Spacing="4">
+                                <TextBlock Text="No notes yet" HorizontalAlignment="Center" FontSize="{StaticResource Font.Body}"
+                                           FontWeight="SemiBold" Foreground="{DynamicResource Text.Secondary}"/>
+                                <TextBlock Text="Press New note to write one." HorizontalAlignment="Center"
+                                           TextAlignment="Center" TextWrapping="Wrap"
+                                           FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Text.Muted}"/>
+                            </StackPanel>
+                            <StackPanel IsVisible="{Binding !!Notes.Count}" Spacing="4">
+                                <TextBlock Text="No matching notes" HorizontalAlignment="Center" FontSize="{StaticResource Font.Body}"
+                                           FontWeight="SemiBold" Foreground="{DynamicResource Text.Secondary}"/>
+                                <TextBlock Text="Try a different search." HorizontalAlignment="Center"
+                                           TextAlignment="Center" TextWrapping="Wrap"
+                                           FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Text.Muted}"/>
+                            </StackPanel>
+                        </Panel>
+                    </Border>
+                </Panel>
 
-                <Border Grid.Row="1" Classes="card output">
-                    <TextBox TextWrapping="Wrap" Text="{Binding SelectedNote.Content, FallbackValue=''}" AcceptsReturn="True" FontSize="12"
-                             Foreground="#ECECEF" Background="Transparent" BorderThickness="0"
-                             FontFamily="Cascadia Code,Consolas" PlaceholderText="Type your note here..." Padding="10"/>
+                <!-- editor -->
+                <Border x:Name="EditorPane" Classes="card">
+                    <Panel>
+                        <DockPanel IsVisible="{Binding IsEditing}">
+                            <Grid DockPanel.Dock="Top" ColumnDefinitions="*, Auto" ColumnSpacing="8" Margin="0,0,0,12">
+                                <TextBox Grid.Column="0" Classes="field" Text="{Binding SelectedNote.Title, FallbackValue=''}"
+                                         FontSize="{StaticResource Font.Title}" FontWeight="SemiBold" PlaceholderText="Title"/>
+                                <Button Grid.Column="1" Classes="secondary" Command="{Binding BackToListCommand}"
+                                        ToolTip.Tip="Save and close this note">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Path Classes="glyph" Data="{StaticResource NoteGlyphCheck}"/>
+                                        <TextBlock Text="Done" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <TextBlock DockPanel.Dock="Bottom" Classes="muted" FontSize="{StaticResource Font.Small}"
+                                       TextWrapping="Wrap" Margin="2,10,0,0"
+                                       Text="Saved and encrypted automatically."/>
+                            <TextBox Classes="field multiline" Text="{Binding SelectedNote.Content, FallbackValue=''}"
+                                     AcceptsReturn="True" TextWrapping="Wrap"
+                                     FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource Font.Body}"
+                                     PlaceholderText="Type your note here…"/>
+                        </DockPanel>
+
+                        <!-- nothing open (side-by-side layout only; on phones this pane appears with a note) -->
+                        <StackPanel IsVisible="{Binding !IsEditing}" MaxWidth="300"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Border Classes="hero">
+                                <Path Classes="ico" Data="{StaticResource IcoNotes}"/>
+                            </Border>
+                            <TextBlock Classes="sectionTitle" Text="No note open" HorizontalAlignment="Center" Margin="0,14,0,0"/>
+                            <TextBlock Text="Pick a note or create a new one."
+                                       FontSize="{StaticResource Font.Body}" Foreground="{DynamicResource Text.Muted}"
+                                       HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                        </StackPanel>
+                    </Panel>
                 </Border>
             </Grid>
-        </Grid>
-    </Grid>
+        </DockPanel>
+    </Panel>
 </UserControl>

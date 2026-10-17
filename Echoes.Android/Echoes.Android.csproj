@@ -13,22 +13,31 @@
     <RootNamespace>Echoes.Android</RootNamespace>
 
     <ApplicationId>com.sinaxhpm.echoes</ApplicationId>
-    <ApplicationVersion>12</ApplicationVersion>
-    <ApplicationDisplayVersion>0.3.7</ApplicationDisplayVersion>
+    <ApplicationVersion>13</ApplicationVersion>
+    <ApplicationDisplayVersion>0.4.0</ApplicationDisplayVersion>
+    <!-- the assembly version follows it (About box, update check, User-Agent); CI sets it from the tag -->
+    <Version>$(ApplicationDisplayVersion)</Version>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <!-- Ship only real-device ABIs; x86/x86_64 are emulator-only and roughly double the native payload. -->
     <RuntimeIdentifiers>android-arm64;android-arm</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="12.0.2" />
-    <PackageReference Include="Avalonia.Android" Version="12.0.2" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.2" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.2" />
-    <PackageReference Include="Avalonia.Controls.WebView" Version="12.0.1" />
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Android" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Controls.WebView" Version="12.1.1" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="DnsClient" Version="1.8.0" />
-    <PackageReference Include="SSH.NET" Version="2025.1.0" />
+    <PackageReference Include="SSH.NET" Version="2026.0.0" />
+  </ItemGroup>
+
+  <!-- The Android SDK's implicit global usings (Android.App, Android.Widget) collide with Avalonia names in the shared
+       sources (Button, Application, …). This head's own files import the Android namespaces they use explicitly. -->
+  <ItemGroup>
+    <Using Remove="Android.App" />
+    <Using Remove="Android.Widget" />
   </ItemGroup>
 
   <!-- Shared source from the desktop project (Program.cs / app.manifest are desktop-only and excluded). -->
@@ -45,5 +54,7 @@
 
     <AvaloniaResource Include="..\Assets\**" Link="Assets\%(RecursiveDir)%(Filename)%(Extension)" />
     <AvaloniaResource Remove="..\Assets\echoes.ico" />
+    <!-- Same as the desktop head: build-time / unused assets are not embedded (~7 MB off the APK). -->
+    <AvaloniaResource Remove="..\Assets\logo.png;..\Assets\logo.icns;..\Assets\echoes.mp4;..\Assets\avalonia-logo.ico" />
   </ItemGroup>
 </Project>

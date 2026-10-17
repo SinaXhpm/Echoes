@@ -1,154 +1,470 @@
 <UserControl xmlns="https://github.com/avaloniaui"
 			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 			 xmlns:vm="using:Echoes.ViewModels"
+			 xmlns:helpers="using:Echoes.Helpers"
 			 x:Class="Echoes.Views.StringLabView"
 			 x:DataType="vm:StringLabViewModel">
 
+	<!-- String Lab: category pills (TabControl.seg) over underline sub-tool tabs. Every sub-tool follows
+		 the same vertical flow — labelled input → (options) → action row → labelled output — so one
+		 markup path serves a wide desktop window and a phone. Colours come only from the solid tokens in
+		 Styles/Tokens.axaml; buttons, labels, badges and tabs use the global classes in AppStyles. -->
 	<UserControl.Styles>
-		<Style Selector="TabItem">
-			<Setter Property="FontSize" Value="11.5"/>
-			<Setter Property="MinHeight" Value="22"/>
-			<Setter Property="Padding" Value="10,0"/>
-			<Setter Property="Opacity" Value="1"/>
+		<!-- ===== tabs ===== -->
+		<!-- gap between the category pills and the sub-tool strip -->
+		<Style Selector="TabControl.cats">
+			<Setter Property="Padding" Value="0,10,0,0"/>
 		</Style>
-		<Style Selector="TabItem.cat">
-			<Setter Property="FontSize" Value="12.5"/>
-			<Setter Property="FontWeight" Value="Bold"/>
-			<Setter Property="Padding" Value="14,0"/>
+		<!-- gap between the sub-tool strip and the tool (the first label already sits on the content
+			 edge: underline tabs have no side padding, see AppStyles) -->
+		<Style Selector="TabControl.tools">
+			<Setter Property="Padding" Value="0,14,0,0"/>
 		</Style>
 
-		<!-- Textareas: high-contrast input surface, visible border, green focus -->
-		<Style Selector="TextBox">
+		<!-- ===== inputs (state colours come from the Fluent overrides in Tokens.axaml) ===== -->
+		<!-- text areas: Enter adds a line and long lines wrap; one-line fields are plain TextBox.field -->
+		<Style Selector="TextBox.multiline">
 			<Setter Property="AcceptsReturn" Value="True"/>
 			<Setter Property="TextWrapping" Value="Wrap"/>
-			<Setter Property="Background" Value="#1D1E25"/>
-			<Setter Property="BorderBrush" Value="#3B3D47"/>
-			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="Foreground" Value="#ECECEF"/>
-			<Setter Property="CaretBrush" Value="#42B883"/>
-			<Setter Property="CornerRadius" Value="6"/>
-			<Setter Property="Padding" Value="10,8"/>
-			<Setter Property="FontSize" Value="12"/>
-			<Setter Property="Transitions">
-				<Transitions>
-					<BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
-				</Transitions>
-			</Setter>
 		</Style>
-		<Style Selector="TextBox:pointerover">
-			<Setter Property="BorderBrush" Value="#4C4E59"/>
-		</Style>
-		<Style Selector="TextBox:focus">
-			<Setter Property="BorderBrush" Value="#42B883"/>
-		</Style>
-		<!-- Read-only outputs: darker inset surface, keep columns aligned and scroll instead of wrapping/lagging -->
+
+		<!-- ===== outputs: read-only, darker inset surface, monospace; scroll instead of wrapping ===== -->
 		<Style Selector="TextBox[IsReadOnly=True]">
+			<Setter Property="AcceptsReturn" Value="True"/>
 			<Setter Property="TextWrapping" Value="NoWrap"/>
-			<Setter Property="Background" Value="#121317"/>
-			<Setter Property="BorderBrush" Value="#2A2C33"/>
-			<Setter Property="Foreground" Value="#ECECEF"/>
+			<Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+			<Setter Property="Padding" Value="12,10"/>
+			<Setter Property="VerticalContentAlignment" Value="Top"/>
 			<Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
 			<Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
 		</Style>
+		<Style Selector="TextBox[IsReadOnly=True] /template/ Border#PART_BorderElement">
+			<Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+		</Style>
+		<Style Selector="TextBox[IsReadOnly=True]:pointerover /template/ Border#PART_BorderElement">
+			<Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+		</Style>
+		<Style Selector="TextBox[IsReadOnly=True]:focus /template/ Border#PART_BorderElement">
+			<Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}"/>
+		</Style>
 
-		<Style Selector="Button">
-			<Setter Property="HorizontalAlignment" Value="Stretch"/>
-			<Setter Property="HorizontalContentAlignment" Value="Center"/>
-			<Setter Property="VerticalContentAlignment" Value="Center"/>
+		<!-- ===== rows ===== -->
+		<!-- action row: primary + secondary transforms, then ghost Clear / Copy; wraps when narrow -->
+		<Style Selector="WrapPanel.actions">
+			<Setter Property="ItemSpacing" Value="8"/>
+			<Setter Property="LineSpacing" Value="8"/>
 		</Style>
-		<!-- Vertical I/O layout: buttons flow in a wrap row (auto width) between input and result. -->
-		<Style Selector="WrapPanel.btns &gt; Button">
-			<Setter Property="HorizontalAlignment" Value="Left"/>
-			<Setter Property="MinWidth" Value="92"/>
-			<Setter Property="Margin" Value="0,0,6,6"/>
+		<Style Selector="WrapPanel.actions > Button">
+			<Setter Property="MinWidth" Value="72"/>
 		</Style>
-		<Style Selector="WrapPanel.btns &gt; CheckBox">
-			<Setter Property="Margin" Value="0,0,12,6"/>
+		<Style Selector="WrapPanel.actions > CheckBox">
 			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+		<!-- the ghost utilities (Clear / Copy) travel as one item: when a row wraps they move together,
+			 so a wrapped line reads as an intentional group instead of a lone "Copy" -->
+		<Style Selector="StackPanel.util">
+			<Setter Property="Orientation" Value="Horizontal"/>
+			<Setter Property="Spacing" Value="8"/>
+		</Style>
+		<Style Selector="StackPanel.util > Button">
+			<Setter Property="MinWidth" Value="72"/>
+		</Style>
+		<!-- options row: labelled small fields + check boxes, all sitting on the fields' baseline -->
+		<Style Selector="WrapPanel.options">
+			<Setter Property="ItemSpacing" Value="20"/>
+			<Setter Property="LineSpacing" Value="10"/>
+		</Style>
+		<Style Selector="WrapPanel.options > CheckBox">
+			<Setter Property="MinHeight" Value="{DynamicResource Control.Height}"/>
+			<Setter Property="VerticalAlignment" Value="Bottom"/>
+		</Style>
+		<!-- many-action tools: the action area scrolls on short screens instead of squeezing the editors -->
+		<Style Selector="ScrollViewer.ops">
+			<Setter Property="MaxHeight" Value="236"/>
+			<Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+			<Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+		</Style>
+
+		<!-- ===== small text ===== -->
+		<!-- status line (file hashing, edit result, generator info) -->
+		<Style Selector="TextBlock.status">
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+		</Style>
+		<!-- Text lab live counters: muted caption + bright number -->
+		<Style Selector="TextBlock.stat">
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+		</Style>
+		<!-- caption under a field (cron ranges) -->
+		<Style Selector="TextBlock.hint">
+			<Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+		</Style>
+
+		<!-- ===== callouts ===== -->
+		<!-- framed note (JWT signature check) -->
+		<Style Selector="Border.callout">
+			<Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+			<Setter Property="Padding" Value="12,8"/>
+		</Style>
+		<Style Selector="Border.callout > TextBlock">
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+		</Style>
+		<!-- accent-tinted note (cron expression in words) -->
+		<Style Selector="Border.callout.accent">
+			<Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+		</Style>
+		<Style Selector="Border.callout.accent > TextBlock">
+			<Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+		</Style>
+		<!-- error banner under the tools -->
+		<Style Selector="Border.errorBanner">
+			<Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+			<Setter Property="Padding" Value="12,9"/>
+		</Style>
+		<Style Selector="Border.errorBanner > TextBlock">
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
 		</Style>
 	</UserControl.Styles>
 
-	<Grid RowDefinitions="*, Auto" Margin="12,8,12,12">
-		<TabControl Grid.Row="0" Background="Transparent" Padding="0">
+	<Grid RowDefinitions="*, Auto, Auto">
+		<TabControl Grid.Row="0" Classes="seg cats" SelectedIndex="{Binding CategoryIndex}">
 
 			<!-- ============ ENCODE ============ -->
-			<TabItem Header="ENCODE" Classes="cat">
-				<TabControl Background="Transparent" Padding="0,4,0,0">
+			<TabItem Header="Encode">
+				<TabControl Classes="tools" SelectedIndex="{Binding EncodeToolIndex}">
 
-					<TabItem Header="BASE64">
-						<Grid RowDefinitions="*, Auto, *" Margin="0,2,0,0">
-							<TextBox Grid.Row="0" Text="{Binding B64Input, Mode=TwoWay}" PlaceholderText="Input..."/>
-							<WrapPanel Grid.Row="1" Classes="btns" Margin="0,8">
-								<Button Command="{Binding B64ActionCommand}" CommandParameter="enc" Content="ENCODE ➔" Classes="primary"/>
-								<Button Command="{Binding B64ActionCommand}" CommandParameter="dec" Content="DECODE ➔" Classes="secondary"/>
-								<Button Command="{Binding ClearCommand}" CommandParameter="b64" Content="CLEAR" Classes="ghost"/>
+					<TabItem Header="Base64">
+						<Grid RowDefinitions="*, Auto, *" RowSpacing="12">
+							<DockPanel Grid.Row="0">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
+								<TextBox Classes="field multiline" helpers:InputAssist.PasteButton="True" Text="{Binding B64Input, Mode=TwoWay}"
+										 PlaceholderText="Text to encode, or Base64 to decode"
+										 ToolTip.Tip="Decode takes Base64 or Base64URL; line breaks, missing '=' and data: URIs are fine"/>
+							</DockPanel>
+							<WrapPanel Grid.Row="1" Classes="actions">
+								<Button Command="{Binding B64ActionCommand}" CommandParameter="enc" Content="Encode" Classes="primary"/>
+								<Button Command="{Binding B64ActionCommand}" CommandParameter="encurl" Content="Base64URL" Classes="secondary"
+										ToolTip.Tip="Encode with the URL-safe alphabet (- and _ instead of + and /, no '=' padding)"/>
+								<Button Command="{Binding B64ActionCommand}" CommandParameter="dec" Content="Decode" Classes="secondary"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="b64" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding B64Output}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
 							</WrapPanel>
-							<TextBox Grid.Row="2" Text="{Binding B64Output}" IsReadOnly="True" PlaceholderText="Result..."/>
+							<DockPanel Grid.Row="2">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Result"/>
+								<TextBox Text="{Binding B64Output, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.ByteRows}}" IsReadOnly="True"
+										 PlaceholderText="Binary data shows as a hex dump"/>
+							</DockPanel>
 						</Grid>
 					</TabItem>
 
 					<TabItem Header="URL">
-						<Grid RowDefinitions="*, Auto, *" Margin="0,2,0,0">
-							<TextBox Grid.Row="0" Text="{Binding UrlInput, Mode=TwoWay}" PlaceholderText="URL..."/>
-							<WrapPanel Grid.Row="1" Classes="btns" Margin="0,8">
-								<Button Command="{Binding UrlActionCommand}" CommandParameter="enc" Content="ENCODE ➔" Classes="primary"/>
-								<Button Command="{Binding UrlActionCommand}" CommandParameter="dec" Content="DECODE ➔" Classes="secondary"/>
-								<Button Command="{Binding ClearCommand}" CommandParameter="url" Content="CLEAR" Classes="ghost"/>
+						<Grid RowDefinitions="*, Auto, *" RowSpacing="12">
+							<DockPanel Grid.Row="0">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
+								<TextBox Classes="field multiline" helpers:InputAssist.PasteButton="True" Text="{Binding UrlInput, Mode=TwoWay}"
+										 PlaceholderText="Text, %-encoded text or a URL"
+										 ToolTip.Tip="Text to encode, %-encoded text to decode, or a full URL to parse"/>
+							</DockPanel>
+							<WrapPanel Grid.Row="1" Classes="actions">
+								<Button Command="{Binding UrlActionCommand}" CommandParameter="enc" Content="Encode (%20)" Classes="primary"
+										ToolTip.Tip="RFC 3986 component encoding (Uri.EscapeDataString) — for path segments and query values"/>
+								<Button Command="{Binding UrlActionCommand}" CommandParameter="form" Content="Form encode (+)" Classes="secondary"
+										ToolTip.Tip="application/x-www-form-urlencoded — spaces become '+'"/>
+								<Button Command="{Binding UrlActionCommand}" CommandParameter="dec" Content="Decode" Classes="secondary"/>
+								<Button Command="{Binding UrlActionCommand}" CommandParameter="parse" Content="Parse URL" Classes="secondary"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="url" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding UrlOutput}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
 							</WrapPanel>
-							<TextBox Grid.Row="2" Text="{Binding UrlOutput}" IsReadOnly="True" PlaceholderText="Result..."/>
+							<DockPanel Grid.Row="2">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Result"/>
+								<TextBox Text="{Binding UrlOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Result, or the URL's parts"/>
+							</DockPanel>
 						</Grid>
 					</TabItem>
 
-					<TabItem Header="HASH">
-						<Grid RowDefinitions="*, Auto, *" Margin="0,2,0,0">
-							<TextBox Grid.Row="0" Text="{Binding HashInput, Mode=TwoWay}" PlaceholderText="Text..."/>
-							<WrapPanel Grid.Row="1" Classes="btns" Margin="0,8">
-								<Button Command="{Binding HashActionCommand}" CommandParameter="md5" Content="MD5" Classes="secondary"/>
-								<Button Command="{Binding HashActionCommand}" CommandParameter="sha256" Content="SHA256" Classes="secondary"/>
-								<Button Command="{Binding ClearCommand}" CommandParameter="hash" Content="CLEAR" Classes="ghost"/>
+					<TabItem Header="Hex">
+						<Grid RowDefinitions="*, Auto, Auto, *" RowSpacing="12">
+							<DockPanel Grid.Row="0">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
+								<TextBox Classes="field multiline mono" helpers:InputAssist.PasteButton="True" Text="{Binding HexInput, Mode=TwoWay}"
+										 PlaceholderText="Text, hex (48 65 6c) or binary"
+										 ToolTip.Tip="Text to convert, or to decode: hex (48 65 6c · 48:65 · 0x48, 0x65 · \x48) or binary (01001000 …)"/>
+							</DockPanel>
+							<WrapPanel Grid.Row="1" Classes="options">
+								<StackPanel>
+									<TextBlock Classes="fieldLabel" Text="Separator"/>
+									<ComboBox Classes="field" Width="150" ItemsSource="{Binding HexSeparators}" SelectedItem="{Binding HexSeparator}"/>
+								</StackPanel>
+								<CheckBox IsChecked="{Binding HexUpper}" Content="Uppercase"/>
 							</WrapPanel>
-							<TextBox Grid.Row="2" Text="{Binding HashOutput}" IsReadOnly="True" PlaceholderText="Hash..." FontFamily="Cascadia Code,Consolas"/>
+							<WrapPanel Grid.Row="2" Classes="actions">
+								<Button Command="{Binding HexActionCommand}" CommandParameter="tohex" Content="Text → hex" Classes="primary"/>
+								<Button Command="{Binding HexActionCommand}" CommandParameter="fromhex" Content="Hex → text" Classes="secondary"/>
+								<Button Command="{Binding HexActionCommand}" CommandParameter="tobin" Content="Text → binary" Classes="secondary"/>
+								<Button Command="{Binding HexActionCommand}" CommandParameter="frombin" Content="Binary → text" Classes="secondary"/>
+								<Button Command="{Binding HexActionCommand}" CommandParameter="dump" Content="Hex dump" Classes="secondary"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="hex" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding HexOutput}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
+							</WrapPanel>
+							<DockPanel Grid.Row="3">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Result"/>
+								<TextBox Text="{Binding HexOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.ByteRows}}" IsReadOnly="True"
+										 PlaceholderText="Hex, binary or decoded text"/>
+							</DockPanel>
 						</Grid>
 					</TabItem>
 
-					<TabItem Header="HASH ID">
-						<Grid RowDefinitions="Auto, *" Margin="0,2,0,0">
-							<Grid Grid.Row="0" ColumnDefinitions="*, 90, 70" Margin="0,0,0,8">
-								<TextBox Grid.Column="0" Text="{Binding HashIdInput, Mode=TwoWay}" AcceptsReturn="False"
-										 TextWrapping="NoWrap" PlaceholderText="Paste a hash to identify..." FontFamily="Cascadia Code,Consolas" Margin="0,0,8,0">
+					<TabItem Header="Escape">
+						<Grid RowDefinitions="*, Auto, *" RowSpacing="12">
+							<DockPanel Grid.Row="0">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
+								<TextBox Classes="field multiline mono" helpers:InputAssist.PasteButton="True" Text="{Binding EscInput, Mode=TwoWay}"
+										 PlaceholderText="Text to escape or unescape"/>
+							</DockPanel>
+							<ScrollViewer Grid.Row="1" Classes="ops">
+								<WrapPanel Classes="actions">
+									<Button Command="{Binding EscActionCommand}" CommandParameter="htmlenc" Content="HTML encode" Classes="secondary"/>
+									<Button Command="{Binding EscActionCommand}" CommandParameter="htmldec" Content="HTML decode" Classes="secondary"/>
+									<Button Command="{Binding EscActionCommand}" CommandParameter="xmlenc" Content="XML escape" Classes="secondary"/>
+									<Button Command="{Binding EscActionCommand}" CommandParameter="xmldec" Content="XML unescape" Classes="secondary"/>
+									<Button Command="{Binding EscActionCommand}" CommandParameter="jsonenc" Content="JSON escape" Classes="secondary"/>
+									<Button Command="{Binding EscActionCommand}" CommandParameter="jsondec" Content="JSON unescape" Classes="secondary"/>
+									<Button Command="{Binding EscActionCommand}" CommandParameter="uenc" Content="\uXXXX escape" Classes="secondary"/>
+									<Button Command="{Binding EscActionCommand}" CommandParameter="udec" Content="\uXXXX unescape" Classes="secondary"/>
+									<Button Command="{Binding EscActionCommand}" CommandParameter="literal" Content="C# / JS literal" Classes="secondary"
+											ToolTip.Tip="Quote as a &quot;...&quot; string literal valid in both C# and JavaScript"/>
+									<Button Command="{Binding EscActionCommand}" CommandParameter="unescape" Content="Unescape \n \t \x41" Classes="secondary"
+											ToolTip.Tip="Interpret backslash escapes: \n \t \r \\ \&quot; \0 \x41 \101 A \u{1F600}"/>
+									<StackPanel Classes="util">
+										<Button Command="{Binding ClearCommand}" CommandParameter="esc" Content="Clear" Classes="ghost"/>
+										<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding EscOutput}" Content="Copy" Classes="ghost"/>
+									</StackPanel>
+								</WrapPanel>
+							</ScrollViewer>
+							<DockPanel Grid.Row="2">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Result"/>
+								<TextBox Text="{Binding EscOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Escaped or unescaped text"/>
+							</DockPanel>
+						</Grid>
+					</TabItem>
+
+					<TabItem Header="Hash">
+						<!-- the input is usually short; the digest table gets the larger share -->
+						<Grid RowDefinitions="*, Auto, Auto, 2*" RowSpacing="12">
+							<DockPanel Grid.Row="0">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
+								<TextBox Classes="field multiline" helpers:InputAssist.PasteButton="True" Text="{Binding HashInput, Mode=TwoWay}"
+										 PlaceholderText="Text to hash (UTF-8), or use File…"/>
+							</DockPanel>
+							<!-- Wide (phones too, the placeholders are short): key | expected | format on one row.
+								 Narrow (below 330): the key gets its own row, expected + format share the next. -->
+							<Grid Grid.Row="1" helpers:Responsive.BreakWidth="330" ColumnDefinitions="*, *, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="12">
+								<Grid.Styles>
+									<Style Selector="Grid.wide > StackPanel#HashKeyCol">
+										<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/>
+										<Setter Property="Grid.ColumnSpan" Value="1"/>
+									</Style>
+									<Style Selector="Grid.wide > StackPanel#HashExpectedCol">
+										<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/>
+										<Setter Property="Grid.ColumnSpan" Value="1"/>
+									</Style>
+									<Style Selector="Grid.wide > StackPanel#HashFormatCol">
+										<Setter Property="Grid.Row" Value="0"/>
+									</Style>
+									<Style Selector="Grid.narrow > StackPanel#HashKeyCol">
+										<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/>
+										<Setter Property="Grid.ColumnSpan" Value="3"/><Setter Property="Margin" Value="0,0,0,12"/>
+									</Style>
+									<Style Selector="Grid.narrow > StackPanel#HashExpectedCol">
+										<Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/>
+										<Setter Property="Grid.ColumnSpan" Value="2"/>
+									</Style>
+									<Style Selector="Grid.narrow > StackPanel#HashFormatCol">
+										<Setter Property="Grid.Row" Value="1"/>
+									</Style>
+								</Grid.Styles>
+								<StackPanel x:Name="HashKeyCol">
+									<TextBlock Classes="fieldLabel" Text="HMAC key"/>
+									<TextBox x:Name="HashKeyBox" Classes="field mono" Text="{Binding HashKey, Mode=TwoWay}"
+											 PlaceholderText="Optional"
+											 ToolTip.Tip="Optional: with a key the digests become HMAC-…"/>
+								</StackPanel>
+								<StackPanel x:Name="HashExpectedCol">
+									<TextBlock Classes="fieldLabel" Text="Expected hash"/>
+									<TextBox x:Name="HashExpectedBox" Classes="field mono" Text="{Binding HashExpected, Mode=TwoWay}"
+											 PlaceholderText="Optional"
+											 ToolTip.Tip="Optional: a known digest to compare the result with"/>
+								</StackPanel>
+								<StackPanel x:Name="HashFormatCol" Grid.Column="2">
+									<TextBlock Classes="fieldLabel" Text="Format"/>
+									<ComboBox Classes="field" Width="112" ItemsSource="{Binding HashFormats}" SelectedItem="{Binding HashFormat}"/>
+								</StackPanel>
+							</Grid>
+							<ScrollViewer Grid.Row="2" Classes="ops">
+								<WrapPanel Classes="actions">
+									<Button Command="{Binding HashActionCommand}" CommandParameter="all" Content="All" Classes="primary"/>
+									<Button Command="{Binding HashActionCommand}" CommandParameter="md5" Content="MD5" Classes="secondary"/>
+									<Button Command="{Binding HashActionCommand}" CommandParameter="sha1" Content="SHA-1" Classes="secondary"/>
+									<Button Command="{Binding HashActionCommand}" CommandParameter="sha256" Content="SHA-256" Classes="secondary"/>
+									<Button Command="{Binding HashActionCommand}" CommandParameter="sha384" Content="SHA-384" Classes="secondary"/>
+									<Button Command="{Binding HashActionCommand}" CommandParameter="sha512" Content="SHA-512" Classes="secondary"/>
+									<Button Command="{Binding HashActionCommand}" CommandParameter="sha3-256" Content="SHA3-256" Classes="secondary"/>
+									<Button Command="{Binding HashActionCommand}" CommandParameter="sha3-512" Content="SHA3-512" Classes="secondary"/>
+									<Button Command="{Binding HashActionCommand}" CommandParameter="crc32" Content="CRC32" Classes="secondary"/>
+									<Button Click="HashFile_Click" Content="File…" Classes="secondary" IsEnabled="{Binding !IsHashingFile}"
+											ToolTip.Tip="Stream a file through MD5 / SHA-1 / SHA-256 / SHA-512 (HMAC when a key is set)"/>
+									<Button Command="{Binding CancelHashFileCommand}" Content="Cancel" Classes="ghost" IsVisible="{Binding IsHashingFile}"/>
+									<StackPanel Classes="util">
+										<Button Command="{Binding ClearCommand}" CommandParameter="hash" Content="Clear" Classes="ghost"/>
+										<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding HashOutput}" Content="Copy" Classes="ghost"/>
+									</StackPanel>
+								</WrapPanel>
+							</ScrollViewer>
+							<DockPanel Grid.Row="3">
+								<TextBlock DockPanel.Dock="Top" Classes="status" Margin="0,0,0,10" Text="{Binding HashFileStatus}"
+										   IsVisible="{Binding HashFileStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+								<!-- compare verdict: MATCH (success) / MISMATCH (danger) -->
+								<Border DockPanel.Dock="Top" Classes="badge" Classes.success="{Binding HashCompareOk}" Classes.danger="{Binding !HashCompareOk}"
+										HorizontalAlignment="Left" Margin="0,0,0,10"
+										IsVisible="{Binding HashCompare, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+									<TextBlock Text="{Binding HashCompare}" FontSize="{StaticResource Font.Small}" TextWrapping="Wrap"/>
+								</Border>
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Digest"/>
+								<TextBox Text="{Binding HashOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Digests appear here"/>
+							</DockPanel>
+						</Grid>
+					</TabItem>
+
+					<TabItem Header="Hash ID">
+						<Grid RowDefinitions="Auto, Auto, *" RowSpacing="12">
+							<StackPanel Grid.Row="0">
+								<TextBlock Classes="fieldLabel" Text="Hash"/>
+								<TextBox Classes="field mono" helpers:InputAssist.PasteButton="True" Text="{Binding HashIdInput, Mode=TwoWay}" PlaceholderText="Paste a hash to identify">
 									<TextBox.KeyBindings>
 										<KeyBinding Gesture="Enter" Command="{Binding RunHashIdCommand}"/>
 									</TextBox.KeyBindings>
 								</TextBox>
-								<Button Grid.Column="1" Command="{Binding RunHashIdCommand}" Content="IDENTIFY" Classes="primary" Margin="0,0,8,0"/>
-								<Button Grid.Column="2" Command="{Binding ClearCommand}" CommandParameter="hashid" Content="CLEAR" Classes="ghost"/>
-							</Grid>
-							<TextBox Grid.Row="1" Text="{Binding HashIdOutput}" IsReadOnly="True" PlaceholderText="Possible hash types..." FontFamily="Cascadia Code,Consolas"/>
+							</StackPanel>
+							<WrapPanel Grid.Row="1" Classes="actions">
+								<Button Command="{Binding RunHashIdCommand}" Content="Identify" Classes="primary"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="hashid" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding HashIdOutput}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
+							</WrapPanel>
+							<DockPanel Grid.Row="2">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Possible types"/>
+								<TextBox Text="{Binding HashIdOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Likely hash types, best match first"/>
+							</DockPanel>
 						</Grid>
 					</TabItem>
 
 					<TabItem Header="JWT">
-						<Grid RowDefinitions="Auto, Auto, *" Margin="0,2,0,0">
-							<TextBox Grid.Row="0" Text="{Binding JwtInput, Mode=TwoWay}" AcceptsReturn="False" Height="80"
-									 PlaceholderText="Paste a JWT — eyJhbGci... (header.payload.signature)" FontFamily="Cascadia Code,Consolas">
-								<TextBox.KeyBindings>
-									<KeyBinding Gesture="Enter" Command="{Binding RunJwtCommand}"/>
-								</TextBox.KeyBindings>
-							</TextBox>
-							<Grid Grid.Row="1" ColumnDefinitions="*, 90, 70" Margin="0,8">
-								<TextBox Grid.Column="0" Text="{Binding JwtKey, Mode=TwoWay}" AcceptsReturn="False" TextWrapping="NoWrap"
-										 PlaceholderText="(optional) HMAC secret or PEM public key — to verify signature"
-										 FontFamily="Cascadia Code,Consolas" Margin="0,0,8,0"/>
-								<Button Grid.Column="1" Command="{Binding RunJwtCommand}" Content="DECODE" Classes="primary" Margin="0,0,8,0"/>
-								<Button Grid.Column="2" Command="{Binding ClearCommand}" CommandParameter="jwt" Content="CLEAR" Classes="ghost"/>
-							</Grid>
-							<Grid Grid.Row="2" RowDefinitions="*, Auto">
-								<TextBox Grid.Row="0" Text="{Binding JwtOutput}" IsReadOnly="True"
-										 PlaceholderText="Decoded header, payload &amp; claims..." FontFamily="Cascadia Code,Consolas"/>
-								<TextBlock Grid.Row="1" Text="{Binding JwtVerify}" FontFamily="Cascadia Code,Consolas" FontSize="11.5"
-										   Margin="2,8,2,0" Foreground="#7FCBA6" TextWrapping="Wrap"
-										   IsVisible="{Binding JwtVerify, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-							</Grid>
+						<Grid RowDefinitions="Auto, Auto, Auto, *" RowSpacing="12">
+							<StackPanel Grid.Row="0">
+								<TextBlock Classes="fieldLabel" Text="Token"/>
+								<TextBox Classes="field multiline mono" helpers:InputAssist.PasteButton="True" Text="{Binding JwtInput, Mode=TwoWay}" AcceptsReturn="False" Height="80"
+										 PlaceholderText="Paste a JWT (eyJhbGci…)"
+										 ToolTip.Tip="A JSON Web Token: header.payload.signature">
+									<TextBox.KeyBindings>
+										<KeyBinding Gesture="Enter" Command="{Binding RunJwtCommand}"/>
+									</TextBox.KeyBindings>
+								</TextBox>
+							</StackPanel>
+							<StackPanel Grid.Row="1">
+								<TextBlock Classes="fieldLabel" Text="Verification key"/>
+								<TextBox Classes="field mono" Text="{Binding JwtKey, Mode=TwoWay}"
+										 PlaceholderText="Optional: secret or PEM key"
+										 ToolTip.Tip="Optional: an HMAC secret or a PEM public key to verify the signature"/>
+							</StackPanel>
+							<WrapPanel Grid.Row="2" Classes="actions">
+								<Button Command="{Binding RunJwtCommand}" Content="Decode" Classes="primary"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="jwt" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding JwtOutput}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
+							</WrapPanel>
+							<DockPanel Grid.Row="3">
+								<!-- signature check (✓ / ✗ / ⚠ come with the message) -->
+								<Border DockPanel.Dock="Top" Classes="callout" Margin="0,0,0,12"
+										IsVisible="{Binding JwtVerify, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+									<TextBlock Text="{Binding JwtVerify}" FontFamily="{StaticResource MonoFont}"/>
+								</Border>
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Decoded"/>
+								<TextBox Text="{Binding JwtOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Header, payload and claims"/>
+							</DockPanel>
+						</Grid>
+					</TabItem>
+
+					<TabItem Header="JWT sign">
+						<Grid RowDefinitions="Auto, *, Auto, Auto, *" RowSpacing="12">
+							<StackPanel Grid.Row="0">
+								<TextBlock Classes="fieldLabel" Text="Header"/>
+								<TextBox Classes="field multiline mono" Text="{Binding JwtSignHeader, Mode=TwoWay}" Height="56"
+										 PlaceholderText="{}{&quot;alg&quot;:&quot;HS256&quot;,&quot;typ&quot;:&quot;JWT&quot;}"/>
+							</StackPanel>
+							<DockPanel Grid.Row="1">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Payload"/>
+								<TextBox Classes="field multiline mono" helpers:InputAssist.PasteButton="True" Text="{Binding JwtSignPayload, Mode=TwoWay}"
+										 PlaceholderText="{}{ &quot;sub&quot;: &quot;1234567890&quot;, &quot;name&quot;: &quot;John Doe&quot; }"/>
+							</DockPanel>
+							<StackPanel Grid.Row="2">
+								<TextBlock Classes="fieldLabel" Text="Secret"/>
+								<TextBox Classes="field mono" Text="{Binding JwtSignSecret, Mode=TwoWay}"
+										 PlaceholderText="HMAC secret"
+										 ToolTip.Tip="The HMAC secret used for HS256 / HS384 / HS512"/>
+							</StackPanel>
+							<WrapPanel Grid.Row="3" Classes="actions">
+								<Button Command="{Binding SignJwtCommand}" Content="Sign" Classes="primary"/>
+								<Button Command="{Binding JwtSetAlgCommand}" CommandParameter="HS256" Content="HS256" Classes="secondary"/>
+								<Button Command="{Binding JwtSetAlgCommand}" CommandParameter="HS384" Content="HS384" Classes="secondary"/>
+								<Button Command="{Binding JwtSetAlgCommand}" CommandParameter="HS512" Content="HS512" Classes="secondary"/>
+								<Button Command="{Binding JwtAddTimesCommand}" Content="+ iat / exp" Classes="secondary"
+										ToolTip.Tip="Add iat (now) and exp (in 1 hour) to the payload"
+										AutomationProperties.Name="Add iat and exp claims"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="jwtsign" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding JwtSignOutput}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
+							</WrapPanel>
+							<DockPanel Grid.Row="4">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Signed token"/>
+								<!-- a token is one long line: wrap it so the whole thing is visible (no horizontal
+									 scrolling, or the text would be measured unbounded and never wrap) -->
+								<TextBox Text="{Binding JwtSignOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True" TextWrapping="Wrap"
+										 ScrollViewer.HorizontalScrollBarVisibility="Disabled" PlaceholderText="The signed token"/>
+							</DockPanel>
 						</Grid>
 					</TabItem>
 
@@ -156,108 +472,248 @@
 			</TabItem>
 
 			<!-- ============ TEXT ============ -->
-			<TabItem Header="TEXT" Classes="cat">
-				<TabControl Background="Transparent" Padding="0,4,0,0">
+			<TabItem Header="Text">
+				<TabControl Classes="tools" SelectedIndex="{Binding TextToolIndex}">
 
-					<TabItem Header="REGEX">
-						<Grid RowDefinitions="Auto, Auto, *" Margin="0,2,0,0">
-							<Grid Grid.Row="0" ColumnDefinitions="*, 175, 70" Margin="0,0,0,8">
-								<TextBox Grid.Column="0" Text="{Binding RegexPattern, Mode=TwoWay}"
-										 PlaceholderText="Regex pattern, e.g. \d+"
-										 AcceptsReturn="False" TextWrapping="NoWrap"
-										 FontFamily="Cascadia Code,Consolas" Margin="0,0,8,0">
-									<TextBox.KeyBindings>
-										<KeyBinding Gesture="Enter" Command="{Binding RunRegexCommand}"/>
-									</TextBox.KeyBindings>
-								</TextBox>
-								<ComboBox Grid.Column="1" Classes="field" ItemsSource="{Binding DefaultRegexList}"
-										  SelectedItem="{Binding SelectedRegex}"
-										  PlaceholderText="Presets..."
-										  HorizontalAlignment="Stretch" Margin="0,0,8,0">
+					<TabItem Header="Regex">
+						<Grid RowDefinitions="Auto, *, Auto, Auto, *" RowSpacing="12">
+							<!-- Wide: pattern | replacement side by side. Narrow (phone): stacked. -->
+							<Grid Grid.Row="0" helpers:Responsive.BreakWidth="520" ColumnDefinitions="*, *" RowDefinitions="Auto, Auto" ColumnSpacing="12">
+								<Grid.Styles>
+									<Style Selector="Grid.wide > StackPanel#RegexPatternCol">
+										<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/>
+										<Setter Property="Grid.ColumnSpan" Value="1"/>
+									</Style>
+									<Style Selector="Grid.wide > StackPanel#RegexReplaceCol">
+										<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/>
+										<Setter Property="Grid.ColumnSpan" Value="1"/>
+									</Style>
+									<Style Selector="Grid.narrow > StackPanel#RegexPatternCol">
+										<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/>
+										<Setter Property="Grid.ColumnSpan" Value="2"/>
+									</Style>
+									<Style Selector="Grid.narrow > StackPanel#RegexReplaceCol">
+										<Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/>
+										<Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,12,0,0"/>
+									</Style>
+								</Grid.Styles>
+								<StackPanel x:Name="RegexPatternCol">
+									<TextBlock Classes="fieldLabel" Text="Pattern"/>
+									<TextBox Classes="field mono" Text="{Binding RegexPattern, Mode=TwoWay}" PlaceholderText="e.g. \d+">
+										<TextBox.KeyBindings>
+											<KeyBinding Gesture="Enter" Command="{Binding RunRegexCommand}"/>
+										</TextBox.KeyBindings>
+									</TextBox>
+								</StackPanel>
+								<StackPanel x:Name="RegexReplaceCol">
+									<TextBlock Classes="fieldLabel" Text="Replacement"/>
+									<TextBox Classes="field mono" Text="{Binding RegexReplacement, Mode=TwoWay}"
+											 PlaceholderText="e.g. $1 or ${name}"
+											 ToolTip.Tip="Used by Replace: $1, $2 or ${name} insert the matched groups"/>
+								</StackPanel>
+							</Grid>
+							<DockPanel Grid.Row="1">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Text"/>
+								<TextBox Classes="field multiline" helpers:InputAssist.PasteButton="True" Text="{Binding RegexInput, Mode=TwoWay}" PlaceholderText="Text to search"/>
+							</DockPanel>
+							<WrapPanel Grid.Row="2" Classes="options">
+								<!-- a preset fills the pattern; the combo names itself, so no caption above it -->
+								<ComboBox Classes="field" Width="250" ItemsSource="{Binding DefaultRegexList}" SelectedItem="{Binding SelectedRegex}"
+										  PlaceholderText="Pattern presets">
 									<ComboBox.ItemTemplate>
 										<DataTemplate>
-											<TextBlock Text="{Binding Key}" FontSize="11"/>
+											<TextBlock Text="{Binding Key}"/>
 										</DataTemplate>
 									</ComboBox.ItemTemplate>
 								</ComboBox>
-								<Button Grid.Column="2" Command="{Binding RunRegexCommand}" Content="RUN" Classes="primary"/>
-							</Grid>
-
-							<Grid Grid.Row="1" ColumnDefinitions="*, 70" Margin="0,0,0,8">
-								<TextBox Grid.Column="0" Text="{Binding RegexReplacement, Mode=TwoWay}"
-										 PlaceholderText="Replacement (use $1, $2 for groups)... — for REPLACE"
-										 AcceptsReturn="False" TextWrapping="NoWrap"
-										 FontFamily="Cascadia Code,Consolas" Margin="0,0,8,0"/>
-								<Button Grid.Column="1" Command="{Binding ReplaceRegexCommand}" Content="REPLACE" Classes="secondary"/>
-							</Grid>
-
-							<Grid Grid.Row="2" RowDefinitions="*, Auto, *">
-								<TextBox Grid.Row="0" Text="{Binding RegexInput, Mode=TwoWay}" PlaceholderText="Text to search..."/>
-								<WrapPanel Grid.Row="1" Classes="btns" Margin="0,8">
-									<Button Command="{Binding RunRegexCommand}" Content="MATCH ➔" Classes="primary"/>
-									<CheckBox IsChecked="{Binding RegexIgnoreCase}" Content="Ignore Case" FontSize="10" Foreground="#C7C8CF" MinHeight="0"/>
-									<CheckBox IsChecked="{Binding RegexMultiline}" Content="Multiline" FontSize="10" Foreground="#C7C8CF" MinHeight="0"/>
-									<Button Command="{Binding ClearCommand}" CommandParameter="regex" Content="CLEAR" Classes="ghost"/>
-								</WrapPanel>
-								<TextBox Grid.Row="2" Text="{Binding RegexOutput}" IsReadOnly="True" PlaceholderText="Result / Matches..." FontFamily="Cascadia Code,Consolas"/>
-							</Grid>
-						</Grid>
-					</TabItem>
-
-					<TabItem Header="TEXT LAB">
-						<Grid RowDefinitions="Auto, *" Margin="0,2,0,0">
-							<StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="16" Margin="0,0,0,6">
-								<TextBlock Text="{Binding CharCount, StringFormat='CHARS: \{0\}'}" FontSize="10" Foreground="#9E9FA8"/>
-								<TextBlock Text="{Binding WordCount, StringFormat='WORDS: \{0\}'}" FontSize="10" Foreground="#9E9FA8"/>
-								<TextBlock Text="{Binding LineCount, StringFormat='LINES: \{0\}'}" FontSize="10" Foreground="#9E9FA8"/>
-							</StackPanel>
-							<Grid Grid.Row="1" RowDefinitions="*, Auto">
-								<TextBox Grid.Row="0" Text="{Binding EditInput, Mode=TwoWay}" PlaceholderText="Edit text here..."/>
-								<WrapPanel Grid.Row="1" Classes="btns" Margin="0,8,0,0">
-									<Button Command="{Binding EditActionCommand}" CommandParameter="sort" Content="SORT A-Z" Classes="secondary"/>
-									<Button Command="{Binding EditActionCommand}" CommandParameter="unique" Content="DISTINCT" Classes="secondary"/>
-									<Button Command="{Binding EditActionCommand}" CommandParameter="trim" Content="TRIM" Classes="secondary"/>
-									<Button Command="{Binding EditActionCommand}" CommandParameter="clean" Content="CLEAN UP" Classes="secondary"/>
-									<Button Command="{Binding EditActionCommand}" CommandParameter="upper" Content="UPPER" Classes="secondary"/>
-									<Button Command="{Binding EditActionCommand}" CommandParameter="lower" Content="lower" Classes="secondary"/>
-									<Button Command="{Binding ClearCommand}" CommandParameter="edit" Content="CLEAR" Classes="ghost"/>
-								</WrapPanel>
-							</Grid>
-						</Grid>
-					</TabItem>
-
-					<TabItem Header="CASE">
-						<Grid RowDefinitions="*, Auto, *" Margin="0,2,0,0">
-							<TextBox Grid.Row="0" Text="{Binding CaseInput, Mode=TwoWay}" PlaceholderText="Input text..."/>
-							<WrapPanel Grid.Row="1" Classes="btns" Margin="0,8">
-								<Button Command="{Binding CaseActionCommand}" CommandParameter="upper" Content="UPPER" Classes="secondary"/>
-								<Button Command="{Binding CaseActionCommand}" CommandParameter="lower" Content="lower" Classes="secondary"/>
-								<Button Command="{Binding CaseActionCommand}" CommandParameter="title" Content="Title Case" Classes="secondary"/>
-								<Button Command="{Binding CaseActionCommand}" CommandParameter="sentence" Content="Sentence" Classes="secondary"/>
-								<Button Command="{Binding CaseActionCommand}" CommandParameter="camel" Content="camelCase" Classes="secondary"/>
-								<Button Command="{Binding CaseActionCommand}" CommandParameter="pascal" Content="PascalCase" Classes="secondary"/>
-								<Button Command="{Binding CaseActionCommand}" CommandParameter="snake" Content="snake_case" Classes="secondary"/>
-								<Button Command="{Binding CaseActionCommand}" CommandParameter="kebab" Content="kebab-case" Classes="secondary"/>
-								<Button Command="{Binding CaseActionCommand}" CommandParameter="constant" Content="CONSTANT" Classes="secondary"/>
-								<Button Command="{Binding CaseActionCommand}" CommandParameter="slug" Content="slugify" Classes="secondary"/>
-								<Button Command="{Binding CaseActionCommand}" CommandParameter="reverse" Content="Reverse" Classes="secondary"/>
-								<Button Command="{Binding ClearCommand}" CommandParameter="case" Content="CLEAR" Classes="ghost"/>
+								<CheckBox IsChecked="{Binding RegexIgnoreCase}" Content="Ignore case"/>
+								<CheckBox IsChecked="{Binding RegexMultiline}" Content="Multiline"
+										  ToolTip.Tip="^ and $ match at the start and end of every line"/>
+								<CheckBox IsChecked="{Binding RegexSingleline}" Content="Singleline"
+										  ToolTip.Tip=". matches every character, \n included"/>
+								<CheckBox IsChecked="{Binding RegexExplicitCapture}" Content="Explicit capture"
+										  ToolTip.Tip="Only named groups (?&lt;name&gt;…) capture"/>
 							</WrapPanel>
-							<TextBox Grid.Row="2" Text="{Binding CaseOutput}" IsReadOnly="True" PlaceholderText="Result..."/>
+							<WrapPanel Grid.Row="3" Classes="actions">
+								<Button Command="{Binding RunRegexCommand}" Content="Match" Classes="primary"/>
+								<Button Command="{Binding ReplaceRegexCommand}" Content="Replace" Classes="secondary"/>
+								<Button Command="{Binding SplitRegexCommand}" Content="Split" Classes="secondary"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="regex" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding RegexOutput}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
+							</WrapPanel>
+							<DockPanel Grid.Row="4">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Result"/>
+								<TextBox Text="{Binding RegexOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Matches, replaced text or split parts"/>
+							</DockPanel>
 						</Grid>
 					</TabItem>
 
-					<TabItem Header="DIFF">
-						<Grid RowDefinitions="*, Auto, *" Margin="0,2,0,0">
-							<Grid Grid.Row="0" ColumnDefinitions="*, *">
-								<TextBox Grid.Column="0" Text="{Binding DiffLeft, Mode=TwoWay}" PlaceholderText="Original text..." Margin="0,0,4,0" FontFamily="Cascadia Code,Consolas"/>
-								<TextBox Grid.Column="1" Text="{Binding DiffRight, Mode=TwoWay}" PlaceholderText="Changed text..." Margin="4,0,0,0" FontFamily="Cascadia Code,Consolas"/>
+					<TabItem Header="Text lab">
+						<Grid RowDefinitions="*, Auto" RowSpacing="12">
+							<DockPanel Grid.Row="0">
+								<!-- live counters -->
+								<WrapPanel DockPanel.Dock="Top" ItemSpacing="18" LineSpacing="4" Margin="2,0,0,8">
+									<TextBlock Classes="stat"><Run Text="Chars "/><Run Text="{Binding CharCount, StringFormat='\{0:N0\}'}" Foreground="{DynamicResource Text.Primary}" FontWeight="SemiBold"/></TextBlock>
+									<TextBlock Classes="stat"><Run Text="No spaces "/><Run Text="{Binding CharNoSpaceCount, StringFormat='\{0:N0\}'}" Foreground="{DynamicResource Text.Primary}" FontWeight="SemiBold"/></TextBlock>
+									<TextBlock Classes="stat"><Run Text="Words "/><Run Text="{Binding WordCount, StringFormat='\{0:N0\}'}" Foreground="{DynamicResource Text.Primary}" FontWeight="SemiBold"/></TextBlock>
+									<TextBlock Classes="stat"><Run Text="Lines "/><Run Text="{Binding LineCount, StringFormat='\{0:N0\}'}" Foreground="{DynamicResource Text.Primary}" FontWeight="SemiBold"/></TextBlock>
+									<TextBlock Classes="stat"><Run Text="Unique lines "/><Run Text="{Binding UniqueLineCount, StringFormat='\{0:N0\}'}" Foreground="{DynamicResource Text.Primary}" FontWeight="SemiBold"/></TextBlock>
+									<TextBlock Classes="stat"><Run Text="UTF-8 bytes "/><Run Text="{Binding ByteCount, StringFormat='\{0:N0\}'}" Foreground="{DynamicResource Text.Primary}" FontWeight="SemiBold"/></TextBlock>
+								</WrapPanel>
+								<TextBlock DockPanel.Dock="Bottom" Classes="status" Margin="2,8,0,0" Text="{Binding EditStatus}"
+										   IsVisible="{Binding EditStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+								<TextBox Classes="field multiline mono" helpers:InputAssist.PasteButton="True" Text="{Binding EditInput, Mode=TwoWay}"
+										 PlaceholderText="Text to edit in place (Undo restores)"
+										 ToolTip.Tip="Every action below rewrites this text in place; Undo restores it"/>
+							</DockPanel>
+							<ScrollViewer Grid.Row="1" Classes="ops">
+								<StackPanel Spacing="8">
+									<WrapPanel Classes="actions">
+										<Button Command="{Binding EditActionCommand}" CommandParameter="sort" Content="Sort A–Z" Classes="secondary"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="sortdesc" Content="Sort Z–A" Classes="secondary"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="natural" Content="Natural sort" Classes="secondary"
+												ToolTip.Tip="Numbers sort by value: file2 before file10"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="shuffle" Content="Shuffle" Classes="secondary"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="reverse" Content="Reverse lines" Classes="secondary"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="reversetext" Content="Reverse text" Classes="secondary"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="unique" Content="Distinct" Classes="secondary"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="uniqueci" Content="Distinct (Aa)" Classes="secondary"
+												ToolTip.Tip="Remove duplicate lines, ignoring case (keeps the first)"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="noempty" Content="No empty lines" Classes="secondary"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="trimlines" Content="Trim lines" Classes="secondary"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="trim" Content="Trim" Classes="secondary"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="clean" Content="Clean up" Classes="secondary"
+												ToolTip.Tip="Trim every line and drop the empty ones"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="collapse" Content="Collapse spaces" Classes="secondary"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="oneline" Content="One line" Classes="secondary"
+												ToolTip.Tip="Remove all line breaks (joined with a space)"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="number" Content="Number lines" Classes="secondary"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="upper" Content="UPPER" Classes="secondary"/>
+										<Button Command="{Binding EditActionCommand}" CommandParameter="lower" Content="lower" Classes="secondary"/>
+									</WrapPanel>
+									<!-- fields + their action: one line when there is room; each group wraps on its own on a
+										 phone. Undo / Clear / Copy close the row as a group of their own. -->
+									<WrapPanel Classes="actions" ItemSpacing="20">
+										<WrapPanel Classes="actions">
+											<TextBox Classes="field" Width="130" Text="{Binding EditPrefix}" PlaceholderText="Prefix"/>
+											<TextBox Classes="field" Width="130" Text="{Binding EditSuffix}" PlaceholderText="Suffix"/>
+											<Button Command="{Binding EditActionCommand}" CommandParameter="affix" Content="Add to lines" Classes="secondary"/>
+										</WrapPanel>
+										<WrapPanel Classes="actions">
+											<TextBox Classes="field mono" Width="110" Text="{Binding EditSeparator}" PlaceholderText="Separator"
+													 ToolTip.Tip="Separator for Join lines / delimiter for Split → lines — \t and \n are understood"/>
+											<Button Command="{Binding EditActionCommand}" CommandParameter="join" Content="Join lines" Classes="secondary"/>
+											<Button Command="{Binding EditActionCommand}" CommandParameter="split" Content="Split → lines" Classes="secondary"/>
+										</WrapPanel>
+										<WrapPanel Classes="actions">
+											<TextBox Classes="field" Width="130" Text="{Binding EditFind}" PlaceholderText="Find"/>
+											<TextBox Classes="field" Width="130" Text="{Binding EditReplace}" PlaceholderText="Replace with"/>
+											<CheckBox IsChecked="{Binding EditIgnoreCase}" Content="Aa"
+													  ToolTip.Tip="Ignore case when finding"/>
+											<Button Command="{Binding EditActionCommand}" CommandParameter="replace" Content="Replace all" Classes="secondary"/>
+										</WrapPanel>
+										<StackPanel Classes="util">
+											<Button Command="{Binding EditUndoCommand}" Content="Undo" Classes="ghost"/>
+											<Button Command="{Binding ClearCommand}" CommandParameter="edit" Content="Clear" Classes="ghost"/>
+											<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding EditInput}" Content="Copy" Classes="ghost"/>
+										</StackPanel>
+									</WrapPanel>
+								</StackPanel>
+							</ScrollViewer>
+						</Grid>
+					</TabItem>
+
+					<TabItem Header="Case">
+						<Grid RowDefinitions="*, Auto, *" RowSpacing="12">
+							<DockPanel Grid.Row="0">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
+								<TextBox Classes="field multiline" helpers:InputAssist.PasteButton="True" Text="{Binding CaseInput, Mode=TwoWay}" PlaceholderText="Text to convert"/>
+							</DockPanel>
+							<!-- the labels show each style -->
+							<ScrollViewer Grid.Row="1" Classes="ops">
+								<WrapPanel Classes="actions">
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="upper" Content="UPPER" Classes="secondary"/>
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="lower" Content="lower" Classes="secondary"/>
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="title" Content="Title Case" Classes="secondary"/>
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="sentence" Content="Sentence case" Classes="secondary"/>
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="camel" Content="camelCase" Classes="secondary"/>
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="pascal" Content="PascalCase" Classes="secondary"/>
+									<!-- "__" = a literal underscore (a single "_" marks an access key in button content) -->
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="snake" Content="snake__case" Classes="secondary"/>
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="kebab" Content="kebab-case" Classes="secondary"/>
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="constant" Content="CONSTANT__CASE" Classes="secondary"/>
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="dot" Content="dot.case" Classes="secondary"/>
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="path" Content="path/case" Classes="secondary"/>
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="train" Content="Train-Case" Classes="secondary"/>
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="slug" Content="slugify" Classes="secondary"/>
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="invert" Content="iNVERT cASE" Classes="secondary"/>
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="alternating" Content="aLtErNaTiNg" Classes="secondary"/>
+									<Button Command="{Binding CaseActionCommand}" CommandParameter="reverse" Content="Reverse" Classes="secondary"/>
+									<StackPanel Classes="util">
+										<Button Command="{Binding ClearCommand}" CommandParameter="case" Content="Clear" Classes="ghost"/>
+										<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding CaseOutput}" Content="Copy" Classes="ghost"/>
+									</StackPanel>
+								</WrapPanel>
+							</ScrollViewer>
+							<DockPanel Grid.Row="2">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Result"/>
+								<TextBox Text="{Binding CaseOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Converted text"/>
+							</DockPanel>
+						</Grid>
+					</TabItem>
+
+					<TabItem Header="Diff">
+						<Grid RowDefinitions="*, Auto, Auto, *" RowSpacing="12">
+							<!-- Wide: original | changed side by side. Narrow (phone): stacked, each full width. -->
+							<Grid Grid.Row="0" helpers:Responsive.BreakWidth="520" ColumnDefinitions="*, *" RowDefinitions="*, *" ColumnSpacing="12" RowSpacing="12">
+								<Grid.Styles>
+									<Style Selector="Grid.wide > DockPanel#DiffACol">
+										<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/>
+										<Setter Property="Grid.RowSpan" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+									</Style>
+									<Style Selector="Grid.wide > DockPanel#DiffBCol">
+										<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/>
+										<Setter Property="Grid.RowSpan" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+									</Style>
+									<Style Selector="Grid.narrow > DockPanel#DiffACol">
+										<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/>
+										<Setter Property="Grid.RowSpan" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+									</Style>
+									<Style Selector="Grid.narrow > DockPanel#DiffBCol">
+										<Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/>
+										<Setter Property="Grid.RowSpan" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+									</Style>
+								</Grid.Styles>
+								<DockPanel x:Name="DiffACol">
+									<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Original"/>
+									<TextBox x:Name="DiffA" Classes="field multiline mono" helpers:InputAssist.PasteButton="True" Text="{Binding DiffLeft, Mode=TwoWay}" PlaceholderText="Original text"/>
+								</DockPanel>
+								<DockPanel x:Name="DiffBCol">
+									<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Changed"/>
+									<TextBox x:Name="DiffB" Classes="field multiline mono" helpers:InputAssist.PasteButton="True" Text="{Binding DiffRight, Mode=TwoWay}" PlaceholderText="Changed text"/>
+								</DockPanel>
 							</Grid>
-							<StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,8">
-								<Button Command="{Binding RunDiffCommand}" Content="COMPARE" Classes="primary" Width="120"/>
-								<Button Command="{Binding ClearCommand}" CommandParameter="diff" Content="CLEAR" Classes="ghost" Width="90"/>
-							</StackPanel>
-							<TextBox Grid.Row="2" Text="{Binding DiffOutput}" IsReadOnly="True" PlaceholderText="Diff result ( - removed, + added )..." FontFamily="Cascadia Code,Consolas"/>
+							<WrapPanel Grid.Row="1" Classes="options">
+								<CheckBox IsChecked="{Binding DiffIgnoreCase}" Content="Ignore case"/>
+								<CheckBox IsChecked="{Binding DiffIgnoreWhitespace}" Content="Ignore whitespace"/>
+								<CheckBox IsChecked="{Binding DiffIgnoreBlankLines}" Content="Ignore blank lines"/>
+							</WrapPanel>
+							<WrapPanel Grid.Row="2" Classes="actions">
+								<Button Command="{Binding RunDiffCommand}" Content="Compare" Classes="primary"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="diff" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding DiffOutput}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
+							</WrapPanel>
+							<DockPanel Grid.Row="3">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Differences"/>
+								<TextBox Text="{Binding DiffOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="- removed, + added"/>
+							</DockPanel>
 						</Grid>
 					</TabItem>
 
@@ -265,32 +721,90 @@
 			</TabItem>
 
 			<!-- ============ DATA ============ -->
-			<TabItem Header="DATA" Classes="cat">
-				<TabControl Background="Transparent" Padding="0,4,0,0">
+			<TabItem Header="Data">
+				<TabControl Classes="tools" SelectedIndex="{Binding DataToolIndex}">
 
-					<TabItem Header="JSON LAB">
-						<Grid RowDefinitions="*, Auto, *" Margin="0,2,0,0">
-							<TextBox Grid.Row="0" Text="{Binding JsonInput, Mode=TwoWay}" PlaceholderText="Paste JSON here..."/>
-							<WrapPanel Grid.Row="1" Classes="btns" Margin="0,8">
-								<Button Command="{Binding JsonActionCommand}" CommandParameter="format" Content="BEAUTIFY" Classes="primary"/>
-								<Button Command="{Binding JsonActionCommand}" CommandParameter="minify" Content="MINIFY" Classes="secondary"/>
-								<Button Command="{Binding ClearCommand}" CommandParameter="json" Content="CLEAR" Classes="ghost"/>
+					<TabItem Header="JSON">
+						<Grid RowDefinitions="*, Auto, *" RowSpacing="12">
+							<DockPanel Grid.Row="0">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
+								<TextBox Classes="field multiline mono" helpers:InputAssist.PasteButton="True" Text="{Binding JsonInput, Mode=TwoWay}"
+										 PlaceholderText="Paste JSON"
+										 ToolTip.Tip="Beautify also accepts bare keys and 'single quotes'"/>
+							</DockPanel>
+							<WrapPanel Grid.Row="1" Classes="actions">
+								<Button Command="{Binding JsonActionCommand}" CommandParameter="format" Content="Beautify" Classes="primary"/>
+								<Button Command="{Binding JsonActionCommand}" CommandParameter="minify" Content="Minify" Classes="secondary"/>
+								<Button Command="{Binding JsonActionCommand}" CommandParameter="validate" Content="Validate" Classes="secondary"/>
+								<Button Command="{Binding JsonActionCommand}" CommandParameter="sort" Content="Sort keys" Classes="secondary"/>
+								<Button Command="{Binding JsonActionCommand}" CommandParameter="escape" Content="To string" Classes="secondary"
+										ToolTip.Tip="Escape the whole input into one JSON string literal"/>
+								<Button Command="{Binding JsonActionCommand}" CommandParameter="unescape" Content="From string" Classes="secondary"
+										ToolTip.Tip="Unescape a JSON string literal (pretty-prints it when it holds JSON)"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="json" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding JsonOutput}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
 							</WrapPanel>
-							<TextBox Grid.Row="2" Text="{Binding JsonOutput}" IsReadOnly="True" PlaceholderText="Result..." FontFamily="Cascadia Code,Consolas"/>
+							<DockPanel Grid.Row="2">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Result"/>
+								<TextBox Text="{Binding JsonOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Formatted JSON or the check result"/>
+							</DockPanel>
 						</Grid>
 					</TabItem>
 
-					<TabItem Header="CONVERT">
-						<Grid RowDefinitions="*, Auto, *" Margin="0,2,0,0">
-							<TextBox Grid.Row="0" Text="{Binding ConvertInput, Mode=TwoWay}" PlaceholderText="Paste JSON / YAML / CSV..." FontFamily="Cascadia Code,Consolas"/>
-							<WrapPanel Grid.Row="1" Classes="btns" Margin="0,8">
+					<TabItem Header="XML">
+						<Grid RowDefinitions="*, Auto, *" RowSpacing="12">
+							<DockPanel Grid.Row="0">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
+								<TextBox Classes="field multiline mono" helpers:InputAssist.PasteButton="True" Text="{Binding XmlInput, Mode=TwoWay}"
+										 PlaceholderText="Paste XML"
+										 ToolTip.Tip="DTDs are rejected (no XXE)"/>
+							</DockPanel>
+							<WrapPanel Grid.Row="1" Classes="actions">
+								<Button Command="{Binding XmlActionCommand}" CommandParameter="format" Content="Format" Classes="primary"/>
+								<Button Command="{Binding XmlActionCommand}" CommandParameter="minify" Content="Minify" Classes="secondary"/>
+								<Button Command="{Binding XmlActionCommand}" CommandParameter="json" Content="XML → JSON" Classes="secondary"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="xml" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding XmlOutput}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
+							</WrapPanel>
+							<DockPanel Grid.Row="2">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Result"/>
+								<TextBox Text="{Binding XmlOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Formatted XML or JSON"/>
+							</DockPanel>
+						</Grid>
+					</TabItem>
+
+					<TabItem Header="Convert">
+						<Grid RowDefinitions="*, Auto, *" RowSpacing="12">
+							<DockPanel Grid.Row="0">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
+								<TextBox Classes="field multiline mono" helpers:InputAssist.PasteButton="True" Text="{Binding ConvertInput, Mode=TwoWay}"
+										 PlaceholderText="JSON, YAML, CSV, TSV or a=1&amp;b=2"/>
+							</DockPanel>
+							<WrapPanel Grid.Row="1" Classes="actions">
 								<Button Command="{Binding ConvertActionCommand}" CommandParameter="json2yaml" Content="JSON → YAML" Classes="secondary"/>
 								<Button Command="{Binding ConvertActionCommand}" CommandParameter="yaml2json" Content="YAML → JSON" Classes="secondary"/>
 								<Button Command="{Binding ConvertActionCommand}" CommandParameter="json2csv" Content="JSON → CSV" Classes="secondary"/>
 								<Button Command="{Binding ConvertActionCommand}" CommandParameter="csv2json" Content="CSV → JSON" Classes="secondary"/>
-								<Button Command="{Binding ClearCommand}" CommandParameter="convert" Content="CLEAR" Classes="ghost"/>
+								<Button Command="{Binding ConvertActionCommand}" CommandParameter="csv2md" Content="CSV → Markdown" Classes="secondary"
+										ToolTip.Tip="CSV or TSV → a Markdown table"/>
+								<Button Command="{Binding ConvertActionCommand}" CommandParameter="qs2json" Content="Query → JSON" Classes="secondary"/>
+								<Button Command="{Binding ConvertActionCommand}" CommandParameter="json2qs" Content="JSON → query" Classes="secondary"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="convert" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding ConvertOutput}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
 							</WrapPanel>
-							<TextBox Grid.Row="2" Text="{Binding ConvertOutput}" IsReadOnly="True" PlaceholderText="Result..." FontFamily="Cascadia Code,Consolas"/>
+							<DockPanel Grid.Row="2">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Result"/>
+								<TextBox Text="{Binding ConvertOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Converted data"/>
+							</DockPanel>
 						</Grid>
 					</TabItem>
 
@@ -298,115 +812,241 @@
 			</TabItem>
 
 			<!-- ============ DEV ============ -->
-			<TabItem Header="DEV" Classes="cat">
-				<TabControl Background="Transparent" Padding="0,4,0,0">
+			<TabItem Header="Dev">
+				<TabControl Classes="tools" SelectedIndex="{Binding DevToolIndex}">
 
-					<TabItem Header="SUBNET">
-						<Grid RowDefinitions="Auto, *" Margin="0,2,0,0">
-							<Grid Grid.Row="0" ColumnDefinitions="*, 90, 70" Margin="0,0,0,8">
-								<TextBox Grid.Column="0" Text="{Binding SubnetInput, Mode=TwoWay}" AcceptsReturn="False"
-										 TextWrapping="NoWrap" PlaceholderText="192.168.1.0/24" FontFamily="Cascadia Code,Consolas" Margin="0,0,8,0">
+					<TabItem Header="Subnet">
+						<Grid RowDefinitions="Auto, Auto, *" RowSpacing="12">
+							<StackPanel Grid.Row="0">
+								<TextBlock Classes="fieldLabel" Text="Network (CIDR)"/>
+								<TextBox Classes="field mono" helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteButton="True"
+										 Text="{Binding SubnetInput, Mode=TwoWay}" PlaceholderText="192.168.1.0/24">
 									<TextBox.KeyBindings>
 										<KeyBinding Gesture="Enter" Command="{Binding RunSubnetCommand}"/>
 									</TextBox.KeyBindings>
 								</TextBox>
-								<Button Grid.Column="1" Command="{Binding RunSubnetCommand}" Content="CALC" Classes="primary" Margin="0,0,8,0"/>
-								<Button Grid.Column="2" Command="{Binding ClearCommand}" CommandParameter="subnet" Content="CLEAR" Classes="ghost"/>
-							</Grid>
-							<TextBox Grid.Row="1" Text="{Binding SubnetOutput}" IsReadOnly="True" PlaceholderText="Subnet details..." FontFamily="Cascadia Code,Consolas"/>
+							</StackPanel>
+							<WrapPanel Grid.Row="1" Classes="actions">
+								<Button Command="{Binding RunSubnetCommand}" Content="Calculate" Classes="primary"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="subnet" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding SubnetOutput}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
+							</WrapPanel>
+							<DockPanel Grid.Row="2">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Details"/>
+								<TextBox Text="{Binding SubnetOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Network, mask, range and host count"/>
+							</DockPanel>
 						</Grid>
 					</TabItem>
 
-					<TabItem Header="EPOCH">
-						<Grid RowDefinitions="Auto, *" Margin="0,2,0,0">
-							<Grid Grid.Row="0" ColumnDefinitions="*, 70, 70, 70" Margin="0,0,0,8">
-								<TextBox Grid.Column="0" Text="{Binding EpochInput, Mode=TwoWay}" AcceptsReturn="False"
-										 TextWrapping="NoWrap" PlaceholderText="Unix timestamp or date string..." FontFamily="Cascadia Code,Consolas" Margin="0,0,8,0">
+					<TabItem Header="IP conv">
+						<Grid RowDefinitions="Auto, Auto, *" RowSpacing="12">
+							<StackPanel Grid.Row="0">
+								<TextBlock Classes="fieldLabel" Text="IP address"/>
+								<TextBox Classes="field mono" helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteButton="True"
+										 Text="{Binding IpConvInput, Mode=TwoWay}"
+										 PlaceholderText="e.g. 192.168.1.10 or 2001:db8::1"
+										 ToolTip.Tip="Any form: 192.168.1.10 · 3232235786 · 0xC0A8010A · 11000000.10101000.… · 2001:db8::1">
+									<TextBox.KeyBindings>
+										<KeyBinding Gesture="Enter" Command="{Binding RunIpConvCommand}"/>
+									</TextBox.KeyBindings>
+								</TextBox>
+							</StackPanel>
+							<WrapPanel Grid.Row="1" Classes="actions">
+								<Button Command="{Binding RunIpConvCommand}" Content="Convert" Classes="primary"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="ipconv" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding IpConvOutput}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
+							</WrapPanel>
+							<DockPanel Grid.Row="2">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Result"/>
+								<TextBox Text="{Binding IpConvOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Integer, hex, binary, IPv6 and PTR forms"/>
+							</DockPanel>
+						</Grid>
+					</TabItem>
+
+					<TabItem Header="Epoch">
+						<Grid RowDefinitions="Auto, Auto, *" RowSpacing="12">
+							<StackPanel Grid.Row="0">
+								<TextBlock Classes="fieldLabel" Text="Timestamp or date"/>
+								<TextBox Classes="field mono" helpers:InputAssist.PasteButton="True" Text="{Binding EpochInput, Mode=TwoWay}"
+										 PlaceholderText="e.g. 1700000000, now, +1h"
+										 ToolTip.Tip="A Unix timestamp (s / ms / µs / ns), a date, now, +1h / -3d, or an ISO week like 2026-W39-3">
 									<TextBox.KeyBindings>
 										<KeyBinding Gesture="Enter" Command="{Binding RunEpochCommand}"/>
 									</TextBox.KeyBindings>
 								</TextBox>
-								<Button Grid.Column="1" Command="{Binding EpochNowCommand}" Content="NOW" Classes="secondary" Margin="0,0,8,0"/>
-								<Button Grid.Column="2" Command="{Binding RunEpochCommand}" Content="CONV" Classes="primary" Margin="0,0,8,0"/>
-								<Button Grid.Column="3" Command="{Binding ClearCommand}" CommandParameter="epoch" Content="CLEAR" Classes="ghost"/>
-							</Grid>
-							<TextBox Grid.Row="1" Text="{Binding EpochOutput}" IsReadOnly="True" PlaceholderText="Converted timestamps..." FontFamily="Cascadia Code,Consolas"/>
+							</StackPanel>
+							<WrapPanel Grid.Row="1" Classes="actions">
+								<Button Command="{Binding RunEpochCommand}" Content="Convert" Classes="primary"/>
+								<Button Command="{Binding EpochNowCommand}" Content="Now" Classes="secondary"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="epoch" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding EpochOutput}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
+							</WrapPanel>
+							<DockPanel Grid.Row="2">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Result"/>
+								<TextBox Text="{Binding EpochOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Converted timestamps"/>
+							</DockPanel>
 						</Grid>
 					</TabItem>
 
-					<TabItem Header="BASE CONV">
-						<Grid RowDefinitions="Auto, *" Margin="0,2,0,0">
-							<Grid Grid.Row="0" ColumnDefinitions="*, 90, 70" Margin="0,0,0,8">
-								<TextBox Grid.Column="0" Text="{Binding BaseInput, Mode=TwoWay}" AcceptsReturn="False"
-										 TextWrapping="NoWrap" PlaceholderText="255  or  0xFF  or  0b1010  or  0o17" FontFamily="Cascadia Code,Consolas" Margin="0,0,8,0">
+					<TabItem Header="Base conv">
+						<Grid RowDefinitions="Auto, Auto, Auto, *" RowSpacing="12">
+							<StackPanel Grid.Row="0">
+								<TextBlock Classes="fieldLabel" Text="Number"/>
+								<TextBox Classes="field mono" helpers:InputAssist.PasteButton="True" Text="{Binding BaseInput, Mode=TwoWay}"
+										 PlaceholderText="e.g. 255, 0xFF, 0b1010"
+										 ToolTip.Tip="Any size, negative too: 255 · -42 · 0xFF · 0b1010 · 0o17">
 									<TextBox.KeyBindings>
 										<KeyBinding Gesture="Enter" Command="{Binding RunBaseConvCommand}"/>
 									</TextBox.KeyBindings>
 								</TextBox>
-								<Button Grid.Column="1" Command="{Binding RunBaseConvCommand}" Content="CONVERT" Classes="primary" Margin="0,0,8,0"/>
-								<Button Grid.Column="2" Command="{Binding ClearCommand}" CommandParameter="baseconv" Content="CLEAR" Classes="ghost"/>
-							</Grid>
-							<TextBox Grid.Row="1" Text="{Binding BaseOutput}" IsReadOnly="True" PlaceholderText="dec / hex / oct / bin..." FontFamily="Cascadia Code,Consolas"/>
+							</StackPanel>
+							<WrapPanel Grid.Row="1" Classes="options">
+								<StackPanel>
+									<TextBlock Classes="fieldLabel" Text="From base"/>
+									<TextBox Classes="field mono" Width="120" Text="{Binding BaseFrom}" PlaceholderText="Auto"/>
+								</StackPanel>
+								<StackPanel>
+									<TextBlock Classes="fieldLabel" Text="To base"/>
+									<TextBox Classes="field mono" Width="120" Text="{Binding BaseTo}" PlaceholderText="2–36"/>
+								</StackPanel>
+							</WrapPanel>
+							<WrapPanel Grid.Row="2" Classes="actions">
+								<Button Command="{Binding RunBaseConvCommand}" Content="Convert" Classes="primary"/>
+								<StackPanel Classes="util">
+									<Button Command="{Binding ClearCommand}" CommandParameter="baseconv" Content="Clear" Classes="ghost"/>
+									<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding BaseOutput}" Content="Copy" Classes="ghost"/>
+								</StackPanel>
+							</WrapPanel>
+							<DockPanel Grid.Row="3">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Result"/>
+								<TextBox Text="{Binding BaseOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Decimal, hex, octal, binary and base N"/>
+							</DockPanel>
 						</Grid>
 					</TabItem>
 
-					<TabItem Header="CRON">
-						<Grid RowDefinitions="Auto, Auto, Auto, *" Margin="0,2,0,0">
-							<!-- presets + the assembled (editable) expression + copy -->
-							<Grid Grid.Row="0" ColumnDefinitions="Auto, *, 60" ColumnSpacing="8" Margin="0,0,0,8">
-								<ComboBox Grid.Column="0" ItemsSource="{Binding CronPresets}" SelectedItem="{Binding SelectedCronPreset}" PlaceholderText="Presets" MinWidth="170"/>
-								<TextBox Grid.Column="1" Text="{Binding CronExpression, Mode=TwoWay}" AcceptsReturn="False" TextWrapping="NoWrap" FontFamily="Cascadia Code,Consolas" FontSize="14" FontWeight="SemiBold" Foreground="#7FE0A8" PlaceholderText="* * * * *"/>
-								<Button Grid.Column="2" Command="{Binding CopyCronCommand}" Content="COPY" Classes="secondary"/>
+					<TabItem Header="Cron">
+						<Grid RowDefinitions="Auto, Auto, Auto, *" RowSpacing="12">
+							<!-- the assembled (editable) expression + copy, and the presets. Wide: one row.
+								 Narrow (phone): the presets drop to their own row. -->
+							<Grid Grid.Row="0" helpers:Responsive.BreakWidth="560" ColumnDefinitions="*, Auto, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="8">
+								<Grid.Styles>
+									<Style Selector="Grid.wide > StackPanel#CronPresetCol">
+										<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/>
+										<Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Margin" Value="12,0,0,0"/>
+									</Style>
+									<Style Selector="Grid.narrow > StackPanel#CronPresetCol">
+										<Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/>
+										<Setter Property="Grid.ColumnSpan" Value="3"/><Setter Property="Margin" Value="0,12,0,0"/>
+									</Style>
+								</Grid.Styles>
+								<StackPanel Grid.Column="0">
+									<TextBlock Classes="fieldLabel" Text="Expression"/>
+									<TextBox Classes="field mono" helpers:InputAssist.PasteButton="True" Text="{Binding CronExpression, Mode=TwoWay}"
+											 AcceptsReturn="False" TextWrapping="NoWrap" FontSize="14" FontWeight="SemiBold" PlaceholderText="* * * * *"/>
+								</StackPanel>
+								<Button Grid.Column="1" VerticalAlignment="Bottom" Command="{Binding CopyCronCommand}" Content="Copy" Classes="ghost" MinWidth="72"/>
+								<!-- MinWidth (not a fixed combo width): 220 wide beside the expression, full width once stacked -->
+								<StackPanel x:Name="CronPresetCol" MinWidth="220">
+									<TextBlock Classes="fieldLabel" Text="Preset"/>
+									<ComboBox Classes="field" ItemsSource="{Binding CronPresets}" SelectedItem="{Binding SelectedCronPreset}" PlaceholderText="Choose a preset"/>
+								</StackPanel>
 							</Grid>
 							<!-- the five fields (edit any; the expression above follows) -->
-							<Grid Grid.Row="1" ColumnDefinitions="*,*,*,*,*" ColumnSpacing="6" Margin="0,0,0,8">
+							<Grid Grid.Row="1" Classes="cronFields" ColumnDefinitions="*, *, *, *, *" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="8">
 								<Grid.Styles>
-									<Style Selector="TextBlock.cf"><Setter Property="FontSize" Value="9.5"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="Foreground" Value="#8A8B93"/><Setter Property="HorizontalAlignment" Value="Center"/></Style>
-									<Style Selector="TextBlock.ch"><Setter Property="FontSize" Value="9"/><Setter Property="Foreground" Value="#6E6F78"/><Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="Margin" Value="0,2,0,0"/></Style>
-									<Style Selector="TextBox.cfield"><Setter Property="FontFamily" Value="Cascadia Code,Consolas"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="Margin" Value="0,2,0,0"/></Style>
+									<Style Selector="Grid.cronFields > TextBlock.fieldLabel">
+										<Setter Property="HorizontalAlignment" Value="Center"/>
+										<Setter Property="Margin" Value="0,0,0,6"/>
+									</Style>
+									<Style Selector="Grid.cronFields > TextBlock.hint">
+										<Setter Property="HorizontalAlignment" Value="Center"/>
+										<Setter Property="Margin" Value="0,6,0,0"/>
+									</Style>
+									<Style Selector="Grid.cronFields > TextBox">
+										<Setter Property="HorizontalContentAlignment" Value="Center"/>
+									</Style>
 								</Grid.Styles>
-								<StackPanel Grid.Column="0"><TextBlock Classes="cf" Text="MINUTE"/><TextBox Classes="cfield" Text="{Binding CronMinute}"/><TextBlock Classes="ch" Text="0-59"/></StackPanel>
-								<StackPanel Grid.Column="1"><TextBlock Classes="cf" Text="HOUR"/><TextBox Classes="cfield" Text="{Binding CronHour}"/><TextBlock Classes="ch" Text="0-23"/></StackPanel>
-								<StackPanel Grid.Column="2"><TextBlock Classes="cf" Text="DAY (MONTH)"/><TextBox Classes="cfield" Text="{Binding CronDom}"/><TextBlock Classes="ch" Text="1-31"/></StackPanel>
-								<StackPanel Grid.Column="3"><TextBlock Classes="cf" Text="MONTH"/><TextBox Classes="cfield" Text="{Binding CronMonth}"/><TextBlock Classes="ch" Text="1-12 / JAN"/></StackPanel>
-								<StackPanel Grid.Column="4"><TextBlock Classes="cf" Text="DAY (WEEK)"/><TextBox Classes="cfield" Text="{Binding CronDow}"/><TextBlock Classes="ch" Text="0-6 / SUN"/></StackPanel>
+								<TextBlock Grid.Row="0" Grid.Column="0" Classes="fieldLabel" Text="Minute"/>
+								<TextBlock Grid.Row="0" Grid.Column="1" Classes="fieldLabel" Text="Hour"/>
+								<TextBlock Grid.Row="0" Grid.Column="2" Classes="fieldLabel" Text="Day"/>
+								<TextBlock Grid.Row="0" Grid.Column="3" Classes="fieldLabel" Text="Month"/>
+								<TextBlock Grid.Row="0" Grid.Column="4" Classes="fieldLabel" Text="Weekday"/>
+								<TextBox Grid.Row="1" Grid.Column="0" Classes="field mono" Text="{Binding CronMinute}"/>
+								<TextBox Grid.Row="1" Grid.Column="1" Classes="field mono" Text="{Binding CronHour}"/>
+								<TextBox Grid.Row="1" Grid.Column="2" Classes="field mono" Text="{Binding CronDom}"/>
+								<TextBox Grid.Row="1" Grid.Column="3" Classes="field mono" Text="{Binding CronMonth}"/>
+								<TextBox Grid.Row="1" Grid.Column="4" Classes="field mono" Text="{Binding CronDow}"/>
+								<TextBlock Grid.Row="2" Grid.Column="0" Classes="hint" Text="0–59"/>
+								<TextBlock Grid.Row="2" Grid.Column="1" Classes="hint" Text="0–23"/>
+								<TextBlock Grid.Row="2" Grid.Column="2" Classes="hint" Text="1–31"/>
+								<TextBlock Grid.Row="2" Grid.Column="3" Classes="hint" Text="1–12 / JAN"/>
+								<TextBlock Grid.Row="2" Grid.Column="4" Classes="hint" Text="0–7 / SUN" ToolTip.Tip="0 and 7 are both Sunday"/>
 							</Grid>
-							<!-- human description -->
-							<Border Grid.Row="2" Background="#141C17" BorderBrush="#24402E" BorderThickness="1" CornerRadius="6" Padding="10,7" Margin="0,0,0,8">
-								<TextBlock Text="{Binding CronDescription}" Foreground="#8CE6B0" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
+							<!-- the expression in words -->
+							<Border Grid.Row="2" Classes="callout accent">
+								<TextBlock Text="{Binding CronDescription}"/>
 							</Border>
 							<!-- upcoming runs -->
-							<Grid Grid.Row="3" RowDefinitions="Auto, *">
-								<TextBlock Grid.Row="0" Text="NEXT RUNS" Classes="fieldLabel" Margin="2,0,0,3"/>
-								<TextBox Grid.Row="1" Text="{Binding CronNextRuns}" IsReadOnly="True" PlaceholderText="Upcoming run times…" FontFamily="Cascadia Code,Consolas"/>
-							</Grid>
+							<DockPanel Grid.Row="3">
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Next runs"/>
+								<TextBox Text="{Binding CronNextRuns, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True" PlaceholderText="Upcoming run times"/>
+							</DockPanel>
 						</Grid>
 					</TabItem>
 
-					<TabItem Header="GENERATE">
-						<Grid RowDefinitions="Auto, *" Margin="0,2,0,0">
-							<StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,8">
-								<Grid ColumnDefinitions="*, *">
-									<StackPanel Grid.Column="0" Margin="0,0,4,0">
-										<TextBlock Text="LENGTH" Classes="fieldLabel"/>
-										<TextBox Text="{Binding GenerateLength}" AcceptsReturn="False"/>
-									</StackPanel>
-									<StackPanel Grid.Column="1" Margin="4,0,0,0">
-										<TextBlock Text="COUNT" Classes="fieldLabel"/>
-										<TextBox Text="{Binding GenerateCount}" AcceptsReturn="False"/>
-									</StackPanel>
-								</Grid>
-								<WrapPanel Classes="btns" Margin="0,2,0,0">
-									<Button Command="{Binding GenerateCommand}" CommandParameter="uuid" Content="UUID" Classes="secondary"/>
-									<Button Command="{Binding GenerateCommand}" CommandParameter="password" Content="PASSWORD" Classes="secondary"/>
-									<Button Command="{Binding GenerateCommand}" CommandParameter="alnum" Content="ALPHANUMERIC" Classes="secondary"/>
-									<Button Command="{Binding GenerateCommand}" CommandParameter="hex" Content="HEX TOKEN" Classes="secondary"/>
-									<Button Command="{Binding GenerateCommand}" CommandParameter="base64" Content="BASE64 TOKEN" Classes="secondary"/>
+					<TabItem Header="Generate">
+						<Grid RowDefinitions="Auto, Auto, *" RowSpacing="12">
+							<WrapPanel Grid.Row="0" Classes="options">
+								<StackPanel>
+									<TextBlock Classes="fieldLabel" Text="Length"/>
+									<TextBox Classes="field mono" Width="120" Text="{Binding GenerateLength}"
+										 ToolTip.Tip="1–4096: characters for passwords, PINs and text tokens; bytes for the hex and Base64 tokens"/>
+								</StackPanel>
+								<StackPanel>
+									<TextBlock Classes="fieldLabel" Text="Count"/>
+									<TextBox Classes="field mono" Width="120" Text="{Binding GenerateCount}"
+											 ToolTip.Tip="How many to generate (1–1000)"/>
+								</StackPanel>
+								<CheckBox IsChecked="{Binding GenSymbols}" Content="Symbols"/>
+								<CheckBox IsChecked="{Binding GenExcludeAmbiguous}" Content="No look-alikes"
+										  ToolTip.Tip="Leave out characters that are easy to confuse: 0 O 1 l I"/>
+							</WrapPanel>
+							<ScrollViewer Grid.Row="1" Classes="ops">
+								<WrapPanel Classes="actions">
+									<Button Command="{Binding GenerateCommand}" CommandParameter="password" Content="Password" Classes="primary"/>
+									<Button Command="{Binding GenerateCommand}" CommandParameter="uuid" Content="UUID v4" Classes="secondary"/>
+									<Button Command="{Binding GenerateCommand}" CommandParameter="uuidv7" Content="UUID v7" Classes="secondary"
+											ToolTip.Tip="Time-ordered UUID (RFC 9562) — sorts by creation time"/>
+									<Button Command="{Binding GenerateCommand}" CommandParameter="ulid" Content="ULID" Classes="secondary"/>
+									<Button Command="{Binding GenerateCommand}" CommandParameter="nanoid" Content="Nano ID" Classes="secondary"/>
+									<Button Command="{Binding GenerateCommand}" CommandParameter="alnum" Content="Alphanumeric" Classes="secondary"/>
 									<Button Command="{Binding GenerateCommand}" CommandParameter="pin" Content="PIN" Classes="secondary"/>
-									<Button Command="{Binding ClearCommand}" CommandParameter="gen" Content="CLEAR" Classes="ghost"/>
+									<Button Command="{Binding GenerateCommand}" CommandParameter="hex" Content="Hex token" Classes="secondary"/>
+									<Button Command="{Binding GenerateCommand}" CommandParameter="base64" Content="Base64 token" Classes="secondary"/>
+									<Button Command="{Binding GenerateCommand}" CommandParameter="b64url" Content="Base64URL token" Classes="secondary"/>
+									<StackPanel Classes="util">
+										<Button Command="{Binding ClearCommand}" CommandParameter="gen" Content="Clear" Classes="ghost"/>
+										<Button Command="{Binding CopyTextCommand}" CommandParameter="{Binding GenerateOutput}" Content="Copy" Classes="ghost"/>
+									</StackPanel>
 								</WrapPanel>
-							</StackPanel>
-							<TextBox Grid.Row="1" Text="{Binding GenerateOutput}" IsReadOnly="True" PlaceholderText="Generated values..." FontFamily="Cascadia Code,Consolas"/>
+							</ScrollViewer>
+							<DockPanel Grid.Row="2">
+								<TextBlock DockPanel.Dock="Top" Classes="status" Margin="0,0,0,10" Text="{Binding GenerateInfo}"
+										   IsVisible="{Binding GenerateInfo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Generated"/>
+								<TextBox Text="{Binding GenerateOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+										 PlaceholderText="Generated values (crypto RNG)"/>
+							</DockPanel>
 						</Grid>
 					</TabItem>
 
@@ -415,8 +1055,13 @@
 
 		</TabControl>
 
-		<Border Grid.Row="1" Background="#33E5484D" BorderBrush="#E5484D" BorderThickness="1" CornerRadius="6" Margin="0,10,0,0" Padding="10,8" IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-			<TextBlock Text="{Binding ErrorMessage}" Foreground="#ECECEF" FontSize="11" FontWeight="Bold" TextWrapping="Wrap"/>
+		<!-- static "working" hint for slow runs (no looping animation, per the design system) -->
+		<Border Grid.Row="1" Classes="badge info" HorizontalAlignment="Left" Margin="0,12,0,0" IsVisible="{Binding IsBusy}">
+			<TextBlock Text="Working…"/>
+		</Border>
+
+		<Border Grid.Row="2" Classes="errorBanner" Margin="0,12,0,0" IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+			<TextBlock Text="{Binding ErrorMessage}"/>
 		</Border>
 	</Grid>
 </UserControl>

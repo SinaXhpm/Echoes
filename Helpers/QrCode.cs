@@ -17,9 +17,11 @@ public static class QrCode
 {
     private const int MaxVersion = 10;
 
-    // Error-correction level M tables, indexed by version (index 0 unused).
+    // Error-correction level M tables, indexed by version (index 0 unused). ISO/IEC 18004 Table 9: versions
+    // 8/9/10-M have 4/5/5 blocks (2+2, 3+2, 4+1) — with 2/3/4 every text over 122 bytes gave an unreadable
+    // symbol (wrong block split, too few EC codewords) and the capacity check overstated what fits.
     private static readonly int[] EccPerBlock  = { -1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26 };
-    private static readonly int[] NumEccBlocks = { -1,  1,  1,  1,  2,  2,  4,  4,  2,  3,  4 };
+    private static readonly int[] NumEccBlocks = { -1,  1,  1,  1,  2,  2,  4,  4,  4,  5,  5 };
 
     /// <summary>Encodes <paramref name="text"/> (UTF-8) into a square dark/light matrix indexed
     /// [row, col]. Returns null if it is too long for versions 1..10 at EC level M.</summary>

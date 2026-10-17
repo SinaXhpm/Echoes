@@ -3,198 +3,419 @@
 			 xmlns:vm="using:Echoes.ViewModels"
 			 xmlns:h="using:Echoes.Helpers"
 			 x:Class="Echoes.Views.NetworkInfoView"
-			 x:DataType="vm:NetworkInfoViewModel"
-			 Background="#0F1012">
+			 x:DataType="vm:NetworkInfoViewModel">
+	<UserControl.Resources>
+		<!-- stroked glyphs on the 24x24 grid the nav icons use -->
+		<StreamGeometry x:Key="GlyphRefresh">M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8 M21 3v5h-5</StreamGeometry>
+		<StreamGeometry x:Key="GlyphCopy">M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2</StreamGeometry>
+	</UserControl.Resources>
+
 	<UserControl.Styles>
-		<Style Selector="Button.refresh-btn">
-			<Setter Property="Background" Value="Transparent"/>
-			<Setter Property="BorderBrush" Value="#2042B883"/>
-			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="CornerRadius" Value="6"/>
-			<Setter Property="Padding" Value="12,6"/>
-			<Setter Property="Transitions">
-				<Transitions>
-					<BrushTransition Property="Background" Duration="0:0:0.15"/>
-					<BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
-				</Transitions>
+		<!-- ===== switcher: segmented pills; on a phone one row of four equal cells, so a larger
+		     platform font can never wrap it to a second line ===== -->
+		<Style Selector="TabControl#NetTabs.seg.narrow">
+			<Setter Property="ItemsPanel">
+				<ItemsPanelTemplate>
+					<UniformGrid Columns="5" ColumnSpacing="4"/>
+				</ItemsPanelTemplate>
 			</Setter>
 		</Style>
-		<Style Selector="Button.refresh-btn:pointerover /template/ ContentPresenter">
-			<Setter Property="Background" Value="#1E3A2B"/>
-			<Setter Property="BorderBrush" Value="#42B883"/>
-		</Style>
-
-		<!-- per-card copy-all glyph -->
-		<Style Selector="Button.copy-btn">
-			<Setter Property="Background" Value="Transparent"/>
-			<Setter Property="BorderThickness" Value="0"/>
-			<Setter Property="Padding" Value="4"/>
-			<Setter Property="CornerRadius" Value="4"/>
-			<Setter Property="Cursor" Value="Hand"/>
-			<Setter Property="VerticalAlignment" Value="Center"/>
-		</Style>
-		<Style Selector="Button.copy-btn:pointerover /template/ ContentPresenter">
-			<Setter Property="Background" Value="#20222A"/>
-		</Style>
-
-		<!-- selectable, copyable field values -->
-		<Style Selector="SelectableTextBlock.val">
-			<Setter Property="FontFamily" Value="Cascadia Code,Consolas"/>
-			<Setter Property="FontSize" Value="12"/>
-			<Setter Property="Foreground" Value="#ECECEF"/>
-			<Setter Property="SelectionBrush" Value="#3042B883"/>
-			<Setter Property="TextWrapping" Value="Wrap"/>
-		</Style>
-
-		<!-- Inner sub-tabs: filled "chip" when selected. The default underline pipe sat tight against
-		     the label and only spanned part of it; a chip reads cleanly and needs no baseline gap.
-		     Laid out by a UniformGrid (see ItemsPanel) so four tabs always share one row instead of
-		     wrapping to two lines where the platform font is larger. -->
-		<Style Selector="TabItem.subtab">
-			<Setter Property="FontSize" Value="10.5"/>
-			<Setter Property="FontWeight" Value="SemiBold"/>
-			<Setter Property="LetterSpacing" Value="0.3"/>
-			<Setter Property="Foreground" Value="#9E9FA8"/>
-			<Setter Property="Padding" Value="6,7"/>
-			<Setter Property="MinHeight" Value="0"/>
-			<Setter Property="Margin" Value="0,0,4,0"/>
+		<Style Selector="TabControl#NetTabs.seg.narrow > TabItem">
+			<Setter Property="Margin" Value="0"/>
+			<Setter Property="Padding" Value="2,0"/>
+			<Setter Property="FontSize" Value="11.5"/>
 			<Setter Property="HorizontalAlignment" Value="Stretch"/>
 			<Setter Property="HorizontalContentAlignment" Value="Center"/>
 		</Style>
-		<Style Selector="TabItem.subtab /template/ Border#PART_LayoutRoot">
+
+		<!-- ===== Wi-Fi ===== -->
+		<!-- small segmented band picker inside the chart card (its tabs carry no content) -->
+		<Style Selector="TabControl.bands">
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="TabControl.bands > TabItem">
+			<Setter Property="MinHeight" Value="24"/>
+			<Setter Property="Padding" Value="9,0"/>
+			<Setter Property="Margin" Value="0,0,4,0"/>
+			<Setter Property="FontSize" Value="11.5"/>
+		</Style>
+		<Style Selector="TextBlock.reco">
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+		<!-- beside the band picker (wide), under it (phone): set by style only, a local Grid.Column would win over it -->
+		<Style Selector="Grid#WifiRoot.wide TextBlock.reco">
+			<Setter Property="Grid.Row" Value="0"/>
+			<Setter Property="Grid.Column" Value="1"/>
+		</Style>
+		<Style Selector="Grid#WifiRoot.narrow TextBlock.reco">
+			<Setter Property="Grid.Row" Value="1"/>
+			<Setter Property="Grid.Column" Value="0"/>
+			<Setter Property="Grid.ColumnSpan" Value="2"/>
+			<Setter Property="Margin" Value="2,6,0,0"/>
+		</Style>
+		<!-- channel bars: info blue; the busiest warning amber; the user's own channel accent -->
+		<Style Selector="Border.bar">
+			<Setter Property="Background" Value="{DynamicResource Info}"/>
+			<Setter Property="CornerRadius" Value="2,2,0,0"/>
+			<Setter Property="Margin" Value="3,0"/>
+			<Setter Property="VerticalAlignment" Value="Bottom"/>
+			<Setter Property="MaxWidth" Value="22"/>
+		</Style>
+		<Style Selector="Border.bar.busy"><Setter Property="Background" Value="{DynamicResource Warning}"/></Style>
+		<Style Selector="Border.bar.current"><Setter Property="Background" Value="{DynamicResource Accent}"/></Style>
+		<Style Selector="Border.bar.empty"><Setter Property="Background" Value="{DynamicResource Border.Default}"/></Style>
+		<Style Selector="TextBlock.barLabel">
+			<Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+			<Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
+			<Setter Property="Margin" Value="0,3,0,0"/>
+		</Style>
+		<Style Selector="TextBlock.barLabel.current">
+			<Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+		</Style>
+		<Style Selector="TextBlock.barCount">
+			<Setter Property="FontSize" Value="9.5"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
+			<Setter Property="Margin" Value="0,0,0,1"/>
+		</Style>
+		<!-- signal meters: a solid track with a solid fill by level -->
+		<Style Selector="Border.track">
+			<Setter Property="Height" Value="6"/>
+			<Setter Property="CornerRadius" Value="3"/>
+			<Setter Property="Background" Value="{DynamicResource Border.Default}"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="Border.fill">
+			<Setter Property="Height" Value="6"/>
+			<Setter Property="CornerRadius" Value="3"/>
+			<Setter Property="HorizontalAlignment" Value="Left"/>
+			<Setter Property="Background" Value="{DynamicResource Text.Muted}"/>
+		</Style>
+		<Style Selector="Border.fill.good"><Setter Property="Background" Value="{DynamicResource Success}"/></Style>
+		<Style Selector="Border.fill.fair"><Setter Property="Background" Value="{DynamicResource Warning}"/></Style>
+		<Style Selector="Border.fill.weak"><Setter Property="Background" Value="{DynamicResource Danger}"/></Style>
+		<!-- sortable column headers: plain text buttons -->
+		<Style Selector="Button.colBtn">
 			<Setter Property="Background" Value="Transparent"/>
-			<Setter Property="CornerRadius" Value="6"/>
-			<Setter Property="Transitions">
-				<Transitions>
-					<BrushTransition Property="Background" Duration="0:0:0.12"/>
-				</Transitions>
-			</Setter>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="MinHeight" Value="0"/>
+			<Setter Property="HorizontalAlignment" Value="Stretch"/>
+			<Setter Property="HorizontalContentAlignment" Value="Left"/>
+			<Setter Property="VerticalAlignment" Value="Stretch"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+			<Setter Property="Cursor" Value="Hand"/>
 		</Style>
-		<Style Selector="TabItem.subtab:pointerover /template/ Border#PART_LayoutRoot">
-			<Setter Property="Background" Value="#14FFFFFF"/>
+		<Style Selector="Button.colBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.colBtn:pressed /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="Transparent"/>
 		</Style>
-		<Style Selector="TabItem.subtab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-			<Setter Property="Foreground" Value="#D7D8DE"/>
+		<Style Selector="Button.colBtn:pointerover TextBlock.colhead">
+			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
 		</Style>
-		<Style Selector="TabItem.subtab:selected /template/ Border#PART_LayoutRoot">
-			<Setter Property="Background" Value="#1E3A2B"/>
-			<Setter Property="BorderBrush" Value="#3F7F5F"/>
+		<!-- connection fields: four across (wide), two by two (phone) -->
+		<Style Selector="Grid#WifiRoot.wide StackPanel.w1"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Margin" Value="0"/></Style>
+		<Style Selector="Grid#WifiRoot.wide StackPanel.w2"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Margin" Value="0"/></Style>
+		<Style Selector="Grid#WifiRoot.wide StackPanel.w3"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Margin" Value="0"/></Style>
+		<Style Selector="Grid#WifiRoot.wide StackPanel.w4"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Margin" Value="0"/></Style>
+		<Style Selector="Grid#WifiRoot.narrow StackPanel.w1"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0"/></Style>
+		<Style Selector="Grid#WifiRoot.narrow StackPanel.w2"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0"/></Style>
+		<Style Selector="Grid#WifiRoot.narrow StackPanel.w3"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,8,0,0"/></Style>
+		<Style Selector="Grid#WifiRoot.narrow StackPanel.w4"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,8,0,0"/></Style>
+		<!-- tinted note (solid soft fill + hairline) -->
+		<Style Selector="Border.note">
+			<Setter Property="Padding" Value="12,9"/>
+			<Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
 			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="CornerRadius" Value="7"/>
+			<Setter Property="Background" Value="{DynamicResource Warning.Soft}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Warning.Border}"/>
 		</Style>
-		<Style Selector="TabItem.subtab:selected /template/ ContentPresenter#PART_ContentPresenter">
-			<Setter Property="Foreground" Value="#6FDCA8"/>
+		<Style Selector="Border.note TextBlock">
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
 		</Style>
-		<!-- the chip replaces the underline entirely -->
-		<Style Selector="TabItem.subtab /template/ Border#PART_SelectedPipe">
-			<Setter Property="IsVisible" Value="False"/>
+		<Style Selector="Grid#WifiRoot.wide Button#LocationBtn">
+			<Setter Property="Grid.Row" Value="0"/>
+			<Setter Property="Grid.Column" Value="1"/>
+		</Style>
+		<Style Selector="Grid#WifiRoot.narrow Button#LocationBtn">
+			<Setter Property="Grid.Row" Value="1"/>
+			<Setter Property="Grid.Column" Value="0"/>
+			<Setter Property="Margin" Value="0,8,0,0"/>
+			<Setter Property="HorizontalAlignment" Value="Left"/>
 		</Style>
 
-		<!-- table cells -->
+		<!-- ===== section header ===== -->
+		<Style Selector="TextBlock.sectionDesc">
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+		</Style>
+		<!-- small stroked glyph inside a button (a Path doesn't inherit Foreground) -->
+		<Style Selector="Path.btnIco">
+			<Setter Property="Width" Value="14"/>
+			<Setter Property="Height" Value="14"/>
+			<Setter Property="Stretch" Value="Uniform"/>
+			<Setter Property="StrokeThickness" Value="1.7"/>
+			<Setter Property="StrokeLineCap" Value="Round"/>
+			<Setter Property="StrokeJoin" Value="Round"/>
+			<Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="Button:pointerover Path.btnIco">
+			<Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+		</Style>
+		<!-- icon-button glyph: Stroke comes from the global Button.icon Path style -->
+		<Style Selector="Path.glyph">
+			<Setter Property="Width" Value="15"/>
+			<Setter Property="Height" Value="15"/>
+			<Setter Property="Stretch" Value="Uniform"/>
+			<Setter Property="StrokeThickness" Value="1.6"/>
+			<Setter Property="StrokeLineCap" Value="Round"/>
+			<Setter Property="StrokeJoin" Value="Round"/>
+		</Style>
+
+		<!-- ===== adapter cards ===== -->
+		<Style Selector="TextBlock.adapterName">
+			<Setter Property="FontSize" Value="{StaticResource Font.Title}"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="Border.adapter.down TextBlock.adapterName">
+			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+		</Style>
+		<Style Selector="TextBlock.speed">
+			<Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="TextBlock.model">
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+		</Style>
+		<!-- selectable, copyable field values -->
+		<Style Selector="SelectableTextBlock.val">
+			<Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="Margin" Value="2,0,0,0"/>
+		</Style>
+		<Style Selector="SelectableTextBlock.val.key">
+			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+		</Style>
+		<!-- adapter fields: 4 columns wide (two rows), 2 columns on a phone (DNS + IPv6 full width) -->
+		<Style Selector="Grid#IfaceRoot.wide StackPanel.f1"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Margin" Value="0"/></Style>
+		<Style Selector="Grid#IfaceRoot.wide StackPanel.f2"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Margin" Value="0"/></Style>
+		<Style Selector="Grid#IfaceRoot.wide StackPanel.f3"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Margin" Value="0"/></Style>
+		<Style Selector="Grid#IfaceRoot.wide StackPanel.f4"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Margin" Value="0"/></Style>
+		<Style Selector="Grid#IfaceRoot.wide StackPanel.f5"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,14,0,0"/></Style>
+		<Style Selector="Grid#IfaceRoot.wide StackPanel.f6"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,14,0,0"/></Style>
+		<Style Selector="Grid#IfaceRoot.narrow StackPanel.f1"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0"/></Style>
+		<Style Selector="Grid#IfaceRoot.narrow StackPanel.f2"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0"/></Style>
+		<Style Selector="Grid#IfaceRoot.narrow StackPanel.f3"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,14,0,0"/></Style>
+		<Style Selector="Grid#IfaceRoot.narrow StackPanel.f4"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,14,0,0"/></Style>
+		<Style Selector="Grid#IfaceRoot.narrow StackPanel.f5"><Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/><Setter Property="Margin" Value="0,14,0,0"/></Style>
+		<Style Selector="Grid#IfaceRoot.narrow StackPanel.f6"><Setter Property="Grid.Row" Value="3"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/><Setter Property="Margin" Value="0,14,0,0"/></Style>
+
+		<!-- ===== tables ===== -->
 		<Style Selector="TextBlock.colhead">
-			<Setter Property="FontSize" Value="9.5"/>
-			<Setter Property="FontWeight" Value="Bold"/>
-			<Setter Property="LetterSpacing" Value="0.5"/>
-			<Setter Property="Foreground" Value="#8A8B93"/>
+			<Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
 			<Setter Property="VerticalAlignment" Value="Center"/>
 		</Style>
 		<Style Selector="TextBlock.cell">
-			<Setter Property="FontFamily" Value="Cascadia Code,Consolas"/>
-			<Setter Property="FontSize" Value="11.5"/>
-			<Setter Property="Foreground" Value="#D7D8DE"/>
+			<Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
 			<Setter Property="VerticalAlignment" Value="Center"/>
 			<Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+			<Setter Property="Margin" Value="0,0,10,0"/>
 		</Style>
-		<Style Selector="Border.zebra:nth-child(2n)">
-			<Setter Property="Background" Value="#0A131417"/>
+		<Style Selector="TextBlock.cell.key">
+			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+		</Style>
+		<Style Selector="TextBlock.cell.proto">
+			<Setter Property="Foreground" Value="{DynamicResource Info}"/>
+		</Style>
+		<Style Selector="TextBlock.cell.dim">
+			<Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+		</Style>
+		<Style Selector="TextBlock.cell.listen">
+			<Setter Property="Foreground" Value="{DynamicResource Success}"/>
+		</Style>
+		<!-- zebra rows + hover, on the item containers (survives virtualization / recycling) -->
+		<Style Selector="ItemsControl.table > ContentPresenter:nth-child(2n)">
+			<Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+		</Style>
+		<Style Selector="ItemsControl.table > ContentPresenter:pointerover">
+			<Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+		</Style>
+
+		<!-- Row tables. PORTS lists every TCP/UDP endpoint (TIME_WAIT included), so a busy host has
+		     hundreds to thousands of rows: a plain ItemsControl (StackPanel) inside an outer ScrollViewer
+		     built and measured every row on the UI thread on each refresh. Virtualize instead — with the
+		     ScrollViewer inside the template (an outer one hands the panel infinite height; the outer
+		     ScrollViewers below scroll horizontally only, so the height stays finite). -->
+		<Style Selector="ItemsControl.table">
+			<Setter Property="ItemsPanel">
+				<ItemsPanelTemplate>
+					<VirtualizingStackPanel/>
+				</ItemsPanelTemplate>
+			</Setter>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<ScrollViewer>
+						<ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}"/>
+					</ScrollViewer>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+
+		<!-- PORTS on a phone: Process moves next to Local (Remote is mostly "*" for listeners), so the
+		     first screen answers "what listens where" before any sideways scrolling -->
+		<Style Selector="TextBlock.c-remote">
+			<Setter Property="Grid.Column" Value="2"/>
+		</Style>
+		<Style Selector="TextBlock.c-process">
+			<Setter Property="Grid.Column" Value="4"/>
+		</Style>
+		<Style Selector="TabControl#NetTabs.narrow TextBlock.c-process">
+			<Setter Property="Grid.Column" Value="2"/>
+		</Style>
+		<Style Selector="TabControl#NetTabs.narrow TextBlock.c-remote">
+			<Setter Property="Grid.Column" Value="4"/>
+		</Style>
+
+		<!-- Wi-Fi rows: names / security in the UI font, the connected access point in accent. After the .cell
+		     styles above on purpose: of two matching styles the later one wins. -->
+		<Style Selector="TextBlock.cell.prose">
+			<Setter Property="FontFamily" Value="{x:Static FontFamily.Default}"/>
+		</Style>
+		<Style Selector="TextBlock.cell.connected">
+			<Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+		</Style>
+
+		<!-- ===== empty / not-available state ===== -->
+		<!-- empty state icon -->
+		<Style Selector="Path.emptyIco">
+			<Setter Property="Width" Value="24"/>
+			<Setter Property="Height" Value="24"/>
+			<Setter Property="Stretch" Value="None"/>
+			<Setter Property="StrokeThickness" Value="1.6"/>
+			<Setter Property="StrokeLineCap" Value="Round"/>
+			<Setter Property="StrokeJoin" Value="Round"/>
+			<Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="TextBlock.emptyText">
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="TextAlignment" Value="Center"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
 		</Style>
 	</UserControl.Styles>
 
-	<TabControl Margin="10,6,10,8" TabStripPlacement="Top">
-		<!-- four equal columns: never wraps to a second line, never overflows the frame -->
-		<TabControl.ItemsPanel>
-			<ItemsPanelTemplate>
-				<UniformGrid Columns="4"/>
-			</ItemsPanelTemplate>
-		</TabControl.ItemsPanel>
+	<!-- Padding 0: the shell already pads the page; content lines up with the switcher and title -->
+	<TabControl x:Name="NetTabs" Classes="seg" Padding="0" h:Responsive.BreakWidth="520" SelectedIndex="{Binding TabIndex}">
 
 		<!-- ============================ INTERFACES ============================ -->
-		<TabItem Classes="subtab" Header="INTERFACES">
-			<Grid RowDefinitions="Auto, *" Margin="0,8,0,0">
-				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
-					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
-						<TextBlock Text="NETWORK ADAPTERS" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
-						<TextBlock Text="Select any value to copy · click ⧉ to copy the whole adapter" FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap"/>
-					</StackPanel>
-					<Button Grid.Column="1" Classes="refresh-btn" Command="{Binding RefreshCommand}" VerticalAlignment="Center">
+		<TabItem Header="Interfaces">
+			<Grid x:Name="IfaceRoot" h:Responsive.BreakWidth="620" RowDefinitions="Auto, *" Margin="0,12,0,0">
+				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,12">
+					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2" Background="Transparent"
+								ToolTip.Tip="Select any value to copy it, or copy a whole adapter with its copy button">
 						<StackPanel Orientation="Horizontal" Spacing="8">
-							<Path Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"
-								  Fill="#42B883" Width="14" Height="14" Stretch="Uniform"/>
-							<TextBlock Text="REFRESH" FontSize="11" FontWeight="SemiBold" LetterSpacing="1" Foreground="#42B883" VerticalAlignment="Center"/>
+							<TextBlock Classes="sectionTitle" Text="Adapters" VerticalAlignment="Center"/>
+							<Border Classes="badge" Padding="7,1">
+								<TextBlock Text="{Binding Adapters.Count}" FontFamily="{StaticResource MonoFont}"/>
+							</Border>
+						</StackPanel>
+					</StackPanel>
+					<Button Grid.Column="1" Classes="secondary" Command="{Binding RefreshCommand}" VerticalAlignment="Center" Padding="12,0">
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<Path Classes="btnIco" Data="{StaticResource GlyphRefresh}"/>
+							<TextBlock Text="Refresh" VerticalAlignment="Center"/>
 						</StackPanel>
 					</Button>
 				</Grid>
 
-				<ScrollViewer Grid.Row="1">
-					<ItemsControl ItemsSource="{Binding Adapters}">
+				<!-- virtualized: an adapter card holds dozens of selectable text blocks, and machines with VPN / virtual
+				     switches list 40+ adapters (all built on every visit took ~300 ms and ~30 MB) -->
+				<ItemsControl Grid.Row="1" ItemsSource="{Binding Adapters}">
+					<ItemsControl.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+					<ItemsControl.Template><ControlTemplate>
+						<ScrollViewer HorizontalScrollBarVisibility="Disabled">
+							<ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}"/>
+						</ScrollViewer>
+					</ControlTemplate></ItemsControl.Template>
 						<ItemsControl.ItemTemplate>
 							<DataTemplate x:DataType="vm:NetworkAdapterInfo">
-								<Border Classes="card" Margin="0,0,0,10" Padding="16,13">
-									<StackPanel Spacing="11">
-										<Grid ColumnDefinitions="*, Auto">
-											<WrapPanel Grid.Column="0" VerticalAlignment="Center">
-												<TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="#42B883" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,3"/>
-												<Border Background="#24262E" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" Margin="0,0,8,3">
-													<TextBlock Text="{Binding Type}" Foreground="#C7C8CF" FontSize="9.5" FontWeight="SemiBold" LetterSpacing="0.5"/>
-												</Border>
-												<Border Background="#1E3A2B" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" IsVisible="{Binding IsUp}" Margin="0,0,8,3">
-													<TextBlock Text="UP" Foreground="#4FCB97" FontSize="9.5" FontWeight="Bold"/>
-												</Border>
-												<Border Background="#2A2126" CornerRadius="4" Padding="7,2" VerticalAlignment="Center" IsVisible="{Binding !IsUp}" Margin="0,0,8,3">
-													<TextBlock Text="DOWN" Foreground="#C08088" FontSize="9.5" FontWeight="Bold"/>
-												</Border>
-												<TextBlock Text="{Binding Speed}" Foreground="#9E9FA8" FontSize="10.5"
-														   FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center" Margin="0,0,0,3"/>
-											</WrapPanel>
-											<Button Grid.Column="1" Classes="copy-btn" VerticalAlignment="Top"
+								<Border Classes="card adapter" Classes.down="{Binding !IsUp}" Margin="0,0,0,12" Padding="16,14">
+									<StackPanel Spacing="12">
+										<Grid ColumnDefinitions="*, Auto" ColumnSpacing="12">
+											<StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+												<WrapPanel>
+													<TextBlock Classes="adapterName" Text="{Binding Name}" Margin="0,0,10,4"/>
+													<Border Classes="badge" Margin="0,0,6,4">
+														<TextBlock Text="{Binding Type}"/>
+													</Border>
+													<Border Classes="badge success" IsVisible="{Binding IsUp}" Margin="0,0,6,4">
+														<TextBlock Text="Up"/>
+													</Border>
+													<Border Classes="badge danger" IsVisible="{Binding !IsUp}" Margin="0,0,6,4">
+														<TextBlock Text="Down"/>
+													</Border>
+													<TextBlock Classes="speed" Text="{Binding Speed}" Margin="4,0,0,4"/>
+												</WrapPanel>
+												<TextBlock Classes="model" Text="{Binding Model}"/>
+											</StackPanel>
+											<Button Grid.Column="1" Classes="icon" VerticalAlignment="Top"
 													Command="{Binding ((vm:NetworkInfoViewModel)DataContext).CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
 													CommandParameter="{Binding Summary}" ToolTip.Tip="Copy all fields">
-												<Path Data="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
-													  Fill="#9E9FA8" Width="13" Height="13" Stretch="Uniform"/>
+												<Path Classes="glyph" Data="{StaticResource GlyphCopy}"/>
 											</Button>
 										</Grid>
-										<TextBlock Text="{Binding Model}" Foreground="#8A8B93" FontSize="10.5" TextWrapping="Wrap"/>
-										<Border Height="1" Background="#22242B"/>
-										<Grid ColumnDefinitions="*,*" ColumnSpacing="18" RowSpacing="10">
-											<Grid.RowDefinitions>
-												<RowDefinition Height="Auto"/>
-												<RowDefinition Height="Auto"/>
-												<RowDefinition Height="Auto"/>
-												<RowDefinition Height="Auto"/>
-											</Grid.RowDefinitions>
-											<StackPanel Grid.Row="0" Grid.Column="0" Spacing="2">
-												<TextBlock Classes="fieldLabel" Text="IPV4"/>
-												<SelectableTextBlock Classes="val" Text="{Binding IPv4}"/>
+										<Border Classes="divider"/>
+										<Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12">
+											<StackPanel Classes="f1">
+												<TextBlock Classes="fieldLabel" Text="IPv4"/>
+												<SelectableTextBlock Classes="val key" Text="{Binding IPv4}"/>
 											</StackPanel>
-											<StackPanel Grid.Row="0" Grid.Column="1" Spacing="2">
+											<StackPanel Classes="f2">
+												<TextBlock Classes="fieldLabel" Text="Subnet"/>
+												<SelectableTextBlock Classes="val" Text="{Binding Subnet}"/>
+											</StackPanel>
+											<StackPanel Classes="f3">
+												<TextBlock Classes="fieldLabel" Text="Gateway"/>
+												<SelectableTextBlock Classes="val" Text="{Binding Gateway}"/>
+											</StackPanel>
+											<StackPanel Classes="f4">
 												<TextBlock Classes="fieldLabel" Text="MAC"/>
-												<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding MacAddress}"/>
+												<SelectableTextBlock Classes="val" Text="{Binding MacAddress}"/>
 											</StackPanel>
-											<StackPanel Grid.Row="1" Grid.Column="0" Spacing="2">
-												<TextBlock Classes="fieldLabel" Text="SUBNET"/>
-												<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding Subnet}"/>
+											<StackPanel Classes="f5">
+												<TextBlock Classes="fieldLabel" Text="DNS servers"/>
+												<SelectableTextBlock Classes="val" Text="{Binding Dns}"/>
 											</StackPanel>
-											<StackPanel Grid.Row="1" Grid.Column="1" Spacing="2">
-												<TextBlock Classes="fieldLabel" Text="GATEWAY"/>
-												<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding Gateway}"/>
-											</StackPanel>
-											<StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Spacing="2">
-												<TextBlock Classes="fieldLabel" Text="IPV6"/>
-												<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding IPv6}" TextWrapping="Wrap"/>
-											</StackPanel>
-											<StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Spacing="2">
-												<TextBlock Classes="fieldLabel" Text="DNS SERVERS"/>
-												<SelectableTextBlock Classes="val" Foreground="#C7C8CF" Text="{Binding Dns}" TextWrapping="Wrap"/>
+											<StackPanel Classes="f6">
+												<TextBlock Classes="fieldLabel" Text="IPv6"/>
+												<SelectableTextBlock Classes="val" Text="{Binding IPv6}"/>
 											</StackPanel>
 										</Grid>
 									</StackPanel>
@@ -202,146 +423,357 @@
 							</DataTemplate>
 						</ItemsControl.ItemTemplate>
 					</ItemsControl>
-				</ScrollViewer>
+			</Grid>
+		</TabItem>
+
+		<!-- ============================ WI-FI ============================ -->
+		<!-- Reads only while this tab is on screen (code-behind tells the view-model): on show, every 10 s, on Refresh. -->
+		<TabItem Header="Wi-Fi">
+			<Grid x:Name="WifiRoot" h:Responsive.BreakWidth="560" RowDefinitions="Auto, Auto, Auto, *" Margin="0,12,0,0">
+				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,10">
+					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<TextBlock Classes="sectionTitle" Text="Wi-Fi" VerticalAlignment="Center"
+									   ToolTip.Tip="Your connection, the networks nearby and how busy each channel is"/>
+							<Border Classes="badge" Padding="7,1" IsVisible="{Binding WifiHasRows}" ToolTip.Tip="Access points seen by the last scan">
+								<TextBlock Text="{Binding WifiNetworks.Count}" FontFamily="{StaticResource MonoFont}"/>
+							</Border>
+							<TextBlock Classes="sectionDesc" Text="{Binding WifiUpdated}" VerticalAlignment="Center" IsVisible="{Binding WifiLoaded}"/>
+						</StackPanel>
+					</StackPanel>
+					<Button Grid.Column="1" Classes="secondary" Command="{Binding RefreshWifiCommand}" VerticalAlignment="Center" Padding="12,0"
+							IsEnabled="{Binding !WifiBusy}" ToolTip.Tip="Scan again (it also refreshes by itself every 10 seconds)">
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<Path Classes="btnIco" Data="{StaticResource GlyphRefresh}"/>
+							<TextBlock Text="Refresh" VerticalAlignment="Center"/>
+						</StackPanel>
+					</Button>
+				</Grid>
+
+				<!-- the current connection -->
+				<Border Grid.Row="1" Classes="card" Padding="14,10" Margin="0,0,0,10" IsVisible="{Binding WifiShowConnection}">
+					<StackPanel Spacing="8">
+						<Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+							<WrapPanel VerticalAlignment="Center">
+								<TextBlock Classes="adapterName" Text="{Binding WifiSsid}" Margin="0,0,10,4" MaxWidth="360" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+										   ToolTip.Tip="{Binding WifiSsid}"/>
+								<Border Classes="badge accent" Margin="0,0,6,4" IsVisible="{Binding WifiHasBand}"><TextBlock Text="{Binding WifiBandText}"/></Border>
+								<Border Classes="badge" Margin="0,0,6,4" IsVisible="{Binding WifiHasChannel}"><TextBlock Text="{Binding WifiChannelText}"/></Border>
+								<Border Classes="badge" Margin="0,0,6,4" IsVisible="{Binding WifiHasSecurity}"><TextBlock Text="{Binding WifiSecurityText}"/></Border>
+								<Border Classes="badge" Margin="0,0,6,4" IsVisible="{Binding WifiHasStandard}"><TextBlock Text="{Binding WifiStandardText}"/></Border>
+							</WrapPanel>
+							<Button Grid.Column="1" Classes="icon" VerticalAlignment="Top" Command="{Binding CopyWifiCommand}"
+									IsVisible="{Binding WifiConnected}" ToolTip.Tip="Copy the connection details">
+								<Path Classes="glyph" Data="{StaticResource GlyphCopy}"/>
+							</Button>
+						</Grid>
+						<Grid ColumnDefinitions="1.3*,*,*,1.3*" RowDefinitions="Auto,Auto" ColumnSpacing="12">
+							<StackPanel Classes="w1">
+								<TextBlock Classes="fieldLabel" Text="Signal"/>
+								<StackPanel Orientation="Horizontal" Spacing="8" Margin="2,0,0,0">
+									<Panel Width="44" VerticalAlignment="Center">
+										<Border Classes="track"/>
+										<Border Classes="fill" Width="{Binding WifiSignalBar}" Classes.good="{Binding WifiSignalGood}"
+												Classes.fair="{Binding WifiSignalFair}" Classes.weak="{Binding WifiSignalWeak}"/>
+									</Panel>
+									<SelectableTextBlock Classes="val key" Text="{Binding WifiSignalText}" Margin="0"/>
+								</StackPanel>
+							</StackPanel>
+							<StackPanel Classes="w2" ToolTip.Tip="The rate the adapter negotiated with the access point (receive / send)">
+								<TextBlock Classes="fieldLabel" Text="Link rate"/>
+								<SelectableTextBlock Classes="val key" Text="{Binding WifiRateText}"/>
+							</StackPanel>
+							<StackPanel Classes="w3">
+								<TextBlock Classes="fieldLabel" Text="BSSID"/>
+								<SelectableTextBlock Classes="val" Text="{Binding WifiBssidText}"/>
+							</StackPanel>
+							<StackPanel Classes="w4">
+								<TextBlock Classes="fieldLabel" Text="Adapter"/>
+								<SelectableTextBlock Classes="val" Text="{Binding WifiAdapterText}"/>
+							</StackPanel>
+						</Grid>
+					</StackPanel>
+				</Border>
+
+				<!-- Windows' location gate: ONE note with the setting's path (and a shortcut to it) -->
+				<Border Grid.Row="2" Classes="note" Margin="0,0,0,10" IsVisible="{Binding WifiNoteIsLocation}">
+					<Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="12">
+						<TextBlock Text="{Binding WifiNote}"/>
+						<Button x:Name="LocationBtn" Classes="secondary" Content="Open location settings" VerticalAlignment="Center"
+								Command="{Binding OpenLocationSettingsCommand}" IsVisible="{Binding CanOpenLocationSettings}"/>
+					</Grid>
+				</Border>
+
+				<!-- channel usage + nearby networks -->
+				<Grid Grid.Row="3" RowDefinitions="Auto, *" IsVisible="{Binding WifiShowData}">
+					<Border Grid.Row="0" Classes="card" Padding="12,8,12,6" Margin="0,0,0,10">
+						<StackPanel Spacing="4">
+							<Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto" ColumnSpacing="12">
+								<TabControl Classes="seg bands" SelectedIndex="{Binding WifiBandIndex}" AutomationProperties.Name="Band">
+									<TabItem Header="{Binding WifiBand24Header}"/>
+									<TabItem Header="{Binding WifiBand5Header}"/>
+									<TabItem Header="{Binding WifiBand6Header}"/>
+								</TabControl>
+								<TextBlock Classes="reco" Text="{Binding WifiRecommendation}" ToolTip.Tip="{Binding WifiRecommendation}"/>
+							</Grid>
+							<ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+										  ToolTip.Tip="Networks per channel, weighted by signal: a strong neighbor counts more than a faint one">
+								<ItemsControl ItemsSource="{Binding WifiBars}" MinWidth="{Binding WifiChartMinWidth}"
+											  Width="{Binding $parent[ScrollViewer].Viewport.Width}">
+									<ItemsControl.ItemsPanel>
+										<ItemsPanelTemplate>
+											<UniformGrid Rows="1"/>
+										</ItemsPanelTemplate>
+									</ItemsControl.ItemsPanel>
+									<ItemsControl.ItemTemplate>
+										<DataTemplate x:DataType="h:WifiChannelBar">
+											<Grid RowDefinitions="70, Auto" Background="Transparent" ToolTip.Tip="{Binding Tip}">
+												<StackPanel Grid.Row="0" VerticalAlignment="Bottom">
+													<TextBlock Classes="barCount" Text="{Binding CountText}"/>
+													<Border Classes="bar" Classes.current="{Binding IsCurrent}" Classes.busy="{Binding IsBusy}"
+															Classes.empty="{Binding IsEmpty}" Height="{Binding BarHeight}"/>
+												</StackPanel>
+												<TextBlock Grid.Row="1" Classes="barLabel" Classes.current="{Binding IsCurrent}" Text="{Binding Label}"/>
+											</Grid>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+							</ScrollViewer>
+						</StackPanel>
+					</Border>
+
+					<!-- the networks: sortable headers; rows virtualize; sideways scroll on a phone -->
+					<Border Grid.Row="1" Classes="card output">
+						<ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+							<Grid MinWidth="620" Width="{Binding $parent[ScrollViewer].Viewport.Width}" RowDefinitions="Auto, Auto, *">
+								<Grid Grid.Row="0" ColumnDefinitions="1.4*,108,80,64,1.1*,128" MinHeight="32" Margin="14,0">
+									<Button Grid.Column="0" Classes="colBtn" Command="{Binding SortWifiCommand}" CommandParameter="ssid">
+										<TextBlock Classes="colhead" Text="{Binding SortMarkSsid, StringFormat='Network{0}'}"/>
+									</Button>
+									<Button Grid.Column="1" Classes="colBtn" Command="{Binding SortWifiCommand}" CommandParameter="signal">
+										<TextBlock Classes="colhead" Text="{Binding SortMarkSignal, StringFormat='Signal{0}'}"/>
+									</Button>
+									<Button Grid.Column="2" Classes="colBtn" Command="{Binding SortWifiCommand}" CommandParameter="channel"
+											ToolTip.Tip="Primary channel · width in MHz">
+										<TextBlock Classes="colhead" Text="{Binding SortMarkChannel, StringFormat='Channel{0}'}"/>
+									</Button>
+									<Button Grid.Column="3" Classes="colBtn" Command="{Binding SortWifiCommand}" CommandParameter="band">
+										<TextBlock Classes="colhead" Text="{Binding SortMarkBand, StringFormat='Band{0}'}"/>
+									</Button>
+									<Button Grid.Column="4" Classes="colBtn" Command="{Binding SortWifiCommand}" CommandParameter="security">
+										<TextBlock Classes="colhead" Text="{Binding SortMarkSecurity, StringFormat='Security{0}'}"/>
+									</Button>
+									<Button Grid.Column="5" Classes="colBtn" Command="{Binding SortWifiCommand}" CommandParameter="bssid">
+										<TextBlock Classes="colhead" Text="{Binding SortMarkBssid, StringFormat='BSSID{0}'}"/>
+									</Button>
+								</Grid>
+								<Border Grid.Row="1" Classes="divider"/>
+								<ItemsControl Grid.Row="2" Classes="table" ItemsSource="{Binding WifiNetworks}" IsVisible="{Binding WifiHasRows}">
+									<ItemsControl.ItemTemplate>
+										<DataTemplate x:DataType="h:WifiNetwork">
+											<Grid ColumnDefinitions="1.4*,108,80,64,1.1*,128" Height="28" Margin="14,0" Background="Transparent" ToolTip.Tip="{Binding Tip}">
+												<TextBlock Grid.Column="0" Classes="cell key prose" Classes.dim="{Binding Hidden}" Classes.connected="{Binding IsConnected}"
+														   Text="{Binding SsidText}"/>
+												<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+													<Panel Width="40" VerticalAlignment="Center">
+														<Border Classes="track"/>
+														<Border Classes="fill" Width="{Binding SignalBarWidth}" Classes.good="{Binding SignalGood}"
+																Classes.fair="{Binding SignalFair}" Classes.weak="{Binding SignalWeak}"/>
+													</Panel>
+													<TextBlock Classes="cell" Text="{Binding SignalShort}" Margin="0"/>
+												</StackPanel>
+												<TextBlock Grid.Column="2" Classes="cell" Text="{Binding ChannelText}"/>
+												<TextBlock Grid.Column="3" Classes="cell dim" Text="{Binding BandText}"/>
+												<TextBlock Grid.Column="4" Classes="cell dim prose" Text="{Binding SecurityText}"/>
+												<TextBlock Grid.Column="5" Classes="cell dim" Text="{Binding Bssid}"/>
+											</Grid>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+								<TextBlock Grid.Row="2" Classes="emptyText" Margin="16,20" VerticalAlignment="Top" Text="{Binding WifiListNote}"
+										   IsVisible="{Binding !WifiHasRows}"/>
+							</Grid>
+						</ScrollViewer>
+					</Border>
+				</Grid>
+
+				<!-- not available here / no adapter / radio off / first read -->
+				<Border Grid.Row="3" Classes="card" IsVisible="{Binding WifiShowEmpty}" VerticalAlignment="Top" Padding="24,28">
+					<StackPanel Spacing="10" HorizontalAlignment="Center" MaxWidth="440">
+						<Path Classes="emptyIco" Data="{StaticResource IcoAbout}"/>
+						<TextBlock Classes="emptyText" Text="{Binding WifiEmptyText}"/>
+					</StackPanel>
+				</Border>
 			</Grid>
 		</TabItem>
 
 		<!-- ============================ NEIGHBORS ============================ -->
-		<TabItem Classes="subtab" Header="NEIGHBORS">
-			<Grid RowDefinitions="Auto, Auto, *" Margin="0,8,0,0">
-				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
-					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
-						<TextBlock Text="LOCAL NETWORK NEIGHBORS" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
-						<TextBlock Text="Devices in this machine's ARP cache (IP ↔ MAC)" FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap"/>
+		<TabItem Header="Neighbors">
+			<Grid RowDefinitions="Auto, *" Margin="0,12,0,0">
+				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,12">
+					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2" Background="Transparent"
+								ToolTip.Tip="Devices in this machine's ARP cache (IP ↔ MAC)">
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<TextBlock Classes="sectionTitle" Text="ARP cache" VerticalAlignment="Center"/>
+							<Border Classes="badge" Padding="7,1" IsVisible="{Binding NeighborsHasRows}">
+								<TextBlock Text="{Binding Neighbors.Count}" FontFamily="{StaticResource MonoFont}"/>
+							</Border>
+						</StackPanel>
 					</StackPanel>
-					<Button Grid.Column="1" Classes="refresh-btn" Command="{Binding RefreshNeighborsCommand}" VerticalAlignment="Center">
-						<TextBlock Text="REFRESH" FontSize="11" FontWeight="SemiBold" LetterSpacing="1" Foreground="#42B883"/>
+					<Button Grid.Column="1" Classes="secondary" Command="{Binding RefreshNeighborsCommand}" VerticalAlignment="Center" Padding="12,0">
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<Path Classes="btnIco" Data="{StaticResource GlyphRefresh}"/>
+							<TextBlock Text="Refresh" VerticalAlignment="Center"/>
+						</StackPanel>
 					</Button>
 				</Grid>
 
-				<Grid Grid.Row="1" ColumnDefinitions="*,180,80,110" Margin="4,0,4,4" IsVisible="{Binding NeighborsHasRows}">
-					<TextBlock Grid.Column="0" Classes="colhead" Text="IP ADDRESS"/>
-					<TextBlock Grid.Column="1" Classes="colhead" Text="MAC"/>
-					<TextBlock Grid.Column="2" Classes="colhead" Text="TYPE"/>
-					<TextBlock Grid.Column="3" Classes="colhead" Text="INTERFACE"/>
-				</Grid>
+				<!-- table: scrolls sideways inside the card on a phone; rows virtualize vertically -->
+				<Border Grid.Row="1" Classes="card output" IsVisible="{Binding NeighborsHasRows}">
+					<ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+						<Grid MinWidth="580" Width="{Binding $parent[ScrollViewer].Viewport.Width}" RowDefinitions="Auto, Auto, *">
+							<Grid Grid.Row="0" ColumnDefinitions="*,170,90,1.2*" MinHeight="36" Margin="14,0">
+								<TextBlock Grid.Column="0" Classes="colhead" Text="IP address"/>
+								<TextBlock Grid.Column="1" Classes="colhead" Text="MAC"/>
+								<TextBlock Grid.Column="2" Classes="colhead" Text="Type"/>
+								<TextBlock Grid.Column="3" Classes="colhead" Text="Interface"/>
+							</Grid>
+							<Border Grid.Row="1" Classes="divider"/>
+							<ItemsControl Grid.Row="2" Classes="table" ItemsSource="{Binding Neighbors}" IsVisible="{Binding NeighborsHasRows}">
+								<ItemsControl.ItemTemplate>
+									<DataTemplate x:DataType="h:Neighbor">
+										<Grid ColumnDefinitions="*,170,90,1.2*" Height="28" Margin="14,0">
+											<TextBlock Grid.Column="0" Classes="cell key" Text="{Binding Ip}"/>
+											<TextBlock Grid.Column="1" Classes="cell" Text="{Binding Mac}"/>
+											<TextBlock Grid.Column="2" Classes="cell dim" Text="{Binding Kind}"/>
+											<TextBlock Grid.Column="3" Classes="cell dim" Text="{Binding Iface}"/>
+										</Grid>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+						</Grid>
+					</ScrollViewer>
+				</Border>
 
-				<ScrollViewer Grid.Row="2" IsVisible="{Binding NeighborsHasRows}">
-					<ItemsControl ItemsSource="{Binding Neighbors}">
-						<ItemsControl.ItemTemplate>
-							<DataTemplate x:DataType="h:Neighbor">
-								<Border Classes="zebra" CornerRadius="4" Padding="4,0">
-									<Grid ColumnDefinitions="*,180,80,110" Height="27">
-										<TextBlock Grid.Column="0" Classes="cell" Foreground="#ECECEF" Text="{Binding Ip}"/>
-										<TextBlock Grid.Column="1" Classes="cell" Text="{Binding Mac}"/>
-										<TextBlock Grid.Column="2" Classes="cell" Foreground="#9E9FA8" Text="{Binding Kind}"/>
-										<TextBlock Grid.Column="3" Classes="cell" Foreground="#9E9FA8" Text="{Binding Iface}"/>
-									</Grid>
-								</Border>
-							</DataTemplate>
-						</ItemsControl.ItemTemplate>
-					</ItemsControl>
-				</ScrollViewer>
-
-				<Border Grid.Row="2" IsVisible="{Binding !NeighborsHasRows}" Background="#14161A" BorderBrush="#22242B" BorderThickness="1" CornerRadius="8" Padding="24" VerticalAlignment="Top" Margin="0,4,0,0">
-					<StackPanel Spacing="8" HorizontalAlignment="Center">
-						<TextBlock Text="⛔ NOT AVAILABLE" FontSize="11" FontWeight="Bold" LetterSpacing="1" Foreground="#8A8B93" HorizontalAlignment="Center"/>
-						<TextBlock Text="{Binding NeighborsNote}" FontSize="11.5" Foreground="#9E9FA8" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="380"/>
+				<Border Grid.Row="1" Classes="card" IsVisible="{Binding !NeighborsHasRows}" VerticalAlignment="Top" Padding="24,28">
+					<StackPanel Spacing="10" HorizontalAlignment="Center" MaxWidth="420">
+						<Path Classes="emptyIco" Data="{StaticResource IcoAbout}"/>
+						<TextBlock Classes="emptyText" Text="{Binding NeighborsNote}"/>
 					</StackPanel>
 				</Border>
 			</Grid>
 		</TabItem>
 
 		<!-- ============================ PORTS ============================ -->
-		<TabItem Classes="subtab" Header="PORTS">
-			<Grid RowDefinitions="Auto, Auto, *" Margin="0,8,0,0">
-				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
-					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
-						<TextBlock Text="LISTENING &amp; ACTIVE PORTS" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
-						<TextBlock Text="TCP/UDP endpoints open on this machine" FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap"/>
+		<TabItem Header="Ports">
+			<Grid RowDefinitions="Auto, *" Margin="0,12,0,0">
+				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,12">
+					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2" Background="Transparent"
+								ToolTip.Tip="TCP and UDP endpoints open on this machine: listening and active">
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<TextBlock Classes="sectionTitle" Text="Local ports" VerticalAlignment="Center"/>
+							<Border Classes="badge" Padding="7,1" IsVisible="{Binding PortsHasRows}">
+								<TextBlock Text="{Binding Ports.Count}" FontFamily="{StaticResource MonoFont}"/>
+							</Border>
+						</StackPanel>
 					</StackPanel>
-					<Button Grid.Column="1" Classes="refresh-btn" Command="{Binding RefreshPortsCommand}" VerticalAlignment="Center">
-						<TextBlock Text="REFRESH" FontSize="11" FontWeight="SemiBold" LetterSpacing="1" Foreground="#42B883"/>
+					<Button Grid.Column="1" Classes="secondary" Command="{Binding RefreshPortsCommand}" VerticalAlignment="Center" Padding="12,0">
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<Path Classes="btnIco" Data="{StaticResource GlyphRefresh}"/>
+							<TextBlock Text="Refresh" VerticalAlignment="Center"/>
+						</StackPanel>
 					</Button>
 				</Grid>
 
-				<Grid Grid.Row="1" ColumnDefinitions="50,*,*,90,134" Margin="4,0,4,4" IsVisible="{Binding PortsHasRows}">
-					<TextBlock Grid.Column="0" Classes="colhead" Text="PROTO"/>
-					<TextBlock Grid.Column="1" Classes="colhead" Text="LOCAL"/>
-					<TextBlock Grid.Column="2" Classes="colhead" Text="REMOTE"/>
-					<TextBlock Grid.Column="3" Classes="colhead" Text="STATE"/>
-					<TextBlock Grid.Column="4" Classes="colhead" Text="PROCESS"/>
-				</Grid>
+				<Border Grid.Row="1" Classes="card output" IsVisible="{Binding PortsHasRows}">
+					<ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+						<Grid MinWidth="680" Width="{Binding $parent[ScrollViewer].Viewport.Width}" RowDefinitions="Auto, Auto, *">
+							<Grid Grid.Row="0" ColumnDefinitions="56,*,*,112,160" MinHeight="36" Margin="14,0">
+								<TextBlock Grid.Column="0" Classes="colhead" Text="Proto"/>
+								<TextBlock Grid.Column="1" Classes="colhead" Text="Local"/>
+								<TextBlock Classes="colhead c-remote" Text="Remote"/>
+								<TextBlock Grid.Column="3" Classes="colhead" Text="State"/>
+								<TextBlock Classes="colhead c-process" Text="Process"/>
+							</Grid>
+							<Border Grid.Row="1" Classes="divider"/>
+							<ItemsControl Grid.Row="2" Classes="table" ItemsSource="{Binding Ports}" IsVisible="{Binding PortsHasRows}">
+								<ItemsControl.ItemTemplate>
+									<DataTemplate x:DataType="h:PortEntry">
+										<Grid ColumnDefinitions="56,*,*,112,160" Height="28" Margin="14,0">
+											<TextBlock Grid.Column="0" Classes="cell proto" Text="{Binding Proto}"/>
+											<TextBlock Grid.Column="1" Classes="cell key" Text="{Binding Local}"/>
+											<TextBlock Classes="cell c-remote" Text="{Binding Remote}"/>
+											<TextBlock Grid.Column="3" Classes="cell dim" Classes.listen="{Binding IsListen}" Text="{Binding State}"/>
+											<TextBlock Classes="cell key c-process" Text="{Binding Process}"
+													   ToolTip.Tip="{Binding Pid, StringFormat='PID {0}'}"/>
+										</Grid>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+						</Grid>
+					</ScrollViewer>
+				</Border>
 
-				<ScrollViewer Grid.Row="2" IsVisible="{Binding PortsHasRows}">
-					<ItemsControl ItemsSource="{Binding Ports}">
-						<ItemsControl.ItemTemplate>
-							<DataTemplate x:DataType="h:PortEntry">
-								<Border Classes="zebra" CornerRadius="4" Padding="4,0">
-									<Grid ColumnDefinitions="50,*,*,90,134" Height="26">
-										<TextBlock Grid.Column="0" Classes="cell" Foreground="#7FB4FF" Text="{Binding Proto}"/>
-										<TextBlock Grid.Column="1" Classes="cell" Foreground="#ECECEF" Text="{Binding Local}"/>
-										<TextBlock Grid.Column="2" Classes="cell" Foreground="#9E9FA8" Text="{Binding Remote}"/>
-										<TextBlock Grid.Column="3" Classes="cell" Foreground="#55C795" Text="{Binding State}"/>
-										<TextBlock Grid.Column="4" Classes="cell" Foreground="#CBA6E6" Text="{Binding Process}"
-												   ToolTip.Tip="{Binding Pid, StringFormat='PID {0}'}"/>
-									</Grid>
-								</Border>
-							</DataTemplate>
-						</ItemsControl.ItemTemplate>
-					</ItemsControl>
-				</ScrollViewer>
-
-				<Border Grid.Row="2" IsVisible="{Binding !PortsHasRows}" Background="#14161A" BorderBrush="#22242B" BorderThickness="1" CornerRadius="8" Padding="24" VerticalAlignment="Top" Margin="0,4,0,0">
-					<StackPanel Spacing="8" HorizontalAlignment="Center">
-						<TextBlock Text="⛔ NOT AVAILABLE" FontSize="11" FontWeight="Bold" LetterSpacing="1" Foreground="#8A8B93" HorizontalAlignment="Center"/>
-						<TextBlock Text="{Binding PortsNote}" FontSize="11.5" Foreground="#9E9FA8" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="380"/>
+				<Border Grid.Row="1" Classes="card" IsVisible="{Binding !PortsHasRows}" VerticalAlignment="Top" Padding="24,28">
+					<StackPanel Spacing="10" HorizontalAlignment="Center" MaxWidth="420">
+						<Path Classes="emptyIco" Data="{StaticResource IcoAbout}"/>
+						<TextBlock Classes="emptyText" Text="{Binding PortsNote}"/>
 					</StackPanel>
 				</Border>
 			</Grid>
 		</TabItem>
 
 		<!-- ============================ ROUTING ============================ -->
-		<TabItem Classes="subtab" Header="ROUTING">
-			<Grid RowDefinitions="Auto, Auto, *" Margin="0,8,0,0">
-				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
-					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
-						<TextBlock Text="ROUTING TABLE" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
-						<TextBlock Text="IPv4 routes (read-only)" FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap"/>
+		<TabItem Header="Routing">
+			<Grid RowDefinitions="Auto, *" Margin="0,12,0,0">
+				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,12">
+					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2" Background="Transparent"
+								ToolTip.Tip="This machine's IPv4 routing table (read-only)">
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<TextBlock Classes="sectionTitle" Text="IPv4 routes" VerticalAlignment="Center"/>
+							<Border Classes="badge" Padding="7,1" IsVisible="{Binding RoutesHasRows}">
+								<TextBlock Text="{Binding Routes.Count}" FontFamily="{StaticResource MonoFont}"/>
+							</Border>
+						</StackPanel>
 					</StackPanel>
-					<Button Grid.Column="1" Classes="refresh-btn" Command="{Binding RefreshRoutesCommand}" VerticalAlignment="Center">
-						<TextBlock Text="REFRESH" FontSize="11" FontWeight="SemiBold" LetterSpacing="1" Foreground="#42B883"/>
+					<Button Grid.Column="1" Classes="secondary" Command="{Binding RefreshRoutesCommand}" VerticalAlignment="Center" Padding="12,0">
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<Path Classes="btnIco" Data="{StaticResource GlyphRefresh}"/>
+							<TextBlock Text="Refresh" VerticalAlignment="Center"/>
+						</StackPanel>
 					</Button>
 				</Grid>
 
-				<Grid Grid.Row="1" ColumnDefinitions="*,*,110,70" Margin="4,0,4,4" IsVisible="{Binding RoutesHasRows}">
-					<TextBlock Grid.Column="0" Classes="colhead" Text="DESTINATION"/>
-					<TextBlock Grid.Column="1" Classes="colhead" Text="GATEWAY"/>
-					<TextBlock Grid.Column="2" Classes="colhead" Text="INTERFACE"/>
-					<TextBlock Grid.Column="3" Classes="colhead" Text="METRIC"/>
-				</Grid>
+				<Border Grid.Row="1" Classes="card output" IsVisible="{Binding RoutesHasRows}">
+					<ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+						<Grid MinWidth="560" Width="{Binding $parent[ScrollViewer].Viewport.Width}" RowDefinitions="Auto, Auto, *">
+							<Grid Grid.Row="0" ColumnDefinitions="*,*,1.2*,64" MinHeight="36" Margin="14,0">
+								<TextBlock Grid.Column="0" Classes="colhead" Text="Destination"/>
+								<TextBlock Grid.Column="1" Classes="colhead" Text="Gateway"/>
+								<TextBlock Grid.Column="2" Classes="colhead" Text="Interface"/>
+								<TextBlock Grid.Column="3" Classes="colhead" Text="Metric"/>
+							</Grid>
+							<Border Grid.Row="1" Classes="divider"/>
+							<ItemsControl Grid.Row="2" Classes="table" ItemsSource="{Binding Routes}" IsVisible="{Binding RoutesHasRows}">
+								<ItemsControl.ItemTemplate>
+									<DataTemplate x:DataType="h:RouteEntry">
+										<Grid ColumnDefinitions="*,*,1.2*,64" Height="28" Margin="14,0">
+											<TextBlock Grid.Column="0" Classes="cell key" Text="{Binding Destination}"/>
+											<TextBlock Grid.Column="1" Classes="cell key" Text="{Binding Gateway}"/>
+											<TextBlock Grid.Column="2" Classes="cell dim" Text="{Binding Iface}"/>
+											<TextBlock Grid.Column="3" Classes="cell dim" Text="{Binding Metric}"/>
+										</Grid>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+						</Grid>
+					</ScrollViewer>
+				</Border>
 
-				<ScrollViewer Grid.Row="2" IsVisible="{Binding RoutesHasRows}">
-					<ItemsControl ItemsSource="{Binding Routes}">
-						<ItemsControl.ItemTemplate>
-							<DataTemplate x:DataType="h:RouteEntry">
-								<Border Classes="zebra" CornerRadius="4" Padding="4,0">
-									<Grid ColumnDefinitions="*,*,110,70" Height="26">
-										<TextBlock Grid.Column="0" Classes="cell" Foreground="#ECECEF" Text="{Binding Destination}"/>
-										<TextBlock Grid.Column="1" Classes="cell" Foreground="#ECECEF" Text="{Binding Gateway}"/>
-										<TextBlock Grid.Column="2" Classes="cell" Foreground="#9E9FA8" Text="{Binding Iface}"/>
-										<TextBlock Grid.Column="3" Classes="cell" Foreground="#9E9FA8" Text="{Binding Metric}"/>
-									</Grid>
-								</Border>
-							</DataTemplate>
-						</ItemsControl.ItemTemplate>
-					</ItemsControl>
-				</ScrollViewer>
-
-				<Border Grid.Row="2" IsVisible="{Binding !RoutesHasRows}" Background="#14161A" BorderBrush="#22242B" BorderThickness="1" CornerRadius="8" Padding="24" VerticalAlignment="Top" Margin="0,4,0,0">
-					<StackPanel Spacing="8" HorizontalAlignment="Center">
-						<TextBlock Text="⛔ NOT AVAILABLE" FontSize="11" FontWeight="Bold" LetterSpacing="1" Foreground="#8A8B93" HorizontalAlignment="Center"/>
-						<TextBlock Text="{Binding RoutesNote}" FontSize="11.5" Foreground="#9E9FA8" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="380"/>
+				<Border Grid.Row="1" Classes="card" IsVisible="{Binding !RoutesHasRows}" VerticalAlignment="Top" Padding="24,28">
+					<StackPanel Spacing="10" HorizontalAlignment="Center" MaxWidth="420">
+						<Path Classes="emptyIco" Data="{StaticResource IcoAbout}"/>
+						<TextBlock Classes="emptyText" Text="{Binding RoutesNote}"/>
 					</StackPanel>
 				</Border>
 			</Grid>

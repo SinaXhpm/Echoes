@@ -2,171 +2,1515 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
              xmlns:helpers="using:Echoes.Helpers"
-             xmlns:views="using:Echoes.Views"
+             xmlns:ctl="using:Echoes.Views.Controls"
              x:Class="Echoes.Views.MonitorView"
              x:DataType="vm:MonitorViewModel">
 
-    <Grid Margin="14">
-        <TabControl>
-            <TabControl.Styles>
-                <Style Selector="TabItem">
-                    <Setter Property="FontSize" Value="12"/>
-                    <Setter Property="MinHeight" Value="34"/>
-                    <Setter Property="Padding" Value="16,0"/>
-                    <Setter Property="Foreground" Value="#9E9FA8"/>
-                </Style>
-                <Style Selector="TabItem:selected">
-                    <Setter Property="Foreground" Value="#ECECEF"/>
-                </Style>
-            </TabControl.Styles>
+    <UserControl.Resources>
+        <!-- stroked glyphs on the 24x24 grid the nav icons use -->
+        <StreamGeometry x:Key="GlyphPause">M9 6.5v11 M15 6.5v11</StreamGeometry>
+        <StreamGeometry x:Key="GlyphPlay">M8.5 6v12l9.5-6z</StreamGeometry>
+        <StreamGeometry x:Key="GlyphClose">M7 7l10 10 M17 7L7 17</StreamGeometry>
+        <StreamGeometry x:Key="GlyphTrash">M4.5 7h15 M9.5 7V4.5h5V7 M6.5 7l1 12.5h9l1-12.5 M10.5 11v5 M13.5 11v5</StreamGeometry>
+        <StreamGeometry x:Key="GlyphSliders">M4 7.5h9 M17 7.5h3 M15 5.5v4 M4 16.5h3 M11 16.5h9 M9 14.5v4</StreamGeometry>
+        <StreamGeometry x:Key="GlyphEdit">M5 19h3.5L18.6 8.9a2.1 2.1 0 0 0-3-3L5.5 16v3z M14.2 7.3l2.9 2.9</StreamGeometry>
+        <StreamGeometry x:Key="GlyphBack">M14.5 6l-6 6 6 6</StreamGeometry>
+        <StreamGeometry x:Key="GlyphPlus">M12 5.5v13 M5.5 12h13</StreamGeometry>
+        <!-- small row glyphs, drawn 1:1 in a 14 x 14 box (no stretching: crisp at row size) -->
+        <StreamGeometry x:Key="RowPause">M5 3.5v7 M9 3.5v7</StreamGeometry>
+        <StreamGeometry x:Key="RowPlay">M5 3.2v7.6l6-3.8z</StreamGeometry>
+        <StreamGeometry x:Key="RowClose">M4 4l6 6 M10 4l-6 6</StreamGeometry>
+    </UserControl.Resources>
 
-            <!-- ============ SETUP ============ -->
-            <!-- No ScrollViewer: a single Grid fills the tab. TARGETS takes the '*' row so it grows to
-                 absorb all leftover height — the page fits any window without ever scrolling. -->
-            <TabItem Header="SETUP">
-                <Grid Margin="0,12,0,2" RowDefinitions="Auto,*,Auto,Auto" ColumnDefinitions="*">
+    <UserControl.Styles>
+        <!-- ================= shared bits ================= -->
+        <Style Selector="Path.btnIco">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.7"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button:pointerover Path.btnIco">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.open Path.btnIco">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <!-- the settings button reads as pressed while its card is open -->
+        <Style Selector="Button.secondary.open">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Button.secondary.open:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent.SoftHover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="TextBlock.sectionDesc">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.inlineMsg">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.inlineMsg.error">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="TextBlock.inlineMsg.ok">
+            <Setter Property="Foreground" Value="{DynamicResource Success}"/>
+        </Style>
+        <!-- a saved secret, shown masked where its input box was ("@bot · …7Kx3") -->
+        <Style Selector="Border.secretBox">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="MinHeight" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="Padding" Value="12,0"/>
+        </Style>
+        <Style Selector="Border.secretBox TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <!-- the detail panel's warnings (amber, solid) -->
+        <Style Selector="Border.warnBox">
+            <Setter Property="Background" Value="{DynamicResource Warning.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Warning.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Padding" Value="10,8"/>
+        </Style>
+        <Style Selector="TextBlock.warnText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <!-- text-only button (Undo) -->
+        <Style Selector="Button.linkBtn">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="MinHeight" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.linkBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Hover}"/>
+        </Style>
+        <!-- small square icon button inside a row / the detail header -->
+        <Style Selector="Button.rowBtn">
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.rowBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedHover}"/>
+        </Style>
+        <!-- touch (the mobile shell, e.g. a tablet wide enough for the table rows): full-size targets -->
+        <Style Selector="Grid#MonRoot.touch Button.rowBtn">
+            <Setter Property="Width" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+        </Style>
+        <Style Selector="Button.rowBtn Path">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Button.rowBtn:pointerover Path">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.rowBtn.remove:pointerover Path">
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+        </Style>
+        <!-- ghost button with danger text (Remove) -->
+        <Style Selector="Button.ghost.dangerText">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Button.ghost.dangerText Path.btnIco">
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Button.ghost.dangerText:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Button.ghost.dangerText:pointerover Path.btnIco">
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+        </Style>
 
-                    <!-- TARGETS (fills leftover height) -->
-                    <TextBlock Grid.Row="0" Classes="fieldLabel" Text="TARGETS" Margin="2,0,0,5"/>
-                    <TextBox Grid.Row="1" Classes="field multiline" Text="{Binding InputAddresses}" AcceptsReturn="True"
-                             FontSize="12" MinHeight="64" FontFamily="Cascadia Code,Consolas"
-                             VerticalContentAlignment="Top" KeyDown="Input_KeyDown"
-                             PlaceholderText="host · host:port · https://url — one per line&#x0a;(Enter = Start, Shift+Enter = newline)"/>
+        <!-- status pill (Up / Down / Pending / Paused): neutral = pending, never checked -->
+        <Style Selector="Border.pill">
+            <Setter Property="Width" Value="62"/>
+            <Setter Property="Padding" Value="0,1"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <Style Selector="Border.pill TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.pill.paused TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
 
-                    <!-- CHECKS + OPTIONS on one compact strip (wraps to 2 rows only on a phone) -->
-                    <Border Grid.Row="2" Classes="card" Padding="14,7" Margin="0,10,0,0">
-                        <WrapPanel>
-                            <WrapPanel.Styles>
-                                <Style Selector="CheckBox">
-                                    <Setter Property="FontSize" Value="12.5"/>
-                                    <Setter Property="FontWeight" Value="SemiBold"/>
-                                    <Setter Property="VerticalAlignment" Value="Center"/>
-                                    <Setter Property="Margin" Value="0,3,14,3"/>
-                                    <Setter Property="MinHeight" Value="26"/>
-                                </Style>
-                                <Style Selector="TextBlock.grp">
-                                    <Setter Property="FontSize" Value="10"/>
-                                    <Setter Property="FontWeight" Value="Bold"/>
-                                    <Setter Property="Foreground" Value="#6E6F78"/>
-                                    <Setter Property="VerticalAlignment" Value="Center"/>
-                                    <Setter Property="Margin" Value="0,0,10,0"/>
-                                </Style>
-                            </WrapPanel.Styles>
+        <!-- custom-drawn charts: colors are tokens -->
+        <Style Selector="ctl|MonitorHistoryBar">
+            <Setter Property="UpBrush" Value="{DynamicResource Success}"/>
+            <Setter Property="PendingBrush" Value="{DynamicResource Warning}"/>
+            <Setter Property="DownBrush" Value="{DynamicResource Danger}"/>
+            <Setter Property="EmptyBrush" Value="{DynamicResource Bg.Raised}"/>
+        </Style>
+        <Style Selector="ctl|MonitorSparkline">
+            <Setter Property="LineBrush" Value="{DynamicResource Accent}"/>
+            <Setter Property="FillBrush" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="FailBrush" Value="{DynamicResource Danger}"/>
+        </Style>
 
-                            <!-- what to probe -->
-                            <TextBlock Classes="grp" Text="CHECKS"/>
-                            <CheckBox IsChecked="{Binding CheckPing}" Content="Ping" ToolTip.Tip="ICMP echo round-trip"/>
-                            <CheckBox IsChecked="{Binding CheckTcp}" Content="TCP" ToolTip.Tip="TCP connect to the port (default 80, or host:port)"/>
-                            <CheckBox IsChecked="{Binding CheckHttp}" Content="HTTP" ToolTip.Tip="HTTP GET — status code + latency"/>
+        <!-- ================= summary strip ================= -->
+        <Style Selector="StackPanel.stat">
+            <Setter Property="Spacing" Value="1"/>
+            <Setter Property="MinWidth" Value="52"/>
+            <Setter Property="Margin" Value="0,0,22,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.statNum">
+            <Setter Property="FontSize" Value="17"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="TextBlock.statNum.zero">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="TextBlock.statNum.up.on">
+            <Setter Property="Foreground" Value="{DynamicResource Success}"/>
+        </Style>
+        <Style Selector="TextBlock.statNum.down.on">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="TextBlock.statNum.pending.on, TextBlock.statNum.warn.on">
+            <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="TextBlock.statCap">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Border.statSep">
+            <Setter Property="Width" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="Margin" Value="0,2,22,2"/>
+        </Style>
+        <Style Selector="Ellipse.live">
+            <Setter Property="Width" Value="7"/>
+            <Setter Property="Height" Value="7"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Fill" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
+        <Style Selector="Ellipse.live.on">
+            <Setter Property="Fill" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="TextBlock.runState">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
 
-                            <!-- No divider here: once the row wraps on a narrow screen it is left
-                                 dangling at the end of the line as a stray mark. -->
+        <!-- one row (wide): [stats ............ state · settings · start] -->
+        <Style Selector="Grid#MonRoot.sw Grid#StatsGrid">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        </Style>
+        <Style Selector="Grid#MonRoot.sw Grid#RunBar">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+        </Style>
+        <!-- two rows: stats, then [state ........ settings · start] -->
+        <Style Selector="Grid#MonRoot:not(.sw) Grid#StatsGrid">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#MonRoot:not(.sw) Grid#RunBar">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+        <!-- stats: one line on desktop; a 4 x 2 grid on a phone -->
+        <Style Selector="Grid#MonRoot StackPanel.st1"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/></Style>
+        <Style Selector="Grid#MonRoot StackPanel.st2"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/></Style>
+        <Style Selector="Grid#MonRoot StackPanel.st3"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/></Style>
+        <Style Selector="Grid#MonRoot StackPanel.stw"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/></Style>
+        <Style Selector="Grid#MonRoot StackPanel.st4"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="4"/></Style>
+        <Style Selector="Grid#MonRoot StackPanel.st5"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="5"/></Style>
+        <Style Selector="Grid#MonRoot Border.statSep"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="6"/></Style>
+        <Style Selector="Grid#MonRoot StackPanel.st6"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="7"/></Style>
+        <Style Selector="Grid#MonRoot StackPanel.st7"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="8"/></Style>
+        <Style Selector="Grid#MonRoot.phone StackPanel.stat">
+            <Setter Property="MinWidth" Value="78"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+        <!-- phone: Monitors · Up · Down · Pending / Uptime · Avg · Paused · Warning -->
+        <Style Selector="Grid#MonRoot.phone StackPanel.st4"><Setter Property="Grid.Column" Value="3"/></Style>
+        <Style Selector="Grid#MonRoot.phone StackPanel.stw"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Margin" Value="0,8,8,0"/></Style>
+        <Style Selector="Grid#MonRoot.phone StackPanel.st5"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Margin" Value="0,8,8,0"/></Style>
+        <Style Selector="Grid#MonRoot.phone StackPanel.st6"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Margin" Value="0,8,8,0"/></Style>
+        <Style Selector="Grid#MonRoot.phone StackPanel.st7"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Margin" Value="0,8,8,0"/></Style>
+        <Style Selector="Grid#MonRoot.phone Border.statSep"><Setter Property="IsVisible" Value="False"/></Style>
+        <!-- the settings button drops its label where the one-line strip is tight (slabel = room for it), and on a phone -->
+        <Style Selector="Grid#MonRoot:not(.slabel) TextBlock#SettingsLabel"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#MonRoot:not(.slabel) Button#SettingsBtn"><Setter Property="Padding" Value="0"/><Setter Property="Width" Value="{DynamicResource Control.Height}"/></Style>
+        <!-- phone: "Edit list" is icon-only, so the add box keeps its width -->
+        <Style Selector="Grid#MonRoot.phone TextBlock#EditLabel"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#MonRoot.phone Button#EditBtn"><Setter Property="Padding" Value="0"/><Setter Property="Width" Value="{DynamicResource Control.Height}"/></Style>
 
-                            <!-- Interval and Timeout wrap independently — as one unit they overflow the frame. -->
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,16,3">
-                                <TextBlock Text="Interval" FontSize="11.5" Foreground="#C7C8CF" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                <TextBox Classes="field" Text="{Binding Interval}" Width="50" HorizontalContentAlignment="Center"/>
-                                <TextBlock Text="sec" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="5,0,0,0"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,16,3">
-                                <TextBlock Text="Timeout" FontSize="11.5" Foreground="#C7C8CF" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                <TextBox Classes="field" Text="{Binding TimeoutMs}" Width="62" HorizontalContentAlignment="Center"/>
-                                <TextBlock Text="ms" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="5,0,0,0"/>
-                            </StackPanel>
-                            <CheckBox IsChecked="{Binding AlertSound}" Foreground="#C7C8CF" Margin="0,3,0,3"
-                                      Content="Sound alert" ToolTip.Tip="Beep when a target goes up or down"/>
-                        </WrapPanel>
-                    </Border>
+        <!-- ================= settings card =================
+             sform (wide enough): a two-column form — checks | timing, each threshold | its sound, the two start options.
+             Otherwise one column; while it is open (setopen) the card then takes the list's place and scrolls. -->
+        <Style Selector="NumericUpDown.num">
+            <Setter Property="Width" Value="76"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="NumericUpDown.num.count"><Setter Property="Width" Value="52"/></Style>
+        <Style Selector="Grid#MonRoot.touch NumericUpDown.num"><Setter Property="Width" Value="96"/></Style>
+        <Style Selector="Grid#MonRoot.touch NumericUpDown.num.count"><Setter Property="Width" Value="64"/></Style>
+        <Style Selector="StackPanel.setRow">
+            <Setter Property="Orientation" Value="Horizontal"/>
+            <Setter Property="Spacing" Value="8"/>
+            <Setter Property="MinHeight" Value="{DynamicResource Control.Height}"/>
+        </Style>
+        <Style Selector="StackPanel.setRow > CheckBox"><Setter Property="VerticalAlignment" Value="Center"/></Style>
+        <Style Selector="TextBlock.setText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.setText.tail"><Setter Property="TextWrapping" Value="Wrap"/></Style>
+        <Style Selector="TextBlock.setLabel">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Grid#SetGrid CheckBox"><Setter Property="VerticalAlignment" Value="Center"/></Style>
+        <Style Selector="StackPanel#SetTiming">
+            <Setter Property="Orientation" Value="Horizontal"/>
+            <Setter Property="Spacing" Value="20"/>
+        </Style>
+        <!-- the sound switches: Down ▶ · Back up ▶ · Warning ▶, wrapping on a phone -->
+        <Style Selector="WrapPanel#SetSoundList > StackPanel">
+            <Setter Property="Orientation" Value="Horizontal"/>
+            <Setter Property="Spacing" Value="2"/>
+            <Setter Property="Margin" Value="0,0,14,0"/>
+            <Setter Property="MinHeight" Value="{DynamicResource Control.Height}"/>
+        </Style>
+        <Style Selector="WrapPanel#SetSoundList > StackPanel > CheckBox"><Setter Property="VerticalAlignment" Value="Center"/></Style>
+        <Style Selector="Panel#SoundsLead, TextBlock#VolumeLead"><Setter Property="Margin" Value="0,0,16,0"/></Style>
+        <!-- a 360 px phone: two to a line (Down · Back up / Warning), not one -->
+        <Style Selector="Grid#MonRoot.phone WrapPanel#SetSoundList > StackPanel"><Setter Property="Margin" Value="0,0,6,0"/></Style>
+        <Style Selector="Grid#MonRoot.phone Panel#SoundsLead"><Setter Property="Margin" Value="0,0,12,0"/></Style>
+        <Style Selector="Grid#MonRoot.phone TextBlock#VolumeLead"><Setter Property="Margin" Value="0,0,12,0"/></Style>
+        <Style Selector="Grid#MonRoot.phone TextBlock.setLabel.head"><Setter Property="MinWidth" Value="0"/></Style>
+        <!-- "Checks", "Sounds", "Volume": one width, so their controls start in one column -->
+        <Style Selector="TextBlock.setLabel.head"><Setter Property="MinWidth" Value="62"/></Style>
+        <Style Selector="Slider#VolumeSlider">
+            <Setter Property="MinWidth" Value="100"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,-6,0,-6"/>
+        </Style>
+        <!-- form: starting (top) · checks | timing · thresholds | sounds · help · Telegram -->
+        <Style Selector="Grid#MonRoot.sform CheckBox#SetStartWithApp"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/></Style>
+        <Style Selector="Grid#MonRoot.sform CheckBox#SetOpenAtLogin"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Margin" Value="24,0,0,0"/></Style>
+        <Style Selector="Grid#MonRoot.sform CheckBox#SetStartOnBoot"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Margin" Value="24,0,0,0"/></Style>
+        <Style Selector="Grid#MonRoot.sform Grid#SetLoginNote"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Margin" Value="24,2,0,0"/></Style>
+        <Style Selector="Grid#MonRoot.sform Grid#SetBootNote"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Margin" Value="24,2,0,0"/></Style>
+        <Style Selector="Grid#MonRoot.sform Border#SetDivStart"><Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,8,0,6"/></Style>
+        <Style Selector="Grid#MonRoot.sform StackPanel#SetChecks"><Setter Property="Grid.Row" Value="3"/><Setter Property="Grid.Column" Value="0"/></Style>
+        <Style Selector="Grid#MonRoot.sform StackPanel#SetTiming"><Setter Property="Grid.Row" Value="3"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Margin" Value="24,0,0,0"/></Style>
+        <Style Selector="Grid#MonRoot.sform Grid#SetDown"><Setter Property="Grid.Row" Value="4"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Margin" Value="0,8,0,0"/></Style>
+        <Style Selector="Grid#MonRoot.sform Grid#SetSounds"><Setter Property="Grid.Row" Value="4"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Margin" Value="24,8,0,0"/></Style>
+        <Style Selector="Grid#MonRoot.sform Grid#SetUp"><Setter Property="Grid.Row" Value="5"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Margin" Value="0,8,0,0"/></Style>
+        <Style Selector="Grid#MonRoot.sform Grid#SetVolume"><Setter Property="Grid.Row" Value="5"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Margin" Value="24,8,0,0"/></Style>
+        <Style Selector="Grid#MonRoot.sform TextBlock#SetHelp"><Setter Property="Grid.Row" Value="6"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="2,10,0,0"/></Style>
+        <Style Selector="Grid#MonRoot.sform StackPanel#SetTg"><Setter Property="Grid.Row" Value="7"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,12,0,0"/></Style>
+        <Style Selector="Grid#MonRoot.sform Button#SetDone"><Setter Property="IsVisible" Value="False"/></Style>
+        <!-- the form sits above the list: with the Telegram section it scrolls within this height rather than squeeze the list -->
+        <Style Selector="Grid#MonRoot.sform Border#SettingsCard"><Setter Property="MaxHeight" Value="380"/></Style>
+        <!-- one column: the same order, top to bottom -->
+        <Style Selector="Grid#MonRoot:not(.sform) Grid#SetGrid > :is(Control)"><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) CheckBox#SetStartWithApp"><Setter Property="Grid.Row" Value="0"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) CheckBox#SetStartWithApp"><Setter Property="Grid.ColumnSpan" Value="1"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) CheckBox#SetOpenAtLogin"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Margin" Value="16,0,0,0"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) CheckBox#SetStartOnBoot"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Margin" Value="16,0,0,0"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) Grid#SetLoginNote"><Setter Property="Grid.Row" Value="2"/><Setter Property="Margin" Value="0,2,0,0"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) Grid#SetBootNote"><Setter Property="Grid.Row" Value="2"/><Setter Property="Margin" Value="0,2,0,0"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) Border#SetDivStart"><Setter Property="Grid.Row" Value="3"/><Setter Property="Margin" Value="0,10,0,8"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) StackPanel#SetChecks"><Setter Property="Grid.Row" Value="4"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) StackPanel#SetTiming">
+            <Setter Property="Grid.Row" Value="5"/><Setter Property="Margin" Value="0,6,0,0"/>
+            <Setter Property="Orientation" Value="Vertical"/><Setter Property="Spacing" Value="6"/>
+        </Style>
+        <!-- one column: the interval / timeout boxes line up with the threshold boxes below -->
+        <Style Selector="Grid#MonRoot:not(.sform) TextBlock.timeLead"><Setter Property="MinWidth" Value="{Binding #UpLead.Bounds.Width}"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) Grid#SetDown"><Setter Property="Grid.Row" Value="6"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) Grid#SetUp"><Setter Property="Grid.Row" Value="7"/><Setter Property="Margin" Value="0,6,0,0"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) Grid#SetSounds"><Setter Property="Grid.Row" Value="8"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) Grid#SetVolume"><Setter Property="Grid.Row" Value="9"/><Setter Property="Margin" Value="0,4,0,0"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) TextBlock#SetHelp"><Setter Property="Grid.Row" Value="10"/><Setter Property="Margin" Value="2,10,0,0"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) StackPanel#SetTg"><Setter Property="Grid.Row" Value="11"/><Setter Property="Margin" Value="0,12,0,0"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform) Button#SetDone"><Setter Property="Grid.Row" Value="12"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
+        <!-- one column with room (a desktop window): interval | timeout and down | up as pairs; the second of each pair
+             starts in the grid's second column, with "Start at sign-in" (the first column is as wide as "Down after …") -->
+        <Style Selector="Grid#MonRoot:not(.sform):not(.phone) CheckBox#SetOpenAtLogin"><Setter Property="Margin" Value="24,0,0,0"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform):not(.phone) CheckBox#SetStartOnBoot"><Setter Property="Margin" Value="24,0,0,0"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform):not(.phone) StackPanel#SetTiming">
+            <Setter Property="Orientation" Value="Horizontal"/><Setter Property="Spacing" Value="24"/>
+        </Style>
+        <Style Selector="Grid#MonRoot:not(.sform):not(.phone) StackPanel#SetInterval"><Setter Property="MinWidth" Value="{Binding #SetDown.Bounds.Width}"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform):not(.phone) Grid#SetDown"><Setter Property="Grid.ColumnSpan" Value="1"/></Style>
+        <!-- … and the note on the automatic checks beside the check switches -->
+        <Style Selector="Grid#MonRoot:not(.sform):not(.phone) StackPanel#SetChecks"><Setter Property="Grid.ColumnSpan" Value="1"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform):not(.phone) TextBlock#SetHelp">
+            <Setter Property="Grid.Row" Value="4"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="24,0,0,0"/><Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Grid#MonRoot:not(.sform):not(.phone) Grid#SetUp">
+            <Setter Property="Grid.Row" Value="6"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="24,10,0,0"/>
+        </Style>
+        <!-- Telegram: bot token | chat, and [proxy address | user | password], side by side; stacked on a phone -->
+        <Style Selector="Grid#SetGrid TextBox#TgProxyUser"><Setter Property="Grid.Column" Value="1"/></Style>
+        <Style Selector="Grid#SetGrid TextBox#TgProxyPass"><Setter Property="Grid.Column" Value="2"/></Style>
+        <Style Selector="Grid#SetGrid StackPanel#TgChatField"><Setter Property="Grid.Column" Value="1"/></Style>
+        <Style Selector="Grid#MonRoot.phone TextBox#TgProxyAddr"><Setter Property="Grid.ColumnSpan" Value="3"/></Style>
+        <Style Selector="Grid#MonRoot.phone TextBox#TgProxyUser">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#MonRoot.phone TextBox#TgProxyPass">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#MonRoot.phone StackPanel#TgTokenField"><Setter Property="Grid.ColumnSpan" Value="2"/></Style>
+        <Style Selector="Grid#MonRoot.phone StackPanel#TgChatField">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <!-- one column, open: the settings replace the monitors / events below and scroll on their own (the row is set
+             here, not on the element: a local value would outrank this style) -->
+        <Style Selector="Border#SettingsCard"><Setter Property="Grid.Row" Value="1"/></Style>
+        <Style Selector="Grid#MonRoot:not(.sform).setopen Border#SettingsCard">
+            <Setter Property="Grid.Row" Value="2"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style Selector="Grid#MonRoot:not(.sform).setopen TabControl#MonTabs"><Setter Property="IsVisible" Value="False"/></Style>
 
-                    <!-- START -->
-                    <Button Grid.Row="3" Classes="toggle" Command="{Binding ToggleMonitorCommand}" Classes.active="{Binding IsMonitoring}"
-                            Height="40" Margin="0,10,0,0" HorizontalAlignment="Stretch">
+        <!-- ================= monitor list ================= -->
+        <!-- the add box looks like a one-line field and grows when a list is pasted into it -->
+        <Style Selector="TextBox.addBox">
+            <Setter Property="Height" Value="NaN"/>
+            <Setter Property="MinHeight" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="MaxHeight" Value="132"/>
+            <Setter Property="Padding" Value="12,4,6,4"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <!-- the paste icon stays in the top-right corner when the box grows -->
+        <Style Selector="TextBox.addBox Button.pasteBtn">
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style Selector="Grid#MonRoot.phone TextBox.addBox Button.pasteBtn">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Width" Value="34"/>
+        </Style>
+
+        <Style Selector="ListBox#MonList">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="ListBox#MonList ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Border.mrow">
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="TextBlock.colhead">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.mname">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="10,0,10,0"/>
+        </Style>
+        <Style Selector="Border.mrow.paused TextBlock.mname">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="ctl|MonitorChipPanel.chips">
+            <Setter Property="Spacing" Value="4"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style Selector="Border.chip">
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Padding" Value="6,1"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.chip TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="10.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+        </Style>
+        <Style Selector="Border.chip.fail">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+        </Style>
+        <Style Selector="Border.chip.fail TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Border.chip.warn">
+            <Setter Property="Background" Value="{DynamicResource Warning.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Warning.Border}"/>
+        </Style>
+        <Style Selector="Border.chip.warn TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="TextBlock.msum">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="10,4,10,0"/>
+        </Style>
+        <Style Selector="TextBlock.msum.fail">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="TextBlock.msum.warn">
+            <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="TextBlock.mnum">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.mage">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style Selector="Ellipse.sdot">
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Height" Value="8"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Fill" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
+        <Style Selector="Ellipse.sdot.up"><Setter Property="Fill" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="Ellipse.sdot.retry"><Setter Property="Fill" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="Ellipse.sdot.down"><Setter Property="Fill" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="Ellipse.sdot.paused"><Setter Property="Fill" Value="{DynamicResource Border.Strong}"/></Style>
+
+        <!-- row cells: fixed widths shared by the header and every row, so the columns line up -->
+        <Style Selector="Grid.mgrid > :is(Control).cSpark"><Setter Property="Width" Value="68"/><Setter Property="Height" Value="18"/><Setter Property="Margin" Value="0,0,14,0"/></Style>
+        <Style Selector="Grid.mgrid > :is(Control).cHist"><Setter Property="Width" Value="131"/><Setter Property="Height" Value="14"/><Setter Property="Margin" Value="0,0,12,0"/></Style>
+        <Style Selector="Grid.mgrid > :is(Control).cUp"><Setter Property="Width" Value="50"/></Style>
+        <Style Selector="Grid.mgrid > :is(Control).cAge"><Setter Property="Width" Value="52"/><Setter Property="Margin" Value="12,0,0,0"/></Style>
+        <Style Selector="Grid.mgrid > :is(Control).cAct"><Setter Property="Width" Value="56"/><Setter Property="Margin" Value="6,0,0,0"/></Style>
+        <!-- row sparklines are a bare line; the detail chart gets the area -->
+        <Style Selector="Grid.mgrid > ctl|MonitorSparkline"><Setter Property="FillBrush" Value="{x:Null}"/></Style>
+        <!-- touch: two 44 px buttons + spacing. Declared after the cell widths above (the later style wins); the header
+             cell gets the same width, so the columns stay aligned. -->
+        <Style Selector="Grid#MonRoot.touch Grid.mgrid > :is(Control).cAct"><Setter Property="Width" Value="92"/></Style>
+        <Style Selector="Grid.mgrid > TextBlock.cSpark, Grid.mgrid > TextBlock.cHist"><Setter Property="Height" Value="NaN"/></Style>
+        <Style Selector="Grid.mgrid > TextBlock.cUp, Grid.mgrid > TextBlock.cAge"><Setter Property="TextAlignment" Value="Right"/></Style>
+        <Style Selector="ctl|MonitorHistoryBar.cHist, ctl|MonitorSparkline.cSpark"><Setter Property="VerticalAlignment" Value="Center"/></Style>
+
+        <!-- lw: one line per monitor -->
+        <Style Selector="Grid#MonRoot.lw Grid.mgrid > :is(Control).cPill"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/></Style>
+        <Style Selector="Grid#MonRoot.lw Grid.mgrid > :is(Control).cDot"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#MonRoot.lw Grid.mgrid > :is(Control).cName"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/></Style>
+        <Style Selector="Grid#MonRoot.lw Grid.mgrid > :is(Control).cChips"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/></Style>
+        <Style Selector="Grid#MonRoot.lw Grid.mgrid > :is(Control).cSum"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#MonRoot.lw Grid.mgrid > :is(Control).cSpark"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/></Style>
+        <Style Selector="Grid#MonRoot.lw Grid.mgrid > :is(Control).cHist"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="4"/></Style>
+        <Style Selector="Grid#MonRoot.lw Grid.mgrid > :is(Control).cUp"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="5"/></Style>
+        <Style Selector="Grid#MonRoot.lw Grid.mgrid > :is(Control).cAge"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="6"/></Style>
+        <Style Selector="Grid#MonRoot.lw Grid.mgrid > :is(Control).cAct"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="7"/></Style>
+
+        <!-- lm: name over the chips; no sparkline / age column -->
+        <Style Selector="Grid#MonRoot.lm Border.mrow"><Setter Property="Padding" Value="12,7"/></Style>
+        <Style Selector="Grid#MonRoot.lm Grid.mgrid > :is(Control).cPill"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.RowSpan" Value="2"/></Style>
+        <Style Selector="Grid#MonRoot.lm Grid.mgrid > :is(Control).cDot"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#MonRoot.lm Grid.mgrid > :is(Control).cName"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/></Style>
+        <Style Selector="Grid#MonRoot.lm Grid.mgrid > :is(Control).cChips"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="10,4,10,0"/></Style>
+        <Style Selector="Grid#MonRoot.lm Grid.mgrid > :is(Control).cSum"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#MonRoot.lm Grid.mgrid > :is(Control).cSpark"><Setter Property="IsVisible" Value="False"/></Style>
+        <!-- lm with room to spare (ls): the sparkline comes back, centered on the two lines -->
+        <Style Selector="Grid#MonRoot.lm.ls Grid.mgrid > :is(Control).cSpark">
+            <Setter Property="IsVisible" Value="True"/>
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Grid.RowSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#MonRoot.lm Grid.mgrid > :is(Control).cHist"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="4"/><Setter Property="Grid.RowSpan" Value="2"/></Style>
+        <Style Selector="Grid#MonRoot.lm Grid.mgrid > :is(Control).cUp"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="5"/><Setter Property="Grid.RowSpan" Value="2"/></Style>
+        <Style Selector="Grid#MonRoot.lm Grid.mgrid > :is(Control).cAge"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#MonRoot.lm Grid.mgrid > :is(Control).cAct"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="7"/><Setter Property="Grid.RowSpan" Value="2"/></Style>
+
+        <!-- lc (phone): a compact two-line card — dot · name · uptime / one-line result · status bar -->
+        <Style Selector="Grid#MonRoot.lc Border.mrow"><Setter Property="Padding" Value="12,9"/></Style>
+        <Style Selector="Grid#MonRoot.lc Grid.mgrid > :is(Control).cPill"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#MonRoot.lc Grid.mgrid > :is(Control).cDot"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/></Style>
+        <Style Selector="Grid#MonRoot.lc Grid.mgrid > :is(Control).cName"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="4"/></Style>
+        <Style Selector="Grid#MonRoot.lc Grid.mgrid > :is(Control).cChips"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#MonRoot.lc Grid.mgrid > :is(Control).cSum"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="4"/></Style>
+        <Style Selector="Grid#MonRoot.lc Grid.mgrid > :is(Control).cSpark"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#MonRoot.lc Grid.mgrid > :is(Control).cHist">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="5"/>
+            <Setter Property="Width" Value="96"/><Setter Property="Height" Value="12"/><Setter Property="Margin" Value="0,4,0,0"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+        <Style Selector="Grid#MonRoot.lc Grid.mgrid > :is(Control).cUp">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="5"/>
+            <Setter Property="Width" Value="NaN"/><Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+        <Style Selector="Grid#MonRoot.lc Grid.mgrid > :is(Control).cAge"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#MonRoot.lc Grid.mgrid > :is(Control).cAct"><Setter Property="IsVisible" Value="False"/></Style>
+        <!-- the column header only exists for the table layouts; two-line rows have no separate chips column -->
+        <Style Selector="Grid#MonRoot.lc Grid#ListHead, Grid#MonRoot.lc Border#ListHeadRule"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#MonRoot.lm Grid#ListHead > :is(Control).cChips"><Setter Property="IsVisible" Value="False"/></Style>
+
+        <!-- ================= detail panel ================= -->
+        <Style Selector="Border#DetailCard">
+            <Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Width" Value="320"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#MonRoot.drill Border#DetailCard">
+            <Setter Property="Grid.Column" Value="0"/>
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Width" Value="NaN"/>
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+        <Style Selector="Grid#MonRoot.drill Border#ListCard"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Button#BackBtn"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#MonRoot.drill Button#BackBtn"><Setter Property="IsVisible" Value="True"/></Style>
+        <Style Selector="Grid#MonRoot.drill Button#CloseBtn"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="TextBlock.detailTitle">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Title}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.detailAddr">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.stateLine">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.stateLine.up"><Setter Property="Foreground" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="TextBlock.stateLine.down"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="TextBlock.stateLine.retry"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="Border.chartBox">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Padding" Value="8,8,8,6"/>
+        </Style>
+        <Style Selector="TextBlock.dval">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.dcap">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="TextBlock.probeName">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="Margin" Value="0,0,12,0"/>
+        </Style>
+        <Style Selector="TextBlock.probeVal">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.probeVal.fail"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="TextBlock.probeVal.warn"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+
+        <!-- ================= events ================= -->
+        <Style Selector="ItemsControl.evlist">
+            <Setter Property="ItemsPanel">
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+            </Setter>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}"/>
+                    </ScrollViewer>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Border.erow">
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="Padding" Value="14,7"/>
+        </Style>
+        <Style Selector="TextBlock.etime">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.etarget">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.emsg">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.epill">
+            <Setter Property="Width" Value="62"/>
+            <Setter Property="Padding" Value="0,1"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <Style Selector="Border.epill TextBlock"><Setter Property="HorizontalAlignment" Value="Center"/></Style>
+        <!-- desktop: time · kind · monitor · message on one line -->
+        <!-- columns: [time] [kind] [monitor 2*] [message 5*] [time on a phone] -->
+        <Style Selector="Grid.egrid > TextBlock.etime"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Width" Value="96"/></Style>
+        <Style Selector="Grid.egrid > Border.epill"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Margin" Value="0,0,12,0"/></Style>
+        <Style Selector="Grid.egrid > TextBlock.etarget"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Margin" Value="0,0,16,0"/></Style>
+        <Style Selector="Grid.egrid > TextBlock.emsg"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Grid.ColumnSpan" Value="2"/></Style>
+        <!-- phone: kind · monitor · time, the message underneath -->
+        <Style Selector="Grid#MonRoot.phone Border.erow"><Setter Property="Padding" Value="12,8"/></Style>
+        <Style Selector="Grid#MonRoot.phone Grid.egrid > Border.epill"><Setter Property="Margin" Value="0,0,10,0"/></Style>
+        <Style Selector="Grid#MonRoot.phone Grid.egrid > TextBlock.etarget"><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,0,10,0"/></Style>
+        <Style Selector="Grid#MonRoot.phone Grid.egrid > TextBlock.etime"><Setter Property="Grid.Column" Value="4"/><Setter Property="Width" Value="NaN"/><Setter Property="HorizontalAlignment" Value="Right"/></Style>
+        <Style Selector="Grid#MonRoot.phone Grid.egrid > TextBlock.emsg"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="4"/><Setter Property="Margin" Value="0,4,0,0"/></Style>
+        <!-- the detail panel's short list: always two lines -->
+        <Style Selector="Border.mini">
+            <Setter Property="Padding" Value="0,6"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        </Style>
+
+        <!-- ================= empty states ================= -->
+        <Style Selector="Path.emptyIco">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.emptyTitle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.emptyText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+    </UserControl.Styles>
+
+    <!-- The view decides the layout from its own width (code-behind): sw = summary on one line (slabel = with the
+         Settings label); phone; lw / lm / lc = one-line / two-line table rows / compact phone cards (ls = two-line rows
+         keep the sparkline); docked = detail beside the list; drill = detail instead of the list; sform = the settings as
+         a two-column form (setopen = they are shown). Defaults are the wide desktop ones, so the first frame is right
+         before any measuring. -->
+    <Grid x:Name="MonRoot" Classes="sw slabel lw ls sform" Classes.setopen="{Binding IsSettingsOpen}" RowDefinitions="Auto, Auto, *">
+
+        <!-- ===================== SUMMARY STRIP ===================== -->
+        <Border Grid.Row="0" Classes="card" Padding="14,10">
+            <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto, Auto">
+                <Grid x:Name="StatsGrid" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto"
+                      HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <StackPanel Classes="stat st1" ToolTip.Tip="Monitors in the list">
+                        <TextBlock Classes="statNum" Text="{Binding TargetCount}"/>
+                        <TextBlock Classes="statCap" Text="Monitors"/>
+                    </StackPanel>
+                    <StackPanel Classes="stat st2" ToolTip.Tip="Answering every enabled check">
+                        <TextBlock Classes="statNum up" Classes.on="{Binding HasUp}" Classes.zero="{Binding !HasUp}" Text="{Binding UpCount}"/>
+                        <TextBlock Classes="statCap" Text="Up"/>
+                    </StackPanel>
+                    <StackPanel Classes="stat st3" ToolTip.Tip="Failed the &quot;down after&quot; number of checks in a row">
+                        <TextBlock Classes="statNum down" Classes.on="{Binding HasDown}" Classes.zero="{Binding !HasDown}" Text="{Binding DownCount}"/>
+                        <TextBlock Classes="statCap" Text="Down"/>
+                    </StackPanel>
+                    <StackPanel Classes="stat stw" IsVisible="{Binding HasWarnings}"
+                                ToolTip.Tip="Up, with a warning: a certificate or domain expiring soon, or changed DNS answers (not downtime)">
+                        <TextBlock Classes="statNum warn on" Text="{Binding WarningCount}"/>
+                        <TextBlock Classes="statCap" Text="Warning"/>
+                    </StackPanel>
+                    <StackPanel Classes="stat st4" ToolTip.Tip="Not checked yet, or failing but not yet marked down">
+                        <TextBlock Classes="statNum pending" Classes.on="{Binding HasRetrying}" Classes.zero="{Binding !HasPending}" Text="{Binding PendingCount}"/>
+                        <TextBlock Classes="statCap" Text="Pending"/>
+                    </StackPanel>
+                    <StackPanel Classes="stat st5" IsVisible="{Binding HasPaused}" ToolTip.Tip="Paused monitors are not checked">
+                        <TextBlock Classes="statNum" Text="{Binding PausedCount}"/>
+                        <TextBlock Classes="statCap" Text="Paused"/>
+                    </StackPanel>
+                    <Border Classes="statSep"/>
+                    <StackPanel Classes="stat st6" ToolTip.Tip="Share of successful checks across all monitors this session">
+                        <TextBlock Classes="statNum" Text="{Binding UptimeText}"/>
+                        <TextBlock Classes="statCap" Text="Uptime"/>
+                    </StackPanel>
+                    <StackPanel Classes="stat st7" ToolTip.Tip="Average response time of the successful checks this session">
+                        <TextBlock Classes="statNum" Text="{Binding AvgResponseText}"/>
+                        <TextBlock Classes="statCap" Text="Avg response"/>
+                    </StackPanel>
+                </Grid>
+
+                <Grid x:Name="RunBar" ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center" Margin="0,0,6,0"
+                                Background="Transparent" ToolTip.Tip="{Binding LastRoundText}">
+                        <Ellipse Classes="live" Classes.on="{Binding IsMonitoring}"/>
+                        <TextBlock Classes="runState" Text="{Binding RunStateText}"/>
+                    </StackPanel>
+                    <Button x:Name="SettingsBtn" Grid.Column="1" Classes="secondary" Classes.open="{Binding IsSettingsOpen}"
+                            Command="{Binding ToggleSettingsCommand}" ToolTip.Tip="Starting by itself, checks, thresholds, sounds and volume, Telegram alerts"
+                            AutomationProperties.Name="Settings">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <Path Classes="btnIco" Data="{StaticResource GlyphSliders}"/>
+                            <TextBlock x:Name="SettingsLabel" Text="Settings" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2" Classes="toggle" MinWidth="84" Command="{Binding ToggleMonitorCommand}"
+                            Classes.active="{Binding IsMonitoring}">
                         <Panel>
-                            <TextBlock Text="START MONITORING" IsVisible="{Binding !IsMonitoring}" FontSize="12" FontWeight="Black" LetterSpacing="0.5"/>
-                            <TextBlock Text="STOP" IsVisible="{Binding IsMonitoring}" FontSize="12" FontWeight="Black" LetterSpacing="0.5"/>
+                            <TextBlock Text="Start" IsVisible="{Binding !IsMonitoring}"/>
+                            <TextBlock Text="Stop" IsVisible="{Binding IsMonitoring}"/>
                         </Panel>
                     </Button>
-
                 </Grid>
-            </TabItem>
 
-            <!-- ============ STATUS ============ -->
+                <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Classes="inlineMsg error" Margin="0,8,0,0"
+                           Text="{Binding Notice}" IsVisible="{Binding HasNotice}"/>
+            </Grid>
+        </Border>
+
+        <!-- ===================== SETTINGS ===================== -->
+        <!-- Placement per layout (sform / one column) is in the styles above. -->
+        <Border x:Name="SettingsCard" Classes="card" Margin="0,10,0,0" IsVisible="{Binding IsSettingsOpen}">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <Grid x:Name="SetGrid" Margin="14,10,14,12" ColumnDefinitions="Auto,*" Grid.IsSharedSizeScope="True"
+                      RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                    <!-- starting by itself: first, so it's easy to find -->
+                    <CheckBox x:Name="SetStartWithApp" IsChecked="{Binding StartWithApp}"
+                              ToolTip.Tip="Start monitoring as soon as Echoes opens, without visiting this tab">
+                        <TextBlock Text="Start with Echoes"/>
+                    </CheckBox>
+                    <CheckBox x:Name="SetOpenAtLogin" IsChecked="{Binding OpenAtLogin}" IsVisible="{Binding ShowOpenAtLogin}"
+                              ToolTip.Tip="Open Echoes in the tray when you sign in to this computer, with monitoring running">
+                        <TextBlock Text="Start at sign-in"/>
+                    </CheckBox>
+                    <CheckBox x:Name="SetStartOnBoot" IsChecked="{Binding StartOnBoot}" IsVisible="{Binding ShowStartOnBoot}"
+                              ToolTip.Tip="After the phone restarts, and after Echoes is updated, monitoring starts in the background without opening Echoes">
+                        <TextBlock Text="Start at boot"/>
+                    </CheckBox>
+                    <Grid x:Name="SetLoginNote" ColumnDefinitions="*, Auto" IsVisible="{Binding HasOpenAtLoginNote}">
+                        <TextBlock Classes="inlineMsg" Classes.error="{Binding OpenAtLoginNoteIsError}" VerticalAlignment="Center"
+                                   Text="{Binding OpenAtLoginNote}"/>
+                        <Button Grid.Column="1" Classes="linkBtn" Content="Use this copy" Command="{Binding UseThisCopyCommand}"
+                                IsVisible="{Binding CanUseThisCopy}" ToolTip.Tip="Open this copy of Echoes at sign-in instead"/>
+                    </Grid>
+                    <Grid x:Name="SetBootNote" ColumnDefinitions="*, Auto" IsVisible="{Binding HasBootNote}">
+                        <TextBlock Classes="inlineMsg" Classes.error="{Binding BootNoteIsError}" VerticalAlignment="Center"
+                                   Text="{Binding BootNote}"/>
+                        <Button Grid.Column="1" Classes="linkBtn" Content="App settings" Command="{Binding OpenAppSettingsCommand}"
+                                ToolTip.Tip="Open Echoes' page in the phone's settings"/>
+                    </Grid>
+                    <Border x:Name="SetDivStart" Classes="divider"/>
+
+                    <!-- what is checked -->
+                    <StackPanel x:Name="SetChecks" Classes="setRow" Spacing="16"
+                                ToolTip.Tip="A monitor is up when every enabled check that applies to it passes">
+                        <TextBlock Classes="setLabel head" Text="Checks"/>
+                        <CheckBox IsChecked="{Binding CheckPing}" Content="Ping" ToolTip.Tip="ICMP echo round-trip"/>
+                        <CheckBox IsChecked="{Binding CheckTcp}" Content="TCP" ToolTip.Tip="TCP connect to the port — 80 unless host:port or the URL says otherwise"/>
+                        <CheckBox IsChecked="{Binding CheckHttp}" Content="HTTP" ToolTip.Tip="HTTP GET for URLs and web ports (80, 443, 8000, 8080, 8443); 2xx and 3xx count as up"/>
+                    </StackPanel>
+                    <!-- how often, how long: side by side in the form, one under the other in one column -->
+                    <StackPanel x:Name="SetTiming">
+                        <StackPanel x:Name="SetInterval" Classes="setRow">
+                            <TextBlock Classes="setText timeLead" Text="Interval"/>
+                            <NumericUpDown Classes="field num" Value="{Binding Interval}" Minimum="1" Maximum="86400" Increment="1"
+                                           FormatString="0" ShowButtonSpinner="False" ToolTip.Tip="Seconds between check rounds (1 s to 24 h)"
+                                           AutomationProperties.Name="Interval (seconds)"/>
+                            <TextBlock Classes="setText" Text="s"/>
+                        </StackPanel>
+                        <StackPanel Classes="setRow">
+                            <TextBlock Classes="setText timeLead" Text="Timeout"/>
+                            <NumericUpDown Classes="field num" Value="{Binding TimeoutMs}" Minimum="200" Maximum="60000" Increment="100"
+                                           FormatString="0" ShowButtonSpinner="False" ToolTip.Tip="How long each check may take (ping, TCP connect, HTTP)"
+                                           AutomationProperties.Name="Timeout (milliseconds)"/>
+                            <TextBlock Classes="setText" Text="ms"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <!-- the two thresholds: their boxes line up (shared first column); the tail wraps in one column -->
+                    <Grid x:Name="SetDown" MinHeight="{DynamicResource Control.Height}"
+                          ToolTip.Tip="A failing monitor shows as pending until this many checks in a row have failed, so one dropped packet doesn't alert you">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="SetLead"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Classes="setText" Text="Down after" Margin="0,0,8,0"/>
+                        <NumericUpDown Grid.Column="1" Classes="field num count" Value="{Binding DownAfter}" Minimum="1" Maximum="20" Increment="1"
+                                       FormatString="0" ShowButtonSpinner="False" AutomationProperties.Name="Mark down after this many failed checks in a row"/>
+                        <!-- no-break spaces: a narrow window wraps it as "failed checks / in a row" -->
+                        <TextBlock Grid.Column="2" Classes="setText tail" Text="failed checks in&#160;a&#160;row" Margin="8,0,0,0"/>
+                    </Grid>
+                    <Grid x:Name="SetUp" MinHeight="{DynamicResource Control.Height}"
+                          ToolTip.Tip="A monitor that answers again stays down until this many checks in a row have passed, so a flapping one doesn't alert on every check">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="SetLead"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="UpLead" Classes="setText" Text="Up after" Margin="0,0,8,0"/>
+                        <NumericUpDown Grid.Column="1" Classes="field num count" Value="{Binding UpAfter}" Minimum="1" Maximum="10" Increment="1"
+                                       FormatString="0" ShowButtonSpinner="False" AutomationProperties.Name="Mark up again after this many successful checks in a row"/>
+                        <TextBlock Grid.Column="2" Classes="setText tail" Text="passed checks in&#160;a&#160;row" Margin="8,0,0,0"/>
+                    </Grid>
+                    <!-- a sound per event, each with a preview; then the volume (0 = no sound) and a test -->
+                    <Grid x:Name="SetSounds" ColumnDefinitions="Auto, *">
+                        <!-- centered on the first line of switches, however they wrap -->
+                        <Panel x:Name="SoundsLead" Height="{DynamicResource Control.Height}" VerticalAlignment="Top">
+                            <TextBlock Classes="setLabel head" Text="Sounds"/>
+                        </Panel>
+                        <WrapPanel x:Name="SetSoundList" Grid.Column="1" Orientation="Horizontal">
+                            <StackPanel ToolTip.Tip="A clear, falling two-tone when a monitor is marked down">
+                                <CheckBox IsChecked="{Binding SoundOnDown}" Content="Down" AutomationProperties.Name="Sound when a monitor goes down"/>
+                                <Button Classes="rowBtn" VerticalAlignment="Center" Command="{Binding PreviewDownSoundCommand}"
+                                        ToolTip.Tip="Play the down sound" AutomationProperties.Name="Play the down sound">
+                                    <Path Data="{StaticResource RowPlay}"/>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel ToolTip.Tip="A bright, rising chime when a monitor is marked up again">
+                                <CheckBox IsChecked="{Binding SoundOnUp}" Content="Up" AutomationProperties.Name="Sound when a monitor comes back up"/>
+                                <Button Classes="rowBtn" VerticalAlignment="Center" Command="{Binding PreviewUpSoundCommand}"
+                                        ToolTip.Tip="Play the up sound" AutomationProperties.Name="Play the up sound">
+                                    <Path Data="{StaticResource RowPlay}"/>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel ToolTip.Tip="A soft double tap for a new warning: a certificate or domain expiring soon, or changed DNS answers">
+                                <CheckBox IsChecked="{Binding SoundOnWarning}" Content="Warning" AutomationProperties.Name="Sound for a new warning"/>
+                                <Button Classes="rowBtn" VerticalAlignment="Center" Command="{Binding PreviewWarningSoundCommand}"
+                                        ToolTip.Tip="Play the warning sound" AutomationProperties.Name="Play the warning sound">
+                                    <Path Data="{StaticResource RowPlay}"/>
+                                </Button>
+                            </StackPanel>
+                        </WrapPanel>
+                    </Grid>
+                    <Grid x:Name="SetVolume" MinHeight="{DynamicResource Control.Height}"
+                          ToolTip.Tip="How loud the alert sounds are, on top of the system volume. At 0 there is no sound.">
+                        <!-- the slider takes the room there is, up to 300 px; the value and Test follow right after it -->
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*" MaxWidth="300"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="VolumeLead" Classes="setLabel head" Text="Volume"/>
+                        <Slider x:Name="VolumeSlider" Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Volume}"
+                                SmallChange="5" LargeChange="10" TickFrequency="1" IsSnapToTickEnabled="True"
+                                AutomationProperties.Name="Alert volume"/>
+                        <TextBlock Grid.Column="2" Classes="setText" Text="{Binding VolumeText}" MinWidth="44" Margin="10,0,8,0"
+                                   FontFamily="{StaticResource MonoFont}" FontSize="12"/>
+                        <Button Grid.Column="3" Classes="secondary" Content="Test" MinWidth="60" Command="{Binding TestSoundCommand}"
+                                IsEnabled="{Binding !IsMuted}" ToolTip.Tip="Play the down sound, then the up sound, at this volume"/>
+                    </Grid>
+                    <TextBlock x:Name="SetHelp" Classes="sectionDesc"
+                               Text="TLS and domain expiry are checked automatically."/>
+
+                    <!-- Telegram alerts: on / proxy (+ its fields), bot token (stored sealed, shown masked), chat, test -->
+                    <StackPanel x:Name="SetTg" Spacing="8">
+                        <Border Classes="divider" Margin="0,0,0,4"/>
+                        <!-- the title and its two switches on one line (on a phone the switches, together, go under it),
+                             then what is still missing; the proxy fields come right under it -->
+                        <StackPanel Spacing="2">
+                            <WrapPanel ItemSpacing="24" LineSpacing="2">
+                                <TextBlock Classes="sectionTitle" Text="Telegram alerts" VerticalAlignment="Center"/>
+                                <StackPanel Orientation="Horizontal" Spacing="24">
+                                    <CheckBox x:Name="TgEnabledBox" IsChecked="{Binding TgEnabled}"
+                                              ToolTip.Tip="Send a Telegram message when a monitor goes down, comes back up (with how long it was down) or gets a warning. Events a few seconds apart arrive as one message.">
+                                        <TextBlock Text="Send alerts"/>
+                                    </CheckBox>
+                                    <CheckBox IsChecked="{Binding TgUseProxy}" ToolTip.Tip="Reach Telegram through an HTTP or SOCKS5 proxy (for where api.telegram.org is blocked), used only for these alerts">
+                                        <TextBlock Text="Use a proxy"/>
+                                    </CheckBox>
+                                </StackPanel>
+                            </WrapPanel>
+                            <TextBlock Classes="sectionDesc" Text="{Binding TgHint}"/>
+                        </StackPanel>
+                        <!-- [address | user | password]; a phone gives the address its own row (styles above) -->
+                        <Grid ColumnDefinitions="2*, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="8" IsVisible="{Binding TgUseProxy}">
+                            <TextBox x:Name="TgProxyAddr" Classes="field mono" Text="{Binding TgProxy}"
+                                     PlaceholderText="host:port or socks5://host:port" AutomationProperties.Name="Proxy address"/>
+                            <TextBox x:Name="TgProxyUser" Classes="field" Text="{Binding TgProxyUser}" PlaceholderText="User (optional)"
+                                     AutomationProperties.Name="Proxy user"/>
+                            <TextBox x:Name="TgProxyPass" Classes="field" PasswordChar="•" Text="{Binding TgProxyPass}"
+                                     PlaceholderText="Password" AutomationProperties.Name="Proxy password"/>
+                        </Grid>
+
+                        <!-- bot token | chat; one under the other on a phone (styles above) -->
+                        <Grid ColumnDefinitions="*, *" RowDefinitions="Auto, Auto" ColumnSpacing="16">
+                            <StackPanel x:Name="TgTokenField" Spacing="4">
+                                <TextBlock Classes="fieldLabel" Margin="0" Text="Bot token"/>
+                                <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8" IsVisible="{Binding ShowTgTokenSaved}">
+                                    <Border Classes="secretBox" ToolTip.Tip="Saved encrypted on this device; only its last characters are shown">
+                                        <TextBlock Text="{Binding TgTokenMasked}"/>
+                                    </Border>
+                                    <Button Grid.Column="1" Classes="secondary" Content="Change" Command="{Binding ChangeTgTokenCommand}"/>
+                                    <Button Grid.Column="2" Classes="ghost dangerText" Command="{Binding RemoveTgTokenCommand}"
+                                            ToolTip.Tip="Remove the saved token" AutomationProperties.Name="Remove the bot token">
+                                        <Path Classes="btnIco" Data="{StaticResource GlyphTrash}"/>
+                                    </Button>
+                                </Grid>
+                                <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8" IsVisible="{Binding ShowTgTokenBox}">
+                                    <TextBox x:Name="TgTokenBox" Classes="field mono" PasswordChar="•" Text="{Binding TgTokenInput}"
+                                             PlaceholderText="e.g. 123456789:AAH…" MaxLength="200"
+                                             ToolTip.Tip="The token @BotFather gave your bot"
+                                             AutomationProperties.Name="Bot token"/>
+                                    <Button Grid.Column="1" Classes="primary" Content="Save" Command="{Binding SaveTgTokenCommand}"/>
+                                    <Button Grid.Column="2" Classes="ghost" Content="Cancel" Command="{Binding CancelTgTokenCommand}"
+                                            IsVisible="{Binding CanCancelTgToken}"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel x:Name="TgChatField" Spacing="4">
+                                <TextBlock Classes="fieldLabel" Margin="0" Text="Chat"/>
+                                <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                                    <TextBox Classes="field mono" Text="{Binding TgChatId}" MaxLength="64"
+                                             PlaceholderText="Chat ID or @channel" AutomationProperties.Name="Chat ID"/>
+                                    <Button Grid.Column="1" Classes="secondary" Content="Find my chat" Command="{Binding FindTgChatCommand}"
+                                            IsEnabled="{Binding CanFindTgChat}"
+                                            ToolTip.Tip="Send your bot any message in Telegram first; this picks up the chat it came from"/>
+                                </Grid>
+                                <TextBlock Classes="sectionDesc" Text="{Binding TgChatName}" IsVisible="{Binding HasTgChatName}"/>
+                                <ComboBox x:Name="TgChatPicker" Classes="field" HorizontalAlignment="Stretch" ItemsSource="{Binding TgChats}"
+                                          SelectedItem="{Binding TgSelectedChat}" PlaceholderText="Pick the chat for alerts"
+                                          IsVisible="{Binding ShowTgChatPicker}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="helpers:MonitorTelegramChat">
+                                            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Spacing="6">
+                            <Button Classes="secondary" HorizontalAlignment="Left" Content="Send test"
+                                    Command="{Binding SendTgTestCommand}" IsEnabled="{Binding CanSendTgTest}"
+                                    ToolTip.Tip="Send a test message to the chat" AutomationProperties.Name="Send a test message"/>
+                            <TextBlock x:Name="TgStatusText" Classes="inlineMsg" Classes.error="{Binding TgStatusIsError}"
+                                       Classes.ok="{Binding TgStatusIsOk}" Text="{Binding TgStatus}" IsVisible="{Binding HasTgStatus}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Button x:Name="SetDone" Classes="secondary" HorizontalAlignment="Right" MinWidth="84" Content="Done"
+                            Command="{Binding ToggleSettingsCommand}"/>
+                </Grid>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ===================== MONITORS / EVENTS ===================== -->
+        <TabControl x:Name="MonTabs" Grid.Row="2" Padding="0" Margin="0,6,0,0">
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <TextBlock Text="STATUS" VerticalAlignment="Center"/>
-                        <Border CornerRadius="9" Background="#2042B883" Padding="8,2" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Targets.Count}" FontSize="10" FontWeight="Bold" Foreground="#42B883"/>
+                        <TextBlock Text="Monitors" VerticalAlignment="Center"/>
+                        <Border Classes="badge" Padding="7,1">
+                            <TextBlock Text="{Binding TargetCount}" FontFamily="{StaticResource MonoFont}"/>
                         </Border>
                     </StackPanel>
                 </TabItem.Header>
 
-                <!-- HorizontalScroll is only a fallback for an extremely narrow window; at any realistic
-                     desktop/phone width the proportional columns fit and no scrollbar appears. -->
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,10,0,0">
-                    <Grid MinWidth="380" RowDefinitions="Auto, *">
-                        <Grid Grid.Row="0" Margin="12,0,12,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1.5*"/>
-                                <ColumnDefinition Width="{Binding CheckPing, Converter={x:Static views:BoolToStarConverter.Instance}}"/>
-                                <ColumnDefinition Width="{Binding CheckTcp, Converter={x:Static views:BoolToStarConverter.Instance}}"/>
-                                <ColumnDefinition Width="{Binding CheckHttp, Converter={x:Static views:BoolToStarConverter.Instance}}"/>
-                                <ColumnDefinition Width="1*"/>
-                                <ColumnDefinition Width="0.7*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="ADDRESS" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8"/>
-                            <TextBlock Grid.Column="1" Text="PING" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center" IsVisible="{Binding CheckPing}"/>
-                            <TextBlock Grid.Column="2" Text="TCP" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center" IsVisible="{Binding CheckTcp}"/>
-                            <TextBlock Grid.Column="3" Text="HTTP" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center" IsVisible="{Binding CheckHttp}"/>
-                            <TextBlock Grid.Column="4" Text="UPTIME" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Center"/>
-                            <TextBlock Grid.Column="5" Text="FAILS" FontSize="10" FontWeight="Bold" Foreground="#9E9FA8" HorizontalAlignment="Right"/>
-                        </Grid>
+                <Grid ColumnDefinitions="*, Auto" Margin="0,10,0,0">
+                    <!-- ===== list card ===== -->
+                    <Border x:Name="ListCard" Grid.Column="0" Classes="card output">
+                        <Grid RowDefinitions="Auto, Auto, Auto, *">
+                            <Grid x:Name="AddBar" Grid.Row="0" ColumnDefinitions="*, Auto, Auto" Margin="10" IsVisible="{Binding !IsEditingList}">
+                                <!-- AcceptsReturn so a pasted list keeps all its lines; Enter is handled in code-behind (desktop) -->
+                                <TextBox x:Name="AddBox" Classes="field addBox" AcceptsReturn="True" TextWrapping="NoWrap"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                                         FontFamily="{StaticResource MonoFont}" Text="{Binding NewTarget}"
+                                         helpers:InputAssist.PasteMode="Lines" helpers:InputAssist.PasteButton="True"
+                                         PlaceholderText="Host, host:port or URL"
+                                         ToolTip.Tip="Add a host, host:port or URL, or paste a whole list. Enter adds and starts monitoring."/>
+                                <Button Grid.Column="1" Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Top"
+                                        Command="{Binding AddTargetsCommand}" ToolTip.Tip="Add the monitors typed or pasted on the left">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Path Classes="btnIco" Data="{StaticResource GlyphPlus}"/>
+                                        <TextBlock Text="Add" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="EditBtn" Grid.Column="2" Classes="ghost" Margin="8,0,0,0" VerticalAlignment="Top"
+                                        Command="{Binding OpenEditListCommand}" ToolTip.Tip="Edit the whole list as text, one monitor per line"
+                                        AutomationProperties.Name="Edit list">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Path Classes="btnIco" Data="{StaticResource GlyphEdit}"/>
+                                        <TextBlock x:Name="EditLabel" Text="Edit list" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <Grid Grid.Row="1" ColumnDefinitions="*, Auto" Margin="12,-4,10,8" IsVisible="{Binding HasAddMessage}">
+                                <TextBlock Classes="inlineMsg" Classes.error="{Binding AddMessageIsError}" Text="{Binding AddMessage}" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Classes="linkBtn" Content="Undo" Command="{Binding UndoRemoveCommand}" IsVisible="{Binding CanUndoRemove}"/>
+                            </Grid>
+                            <Border Grid.Row="2" Classes="divider" IsVisible="{Binding !IsEditingList}"/>
 
-                        <ListBox Grid.Row="1" ItemsSource="{Binding Targets}" Background="Transparent" Padding="0">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:MonitorTarget">
-                                    <Border CornerRadius="6" Margin="0,2" Padding="12,7" BorderThickness="1" Classes.success="{Binding IsSuccess}" Classes.failed="{Binding !IsSuccess}">
-                                        <Border.Styles>
-                                            <Style Selector="Border">
-                                                <Setter Property="Background" Value="#191A1F"/>
-                                                <Setter Property="BorderBrush" Value="#2F3139"/>
-                                            </Style>
-                                            <Style Selector="Border.success">
-                                                <Setter Property="Background" Value="#2042B883"/>
-                                                <Setter Property="BorderBrush" Value="#2042B883"/>
-                                            </Style>
-                                            <Style Selector="Border.failed">
-                                                <Setter Property="Background" Value="#20E5484D"/>
-                                                <Setter Property="BorderBrush" Value="#20E5484D"/>
-                                            </Style>
-                                        </Border.Styles>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="1.5*"/>
-                                                <ColumnDefinition Width="{Binding ShowPing, Converter={x:Static views:BoolToStarConverter.Instance}}"/>
-                                                <ColumnDefinition Width="{Binding ShowTcp, Converter={x:Static views:BoolToStarConverter.Instance}}"/>
-                                                <ColumnDefinition Width="{Binding ShowHttp, Converter={x:Static views:BoolToStarConverter.Instance}}"/>
-                                                <ColumnDefinition Width="1*"/>
-                                                <ColumnDefinition Width="0.7*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Address}" FontSize="11.5" Foreground="#ECECEF" TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding History}" FontSize="9" Foreground="#42B883" FontFamily="Cascadia Code,Consolas" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="1" Text="{Binding PingStatus}" FontSize="10.5" Foreground="#C7C8CF" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowPing}"/>
-                                            <TextBlock Grid.Column="2" Text="{Binding TcpStatus}" FontSize="10.5" Foreground="#C7C8CF" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowTcp}"/>
-                                            <TextBlock Grid.Column="3" Text="{Binding HttpStatus}" FontSize="10.5" Foreground="#ECECEF" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" IsVisible="{Binding ShowHttp}"/>
-                                            <TextBlock Grid.Column="4" Text="{Binding Uptime}" FontSize="10.5" Foreground="#4FCB97" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                                            <TextBlock Grid.Column="5" Text="{Binding FailedCount}" FontSize="11" Foreground="#E5484D" FontFamily="Cascadia Code,Consolas" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
-                                        </Grid>
+                            <Panel Grid.Row="3">
+                                <!-- the monitors -->
+                                <Grid RowDefinitions="Auto, Auto, *" IsVisible="{Binding ShowList}">
+                                    <Grid x:Name="ListHead" Classes="mgrid" ColumnDefinitions="Auto, 1.6*, 3.4*, Auto, Auto, Auto, Auto, Auto"
+                                          MinHeight="28" Margin="12,0">
+                                        <TextBlock Classes="colhead cPill" Text="Status" Width="62"/>
+                                        <TextBlock Classes="colhead cName" Text="Monitor" Margin="10,0"/>
+                                        <TextBlock Classes="colhead cChips" Text="Last check"/>
+                                        <TextBlock Classes="colhead cSpark" Text="Response"/>
+                                        <TextBlock Classes="colhead cHist" Text="History"/>
+                                        <TextBlock Classes="colhead cUp" Text="Uptime"/>
+                                        <TextBlock Classes="colhead cAge" Text="Checked"/>
+                                        <Border Classes="cAct"/>
+                                    </Grid>
+                                    <Border x:Name="ListHeadRule" Grid.Row="1" Classes="divider"/>
+                                    <ListBox x:Name="MonList" Grid.Row="2" ItemsSource="{Binding Targets}" SelectedItem="{Binding SelectedTarget}"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:MonitorTarget">
+                                                <Border Classes="mrow" Classes.paused="{Binding IsPaused}">
+                                                    <Grid Classes="mgrid" ColumnDefinitions="Auto, 1.6*, 3.4*, Auto, Auto, Auto, Auto, Auto" RowDefinitions="Auto, Auto">
+                                                        <Border Classes="badge pill cPill" VerticalAlignment="Center" ToolTip.Tip="{Binding StateTip}"
+                                                                Classes.success="{Binding IsGreen}" Classes.danger="{Binding IsDown}"
+                                                                Classes.warning="{Binding IsAmber}" Classes.paused="{Binding IsPaused}">
+                                                            <TextBlock Text="{Binding StateText}"/>
+                                                        </Border>
+                                                        <Ellipse Classes="sdot cDot" Classes.up="{Binding IsGreen}" Classes.down="{Binding IsDown}" ToolTip.Tip="{Binding StateTip}"
+                                                                 Classes.retry="{Binding IsAmber}" Classes.paused="{Binding IsPaused}"/>
+                                                        <TextBlock Classes="mname cName" Text="{Binding DisplayName}" ToolTip.Tip="{Binding Address}"/>
+                                                        <!-- order = which chips stay when the row is tight (failures first, then this order) -->
+                                                        <ctl:MonitorChipPanel Classes="chips cChips">
+                                                            <Border Classes="chip" Classes.fail="{Binding HttpFailed}" IsVisible="{Binding ShowHttp}">
+                                                                <TextBlock Text="{Binding HttpText}"/>
+                                                            </Border>
+                                                            <Border Classes="chip warn" IsVisible="{Binding ShowDnsChip}" ToolTip.Tip="{Binding DnsChipTip}">
+                                                                <TextBlock Text="DNS changed"/>
+                                                            </Border>
+                                                            <Border Classes="chip warn" IsVisible="{Binding ShowDomainChip}" ToolTip.Tip="Domain registration expiring (RDAP)">
+                                                                <TextBlock Text="{Binding DomainChipText}"/>
+                                                            </Border>
+                                                            <Border Classes="chip" Classes.warn="{Binding CertWarn}" Classes.fail="{Binding CertFailed}"
+                                                                    IsVisible="{Binding ShowCert}" ToolTip.Tip="{Binding CertTip}">
+                                                                <TextBlock Text="{Binding CertText}"/>
+                                                            </Border>
+                                                            <Border Classes="chip" Classes.fail="{Binding TcpFailed}" IsVisible="{Binding ShowTcp}">
+                                                                <TextBlock Text="{Binding TcpText}"/>
+                                                            </Border>
+                                                            <Border Classes="chip" Classes.fail="{Binding PingFailed}" IsVisible="{Binding ShowPing}">
+                                                                <TextBlock Text="{Binding PingText}"/>
+                                                            </Border>
+                                                        </ctl:MonitorChipPanel>
+                                                        <TextBlock Classes="msum cSum" Classes.fail="{Binding SummaryFailed}" Classes.warn="{Binding SummaryWarn}"
+                                                                   Text="{Binding SummaryText}"/>
+                                                        <ctl:MonitorSparkline Classes="cSpark" Points="30" History="{Binding History}" Version="{Binding HistoryVersion}"
+                                                                              ToolTip.Tip="Response time, last 30 checks"/>
+                                                        <ctl:MonitorHistoryBar Classes="cHist" History="{Binding History}" Version="{Binding HistoryVersion}"
+                                                                               ToolTip.Tip="Recent checks, newest on the right: green up, red down, amber not settled yet (failing, or answering again)"/>
+                                                        <TextBlock Classes="mnum cUp" Text="{Binding UptimeText}"/>
+                                                        <TextBlock Classes="mnum mage cAge" Text="{Binding LastCheckedText}"/>
+                                                        <StackPanel Classes="cAct" Orientation="Horizontal" Spacing="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                            <Button Classes="rowBtn" ToolTip.Tip="{Binding PauseTip}" AutomationProperties.Name="{Binding PauseTip}"
+                                                                    Command="{Binding ((vm:MonitorViewModel)DataContext).TogglePauseCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                    CommandParameter="{Binding}">
+                                                                <Panel>
+                                                                    <Path Data="{StaticResource RowPause}" IsVisible="{Binding !IsPaused}"/>
+                                                                    <Path Data="{StaticResource RowPlay}" IsVisible="{Binding IsPaused}"/>
+                                                                </Panel>
+                                                            </Button>
+                                                            <Button Classes="rowBtn remove" ToolTip.Tip="Remove monitor" AutomationProperties.Name="Remove monitor"
+                                                                    Command="{Binding ((vm:MonitorViewModel)DataContext).RemoveTargetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                    CommandParameter="{Binding}">
+                                                                <Path Data="{StaticResource RowClose}"/>
+                                                            </Button>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Grid>
+
+                                <!-- first run / empty list -->
+                                <StackPanel IsVisible="{Binding ShowEmpty}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                            Spacing="8" Margin="24" MaxWidth="400">
+                                    <Path Classes="emptyIco" Data="{StaticResource IcoMonitor}"/>
+                                    <TextBlock Classes="emptyTitle" Text="No monitors yet"/>
+                                    <TextBlock Classes="emptyText"
+                                               Text="Add a host, host:port or URL above (or paste a list), then press Start."/>
+                                    <Button Classes="ghost" HorizontalAlignment="Center" Margin="0,6,0,0" Content="Add examples"
+                                            Command="{Binding AddExamplesCommand}" ToolTip.Tip="google.com, 1.1.1.1:53 and https://api.ipify.org"/>
+                                </StackPanel>
+
+                                <!-- bulk editor -->
+                                <Grid IsVisible="{Binding IsEditingList}" RowDefinitions="Auto, *, Auto, Auto" Margin="12">
+                                    <StackPanel Spacing="2" Margin="0,0,0,10">
+                                        <TextBlock Classes="sectionTitle" Text="Edit monitor list"/>
+                                        <TextBlock Classes="sectionDesc"
+                                                   Text="One per line; kept monitors keep their history."/>
+                                    </StackPanel>
+                                    <TextBox x:Name="EditBox" Grid.Row="1" Classes="field multiline" AcceptsReturn="True" TextWrapping="NoWrap"
+                                             MinHeight="120" FontSize="12" FontFamily="{StaticResource MonoFont}" VerticalContentAlignment="Top"
+                                             Text="{Binding EditListText}"
+                                             helpers:InputAssist.PasteMode="Lines" helpers:InputAssist.PasteButton="True"
+                                             PlaceholderText="One host, host:port or URL per line"/>
+                                    <TextBlock Grid.Row="2" Classes="inlineMsg error" Margin="2,8,0,0"
+                                               Text="{Binding EditMessage}" IsVisible="{Binding HasEditMessage}"/>
+                                    <Grid Grid.Row="3" ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8" Margin="0,10,0,0">
+                                        <TextBlock x:Name="EditHint" Classes="sectionDesc" VerticalAlignment="Center"
+                                                   Text="Enter saves · Shift+Enter adds a line"
+                                                   ToolTip.Tip="Enter saves the list and starts monitoring; Shift+Enter adds a line"/>
+                                        <Button Grid.Column="1" Classes="ghost" Content="Cancel" Command="{Binding CancelEditListCommand}"/>
+                                        <Button Grid.Column="2" Classes="primary" Content="Save" Command="{Binding SaveEditListCommand}"
+                                                ToolTip.Tip="Save the list and start monitoring" AutomationProperties.Name="Save list"/>
+                                    </Grid>
+                                </Grid>
+                            </Panel>
+                        </Grid>
+                    </Border>
+
+                    <!-- ===== detail panel (beside the list; instead of it on a phone) ===== -->
+                    <Border x:Name="DetailCard" Classes="card" IsVisible="{Binding HasSelection}">
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="14,10,14,14" Spacing="12">
+                                <Button x:Name="BackBtn" Classes="ghost" HorizontalAlignment="Left" Command="{Binding CloseDetailCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Path Classes="btnIco" Data="{StaticResource GlyphBack}"/>
+                                        <TextBlock Text="All monitors" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+
+                                <StackPanel Spacing="6">
+                                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10">
+                                        <Border Classes="badge pill" VerticalAlignment="Center" ToolTip.Tip="{Binding Detail.StateTip}"
+                                                Classes.success="{Binding Detail.IsGreen}" Classes.danger="{Binding Detail.IsDown}"
+                                                Classes.warning="{Binding Detail.IsAmber}" Classes.paused="{Binding Detail.IsPaused}">
+                                            <TextBlock Text="{Binding Detail.StateText}"/>
+                                        </Border>
+                                        <TextBlock Grid.Column="1" Classes="detailTitle" Text="{Binding Detail.Title}"/>
+                                        <Button x:Name="CloseBtn" Grid.Column="2" Classes="rowBtn" VerticalAlignment="Top"
+                                                Command="{Binding CloseDetailCommand}" ToolTip.Tip="Close (Esc)" AutomationProperties.Name="Close details">
+                                            <Path Data="{StaticResource RowClose}"/>
+                                        </Button>
+                                    </Grid>
+                                    <SelectableTextBlock Classes="detailAddr" Text="{Binding Detail.Address}"/>
+                                    <TextBlock Classes="stateLine" Classes.up="{Binding Detail.IsUp}" Classes.down="{Binding Detail.IsDown}"
+                                               Classes.retry="{Binding Detail.StateLineAmber}" Text="{Binding Detail.StateLine}"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="secondary" Command="{Binding TogglePauseCommand}" CommandParameter="{Binding SelectedTarget}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Panel>
+                                                <Path Classes="btnIco" Data="{StaticResource GlyphPause}" IsVisible="{Binding !Detail.IsPaused}"/>
+                                                <Path Classes="btnIco" Data="{StaticResource GlyphPlay}" IsVisible="{Binding Detail.IsPaused}"/>
+                                            </Panel>
+                                            <TextBlock Text="{Binding Detail.PauseText}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Classes="ghost dangerText" Command="{Binding RemoveTargetCommand}" CommandParameter="{Binding SelectedTarget}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Path Classes="btnIco" Data="{StaticResource GlyphTrash}"/>
+                                            <TextBlock Text="Remove" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+
+                                <!-- warnings: amber, not downtime -->
+                                <Border x:Name="WarnBox" Classes="warnBox" IsVisible="{Binding Detail.HasWarnings}">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Classes="warnText" Text="{Binding Detail.WarningText}"/>
+                                        <Button Classes="secondary" HorizontalAlignment="Left" Content="Accept new answers"
+                                                Command="{Binding AcceptDnsAnswersCommand}" CommandParameter="{Binding SelectedTarget}"
+                                                IsVisible="{Binding Detail.CanAcceptDns}"
+                                                ToolTip.Tip="The current DNS answers become the accepted ones; the warning clears"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- the slower checks: automatic (TLS, domain) and this monitor's own (DNS watch, keyword) -->
+                                <StackPanel x:Name="ChecksBlock" Spacing="6">
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock Classes="fieldLabel" Margin="0" VerticalAlignment="Center" Text="Checks"/>
+                                        <Button Grid.Column="1" Classes="linkBtn" MinHeight="0" Padding="6,1" Margin="0,-2,-6,-2"
+                                                Content="Edit" Command="{Binding EditChecksCommand}"
+                                                IsVisible="{Binding !IsEditingChecks}" ToolTip.Tip="A keyword the page must (not) contain, and watching the DNS answers"/>
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto, Auto" RowSpacing="4" IsVisible="{Binding !IsEditingChecks}">
+                                        <TextBlock Grid.Row="0" Classes="probeName" Text="TLS" IsVisible="{Binding Detail.ShowCertLine}"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Classes="probeVal" Classes.fail="{Binding Detail.CertLineFailed}"
+                                                   Classes.warn="{Binding Detail.CertLineWarn}" Text="{Binding Detail.CertLine}" IsVisible="{Binding Detail.ShowCertLine}"/>
+                                        <TextBlock Grid.Row="1" Classes="probeName" Text="Domain" IsVisible="{Binding Detail.ShowDomainLine}"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="probeVal" Classes.warn="{Binding Detail.DomainLineWarn}"
+                                                   Text="{Binding Detail.DomainLine}" IsVisible="{Binding Detail.ShowDomainLine}"/>
+                                        <TextBlock Grid.Row="2" Classes="probeName" Text="DNS"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="probeVal" Classes.warn="{Binding Detail.DnsLineWarn}" Text="{Binding Detail.DnsLine}"/>
+                                        <TextBlock Grid.Row="3" Classes="probeName" Text="Keyword"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="probeVal" Text="{Binding Detail.KeywordLine}"/>
+                                    </Grid>
+
+                                    <!-- edit this monitor's own checks -->
+                                    <StackPanel x:Name="ChecksEditor" Spacing="10" IsVisible="{Binding IsEditingChecks}">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Classes="fieldLabel" Margin="0" Text="Keyword"/>
+                                            <!-- the text and its rule side by side -->
+                                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                                                <TextBox x:Name="KeywordBox" Classes="field" Text="{Binding EditKeyword}" MaxLength="200"
+                                                         PlaceholderText="Text on the page" IsEnabled="{Binding CanEditKeyword}"
+                                                         ToolTip.Tip="Text the page must (not) contain; not case-sensitive"
+                                                         AutomationProperties.Name="Keyword"/>
+                                                <ComboBox Grid.Column="1" Classes="field" MinWidth="150" SelectedIndex="{Binding EditKeywordModeIndex}"
+                                                          IsEnabled="{Binding CanEditKeyword}" AutomationProperties.Name="Keyword rule">
+                                                    <ComboBoxItem Content="Must contain"/>
+                                                    <ComboBoxItem Content="Must not contain"/>
+                                                </ComboBox>
+                                            </Grid>
+                                            <TextBlock Classes="sectionDesc" IsVisible="{Binding CanEditKeyword}"
+                                                       Text="Searched in the first 512 KB; a miss fails the check."/>
+                                            <TextBlock Classes="sectionDesc" IsVisible="{Binding !CanEditKeyword}"
+                                                       Text="Only for URLs and web ports (80, 443, 8000, 8080, 8443)."/>
+                                        </StackPanel>
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Classes="fieldLabel" Margin="0" Text="Watch DNS"/>
+                                            <ComboBox Classes="field" MinWidth="170" HorizontalAlignment="Left" SelectedIndex="{Binding EditDnsIndex}"
+                                                      IsEnabled="{Binding CanEditDns}" AutomationProperties.Name="Watch DNS answers"
+                                                      ToolTip.Tip="The first answers are accepted; a warning shows when they change, until you accept the new ones">
+                                                <ComboBoxItem Content="Off"/>
+                                                <ComboBoxItem Content="A / AAAA (addresses)"/>
+                                                <ComboBoxItem Content="CNAME"/>
+                                                <ComboBoxItem Content="NS (name servers)"/>
+                                            </ComboBox>
+                                            <TextBlock Classes="sectionDesc" IsVisible="{Binding CanEditDns}"
+                                                       Text="Warns when the answers change from the accepted ones."/>
+                                            <TextBlock Classes="sectionDesc" IsVisible="{Binding !CanEditDns}" Text="Not for an IP address."/>
+                                        </StackPanel>
+                                        <TextBlock Classes="inlineMsg error" Text="{Binding EditChecksNote}" IsVisible="{Binding HasEditChecksNote}"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                            <Button Classes="ghost" Content="Cancel" Command="{Binding CancelEditChecksCommand}"/>
+                                            <Button Classes="primary" Content="Save" Command="{Binding SaveChecksCommand}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <Border Classes="divider"/>
+
+                                <StackPanel Spacing="6">
+                                    <TextBlock Classes="fieldLabel" Margin="0" Text="{Binding Detail.WindowText}"/>
+                                    <ctl:MonitorHistoryBar Height="22" TickWidth="3" TickGap="1" StretchTicks="True"
+                                                           History="{Binding SelectedTarget.History}" Version="{Binding SelectedTarget.HistoryVersion}"/>
+                                </StackPanel>
+
+                                <StackPanel Spacing="6">
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock Classes="fieldLabel" Margin="0" Text="Response time"/>
+                                        <TextBlock Grid.Column="1" Classes="dcap" Text="{Binding Detail.ResponseNow, StringFormat='Current {0}'}"/>
+                                    </Grid>
+                                    <Border Classes="chartBox">
+                                        <ctl:MonitorSparkline Height="64" StrokeThickness="1.6"
+                                                              History="{Binding SelectedTarget.History}" Version="{Binding SelectedTarget.HistoryVersion}"/>
                                     </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Grid>
-                </ScrollViewer>
+                                </StackPanel>
+
+                                <Grid ColumnDefinitions="*, *, *" RowDefinitions="Auto, Auto, Auto" RowSpacing="10" ColumnSpacing="8">
+                                    <StackPanel Grid.Row="0" Grid.Column="0" ToolTip.Tip="Share of successful checks this session">
+                                        <TextBlock Classes="dval" Text="{Binding Detail.Uptime}"/>
+                                        <TextBlock Classes="dcap" Text="Uptime"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="0" Grid.Column="1">
+                                        <TextBlock Classes="dval" Text="{Binding Detail.Checks}"/>
+                                        <TextBlock Classes="dcap" Text="Checks"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="0" Grid.Column="2">
+                                        <TextBlock Classes="dval" Text="{Binding Detail.Failures}"/>
+                                        <TextBlock Classes="dcap" Text="Failed"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.Column="0">
+                                        <TextBlock Classes="dval" Text="{Binding Detail.Min}"/>
+                                        <TextBlock Classes="dcap" Text="Min"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.Column="1">
+                                        <TextBlock Classes="dval" Text="{Binding Detail.Avg}"/>
+                                        <TextBlock Classes="dcap" Text="Avg"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.Column="2">
+                                        <TextBlock Classes="dval" Text="{Binding Detail.Max}"/>
+                                        <TextBlock Classes="dcap" Text="Max"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="0" ToolTip.Tip="95 % of the recent checks answered at least this fast">
+                                        <TextBlock Classes="dval" Text="{Binding Detail.P95}"/>
+                                        <TextBlock Classes="dcap" Text="p95"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2">
+                                        <TextBlock Classes="dval" Text="{Binding Detail.LastChecked}"/>
+                                        <TextBlock Classes="dcap" Text="Last check"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Border Classes="divider"/>
+
+                                <StackPanel Spacing="6">
+                                    <TextBlock Classes="fieldLabel" Margin="0" Text="Last result"/>
+                                    <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto" RowSpacing="4">
+                                        <TextBlock Grid.Row="0" Classes="probeName" Text="{Binding Detail.HttpLabel}" IsVisible="{Binding Detail.ShowHttp}"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Classes="probeVal" Classes.fail="{Binding Detail.HttpFailed}"
+                                                   Text="{Binding Detail.HttpResult}" IsVisible="{Binding Detail.ShowHttp}"/>
+                                        <TextBlock Grid.Row="1" Classes="probeName" Text="{Binding Detail.TcpLabel}" IsVisible="{Binding Detail.ShowTcp}"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="probeVal" Classes.fail="{Binding Detail.TcpFailed}"
+                                                   Text="{Binding Detail.TcpResult}" IsVisible="{Binding Detail.ShowTcp}"/>
+                                        <TextBlock Grid.Row="2" Classes="probeName" Text="Ping" IsVisible="{Binding Detail.ShowPing}"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="probeVal" Classes.fail="{Binding Detail.PingFailed}"
+                                                   Text="{Binding Detail.PingResult}" IsVisible="{Binding Detail.ShowPing}"/>
+                                    </Grid>
+                                    <TextBlock Classes="sectionDesc" Text="{Binding Detail.LastError, StringFormat='Last error: {0}'}"/>
+                                </StackPanel>
+
+                                <Border Classes="divider"/>
+
+                                <StackPanel Spacing="2">
+                                    <TextBlock Classes="fieldLabel" Margin="0,0,0,2" Text="Recent events"/>
+                                    <ItemsControl ItemsSource="{Binding SelectedEvents}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:MonitorEvent">
+                                                <Border Classes="mini">
+                                                    <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
+                                                        <Border Classes="badge epill" Classes.success="{Binding IsGood}" Classes.danger="{Binding IsDanger}" Classes.warning="{Binding IsWarning}" Margin="0,0,10,0">
+                                                            <TextBlock Text="{Binding KindText}"/>
+                                                        </Border>
+                                                        <TextBlock Grid.Column="1" Classes="etime" Text="{Binding TimeText}"/>
+                                                        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Classes="emsg" Margin="0,4,0,0" Text="{Binding Message}"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Classes="sectionDesc" Text="No state changes yet." IsVisible="{Binding !HasSelectedEvents}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
             </TabItem>
 
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock Text="Events" VerticalAlignment="Center"/>
+                        <Border Classes="badge" Padding="7,1" IsVisible="{Binding HasEvents}">
+                            <TextBlock Text="{Binding Events.Count}" FontFamily="{StaticResource MonoFont}"/>
+                        </Border>
+                    </StackPanel>
+                </TabItem.Header>
+
+                <Border Classes="card output" Margin="0,10,0,0">
+                    <Grid RowDefinitions="Auto, Auto, *">
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="14,6,8,6" MinHeight="{DynamicResource Control.Height}">
+                            <TextBlock Classes="sectionDesc" VerticalAlignment="Center"
+                                       Text="Newest first · the last 500 this session"
+                                       ToolTip.Tip="Monitors going down, coming back up and warnings, kept for this session (the last 500)"/>
+                            <Button Grid.Column="1" Classes="ghost" Content="Clear" Command="{Binding ClearEventsCommand}" IsEnabled="{Binding HasEvents}"/>
+                        </Grid>
+                        <Border Grid.Row="1" Classes="divider"/>
+                        <Panel Grid.Row="2">
+                            <ItemsControl Classes="evlist" ItemsSource="{Binding Events}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:MonitorEvent">
+                                        <Border Classes="erow">
+                                            <Grid Classes="egrid" ColumnDefinitions="Auto, Auto, 2*, 5*, Auto" RowDefinitions="Auto, Auto">
+                                                <TextBlock Classes="etime" Text="{Binding TimeText}"/>
+                                                <Border Classes="badge epill" Classes.success="{Binding IsGood}" Classes.danger="{Binding IsDanger}" Classes.warning="{Binding IsWarning}">
+                                                    <TextBlock Text="{Binding KindText}"/>
+                                                </Border>
+                                                <TextBlock Classes="etarget" Text="{Binding Target}"/>
+                                                <TextBlock Classes="emsg" Text="{Binding Message}"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <StackPanel IsVisible="{Binding !HasEvents}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        Spacing="8" Margin="24" MaxWidth="380">
+                                <Path Classes="emptyIco" Data="{StaticResource IcoHistory}"/>
+                                <TextBlock Classes="emptyTitle" Text="No events yet"/>
+                                <TextBlock Classes="emptyText"
+                                           Text="Outages, recoveries and warnings are logged here."/>
+                            </StackPanel>
+                        </Panel>
+                    </Grid>
+                </Border>
+            </TabItem>
         </TabControl>
     </Grid>
 </UserControl>

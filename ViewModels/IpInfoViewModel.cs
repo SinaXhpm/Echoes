@@ -43,10 +43,22 @@ public sealed class IpGeoResult
     public bool HasVersion => Version.Length > 0;
     public bool HasFlag => CountryCode.Trim().Length == 2;
     public string Coordinates => (Latitude.Length > 0 && Longitude.Length > 0) ? $"{Latitude}, {Longitude}" : "";
-    public bool HasCoordinates => Latitude.Length > 0 && Longitude.Length > 0;
-    public string MapUrl => HasCoordinates
-        ? $"https://www.openstreetmap.org/?mlat={Latitude}&mlon={Longitude}#map=11/{Latitude}/{Longitude}"
+    // The coordinates are provider text — one source is plain HTTP that anything on the path (the proxy under test
+    // included) can rewrite — and they went into the browser URL verbatim ("1\"><x>&layers=…" and all). The map link
+    // is now built only from two real coordinates, written back as plain numbers.
+    public bool HasCoordinates => TryCoordinate(Latitude, 90, out _) && TryCoordinate(Longitude, 180, out _);
+    public string MapUrl => TryCoordinate(Latitude, 90, out string lat) && TryCoordinate(Longitude, 180, out string lon)
+        ? $"https://www.openstreetmap.org/?mlat={lat}&mlon={lon}#map=11/{lat}/{lon}"
         : "";
+
+    private static bool TryCoordinate(string text, double limit, out string number)
+    {
+        number = string.Empty;
+        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double v) || !double.IsFinite(v) || Math.Abs(v) > limit)
+            return false;
+        number = v.ToString("0.######", CultureInfo.InvariantCulture);
+        return true;
+    }
     public string SecurityText => string.Join("   ", new[]
     {
         IsProxy ? "⚠ Proxy / VPN / Tor" : null,
@@ -92,9 +104,30 @@ public partial class IpInfoViewModel : ObservableObject
     [ObservableProperty] private string _subnetInput = "192.168.1.0/24";
     [ObservableProperty] private string _subnetOutput = string.Empty;
 
+    /// <summary>0 Lookup · 1 Subnet / CIDR (remembered).</summary>
+    [ObservableProperty] private int _tabIndex;
+
+    private const string KMyIpLast = "ip.myIpLast", KSubnet = "ip.subnet", KTab = "ip.tab";
+
+    partial void OnTabIndexChanged(int value)
+    {
+        if (_loaded && value >= 0) ProfileService.Instance.SetSetting(KTab, value.ToString(CultureInfo.InvariantCulture));
+    }
+
+    // Whether the box comes back empty (the last lookup was this device's own address) or with the last address.
+    private static void SaveMyIpLast(bool mine)
+    {
+        if (ProfileService.Instance.GetBool(KMyIpLast) != mine) ProfileService.Instance.SetBool(KMyIpLast, mine);
+    }
+
     private bool _loaded;
     private static readonly HashSet<string> PersistProps = new()
     { "UseProxy", "ProxyAddress", "ProxyUser", "ProxyPass", "SelectedProviderIndex" };
+
+    // The saved proxy password when it can't be decrypted here (no key file, a profile from another machine): Unprotect
+    // gives "" for it, which looked like "no password", and the next save of ANY proxy setting wrote "" over the stored
+    // secret. It's written back exactly as stored until the user types a password of their own.
+    private string? _unreadablePass;
 
     public IpInfoViewModel()
     {
@@ -102,19 +135,108 @@ public partial class IpInfoViewModel : ObservableObject
         UseProxy = ps.GetBool("ip.useProxy");
         ProxyAddress = ps.GetSetting("ip.proxyAddr") ?? (HistoryService.Instance.Last("ip.proxy") ?? string.Empty);
         ProxyUser = ps.GetSetting("ip.proxyUser") ?? string.Empty;
-        ProxyPass = ps.GetSetting("ip.proxyPass") ?? string.Empty;
+        // Stored encrypted via SecretProtector (per-user key); legacy plaintext and old-format values still
+        // load and are re-saved in the current format right away.
+        string rawPass = ps.GetSetting("ip.proxyPass") ?? string.Empty;
+        ProxyPass = SecretProtector.Unprotect(rawPass);
+        if (rawPass.Length > 0 && ProxyPass.Length == 0) _unreadablePass = rawPass;
         if (int.TryParse(ps.GetSetting("ip.provider"), out int pi) && pi >= 0 && pi < Providers.Count) SelectedProviderIndex = pi;
+        // The address looked up last (none when "My IP" was the last lookup), the subnet box and the sub-tab.
+        if (!ps.GetBool(KMyIpLast) && HistoryService.Instance.Last("ip.target") is { } lastTarget) TargetIp = lastTarget;
+        if (ps.GetSetting(KSubnet) is { Length: > 0 } subnet) SubnetInput = subnet;
+        TabIndex = Math.Clamp(ps.GetInt(KTab, 0), 0, 1);
         _loaded = true;
+        // Re-save under the current key: legacy plaintext, or an old "enc1:" value that still decrypts (one that
+        // doesn't is left untouched rather than overwritten with an empty password).
+        if (rawPass.Length > 0 && (ProxyPass == rawPass || (SecretProtector.IsLegacy(rawPass) && ProxyPass.Length > 0))) SchedulePersist();
+        // An address saved with credentials in it (before they were moved out): into the fields, and the profile is
+        // rewritten without them.
+        MoveProxyCredentials(whileTyping: false);
     }
 
     protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
-        if (_loaded && e.PropertyName is { } n && PersistProps.Contains(n))
-            ProfileService.Instance.SetMany(
-                ("ip.useProxy", UseProxy ? "true" : "false"), ("ip.proxyAddr", ProxyAddress),
-                ("ip.proxyUser", ProxyUser), ("ip.proxyPass", ProxyPass),
-                ("ip.provider", SelectedProviderIndex.ToString()));
+        if (_loaded && e.PropertyName == nameof(ProxyPass)) _unreadablePass = null;   // the user's own password now
+        if (_loaded && e.PropertyName is { } n && PersistProps.Contains(n)) SchedulePersist();
+    }
+
+    // ---- credentials typed into the proxy address ----
+
+    // "user:pass@host:port" in any scheme ("socks5://user:p%40ss@host:1080"): the address without the user info, and the
+    // user / password from it. Null when the address has no user info. The LAST '@' of the authority ends it, so a
+    // password holding an '@' moves whole; with a scheme it's URL syntax, so percent escapes are decoded.
+    private readonly record struct ProxyUserInfo(string Clean, string User, string Pass, bool HasHost, bool HasPort);
+
+    private static ProxyUserInfo? ParseProxyUserInfo(string? address)
+    {
+        string a = (address ?? string.Empty).Trim();
+        int scheme = a.IndexOf("://", StringComparison.Ordinal);
+        int start = scheme >= 0 ? scheme + 3 : 0;
+        int end = a.IndexOfAny(new[] { '/', '?', '#' }, start);
+        if (end < 0) end = a.Length;
+        int at = end > start ? a.LastIndexOf('@', end - 1, end - start) : -1;
+        if (at < 0) return null;
+        string info = a[start..at], hostPort = a[(at + 1)..end];
+        int colon = info.IndexOf(':');
+        string user = colon >= 0 ? info[..colon] : info, pass = colon >= 0 ? info[(colon + 1)..] : string.Empty;
+        if (scheme >= 0)
+        {
+            user = Uri.UnescapeDataString(user);
+            pass = Uri.UnescapeDataString(pass);
+        }
+        int portColon = hostPort.LastIndexOf(':');
+        bool hasPort = portColon >= 0 && portColon < hostPort.Length - 1 && hostPort[(portColon + 1)..].All(char.IsAsciiDigit);
+        return new ProxyUserInfo(a[..start] + a[(at + 1)..], user, pass, hostPort.Length > 0, hasPort);
+    }
+
+    /// <summary>
+    /// The proxy address is a plaintext profile setting (and .NET never authenticates with credentials written into a
+    /// proxy address — only the User / Password fields do), so pasted "user:pass@host:port" credentials move into those
+    /// fields (the password is stored encrypted) and the box keeps only the address.
+    /// </summary>
+    /// <param name="whileTyping">From the debounced save: only an address that already ends in its port is split, so a
+    /// pause mid-typing doesn't cut "user:p@ss…" at the wrong '@'. (The save itself never writes the user info.)</param>
+    private void MoveProxyCredentials(bool whileTyping)
+    {
+        if (ParseProxyUserInfo(ProxyAddress) is not { HasHost: true } info || (whileTyping && !info.HasPort)) return;
+        ProxyAddress = info.Clean;
+        if (info.User.Length > 0) ProxyUser = info.User;
+        if (info.Pass.Length > 0) ProxyPass = info.Pass;
+    }
+
+    // Debounced: the proxy boxes update on every keystroke, and each save re-serializes + rewrites the whole
+    // profile file on the UI thread. Write once typing pauses; a lookup and app exit/background flush it.
+    private System.Threading.CancellationTokenSource? _persistCts;
+    private bool _persistPending;   // UI thread only
+
+    private void SchedulePersist()
+    {
+        _persistPending = true;
+        _persistCts?.Cancel();
+        _persistCts?.Dispose();
+        var cts = _persistCts = new System.Threading.CancellationTokenSource();
+        _ = Task.Delay(500, cts.Token).ContinueWith(t =>
+        {
+            // Values are read back on the UI thread at write time, so the latest edit always wins.
+            if (!t.IsCanceled) Avalonia.Threading.Dispatcher.UIThread.Post(FlushPendingSave);
+        }, TaskScheduler.Default);
+    }
+
+    /// <summary>Persist a pending (debounced) settings change now. No-op when nothing is pending. UI thread only.</summary>
+    public void FlushPendingSave()
+    {
+        _persistCts?.Cancel();
+        if (!_persistPending) return;
+        MoveProxyCredentials(whileTyping: true);   // its property changes re-arm the debounce: cancelled again here
+        _persistCts?.Cancel();
+        _persistPending = false;
+        // The address goes into the plaintext profile: never with user info in it, even half-typed.
+        string address = ParseProxyUserInfo(ProxyAddress)?.Clean ?? ProxyAddress;
+        ProfileService.Instance.SetMany(
+            ("ip.useProxy", UseProxy ? "true" : "false"), ("ip.proxyAddr", address),
+            ("ip.proxyUser", ProxyUser), ("ip.proxyPass", _unreadablePass ?? SecretProtector.Protect(ProxyPass)),
+            ("ip.provider", SelectedProviderIndex.ToString()));
     }
 
     [RelayCommand]
@@ -123,13 +245,19 @@ public partial class IpInfoViewModel : ObservableObject
         try
         {
             if (string.IsNullOrWhiteSpace(SubnetInput)) return;
+            if (SubnetInput.Length <= 256) ProfileService.Instance.SetSetting(KSubnet, SubnetInput.Trim());
             SubnetOutput = SubnetCalc.Describe(SubnetInput);
         }
         catch (Exception ex) { SubnetOutput = "Error: " + ex.Message; }
     }
 
+    // Copies just the IP address: what you paste into another tool. The full details stay on screen, selectable.
     [RelayCommand]
-    private async Task CopyResult() => await ClipboardHelper.SetTextAsync(RawResult);
+    private async Task CopyResult()
+    {
+        string? ip = Result?.Ip?.Trim();
+        if (!string.IsNullOrEmpty(ip)) await ClipboardHelper.SetTextAsync(ip);
+    }
 
     [RelayCommand]
     private async Task CopySubnet() => await ClipboardHelper.SetTextAsync(SubnetOutput);
@@ -137,17 +265,24 @@ public partial class IpInfoViewModel : ObservableObject
     [RelayCommand]
     private void OpenMap() => Helpers.LinkHelper.Open(Result?.MapUrl);
 
+    // Both entry points bail while a fetch runs: the buttons are disabled then, but Enter in the target
+    // box goes through LookupIpCommand, which is free while GetMyIpCommand runs — two overlapping fetches
+    // would interleave their provider rows and race on Result / IsWorking.
     [RelayCommand]
     private async Task GetMyIp()
     {
+        if (IsWorking) return;
         TargetIp = string.Empty;
+        SaveMyIpLast(true);
         await FetchIpInfo(string.Empty);
     }
 
     [RelayCommand]
     private async Task LookupIp()
     {
+        if (IsWorking) return;
         HistoryService.Instance.Add("ip.target", TargetIp);
+        SaveMyIpLast(string.IsNullOrWhiteSpace(TargetIp));
         await FetchIpInfo(TargetIp);
     }
 
@@ -157,70 +292,92 @@ public partial class IpInfoViewModel : ObservableObject
 
     private async Task FetchIpInfo(string ip)
     {
+        MoveProxyCredentials(whileTyping: false);   // typing is done: credentials in the address go to the fields this lookup uses
+        FlushPendingSave();   // the proxy settings this lookup uses are saved even if the app closes mid-run
         IsWorking = true;
         Result = null;
         ProviderResults.Clear();
         RawResult = "Querying sources…";
         StatusLine = string.Empty;
 
-        string? proxy = UseProxy && !string.IsNullOrWhiteSpace(ProxyAddress) ? ProxyAddress : null;
-        if (proxy != null) HistoryService.Instance.Add("ip.proxy", proxy);
-        using var client = HttpHelper.Create(proxy, ProxyUser, ProxyPass, timeout: TimeSpan.FromSeconds(8));
-
-        bool self = string.IsNullOrWhiteSpace(ip);
-        var sources = BuildSources(self, ip.Trim());
-
-        // Restrict to one provider when the user picked a specific one (index 0 = Auto = all sources).
-        if (SelectedProviderIndex > 0)
+        // try/finally so no exception (e.g. a malformed proxy address, which HttpHelper.Create rejects)
+        // escapes the command — that would crash the app — or leaves IsWorking stuck on.
+        try
         {
-            string want = ProviderKey(SelectedProviderIndex);
-            var only = sources.FirstOrDefault(s => s.Name == want);
-            if (only is null)
+            string? proxy = UseProxy && !string.IsNullOrWhiteSpace(ProxyAddress) ? ProxyAddress : null;
+            using var client = HttpHelper.Create(proxy, ProxyUser, ProxyPass, timeout: TimeSpan.FromSeconds(8));
+            // Every provider answers with a few hundred bytes of JSON; don't let a hostile proxy stream more.
+            client.MaxResponseContentBufferSize = 256 * 1024;
+            if (proxy != null) HistoryService.Instance.Add("ip.proxy", proxy);   // only once it parsed
+
+            bool self = string.IsNullOrWhiteSpace(ip);
+            var sources = BuildSources(self, ip.Trim());
+
+            // Restrict to one provider when the user picked a specific one (index 0 = Auto = all sources).
+            if (SelectedProviderIndex > 0)
+            {
+                string want = ProviderKey(SelectedProviderIndex);
+                var only = sources.FirstOrDefault(s => s.Name == want);
+                if (only is null)
+                {
+                    Result = null;
+                    RawResult = $"{want} doesn't support {(self ? "My IP" : "this query")} — pick another provider or Auto.";
+                    return;
+                }
+                sources = new List<IpSource> { only };
+            }
+
+            // Cross-check: query the top sources concurrently (accuracy ↑, latency = the fastest).
+            var hits = new List<(int prio, string name, IpGeoResult res)>();
+            const int parallelCount = 3;
+            var primary = sources.Take(parallelCount).ToArray();
+            var results = await Task.WhenAll(primary.Select(s => FetchOne(client, s)));
+            foreach (var r in results) if (r.res is not null) hits.Add((r.prio, r.name, r.res));
+
+            // Nothing from the fast batch → walk the remaining fallbacks one by one.
+            if (hits.Count == 0)
+            {
+                foreach (var s in sources.Skip(parallelCount))
+                {
+                    var r = await FetchOne(client, s);
+                    if (r.res is not null) { hits.Add((r.prio, r.name, r.res)); break; }
+                }
+            }
+
+            if (hits.Count == 0)
             {
                 Result = null;
-                RawResult = $"{want} doesn't support {(self ? "My IP" : "this query")} — pick another provider or Auto.";
-                IsWorking = false;
+                RawResult = "No source responded. Check the address / your connection" + (proxy != null ? " / proxy." : ".");
+                StatusLine = string.Empty;
                 return;
             }
-            sources = new List<IpSource> { only };
+
+            // HTTPS answers win the merge. A plain-HTTP source (ip-api.com's free tier) can be rewritten
+            // by anyone on the path — including the proxy under test — so it only fills the fields no
+            // HTTPS source supplied. It stays in the batch: it's the only proxy/hosting/mobile source.
+            var plain = sources.Where(s => s.Url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+                               .Select(s => s.Name).ToHashSet();
+            var ordered = hits.OrderBy(h => plain.Contains(h.name) ? 1 : 0).ThenBy(h => h.prio).ToList();
+            var merged = Merge(ordered);
+            Result = merged;
+            foreach (var (_, name, res) in ordered)
+                ProviderResults.Add(new IpProviderResult { Name = plain.Contains(name) ? name + "  (plain HTTP)" : name, Data = res });
+            RawResult = BuildCopyText(merged);
+            StatusLine = hits.Count > 1
+                ? $"Cross-checked via {merged.Sources}"
+                : $"Source: {merged.Sources}";
         }
-
-        // Cross-check: query the top sources concurrently (accuracy ↑, latency = the fastest).
-        var hits = new List<(int prio, string name, IpGeoResult res)>();
-        const int parallelCount = 3;
-        var primary = sources.Take(parallelCount).ToArray();
-        var results = await Task.WhenAll(primary.Select(s => FetchOne(client, s)));
-        foreach (var r in results) if (r.res is not null) hits.Add((r.prio, r.name, r.res));
-
-        // Nothing from the fast batch → walk the remaining fallbacks one by one.
-        if (hits.Count == 0)
-        {
-            foreach (var s in sources.Skip(parallelCount))
-            {
-                var r = await FetchOne(client, s);
-                if (r.res is not null) { hits.Add((r.prio, r.name, r.res)); break; }
-            }
-        }
-
-        if (hits.Count == 0)
+        catch (Exception ex)
         {
             Result = null;
-            RawResult = "No source responded. Check the address / your connection" + (proxy != null ? " / proxy." : ".");
+            ProviderResults.Clear();
+            RawResult = "Error: " + ex.Message;
             StatusLine = string.Empty;
-            IsWorking = false;
-            return;
         }
-
-        var ordered = hits.OrderBy(h => h.prio).ToList();
-        var merged = Merge(ordered);
-        Result = merged;
-        foreach (var (_, name, res) in ordered)
-            ProviderResults.Add(new IpProviderResult { Name = name, Data = res });
-        RawResult = BuildCopyText(merged);
-        StatusLine = hits.Count > 1
-            ? $"Cross-checked via {merged.Sources}"
-            : $"Source: {merged.Sources}";
-        IsWorking = false;
+        finally
+        {
+            IsWorking = false;
+        }
     }
 
     private static async Task<(int prio, string name, IpGeoResult? res)> FetchOne(HttpClient client, IpSource s)

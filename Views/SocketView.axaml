@@ -1,0 +1,799 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
+             xmlns:ctl="using:Echoes.Views.Controls"
+             x:Class="Echoes.Views.SocketView"
+             x:DataType="vm:SocketViewModel"
+             x:CompileBindings="True">
+
+    <UserControl.Resources>
+        <!-- stroked glyphs on the 24x24 grid the nav icons use -->
+        <StreamGeometry x:Key="SkIcoCopy">M10 8 H18 A2 2 0 0 1 20 10 V18 A2 2 0 0 1 18 20 H10 A2 2 0 0 1 8 18 V10 A2 2 0 0 1 10 8 Z M5 16 A1.5 1.5 0 0 1 4 14.5 V5.5 A1.5 1.5 0 0 1 5.5 4 H14.5 A1.5 1.5 0 0 1 16 5</StreamGeometry>
+        <StreamGeometry x:Key="SkIcoSave">M12 4 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19</StreamGeometry>
+        <StreamGeometry x:Key="SkIcoClear">M4.5 7 H19.5 M9.5 7 V4.5 H14.5 V7 M6.5 7 L7.5 19.5 H16.5 L17.5 7</StreamGeometry>
+        <StreamGeometry x:Key="SkIcoClose">M7 7 L17 17 M17 7 L7 17</StreamGeometry>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- ===== page: one screen tall on desktop (the transcript takes what the cards leave); on a phone never
+             shorter than 600px, so with the soft keyboard up the page scrolls instead of squeezing the transcript ===== -->
+        <Style Selector="ScrollViewer#SkPage.wide">
+            <Setter Property="VerticalScrollBarVisibility" Value="Disabled"/>
+        </Style>
+        <Style Selector="ScrollViewer#SkPage.narrow">
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+        </Style>
+        <Style Selector="ScrollViewer#SkPage.narrow > Grid#SkRoot">
+            <Setter Property="Height" Value="{Binding $parent[ScrollViewer].Bounds.Height}"/>
+            <Setter Property="MinHeight" Value="600"/>
+        </Style>
+        <!-- phone, WebSocket options open (idle): the card is tall, so the page grows and scrolls instead of squeezing the transcript -->
+        <Style Selector="ScrollViewer#SkPage.narrow > Grid#SkRoot.wsopts">
+            <Setter Property="MinHeight" Value="920"/>
+        </Style>
+
+        <!-- ===== mode switch: five equal segmented pills. ONE panel for every width — swapping the items panel
+             rebuilds the tabs, and the TabControl then re-selects the first one (which would flip the bound mode).
+             Desktop: one row, as wide as the widest label; phone: the full width in two rows of three. ===== -->
+        <Style Selector="TabControl.modes">
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="ItemsPanel">
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="5" ColumnSpacing="6" RowSpacing="6"/>
+                </ItemsPanelTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Panel#SkModesWrap.narrow UniformGrid">
+            <Setter Property="Columns" Value="3"/>
+        </Style>
+        <Style Selector="TabControl.modes > TabItem">
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Panel#SkModesWrap.narrow TabControl.modes">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Panel#SkModesWrap.narrow TabControl.modes > TabItem">
+            <Setter Property="Padding" Value="4,0"/>
+        </Style>
+        <Style Selector="Panel#SkModesTight.narrow Panel#SkModesWrap UniformGrid">
+            <Setter Property="Columns" Value="2"/>
+        </Style>
+
+        <!-- ===== connection rows. Wide: [host][port][tls][connect] / [listen on][port][listen] on one line;
+             narrow: the host / address gets its own line, the rest the next one (button stretched) ===== -->
+        <Style Selector="Grid#SkClient.wide > Grid#SkClientRest, Grid#SkServer.wide > Grid#SkServerRest">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#SkClient.narrow > Grid#SkClientRest, Grid#SkServer.narrow > Grid#SkServerRest">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#SkClient.narrow > StackPanel#SkHost, Grid#SkServer.narrow > StackPanel#SkBind">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <!-- WebSocket: [url][options][ping][connect] when wide; the URL on its own line on a phone -->
+        <Style Selector="Grid#SkWs.wide > Grid#SkWsRest">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#SkWs.narrow > Grid#SkWsRest">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+        <Style Selector="Grid#SkWs.narrow > StackPanel#SkWsUrl">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#SkWs.narrow Button.go">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Grid#SkWsRest > Button.secondary">
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+        <!-- options: [subprotocols][proxy] over the headers box when wide; stacked on a phone -->
+        <Style Selector="Grid#SkWsOpts.wide > StackPanel#SkWsProxy">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Margin" Value="10,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#SkWsOpts.narrow > StackPanel#SkWsProxy">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+        <Style Selector="Grid#SkWsOpts.narrow > StackPanel#SkWsProto">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="TextBox.headers">
+            <Setter Property="Height" Value="NaN"/>
+            <Setter Property="MinHeight" Value="52"/>
+            <Setter Property="MaxHeight" Value="76"/>
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+        </Style>
+        <Style Selector="Button.go">
+            <Setter Property="MinWidth" Value="104"/>
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+        </Style>
+        <Style Selector="Grid#SkClient.narrow Button.go, Grid#SkServer.narrow Button.go">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="CheckBox.tls">
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+            <Setter Property="Margin" Value="4,0,14,0"/>
+        </Style>
+        <!-- phone, while a session runs: the card shrinks to its Disconnect / Stop button (the transcript header
+             names the endpoint), so the transcript gets the room -->
+        <Style Selector="ScrollViewer#SkPage.narrow Grid#SkRoot.running Panel#SkModesTight,
+                         ScrollViewer#SkPage.narrow Grid#SkRoot.running StackPanel#SkHost,
+                         ScrollViewer#SkPage.narrow Grid#SkRoot.running StackPanel#SkBind,
+                         ScrollViewer#SkPage.narrow Grid#SkRoot.running StackPanel#SkWsUrl,
+                         ScrollViewer#SkPage.narrow Grid#SkRoot.running Grid#SkWsOpts,
+                         ScrollViewer#SkPage.narrow Grid#SkRoot.running :is(Control).hideRunning">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="ScrollViewer#SkPage.narrow Grid#SkRoot.running Grid#SkClientRest, ScrollViewer#SkPage.narrow Grid#SkRoot.running Grid#SkServerRest,
+                         ScrollViewer#SkPage.narrow Grid#SkRoot.running Grid#SkWsRest">
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+
+        <!-- ===== transcript header: status · traffic · view switch + tools (two lines on a phone) ===== -->
+        <Style Selector="Grid#SkTx.wide StackPanel#SkTools">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#SkTx.narrow StackPanel#SkTools">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <!-- status · traffic: one line when wide (a long status is trimmed, never drawn over the tools), two on a phone -->
+        <Style Selector="Grid#SkTx.wide Grid#SkStatus > TextBlock.traffic">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/>
+        </Style>
+        <Style Selector="Grid#SkTx.narrow Grid#SkStatus > TextBlock.traffic">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+        </Style>
+        <Style Selector="Ellipse.dot">
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Height" Value="8"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Fill" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
+        <Style Selector="Ellipse.dot.busy">
+            <Setter Property="Fill" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="Ellipse.dot.on">
+            <Setter Property="Fill" Value="{DynamicResource Success}"/>
+        </Style>
+        <Style Selector="TextBlock.status">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Grid#SkTx.narrow TextBlock.status">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="MaxLines" Value="2"/>
+        </Style>
+        <Style Selector="TextBlock.traffic">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Grid#SkTx.wide TextBlock.traffic">
+            <Setter Property="Margin" Value="14,0,0,0"/>
+        </Style>
+        <Style Selector="TabControl.view > TabItem">
+            <Setter Property="Padding" Value="10,0"/>
+        </Style>
+        <Style Selector="Button.icon Path.glyph">
+            <Setter Property="Width" Value="15"/>
+            <Setter Property="Height" Value="15"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+        </Style>
+
+        <!-- ===== transcript: virtualized, the scroll viewer inside the template ===== -->
+        <Style Selector="ItemsControl.tx">
+            <Setter Property="ItemsPanel">
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+            </Setter>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ScrollViewer Name="PART_Scroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                        <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" Margin="0,6"/>
+                    </ScrollViewer>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Border.entry">
+            <Setter Property="Padding" Value="12,3"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Border.entry:pointerover">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+        </Style>
+        <Style Selector="Border.entry TextBlock.meta">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style Selector="Border.entry TextBlock.time">
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+        <Style Selector="Border.entry TextBlock.arrow">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+        <Style Selector="Border.entry.sent TextBlock.arrow">
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Border.entry.recv TextBlock.arrow">
+            <Setter Property="Foreground" Value="{DynamicResource Info}"/>
+        </Style>
+        <Style Selector="Border.entry.error TextBlock.arrow">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Border.entry TextBlock.peer">
+            <Setter Property="Width" Value="128"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+        </Style>
+        <Style Selector="Border.entry TextBlock.size">
+            <Setter Property="Width" Value="58"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="Margin" Value="0,0,12,0"/>
+        </Style>
+        <!-- WebSocket frame kind: text · bin · ping · pong -->
+        <Style Selector="Border.entry TextBlock.tag">
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+        </Style>
+        <Style Selector="Border.entry.control TextBlock.tag">
+            <Setter Property="Foreground" Value="{DynamicResource Violet}"/>
+        </Style>
+        <Style Selector="TextBlock.entryDetail">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.textBody, SelectableTextBlock.msg">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <!-- one context menu for the whole transcript (built in code-behind) -->
+            <Setter Property="ContextFlyout" Value="{x:Null}"/>
+            <Setter Property="ContextMenu" Value="{x:Null}"/>
+        </Style>
+        <Style Selector="Border.entry.sent SelectableTextBlock.textBody">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+        </Style>
+        <Style Selector="Border.entry.info SelectableTextBlock.msg">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Border.entry.error SelectableTextBlock.msg">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="ctl|HexDumpView">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="OffsetBrush" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="HexBrush" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="AsciiBrush" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <!-- body placement: one line per entry when wide; on a phone the data goes under the time / size line -->
+        <Style Selector="Border.entry StackPanel.body">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="5"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        </Style>
+        <Style Selector="Grid#SkTx.narrow Border.entry StackPanel.body">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="6"/>
+            <Setter Property="Margin" Value="0,2,0,2"/>
+        </Style>
+        <Style Selector="Border.entry StackPanel.note">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="4"/>
+        </Style>
+        <!-- what the body shows: text (hex for binary data) · hex · both -->
+        <Style Selector="Border.entry ctl|HexDumpView.hexBody">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Border.entry.binary ctl|HexDumpView.hexBody">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="Border.entry.binary SelectableTextBlock.textBody">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="ItemsControl.hexview Border.entry ctl|HexDumpView.hexBody">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="ItemsControl.hexview Border.entry SelectableTextBlock.textBody">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="ItemsControl.bothview Border.entry ctl|HexDumpView.hexBody">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="ItemsControl.bothview Border.entry SelectableTextBlock.textBody">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+
+        <!-- ===== empty state ===== -->
+        <Style Selector="Path.emptyIcon">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ===== clients / senders (server modes): a side list when wide, a picker above the send box on a phone ===== -->
+        <Style Selector="Grid#SkTx.narrow Panel#SkPeersWrap">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#SkTx.wide Panel#SkTargetWrap">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="ListBox.peers ListBoxItem">
+            <Setter Property="Padding" Value="10,5,4,5"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Margin" Value="4,1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+        </Style>
+        <Style Selector="ListBox.peers ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+        </Style>
+        <Style Selector="ListBox.peers ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Selected}"/>
+        </Style>
+        <Style Selector="ListBox.peers ListBoxItem:selected TextBlock.peerLabel">
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="TextBlock.peerLabel">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.peerDetail">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.panelTitle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="LetterSpacing" Value="0.4"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.rowBtn">
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.rowBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedHover}"/>
+        </Style>
+        <!-- touch (the phone shell, e.g. a tablet wide enough for the client list): full-size targets -->
+        <Style Selector="Grid#SkRoot.touch Button.rowBtn">
+            <Setter Property="Width" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+        </Style>
+        <Style Selector="Button.rowBtn Path">
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="12"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Button.rowBtn:pointerover Path">
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+        </Style>
+
+        <!-- ===== send box. Wide: [text|hex][message][line ending][send]. Narrow: [message][send] over
+             [text|hex][line ending], with the target picker above in the server modes ===== -->
+        <Style Selector="TextBox.input">
+            <Setter Property="Height" Value="NaN"/>
+            <Setter Property="MinHeight" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="MaxHeight" Value="112"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Grid#SkSend.wide > TabControl#SkInMode">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Margin" Value="0,1,0,0"/>
+        </Style>
+        <Style Selector="Grid#SkSend.wide > TextBox#InputBox">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        </Style>
+        <Style Selector="Grid#SkSend.wide > Panel#SkEolWrap">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style Selector="Grid#SkSend.wide > Button#SkSendBtn">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="3"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style Selector="Grid#SkSend.narrow > TextBox#InputBox">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+        </Style>
+        <Style Selector="Grid#SkSend.narrow > Button#SkSendBtn">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="3"/>
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+        </Style>
+        <Style Selector="Grid#SkSend.narrow > TabControl#SkInMode">
+            <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Grid#SkSend.narrow > Panel#SkEolWrap">
+            <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="TabControl.inmode > TabItem">
+            <Setter Property="Padding" Value="10,0"/>
+        </Style>
+        <Style Selector="TextBlock.inputError">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="2,6,0,0"/>
+            <Setter Property="Grid.Row" Value="3"/>
+        </Style>
+        <Style Selector="Grid#SkSend.wide > TextBlock.inputError">
+            <Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+        </Style>
+        <Style Selector="Grid#SkSend.narrow > TextBlock.inputError">
+            <Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/>
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer x:Name="SkPage" helpers:Responsive.BreakWidth="560" HorizontalScrollBarVisibility="Disabled">
+        <Grid x:Name="SkRoot" RowDefinitions="Auto, *" RowSpacing="12" Classes.running="{Binding IsRunning}" Classes.wsopts="{Binding ShowWsOptions}">
+
+            <!-- ===================== mode + endpoint ===================== -->
+            <Border Grid.Row="0" Classes="card" Padding="12">
+                <StackPanel Spacing="12">
+                    <!-- locked while a session runs: switching would silently drop it -->
+                    <Panel x:Name="SkModesTight" helpers:Responsive.BreakWidth="300">
+                        <Panel x:Name="SkModesWrap" helpers:Responsive.BreakWidth="440">
+                            <TabControl x:Name="SkModes" Classes="seg modes" Padding="0"
+                                        SelectedIndex="{Binding ModeIndex}" IsEnabled="{Binding IsIdle}">
+                                <TabItem Header="TCP client"/>
+                                <TabItem Header="TCP server"/>
+                                <TabItem Header="UDP client"/>
+                                <TabItem Header="UDP server"/>
+                                <TabItem Header="WebSocket"/>
+                            </TabControl>
+                        </Panel>
+                    </Panel>
+
+                    <!-- WebSocket client: URL, options, ping, connect -->
+                    <Grid x:Name="SkWs" helpers:Responsive.BreakWidth="560" IsVisible="{Binding IsWsMode}"
+                          ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                        <StackPanel x:Name="SkWsUrl">
+                            <TextBlock Classes="fieldLabel" Text="URL"/>
+                            <AutoCompleteBox x:Name="WsUrlBox" Classes="field"
+                                             helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Text"
+                                             helpers:InputAssist.PasteButton="True"
+                                             Text="{Binding WsUrl}" ItemsSource="{Binding WsUrlHistory}"
+                                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                             FontFamily="{StaticResource MonoFont}" IsEnabled="{Binding IsIdle}"
+                                             PlaceholderText="wss://example.com/socket"
+                                             ToolTip.Tip="A ws:// or wss:// URL (http:// and https:// work too)">
+                                <AutoCompleteBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding ToggleSessionCommand}"/>
+                                </AutoCompleteBox.KeyBindings>
+                            </AutoCompleteBox>
+                        </StackPanel>
+                        <Grid x:Name="SkWsRest" ColumnDefinitions="Auto, Auto, *">
+                            <Button Grid.Column="0" Classes="secondary hideRunning" Content="{Binding WsOptionsLabel}"
+                                    Command="{Binding ToggleWsOptionsCommand}"
+                                    ToolTip.Tip="Subprotocols, request headers and a proxy"/>
+                            <Button Grid.Column="1" Classes="secondary" Content="Ping" IsVisible="{Binding IsActive}"
+                                    IsEnabled="{Binding CanPing}" Command="{Binding PingCommand}"
+                                    ToolTip.Tip="Send a ping frame — the pong shows the round trip"/>
+                            <Button Grid.Column="2" Classes="toggle go" Classes.active="{Binding IsRunning}"
+                                    Command="{Binding ToggleSessionCommand}">
+                                <TextBlock Text="{Binding ActionText}" HorizontalAlignment="Center"/>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                    <Grid x:Name="SkWsOpts" helpers:Responsive.BreakWidth="520" ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto"
+                          IsEnabled="{Binding IsIdle}">
+                        <Grid.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="IsWsMode"/>
+                                <Binding Path="IsWsOptionsOpen"/>
+                            </MultiBinding>
+                        </Grid.IsVisible>
+                        <StackPanel x:Name="SkWsProto" Grid.Row="0" Grid.Column="0">
+                            <TextBlock Classes="fieldLabel" Text="Subprotocols"/>
+                            <TextBox Classes="field mono" Text="{Binding WsSubprotocols}" PlaceholderText="e.g. graphql-ws, chat"
+                                     ToolTip.Tip="Optional, comma-separated (Sec-WebSocket-Protocol)"/>
+                        </StackPanel>
+                        <StackPanel x:Name="SkWsProxy">
+                            <TextBlock Classes="fieldLabel" Text="Proxy"/>
+                            <TextBox Classes="field mono" Text="{Binding WsProxy}" PlaceholderText="e.g. 127.0.0.1:8080"
+                                     ToolTip.Tip="Optional HTTP (CONNECT) or SOCKS5 proxy. user:password@ in front of the host signs in."/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,10,0,0">
+                            <TextBlock Classes="fieldLabel" Text="Headers"/>
+                            <TextBox Classes="field multiline headers" Text="{Binding WsHeaders}" AcceptsReturn="True" TextWrapping="NoWrap"
+                                     PlaceholderText="Origin: https://example.com&#10;Authorization: Bearer …"
+                                     ToolTip.Tip="Request headers, one per line"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- client: host, port, TLS, connect -->
+                    <Grid x:Name="SkClient" helpers:Responsive.BreakWidth="560" IsVisible="{Binding IsClientMode}"
+                          ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                        <StackPanel x:Name="SkHost">
+                            <TextBlock Classes="fieldLabel" Text="Host"/>
+                            <AutoCompleteBox x:Name="HostBox" Classes="field"
+                                             helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Host"
+                                             helpers:InputAssist.PasteButton="True" helpers:InputAssist.PortTarget="PortBox"
+                                             Text="{Binding Host}" ItemsSource="{Binding TargetHistory}"
+                                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                             FontFamily="{StaticResource MonoFont}"
+                                             IsEnabled="{Binding IsIdle}"
+                                             PlaceholderText="e.g. example.com or host:port">
+                                <AutoCompleteBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding ToggleSessionCommand}"/>
+                                </AutoCompleteBox.KeyBindings>
+                            </AutoCompleteBox>
+                        </StackPanel>
+                        <Grid x:Name="SkClientRest" ColumnDefinitions="Auto, Auto, *">
+                            <StackPanel Grid.Column="0" Classes="hideRunning" Width="88" Margin="0,0,8,0">
+                                <TextBlock Classes="fieldLabel" Text="Port"/>
+                                <TextBox x:Name="PortBox" Classes="field mono" Text="{Binding Port}" PlaceholderText="Port"
+                                         helpers:InputAssist.SelectAllOnFocus="True" IsEnabled="{Binding IsIdle}">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding ToggleSessionCommand}"/>
+                                    </TextBox.KeyBindings>
+                                </TextBox>
+                            </StackPanel>
+                            <Panel Grid.Column="1" Classes="hideRunning">
+                                <CheckBox Classes="tls" Content="TLS" IsChecked="{Binding UseTls}"
+                                          IsVisible="{Binding IsTcpClientMode}" IsEnabled="{Binding IsIdle}"
+                                          ToolTip.Tip="Wrap the connection in TLS (like openssl s_client). Certificate problems are shown, never silently accepted."/>
+                            </Panel>
+                            <Button Grid.Column="2" Classes="toggle go" Classes.active="{Binding IsRunning}"
+                                    Command="{Binding ToggleSessionCommand}">
+                                <TextBlock Text="{Binding ActionText}" HorizontalAlignment="Center"/>
+                            </Button>
+                        </Grid>
+                    </Grid>
+
+                    <!-- server: bind address, port, listen -->
+                    <Grid x:Name="SkServer" helpers:Responsive.BreakWidth="560" IsVisible="{Binding IsServerMode}"
+                          ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                        <StackPanel x:Name="SkBind">
+                            <TextBlock Classes="fieldLabel" Text="Listen on"/>
+                            <ComboBox x:Name="BindBox" Classes="field" ItemsSource="{Binding BindOptions}" SelectedItem="{Binding SelectedBind}"
+                                      IsEnabled="{Binding IsIdle}"
+                                      ToolTip.Tip="All interfaces = reachable from other devices on your network; this device only = 127.0.0.1">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:BindOption">
+                                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+                        <Grid x:Name="SkServerRest" ColumnDefinitions="Auto, *">
+                            <StackPanel Grid.Column="0" Classes="hideRunning" Width="88" Margin="0,0,8,0">
+                                <TextBlock Classes="fieldLabel" Text="Port"/>
+                                <TextBox Classes="field mono" Text="{Binding ListenPort}" PlaceholderText="Port"
+                                         helpers:InputAssist.SelectAllOnFocus="True" IsEnabled="{Binding IsIdle}">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding ToggleSessionCommand}"/>
+                                    </TextBox.KeyBindings>
+                                </TextBox>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="toggle go" Classes.active="{Binding IsRunning}"
+                                    Command="{Binding ToggleSessionCommand}">
+                                <TextBlock Text="{Binding ActionText}" HorizontalAlignment="Center"/>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ===================== transcript + send box ===================== -->
+            <Border Grid.Row="1" Classes="card output">
+                <Grid x:Name="SkTx" helpers:Responsive.BreakWidth="600" RowDefinitions="Auto, Auto, *, Auto">
+
+                    <!-- header: status · traffic · view + tools -->
+                    <Grid Grid.Row="0" Margin="12,8" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                        <Grid x:Name="SkStatus" Grid.Column="0" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" VerticalAlignment="Center" HorizontalAlignment="Left">
+                            <Grid ColumnDefinitions="Auto, *" ColumnSpacing="8">
+                                <Ellipse Classes="dot" Classes.on="{Binding IsActive}" Classes.busy="{Binding IsBusy}"/>
+                                <TextBlock Grid.Column="1" Classes="status" Text="{Binding StatusText}" ToolTip.Tip="{Binding StatusText}"/>
+                            </Grid>
+                            <TextBlock Classes="traffic" Text="{Binding TrafficText}"/>
+                        </Grid>
+                        <StackPanel x:Name="SkTools" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <TabControl Classes="seg view" Padding="0" SelectedIndex="{Binding ViewIndex}" VerticalAlignment="Center"
+                                        ToolTip.Tip="Show data as text (binary data as hex), as a hex dump, or both">
+                                <TabItem Header="Text"/>
+                                <TabItem Header="Hex"/>
+                                <TabItem Header="Both"/>
+                            </TabControl>
+                            <Button Classes="icon" Command="{Binding CopyTranscriptCommand}" ToolTip.Tip="Copy the transcript">
+                                <Path Classes="glyph" Data="{StaticResource SkIcoCopy}"/>
+                            </Button>
+                            <Button Classes="icon" Click="OnSaveClick" ToolTip.Tip="Save the transcript to a file">
+                                <Path Classes="glyph" Data="{StaticResource SkIcoSave}"/>
+                            </Button>
+                            <Button Classes="icon" Command="{Binding ClearCommand}" ToolTip.Tip="Clear the transcript and counters">
+                                <Path Classes="glyph" Data="{StaticResource SkIcoClear}"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                    <Border Grid.Row="1" Classes="divider"/>
+
+                    <!-- body: transcript (+ clients / senders in the server modes) -->
+                    <Grid Grid.Row="2" ColumnDefinitions="*, Auto">
+                        <Panel Grid.Column="0">
+                            <ItemsControl x:Name="TxList" Classes="tx" ItemsSource="{Binding Entries}"
+                                          Classes.hexview="{Binding IsHexView}" Classes.bothview="{Binding IsBothView}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:SocketEntry">
+                                        <Border Classes="entry" Classes.sent="{Binding IsSent}" Classes.recv="{Binding IsReceived}"
+                                                Classes.info="{Binding IsInfo}" Classes.error="{Binding IsError}" Classes.binary="{Binding LooksBinary}"
+                                                Classes.control="{Binding IsControlFrame}">
+                                            <Grid ColumnDefinitions="Auto, Auto, Auto, Auto, Auto, *" RowDefinitions="Auto, Auto">
+                                                <TextBlock Grid.Column="0" Classes="meta time" Text="{Binding TimeText}"/>
+                                                <TextBlock Grid.Column="1" Classes="meta arrow" Text="{Binding Arrow}"/>
+                                                <TextBlock Grid.Column="2" Classes="meta tag" Text="{Binding Tag}" IsVisible="{Binding HasTag}"/>
+                                                <TextBlock Grid.Column="3" Classes="meta peer" Text="{Binding Peer}" IsVisible="{Binding HasPeer}"
+                                                           ToolTip.Tip="{Binding Peer}"/>
+                                                <TextBlock Grid.Column="4" Classes="meta size" Text="{Binding SizeText}" IsVisible="{Binding IsData}"/>
+                                                <StackPanel Classes="body" Spacing="4" IsVisible="{Binding IsData}">
+                                                    <SelectableTextBlock Classes="textBody" Text="{Binding Text}"/>
+                                                    <ctl:HexDumpView Classes="hexBody" Data="{Binding Data}"/>
+                                                    <TextBlock Classes="entryDetail" Text="{Binding Detail}" IsVisible="{Binding HasDetail}"/>
+                                                </StackPanel>
+                                                <StackPanel Classes="note" Spacing="6" IsVisible="{Binding IsNote}">
+                                                    <SelectableTextBlock Classes="msg" Text="{Binding Message}"/>
+                                                    <Button Classes="secondary" Content="Connect anyway" HorizontalAlignment="Left"
+                                                            IsVisible="{Binding HasAction}"
+                                                            Command="{Binding $parent[ItemsControl].((vm:SocketViewModel)DataContext).ConnectAnywayCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            ToolTip.Tip="Connect again, trusting exactly this certificate — for this connection only"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- empty state -->
+                            <StackPanel Spacing="6" Margin="24" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        IsHitTestVisible="False" IsVisible="{Binding !HasEntries}">
+                                <Path Classes="emptyIcon" Data="{StaticResource IcoSocket}"/>
+                                <TextBlock Text="{Binding EmptyTitle}" HorizontalAlignment="Center" FontSize="{StaticResource Font.Body}"
+                                           FontWeight="SemiBold" Foreground="{DynamicResource Text.Secondary}"/>
+                                <TextBlock Text="{Binding EmptyHint}" HorizontalAlignment="Center" TextAlignment="Center"
+                                           TextWrapping="Wrap" MaxWidth="360"
+                                           FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Text.Muted}"/>
+                            </StackPanel>
+                        </Panel>
+
+                        <!-- clients / senders (wide, server modes) -->
+                        <Panel x:Name="SkPeersWrap" Grid.Column="1">
+                            <Border Width="212" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="1,0,0,0"
+                                    IsVisible="{Binding IsServerMode}">
+                                <Grid RowDefinitions="Auto, *">
+                                    <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="14,10,10,6">
+                                        <TextBlock Classes="panelTitle" Text="{Binding PeersTitle}"/>
+                                        <Border Grid.Column="1" Classes="badge" Padding="7,1">
+                                            <TextBlock Text="{Binding PeerCount}" FontFamily="{StaticResource MonoFont}"/>
+                                        </Border>
+                                    </Grid>
+                                    <ListBox Grid.Row="1" Classes="peers" ItemsSource="{Binding Peers}" SelectedItem="{Binding SelectedPeer}"
+                                             Background="Transparent" BorderThickness="0" Padding="0,0,0,6">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:SocketPeerRow">
+                                                <Grid ColumnDefinitions="*, Auto" ColumnSpacing="4">
+                                                    <StackPanel Spacing="1" VerticalAlignment="Center">
+                                                        <TextBlock Classes="peerLabel" Text="{Binding Label}" ToolTip.Tip="{Binding Label}"/>
+                                                        <TextBlock Classes="peerDetail" Text="{Binding Detail}" IsVisible="{Binding HasDetail}"/>
+                                                    </StackPanel>
+                                                    <Button Grid.Column="1" Classes="rowBtn" IsVisible="{Binding CanDisconnect}"
+                                                            Command="{Binding $parent[ListBox].((vm:SocketViewModel)DataContext).DisconnectPeerCommand}"
+                                                            CommandParameter="{Binding}" ToolTip.Tip="Disconnect this client">
+                                                        <Path Data="{StaticResource SkIcoClose}"/>
+                                                    </Button>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Grid>
+                            </Border>
+                        </Panel>
+                    </Grid>
+
+                    <!-- send box -->
+                    <Border Grid.Row="3" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0" Padding="12">
+                        <Grid x:Name="SkSend" helpers:Responsive.BreakWidth="560" ColumnDefinitions="Auto, *, Auto, Auto"
+                              RowDefinitions="Auto, Auto, Auto, Auto" ColumnSpacing="8">
+
+                            <!-- phone, server modes: who the message goes to -->
+                            <Panel x:Name="SkTargetWrap" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="4">
+                                <Grid IsVisible="{Binding IsServerMode}" ColumnDefinitions="Auto, *, Auto" ColumnSpacing="8" Margin="0,0,0,8">
+                                    <TextBlock Classes="fieldLabel" Text="To" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                    <ComboBox Grid.Column="1" Classes="field" ItemsSource="{Binding Peers}" SelectedItem="{Binding SelectedPeer}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:SocketPeerRow">
+                                                <TextBlock FontFamily="{StaticResource MonoFont}" TextTrimming="CharacterEllipsis">
+                                                    <Run Text="{Binding Label}"/><Run Text="{Binding ComboSuffix}"/>
+                                                </TextBlock>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button Grid.Column="2" Classes="icon" IsVisible="{Binding IsTcpServerMode}"
+                                            Command="{Binding DisconnectPeerCommand}" CommandParameter="{Binding SelectedPeer}"
+                                            ToolTip.Tip="Disconnect the selected client">
+                                        <Path Classes="glyph" Data="{StaticResource SkIcoClose}"/>
+                                    </Button>
+                                </Grid>
+                            </Panel>
+
+                            <TabControl x:Name="SkInMode" Classes="seg inmode" Padding="0" SelectedIndex="{Binding InputModeIndex}"
+                                        ToolTip.Tip="Send text, raw bytes typed as hex (a binary message on a WebSocket), or JSON checked before it goes">
+                                <TabItem Header="Text"/>
+                                <TabItem Header="Hex"/>
+                                <TabItem Header="JSON" IsVisible="{Binding IsWsMode}"/>
+                            </TabControl>
+                            <TextBox x:Name="InputBox" Classes="field mono input" Text="{Binding Input}"
+                                     AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="{Binding InputPlaceholder}"
+                                     ToolTip.Tip="Enter sends · Shift+Enter adds a line · Up / Down recall earlier messages"/>
+                            <Panel x:Name="SkEolWrap">
+                                <ComboBox x:Name="SkEol" Classes="field" Width="84" ItemsSource="{Binding LineEndings}"
+                                          SelectedIndex="{Binding LineEndingIndex}" IsEnabled="{Binding !InputIsHex}" IsVisible="{Binding ShowLineEnding}"
+                                          ToolTip.Tip="Line ending added to text you send (also used between the lines of a multi-line message)"/>
+                                <Button Classes="ghost" Content="Format" IsVisible="{Binding ShowJsonFormat}"
+                                        Command="{Binding FormatJsonCommand}" ToolTip.Tip="Indent the JSON (or show where it's broken)"/>
+                            </Panel>
+                            <Button x:Name="SkSendBtn" Classes="primary" MinWidth="72" Content="Send"
+                                    Command="{Binding SendCommand}" IsEnabled="{Binding CanSend}"/>
+                            <TextBlock Classes="inputError" Text="{Binding InputError}"
+                                       IsVisible="{Binding InputError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

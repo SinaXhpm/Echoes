@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -45,8 +46,13 @@ public partial class StringLabViewModel
 
     private bool _cronSyncing;   // guards the field <-> expression two-way sync from recursing
 
-    // No other partial defines a constructor; this one seeds the initial description / next runs.
-    public StringLabViewModel() => EvaluateCron();
+    // No other partial defines a constructor; this one restores the remembered choices (StringLabViewModel.Prefs.cs) and
+    // seeds the initial description / next runs.
+    public StringLabViewModel()
+    {
+        RestorePrefs();
+        EvaluateCron();
+    }
 
     partial void OnCronMinuteChanged(string value) => RebuildCronExpression();
     partial void OnCronHourChanged(string value) => RebuildCronExpression();
@@ -102,25 +108,32 @@ public partial class StringLabViewModel
             CronNextRuns = "No upcoming runs within the next 6 years (impossible date?).";
             return;
         }
+        // Invariant, like the desktop Release build (InvariantGlobalization): a phone set to fa-IR or
+        // th-TH would otherwise print a Persian / Buddhist calendar year and local day names under an
+        // English description.
         var sb = new StringBuilder();
         foreach (var r in runs)
         {
-            var delta = r - now;
-            sb.AppendLine($"{r:ddd  yyyy-MM-dd  HH:mm}   ({RelativeShort(delta)})");
+            // Elapsed time via UTC: local wall-clock subtraction is an hour off across a DST change.
+            var delta = r.ToUniversalTime() - now.ToUniversalTime();
+            sb.AppendLine(string.Create(CultureInfo.InvariantCulture, $"{r:ddd  yyyy-MM-dd  HH:mm}   ({RelativeShort(delta)})"));
         }
         CronNextRuns = sb.ToString().TrimEnd();
     }
 
     private static string RelativeShort(TimeSpan d)
     {
+        var inv = CultureInfo.InvariantCulture;
         if (d.TotalMinutes < 1) return "now";
-        if (d.TotalHours < 1) return $"in {d.TotalMinutes:F0} min";
-        if (d.TotalDays < 1) return $"in {d.TotalHours:F0} h {d.Minutes} min";
-        if (d.TotalDays < 30) return $"in {d.TotalDays:F0} d";
-        if (d.TotalDays < 365) return $"in {d.TotalDays / 30:F0} mo";
-        return $"in {d.TotalDays / 365:F1} yr";
+        if (d.TotalHours < 1) return string.Create(inv, $"in {d.TotalMinutes:F0} min");
+        if (d.TotalDays < 1) return string.Create(inv, $"in {(int)d.TotalHours} h {d.Minutes} min");   // whole hours: 1:54 is "1 h 54 min", not "2 h 54 min"
+        if (d.TotalDays < 30) return string.Create(inv, $"in {d.TotalDays:F0} d");
+        if (d.TotalDays < 365) return string.Create(inv, $"in {d.TotalDays / 30:F0} mo");
+        return string.Create(inv, $"in {d.TotalDays / 365:F1} yr");
     }
 
+    // Through CopyText, so a failed clipboard write shows "Copy failed: …" like every other COPY
+    // instead of escaping the command into the global crash handler with no feedback.
     [RelayCommand]
-    private async System.Threading.Tasks.Task CopyCron() => await ClipboardHelper.SetTextAsync(CronExpression);
+    private System.Threading.Tasks.Task CopyCron() => CopyText(CronExpression);
 }

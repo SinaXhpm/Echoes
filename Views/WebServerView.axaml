@@ -3,103 +3,761 @@
              xmlns:vm="using:Echoes.ViewModels"
              xmlns:helpers="using:Echoes.Helpers"
              xmlns:sys="using:System"
+             xmlns:ctl="using:Echoes.Views.Controls"
              x:Class="Echoes.Views.WebServerView"
              x:DataType="vm:WebServerViewModel">
 
-    <!-- The whole page scrolls: once the server is running it grows (stats + share URLs + QR + log),
+    <UserControl.Resources>
+        <StreamGeometry x:Key="WsIcoQr">M4 4 H10 V10 H4 Z M14 4 H20 V10 H14 Z M4 14 H10 V20 H4 Z M14 14 H16 V16 H14 Z M18 14 H20 M14 18 V20 H16 M18 18 H20 V20</StreamGeometry>
+        <StreamGeometry x:Key="WsIcoBack">M15 5 L8 12 L15 19</StreamGeometry>
+        <StreamGeometry x:Key="WsIcoClear">M4.5 7 H19.5 M9.5 7 V4.5 H14.5 V7 M6.5 7 L7.5 19.5 H16.5 L17.5 7</StreamGeometry>
+        <!-- one name / value line: header, query parameter, form field, multipart part -->
+        <DataTemplate x:Key="CtFieldTemplate" x:DataType="helpers:CatcherField">
+            <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10" Margin="0,0,0,5">
+                <TextBlock Classes="fieldName" Text="{Binding Name}" ToolTip.Tip="{Binding Name}"/>
+                <StackPanel Grid.Column="1" Spacing="1">
+                    <SelectableTextBlock Classes="fieldValue" Text="{Binding Value}"/>
+                    <TextBlock Classes="hint" Text="{Binding Detail}" IsVisible="{Binding HasDetail}"/>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+        <!-- stroked glyphs, 24x24 box (same convention as Assets/ToolIcons.axaml) -->
+        <StreamGeometry x:Key="WsIcoPlus">M12 5 V19 M5 12 H19</StreamGeometry>
+        <StreamGeometry x:Key="WsIcoFile">M14.5 3 H6.5 A1.5 1.5 0 0 0 5 4.5 V19.5 A1.5 1.5 0 0 0 6.5 21 H17.5 A1.5 1.5 0 0 0 19 19.5 V7.5 Z M14 3 V8 H19</StreamGeometry>
+        <StreamGeometry x:Key="WsIcoClose">M7 7 L17 17 M17 7 L7 17</StreamGeometry>
+        <StreamGeometry x:Key="WsIcoCopy">M10 8 H18 A2 2 0 0 1 20 10 V18 A2 2 0 0 1 18 20 H10 A2 2 0 0 1 8 18 V10 A2 2 0 0 1 10 8 Z M5 16 A1.5 1.5 0 0 1 4 14.5 V5.5 A1.5 1.5 0 0 1 5.5 4 H14.5 A1.5 1.5 0 0 1 16 5</StreamGeometry>
+        <StreamGeometry x:Key="WsIcoOpen">M14 4 H20 V10 M20 4 L11 13 M18 14 V18.5 A1.5 1.5 0 0 1 16.5 20 H5.5 A1.5 1.5 0 0 1 4 18.5 V7.5 A1.5 1.5 0 0 1 5.5 6 H10</StreamGeometry>
+        <StreamGeometry x:Key="WsIcoInbox">M4 13 H8.5 L10 15.5 H14 L15.5 13 H20 M4 13 L6.5 5.5 H17.5 L20 13 V18.5 A1.5 1.5 0 0 1 18.5 20 H5.5 A1.5 1.5 0 0 1 4 18.5 Z</StreamGeometry>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- ===== page rhythm: 16px between cards on desktop, 12px on a phone. A margin on every card but the
+             first (not RowSpacing), so the cards hidden while stopped leave no doubled gap. ===== -->
+        <Style Selector="Grid#WsPage > :is(Control):not(:nth-child(1))">
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#WsPage.narrow > :is(Control):not(:nth-child(1))">
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Border.card.section">
+            <Setter Property="Padding" Value="12"/>
+        </Style>
+        <Style Selector="Grid#WsPage.narrow Border.card.section">
+            <Setter Property="Padding" Value="12"/>
+        </Style>
+        <Style Selector="TextBlock.hint">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <!-- glyph inside a button: follows the button's state through Stroke (a Path doesn't inherit Foreground) -->
+        <Style Selector="Button Path.glyph">
+            <Setter Property="StrokeThickness" Value="1.7"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.secondary Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="12"/>
+        </Style>
+
+        <!-- ===== server settings: [listen on][port][max connections] on one line, stacked on a phone ===== -->
+        <Style Selector="Grid#WsFields.wide > StackPanel#WsBind">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        </Style>
+        <Style Selector="Grid#WsFields.narrow > StackPanel#WsBind">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#WsFields.wide > Grid#WsLimits">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Width" Value="280"/>
+        </Style>
+        <Style Selector="Grid#WsFields.narrow > Grid#WsLimits">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <!-- START + status: side by side; on a phone the button is a full-width row above the status -->
+        <Style Selector="Grid#WsAction.wide > Button#WsToggle">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        </Style>
+        <Style Selector="Grid#WsAction.narrow > Button#WsToggle">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Grid#WsAction.wide > TextBlock#WsStatus">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="16,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#WsAction.narrow > TextBlock#WsStatus">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="2,10,0,0"/>
+        </Style>
+        <Style Selector="TextBlock#WsStatus">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <!-- credentials: next to "Require password" on desktop (two fields of at most 200px each: a full-width pair
+             would be oddly long), on their own line in halves on a phone -->
+        <Style Selector="Grid#WsPage.wide Grid#WsAuthRow > CheckBox">
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+        </Style>
+        <Style Selector="Grid#WsPage.wide Grid#WsAuthRow > Grid#WsAuth">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="16,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#WsPage.narrow Grid#WsAuthRow > Grid#WsAuth">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Border.badge Ellipse.dot">
+            <Setter Property="Width" Value="6"/>
+            <Setter Property="Height" Value="6"/>
+            <Setter Property="Fill" Value="{DynamicResource Success}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ===== live stats: metric tiles, 5 across; 2 + 2 + 1 compact rows below 640px (10-column grid, spans) ===== -->
+        <Style Selector="Border.card.tile">
+            <Setter Property="Padding" Value="14,12"/>
+        </Style>
+        <!-- tile = label over value; on a phone a compact row (label left, value right) -->
+        <Style Selector="TextBlock.tileLabel">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="TextBlock.tileValue">
+            <Setter Property="FontSize" Value="17"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#WsStats.narrow > Border.tile">
+            <Setter Property="Padding" Value="12,10"/>
+        </Style>
+        <Style Selector="Grid#WsStats.narrow TextBlock.tileLabel">
+            <Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Grid#WsStats.narrow TextBlock.tileValue">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Title}"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Grid#WsStats > Border">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#WsStats.narrow > Border">
+            <Setter Property="Grid.ColumnSpan" Value="5"/>
+        </Style>
+        <Style Selector="Grid#WsStats > Border#WsStat2"><Setter Property="Grid.Column" Value="2"/></Style>
+        <Style Selector="Grid#WsStats > Border#WsStat3"><Setter Property="Grid.Column" Value="4"/></Style>
+        <Style Selector="Grid#WsStats > Border#WsStat4"><Setter Property="Grid.Column" Value="6"/></Style>
+        <Style Selector="Grid#WsStats > Border#WsStat5"><Setter Property="Grid.Column" Value="8"/></Style>
+        <Style Selector="Grid#WsStats.narrow > Border#WsStat2"><Setter Property="Grid.Column" Value="5"/></Style>
+        <Style Selector="Grid#WsStats.narrow > Border#WsStat3">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#WsStats.narrow > Border#WsStat4">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="5"/><Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#WsStats.narrow > Border#WsStat5">
+            <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="10"/><Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+
+        <!-- ===== share links: selectable tiles (the selected one is the QR target) ===== -->
+        <Style Selector="ListBox.links > ListBoxItem">
+            <Setter Property="Padding" Value="12,4,4,4"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="ListBox.links > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+        </Style>
+        <Style Selector="ListBox.links > ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Pressed}"/>
+        </Style>
+        <Style Selector="ListBox.links > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        </Style>
+        <Style Selector="ListBox.links > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent.SoftHover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        </Style>
+        <Style Selector="TextBlock.url">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="ListBox.links > ListBoxItem:selected TextBlock.url">
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Button.icon Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+        </Style>
+        <Style Selector="Button.icon:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <!-- QR next to the links; centered under them on a phone -->
+        <Style Selector="Grid#WsShare.wide > ListBox#WsLinks">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        </Style>
+        <Style Selector="Grid#WsShare.narrow > ListBox#WsLinks">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#WsShare.wide > Border#WsQr">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="16,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#WsShare.narrow > Border#WsQr">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,6,0,0"/>
+        </Style>
+
+        <!-- ===== shared files list ===== -->
+        <Style Selector="Border.fileRow">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Padding" Value="12,4,4,4"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+        <Style Selector="Path.fileIcon">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <!-- remove (×): no fill until hovered, so a long list stays calm -->
+        <Style Selector="Button.rowAction">
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.rowAction:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+        </Style>
+        <Style Selector="Button.rowAction:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Danger.Border}"/>
+        </Style>
+        <Style Selector="Button.rowAction Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="12"/>
+        </Style>
+        <Style Selector="Button.rowAction:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Border.empty">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Padding" Value="16,12"/>
+        </Style>
+        <Style Selector="Path.emptyIcon">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ===== request log: a read-only text area that blends into its inset card ===== -->
+        <Style Selector="TextBox.log">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="TextBox.log:pointerover /template/ Border#PART_BorderElement, TextBox.log:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="TextBox.log:pointerover, TextBox.log:focus">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+        </Style>
+
+        <!-- ===================== CATCH REQUESTS ===================== -->
+        <Style Selector="TabControl.wsmode > TabItem">
+            <Setter Property="Padding" Value="12,0"/>
+        </Style>
+        <!-- page: one screen tall on desktop; on a phone at least 640px (the page scrolls, the list keeps its room) -->
+        <Style Selector="ScrollViewer#CtPage.wide">
+            <Setter Property="VerticalScrollBarVisibility" Value="Disabled"/>
+        </Style>
+        <Style Selector="ScrollViewer#CtPage.narrow">
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+        </Style>
+        <Style Selector="ScrollViewer#CtPage.narrow > Grid#CtRoot">
+            <Setter Property="Height" Value="{Binding $parent[ScrollViewer].Bounds.Height}"/>
+            <Setter Property="MinHeight" Value="640"/>
+        </Style>
+        <!-- phone, reply editor open: the page grows (and scrolls) rather than squeezing the list to a row -->
+        <Style Selector="ScrollViewer#CtPage.narrow > Grid#CtRoot.replyOpen">
+            <Setter Property="MinHeight" Value="1000"/>
+        </Style>
+        <Style Selector="TextBlock.hint.error">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="TextBlock.hint.warn">
+            <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+        </Style>
+
+        <!-- [listen on][port][start] on one line; the address on its own line on a phone -->
+        <Style Selector="Grid#CtFields.wide > Grid#CtRest">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#CtFields.narrow > Grid#CtRest">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+        <Style Selector="Grid#CtFields.narrow > StackPanel#CtBind">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#CtFields.narrow Button#CtToggle">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <!-- phone, while catching: the (locked) address and port fold away — the card keeps Stop and the URL -->
+        <Style Selector="ScrollViewer#CtPage.narrow Grid#CtRoot.running StackPanel#CtBind, ScrollViewer#CtPage.narrow Grid#CtRoot.running StackPanel#CtPortBox">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="ScrollViewer#CtPage.narrow Grid#CtRoot.running Grid#CtRest">
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+
+        <!-- reply editor: [status][content type][delay] / [body]; the content type on its own line on a phone -->
+        <Style Selector="Grid#CtReply > StackPanel#CtReplyType">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/>
+        </Style>
+        <Style Selector="Grid#CtReply > StackPanel#CtReplyDelay">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#CtReply.narrow > StackPanel#CtReplyType">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+        <Style Selector="Grid#CtReply.narrow > StackPanel#CtReplyDelay">
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <Style Selector="TextBox.replyBody">
+            <Setter Property="MinHeight" Value="52"/>
+            <Setter Property="MaxHeight" Value="96"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+        </Style>
+
+        <!-- list | details side by side; on a phone the list, or the details of the one picked (with a back button) -->
+        <Style Selector="Grid#CtSplit.wide > Grid#CtListPane">
+            <Setter Property="Width" Value="268"/>
+        </Style>
+        <Style Selector="Grid#CtSplit.wide > Border#CtDetailPane">
+            <Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="BorderThickness" Value="1,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#CtSplit.wide Button#CtBack">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#CtSplit.narrow > Grid#CtListPane, Grid#CtSplit.narrow > Border#CtDetailPane">
+            <Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#CtSplit.narrow.detail > Grid#CtListPane">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#CtSplit.narrow:not(.detail) > Border#CtDetailPane">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+
+        <Style Selector="TextBlock.panelTitle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="LetterSpacing" Value="0.4"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.counts">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Button.icon.small">
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="26"/>
+        </Style>
+        <Style Selector="Button.icon.small Path.glyph">
+            <Setter Property="Width" Value="13"/>
+            <Setter Property="Height" Value="13"/>
+        </Style>
+
+        <!-- request rows -->
+        <Style Selector="ListBox.reqs ListBoxItem">
+            <Setter Property="Padding" Value="10,5,10,5"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Margin" Value="4,1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="ListBox.reqs ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+        </Style>
+        <Style Selector="ListBox.reqs ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Selected}"/>
+        </Style>
+        <Style Selector="Border.badge.method">
+            <Setter Property="Padding" Value="5,0"/>
+            <Setter Property="MinWidth" Value="44"/>
+        </Style>
+        <Style Selector="Border.badge.method TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.badge.violet">
+            <Setter Property="Background" Value="{DynamicResource Violet.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Violet.Border}"/>
+        </Style>
+        <Style Selector="Border.badge.violet TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Violet}"/>
+        </Style>
+        <Style Selector="TextBlock.reqPath">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.reqStatus">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.reqStatus.ok"><Setter Property="Foreground" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="TextBlock.reqStatus.redirect"><Setter Property="Foreground" Value="{DynamicResource Info}"/></Style>
+        <Style Selector="TextBlock.reqStatus.client"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="TextBlock.reqStatus.server"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="TextBlock.reqMeta">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="0,3,0,0"/>
+        </Style>
+
+        <!-- details -->
+        <Style Selector="SelectableTextBlock.reqLine">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TabControl.detailTabs > TabItem">
+            <Setter Property="Padding" Value="10,0"/>
+        </Style>
+        <Style Selector="TextBlock.bodyLabel">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.bodyText, SelectableTextBlock.fieldValue">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.fieldName">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Width" Value="128"/>
+        </Style>
+        <Style Selector="Grid#CtSplit.narrow TextBlock.fieldName">
+            <Setter Property="Width" Value="104"/>
+        </Style>
+        <Style Selector="ctl|HexDumpView.bodyHex">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="OffsetBrush" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="HexBrush" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="AsciiBrush" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+    <!-- ===================== SHARE FILES =====================
+         The whole page scrolls: once the server is running it grows (stats + share URLs + QR + log),
          which overflows a short window, so a single outer ScrollViewer keeps everything reachable.
          Full width (no MaxWidth) so it still uses the available space. -->
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="12" Margin="14,12,14,14">
+    <ScrollViewer x:Name="WsShareMode" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                  IsVisible="{Binding IsShareMode}">
+        <!-- At least as tall as the visible area: the request log (the star row) takes the spare height instead
+             of leaving it empty under the cards; taller content still scrolls. -->
+        <Grid x:Name="WsPage" helpers:Responsive.BreakWidth="560" RowDefinitions="Auto, Auto, Auto, Auto, *"
+              MinHeight="{Binding $parent[ScrollViewer].Bounds.Height}">
 
-            <!-- ===== LISTEN SETTINGS + START (top) ===== -->
-            <StackPanel Spacing="7">
-                <TextBlock Classes="fieldLabel" Text="LISTEN"/>
-                <Border Classes="card" Padding="14,9">
-                    <StackPanel Spacing="9">
-                        <!-- how to listen: bind interface (default 0.0.0.0 = LAN-visible) -->
-                        <Grid ColumnDefinitions="Auto,*">
-                            <TextBlock Grid.Column="0" Text="Listen on" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <ComboBox Grid.Column="1" Classes="field" ItemsSource="{Binding BindOptions}" SelectedItem="{Binding SelectedBind}"
-                                      HorizontalAlignment="Stretch"
+            <!-- ===== SERVER: listen settings + START ===== -->
+            <Border Grid.Row="0" Classes="card section">
+                <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TabControl Grid.Column="0" Classes="seg wsmode" Padding="0" SelectedIndex="{Binding ModeIndex}" VerticalAlignment="Center"
+                                    ToolTip.Tip="Share files with devices on your network, or catch the requests a webhook / app sends">
+                            <TabItem Header="Share files"/>
+                            <TabItem Header="Catch requests"/>
+                        </TabControl>
+                        <Border Grid.Column="1" Classes="badge" Classes.success="{Binding IsRunning}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Ellipse Classes="dot" IsVisible="{Binding IsRunning}"/>
+                                <TextBlock Text="Running" IsVisible="{Binding IsRunning}"/>
+                                <TextBlock Text="Stopped" IsVisible="{Binding !IsRunning}"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- how to listen: bind interface (default 0.0.0.0 = LAN-visible).
+                         Listen settings are locked while running: the server captures them at START,
+                         so edits would be silently ignored while the UI claimed otherwise. -->
+                    <Grid x:Name="WsFields" helpers:Responsive.BreakWidth="600"
+                          ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="12">
+                        <StackPanel x:Name="WsBind">
+                            <TextBlock Classes="fieldLabel" Text="Listen on"/>
+                            <ComboBox Classes="field" ItemsSource="{Binding BindOptions}" SelectedItem="{Binding SelectedBind}"
+                                      HorizontalAlignment="Stretch" IsEnabled="{Binding !IsRunning}"
                                       ToolTip.Tip="Which address the server binds to. 0.0.0.0 (default) = reachable from other devices on your network; 127.0.0.1 = this device only; or pick one specific interface IP.">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate x:DataType="vm:BindOption">
-                                        <TextBlock Text="{Binding Label}" FontSize="11.5"/>
+                                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis"/>
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
-                        </Grid>
-                        <!-- port + max connections + require password -->
-                        <WrapPanel>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,22,3">
-                                <TextBlock Text="Port" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" ShowButtonSpinner="False"
-                                               Height="30" Width="80" FontSize="11.5" HorizontalContentAlignment="Center" CornerRadius="6"
-                                               Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
+                        </StackPanel>
+                        <Grid x:Name="WsLimits" ColumnDefinitions="*, *" ColumnSpacing="12">
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Classes="fieldLabel" Text="Port"/>
+                                <NumericUpDown Classes="field" Value="{Binding Port}" Minimum="1" Maximum="65535" ShowButtonSpinner="False" IsEnabled="{Binding !IsRunning}"/>
                             </StackPanel>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,22,3">
-                                <TextBlock Text="Max conns" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,8,0"
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Classes="fieldLabel" Text="Max connections"
                                            ToolTip.Tip="Maximum simultaneous connections the server accepts"/>
-                                <NumericUpDown Value="{Binding MaxConnections}" Minimum="1" Maximum="512" ShowButtonSpinner="False"
-                                               Height="30" Width="70" FontSize="11.5" HorizontalContentAlignment="Center" CornerRadius="6"
-                                               Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
+                                <NumericUpDown Classes="field" Value="{Binding MaxConnections}" Minimum="1" Maximum="512" ShowButtonSpinner="False" IsEnabled="{Binding !IsRunning}"
+                                               ToolTip.Tip="Maximum simultaneous connections the server accepts"/>
                             </StackPanel>
-                            <CheckBox IsChecked="{Binding RequireAuth}" Content="Require password" FontSize="11.5"
-                                      FontWeight="SemiBold" Foreground="#C7C8CF" VerticalAlignment="Center" Margin="0,3,0,3"
-                                      ToolTip.Tip="Protect downloads with HTTP Basic auth"/>
-                        </WrapPanel>
-                        <Grid ColumnDefinitions="*, *" ColumnSpacing="8" IsVisible="{Binding RequireAuth}">
-                            <TextBox Grid.Column="0" Classes="field" Text="{Binding AuthUser}" PlaceholderText="username"/>
-                            <TextBox Grid.Column="1" Classes="field" Text="{Binding AuthPass}" PasswordChar="●" PlaceholderText="password"/>
                         </Grid>
-                        <!-- START / STOP + status — inside the settings box -->
-                        <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10" Margin="0,2,0,0">
-                            <Button Grid.Column="0" Classes="toggle" Command="{Binding ToggleServerCommand}" Classes.active="{Binding IsRunning}"
-                                    Height="32" Width="150">
-                                <Panel>
-                                    <TextBlock Text="START SHARING" IsVisible="{Binding !IsRunning}" FontSize="11" FontWeight="Bold"/>
-                                    <TextBlock Text="STOP" IsVisible="{Binding IsRunning}" FontSize="11" FontWeight="Bold"/>
-                                </Panel>
-                            </Button>
-                            <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" FontSize="11" Foreground="#42B883"
-                                       FontFamily="Cascadia Code,Consolas" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <!-- optional HTTP Basic auth: [require password][username][password] on one line when wide -->
+                    <Grid x:Name="WsAuthRow" ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
+                        <CheckBox IsChecked="{Binding RequireAuth}" IsEnabled="{Binding !IsRunning}" Content="Require password"
+                                  ToolTip.Tip="Protect downloads with HTTP Basic auth (a username and password)"/>
+                        <Grid x:Name="WsAuth" ColumnSpacing="12" IsVisible="{Binding RequireAuth}" IsEnabled="{Binding !IsRunning}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" MaxWidth="200"/>
+                                <ColumnDefinition Width="*" MaxWidth="200"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Classes="fieldLabel" Text="Username"/>
+                                <TextBox Classes="field" Text="{Binding AuthUser}" PlaceholderText="Username"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Classes="fieldLabel" Text="Password"/>
+                                <TextBox Classes="field" Text="{Binding AuthPass}" IsUndoEnabled="False" PasswordChar="●" PlaceholderText="Password"/>
+                            </StackPanel>
                         </Grid>
-                    </StackPanel>
+                    </Grid>
+
+                    <Border Classes="divider"/>
+
+                    <!-- START / STOP + status -->
+                    <Grid x:Name="WsAction" helpers:Responsive.BreakWidth="480" ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
+                        <Button x:Name="WsToggle" Classes="toggle" MinWidth="148"
+                                Command="{Binding ToggleServerCommand}" Classes.active="{Binding IsRunning}">
+                            <Panel>
+                                <TextBlock Text="Start sharing" IsVisible="{Binding !IsRunning}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Stop" IsVisible="{Binding IsRunning}" HorizontalAlignment="Center"/>
+                            </Panel>
+                        </Button>
+                        <TextBlock x:Name="WsStatus" Text="{Binding StatusMessage}"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== LIVE STATS (while running) ===== -->
+            <Grid x:Name="WsStats" Grid.Row="1" helpers:Responsive.BreakWidth="640" IsVisible="{Binding IsRunning}"
+                  ColumnDefinitions="*,*,*,*,*,*,*,*,*,*" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="12">
+                <Border x:Name="WsStat1" Classes="card tile">
+                    <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                        <TextBlock Classes="tileLabel" Text="Active"/>
+                        <TextBlock Classes="tileValue" Text="{Binding ActiveConnections}"/>
+                    </Grid>
                 </Border>
-            </StackPanel>
+                <Border x:Name="WsStat2" Classes="card tile">
+                    <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                        <TextBlock Classes="tileLabel" Text="Downloads"/>
+                        <TextBlock Classes="tileValue" Text="{Binding TotalDownloads}"/>
+                    </Grid>
+                </Border>
+                <Border x:Name="WsStat3" Classes="card tile">
+                    <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                        <TextBlock Classes="tileLabel" Text="Sent"/>
+                        <TextBlock Classes="tileValue" Text="{Binding BytesSentText}"/>
+                    </Grid>
+                </Border>
+                <Border x:Name="WsStat4" Classes="card tile">
+                    <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                        <TextBlock Classes="tileLabel" Text="Clients"/>
+                        <TextBlock Classes="tileValue" Text="{Binding ClientCount}"/>
+                    </Grid>
+                </Border>
+                <Border x:Name="WsStat5" Classes="card tile">
+                    <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                        <TextBlock Classes="tileLabel" Text="Connections" ToolTip.Tip="Connections since the server started"/>
+                        <TextBlock Classes="tileValue" Text="{Binding TotalConnections}"/>
+                    </Grid>
+                </Border>
+            </Grid>
 
-            <!-- ===== SHARED FILES (below settings) ===== -->
-            <StackPanel Spacing="6">
-                <Grid ColumnDefinitions="*, Auto, Auto">
-                    <TextBlock Grid.Column="0" Classes="fieldLabel" Text="SHARED FILES" VerticalAlignment="Center"/>
-                    <Button Grid.Column="1" Classes="secondary" Click="AddFiles_Click" Content="+ ADD FILES" FontSize="11" Margin="0,0,6,0"/>
-                    <Button Grid.Column="2" Classes="ghost" Command="{Binding ClearFilesCommand}" Content="CLEAR" FontSize="11"/>
-                </Grid>
+            <!-- ===== SHARE URLs + QR (while running) ===== -->
+            <Border Grid.Row="2" Classes="card section" IsVisible="{Binding IsRunning}">
+                <StackPanel Spacing="14">
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12">
+                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Classes="sectionTitle" Text="Share links"/>
+                            <TextBlock Classes="hint" Text="Scan the QR or open a link."
+                                       ToolTip.Tip="Point a phone camera at the QR, or open a URL in any browser on the same Wi-Fi / LAN"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="ghost" Command="{Binding RefreshAddressesCommand}" Content="Refresh" VerticalAlignment="Top"/>
+                    </Grid>
+                    <Grid x:Name="WsShare" helpers:Responsive.BreakWidth="560" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                        <!-- addresses — click one to show its QR -->
+                        <ListBox x:Name="WsLinks" Classes="links" ItemsSource="{Binding Addresses}" SelectedItem="{Binding SelectedShareUrl}"
+                                 Background="{DynamicResource Bg.Card}" BorderThickness="0" Padding="0" VerticalAlignment="Top"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="sys:String">
+                                    <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="4">
+                                        <TextBlock Grid.Column="0" Classes="url" Text="{Binding}" Margin="0,0,8,0"/>
+                                        <Button Grid.Column="1" Classes="icon" ToolTip.Tip="Copy link"
+                                                Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).CopyAddressCommand}"
+                                                CommandParameter="{Binding}">
+                                            <Path Classes="glyph" Data="{StaticResource WsIcoCopy}"/>
+                                        </Button>
+                                        <Button Grid.Column="2" Classes="icon" ToolTip.Tip="Open in browser"
+                                                IsVisible="{x:Static helpers:AppPlatform.IsDesktop}"
+                                                Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).OpenAddressCommand}"
+                                                CommandParameter="{Binding}">
+                                            <Path Classes="glyph" Data="{StaticResource WsIcoOpen}"/>
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
 
-                <!-- files list (grows with the file count; a very long list caps here and scrolls internally) -->
-                <Border Classes="card" Padding="6" MinHeight="80">
+                        <!-- QR of the selected address (the bitmap carries its own white quiet zone) -->
+                        <Border x:Name="WsQr" CornerRadius="{StaticResource Radius.Md}" ClipToBounds="True" VerticalAlignment="Top"
+                                IsVisible="{Binding QrImage, Converter={x:Static ObjectConverters.IsNotNull}}">
+                            <Image Source="{Binding QrImage}" Width="164" Height="164"
+                                   RenderOptions.BitmapInterpolationMode="None"/>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== SHARED FILES ===== -->
+            <Border Grid.Row="3" Classes="card section">
+                <StackPanel Spacing="14">
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Classes="sectionTitle" Text="Shared files" VerticalAlignment="Center"/>
+                            <Border Classes="badge" IsVisible="{Binding HasFiles}">
+                                <TextBlock Text="{Binding Files.Count}"/>
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <Button Classes="secondary" Click="AddFiles_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Path Classes="glyph" Data="{StaticResource WsIcoPlus}"/>
+                                    <TextBlock Text="Add files" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Classes="ghost" Command="{Binding ClearFilesCommand}" Content="Clear"/>
+                        </StackPanel>
+                    </Grid>
+
                     <Panel>
-                        <TextBlock Text="No files yet — press “+ ADD FILES”." FontSize="11.5" Foreground="#6B6C74"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   IsVisible="{Binding !HasFiles}"/>
+                        <Border Classes="empty" IsVisible="{Binding !HasFiles}">
+                            <StackPanel Spacing="4">
+                                <Path Classes="emptyIcon" Data="{StaticResource WsIcoInbox}"/>
+                                <TextBlock Text="No files yet" HorizontalAlignment="Center" FontWeight="SemiBold"
+                                           FontSize="{StaticResource Font.Body}" Foreground="{DynamicResource Text.Secondary}"/>
+                                <TextBlock Classes="hint" Text="Add files to share them on your network." HorizontalAlignment="Center" TextAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <!-- files list (grows with the file count; a very long list caps here and scrolls internally) -->
                         <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <ItemsControl ItemsSource="{Binding Files}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:SharedFileRow">
-                                        <Border Background="#191A1F" BorderBrush="#2A2C33" BorderThickness="1" CornerRadius="6"
-                                                Padding="10,7" Margin="0,0,0,5">
-                                            <Grid ColumnDefinitions="*, Auto, 30">
-                                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" Foreground="#ECECEF"
+                                        <Border Classes="fileRow">
+                                            <Grid ColumnDefinitions="Auto, *, Auto, Auto, Auto" ColumnSpacing="10">
+                                                <Path Grid.Column="0" Classes="fileIcon" Data="{StaticResource WsIcoFile}"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="{StaticResource Font.Body}"
+                                                           Foreground="{DynamicResource Text.Primary}"
                                                            TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding SizeText}" FontSize="10.5" Foreground="#9E9FA8"
-                                                           FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center" Margin="8,0"/>
-                                                <Button Grid.Column="2" Content="✕" FontSize="12" Padding="0" Width="26" Height="26"
-                                                        Background="#2A2C33" BorderThickness="0" CornerRadius="4"
-                                                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                                        ToolTip.Tip="Remove"
+                                                <TextBlock Grid.Column="2" Text="{Binding Downloads, StringFormat='↓ {0}'}" IsVisible="{Binding HasDownloads}"
+                                                           FontSize="{StaticResource Font.Small}" FontWeight="SemiBold" Foreground="{DynamicResource Success}"
+                                                           VerticalAlignment="Center" ToolTip.Tip="Downloads of this file"/>
+                                                <TextBlock Grid.Column="3" Text="{Binding SizeText}" FontSize="{StaticResource Font.Small}"
+                                                           Foreground="{DynamicResource Text.Muted}"
+                                                           FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center"/>
+                                                <Button Grid.Column="4" Classes="rowAction" ToolTip.Tip="Remove"
                                                         Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).RemoveFileCommand}"
-                                                        CommandParameter="{Binding}"/>
+                                                        CommandParameter="{Binding}">
+                                                    <Path Classes="glyph" Data="{StaticResource WsIcoClose}"/>
+                                                </Button>
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
@@ -107,117 +765,270 @@
                             </ItemsControl>
                         </ScrollViewer>
                     </Panel>
-                </Border>
-            </StackPanel>
-
-            <!-- ===== LIVE STATS (while running) ===== -->
-            <Border Classes="card" Padding="12,8" IsVisible="{Binding IsRunning}">
-                <WrapPanel>
-                    <WrapPanel.Styles>
-                        <Style Selector="StackPanel.stat">
-                            <Setter Property="Orientation" Value="Horizontal"/>
-                            <Setter Property="Margin" Value="0,2,24,2"/>
-                            <Setter Property="VerticalAlignment" Value="Center"/>
-                        </Style>
-                        <Style Selector="StackPanel.stat > TextBlock.k">
-                            <Setter Property="FontSize" Value="10.5"/>
-                            <Setter Property="Foreground" Value="#9E9FA8"/>
-                            <Setter Property="VerticalAlignment" Value="Center"/>
-                            <Setter Property="Margin" Value="0,0,6,0"/>
-                        </Style>
-                        <Style Selector="StackPanel.stat > TextBlock.v">
-                            <Setter Property="FontSize" Value="13"/>
-                            <Setter Property="FontWeight" Value="Bold"/>
-                            <Setter Property="Foreground" Value="#7FCBA6"/>
-                            <Setter Property="FontFamily" Value="Cascadia Code,Consolas"/>
-                            <Setter Property="VerticalAlignment" Value="Center"/>
-                        </Style>
-                    </WrapPanel.Styles>
-                    <StackPanel Classes="stat">
-                        <TextBlock Classes="k" Text="active"/>
-                        <TextBlock Classes="v" Text="{Binding ActiveConnections}"/>
-                    </StackPanel>
-                    <StackPanel Classes="stat">
-                        <TextBlock Classes="k" Text="downloads"/>
-                        <TextBlock Classes="v" Text="{Binding TotalDownloads}"/>
-                    </StackPanel>
-                    <StackPanel Classes="stat">
-                        <TextBlock Classes="k" Text="sent"/>
-                        <TextBlock Classes="v" Text="{Binding BytesSentText}"/>
-                    </StackPanel>
-                    <StackPanel Classes="stat">
-                        <TextBlock Classes="k" Text="clients"/>
-                        <TextBlock Classes="v" Text="{Binding ClientCount}"/>
-                    </StackPanel>
-                    <StackPanel Classes="stat">
-                        <TextBlock Classes="k" Text="total conns"/>
-                        <TextBlock Classes="v" Text="{Binding TotalConnections}"/>
-                    </StackPanel>
-                </WrapPanel>
+                </StackPanel>
             </Border>
 
-            <!-- ===== SHARE URLs + QR (while running) ===== -->
-            <StackPanel Spacing="6" IsVisible="{Binding IsRunning}">
-                <Grid ColumnDefinitions="*, Auto">
-                    <TextBlock Grid.Column="0" Classes="fieldLabel" Text="SHARE  ·  SCAN TO DOWNLOAD" VerticalAlignment="Center"/>
-                    <Button Grid.Column="1" Classes="ghost" Command="{Binding RefreshAddressesCommand}" Content="↻ REFRESH" FontSize="10.5"/>
+            <!-- ===== REQUEST LOG ===== -->
+            <Border Grid.Row="4" Classes="card output section">
+                <Grid RowDefinitions="Auto, *" RowSpacing="10">
+                    <TextBlock Grid.Row="0" Classes="sectionTitle" Text="Requests"/>
+                    <!-- Fills the card (at least 64px, so the page still fits the window's default 860x569).
+                         Capped at the visible height, so a long log scrolls inside the box instead of stretching the page. -->
+                    <TextBox Grid.Row="1" Classes="log" Text="{Binding Log}" IsReadOnly="True" AcceptsReturn="True"
+                             MinHeight="64" MaxHeight="{Binding $parent[ScrollViewer].Bounds.Height}"
+                             TextWrapping="NoWrap"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             PlaceholderText="Download requests show up here."/>
                 </Grid>
-                <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12">
-                    <!-- addresses — click one to show its QR on the right -->
-                    <StackPanel Grid.Column="0" Spacing="5" VerticalAlignment="Top">
-                        <ListBox ItemsSource="{Binding Addresses}" SelectedItem="{Binding SelectedShareUrl}"
-                                 Background="Transparent" BorderThickness="0" Padding="0">
-                            <ListBox.Styles>
-                                <Style Selector="ListBoxItem">
-                                    <Setter Property="Padding" Value="0"/>
-                                    <Setter Property="Margin" Value="0"/>
-                                    <Setter Property="MinHeight" Value="0"/>
-                                </Style>
-                            </ListBox.Styles>
-                            <ListBox.ItemTemplate>
+            </Border>
+
+        </Grid>
+    </ScrollViewer>
+
+    <!-- ===================== CATCH REQUESTS =====================
+         One screen tall on desktop (the request list takes what the server card leaves, lists scroll inside);
+         on a phone never shorter than 640px, so the page scrolls instead of squeezing the list. -->
+    <ScrollViewer x:Name="CtPage" helpers:Responsive.BreakWidth="560" HorizontalScrollBarVisibility="Disabled"
+                  IsVisible="{Binding IsCatchMode}">
+        <Grid x:Name="CtRoot" RowDefinitions="Auto, *" RowSpacing="12" Classes.running="{Binding IsCatching}" Classes.replyOpen="{Binding IsReplyOpen}">
+
+            <!-- ===== server + reply ===== -->
+            <Border Grid.Row="0" Classes="card section">
+                <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TabControl Grid.Column="0" Classes="seg wsmode" Padding="0" SelectedIndex="{Binding ModeIndex}" VerticalAlignment="Center">
+                            <TabItem Header="Share files"/>
+                            <TabItem Header="Catch requests"/>
+                        </TabControl>
+                        <Border Grid.Column="1" Classes="badge" Classes.success="{Binding IsCatching}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Ellipse Classes="dot" IsVisible="{Binding IsCatching}"/>
+                                <TextBlock Text="Listening" IsVisible="{Binding IsCatching}"/>
+                                <TextBlock Text="Stopped" IsVisible="{Binding !IsCatching}"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- [listen on][port][start] — the URL(s) to send to once it runs -->
+                    <Grid x:Name="CtFields" helpers:Responsive.BreakWidth="520" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                        <StackPanel x:Name="CtBind">
+                            <TextBlock Classes="fieldLabel" Text="Listen on"/>
+                            <ComboBox x:Name="CtBindBox" Classes="field" ItemsSource="{Binding CatchBindOptions}" SelectedItem="{Binding SelectedCatchBind}"
+                                      IsEnabled="{Binding !IsCatching}"
+                                      ToolTip.Tip="All interfaces = this device and other devices on your network; this device only = 127.0.0.1">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:BindOption">
+                                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+                        <Grid x:Name="CtRest" ColumnDefinitions="Auto, *">
+                            <StackPanel x:Name="CtPortBox" Grid.Column="0" Width="88" Margin="0,0,8,0">
+                                <TextBlock Classes="fieldLabel" Text="Port"/>
+                                <NumericUpDown Classes="field" Value="{Binding CatchPort}" Minimum="1" Maximum="65535" ShowButtonSpinner="False"
+                                               FormatString="0" IsEnabled="{Binding !IsCatching}"/>
+                            </StackPanel>
+                            <Button x:Name="CtToggle" Grid.Column="1" Classes="toggle" MinWidth="132" VerticalAlignment="Bottom"
+                                    Command="{Binding ToggleCatcherCommand}" Classes.active="{Binding IsCatching}">
+                                <Panel>
+                                    <TextBlock Text="Start catching" IsVisible="{Binding !IsCatching}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Stop" IsVisible="{Binding IsCatching}" HorizontalAlignment="Center"/>
+                                </Panel>
+                            </Button>
+                        </Grid>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*, Auto, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="8" IsVisible="{Binding IsCatching}">
+                        <TextBlock Grid.ColumnSpan="3" Classes="fieldLabel" Text="Send to"/>
+                        <!-- a narrow phone cuts the URL at the front ("…0.0.1:8090/"), so the port stays readable -->
+                        <ComboBox x:Name="CtUrlBox" Grid.Row="1" Grid.Column="0" Classes="field" ItemsSource="{Binding CatchUrls}" SelectedItem="{Binding SelectedCatchUrl}"
+                                  ToolTip.Tip="Where to send requests — 127.0.0.1 from this device, a LAN address from others">
+                            <ComboBox.ItemTemplate>
                                 <DataTemplate x:DataType="sys:String">
-                                    <Border Background="#16311F" BorderBrush="#1E3A2B" BorderThickness="1" CornerRadius="6"
-                                            Padding="10,7" Margin="0,0,0,5">
-                                        <Grid ColumnDefinitions="*, Auto, Auto">
-                                            <TextBlock Grid.Column="0" Text="{Binding}" FontSize="12" Foreground="#7FCBA6"
-                                                       FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <Button Grid.Column="1" Content="COPY" FontSize="10" Classes="ghost" Padding="8,3" Margin="6,0,4,0"
-                                                    Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).CopyAddressCommand}"
-                                                    CommandParameter="{Binding}"/>
-                                            <Button Grid.Column="2" Content="OPEN" FontSize="10" Classes="ghost" Padding="8,3"
-                                                    IsVisible="{x:Static helpers:AppPlatform.IsDesktop}"
-                                                    Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).OpenAddressCommand}"
-                                                    CommandParameter="{Binding}"/>
-                                        </Grid>
-                                    </Border>
+                                    <TextBlock Text="{Binding}" FontFamily="{StaticResource MonoFont}" TextTrimming="LeadingCharacterEllipsis"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button Grid.Row="1" Grid.Column="1" Classes="icon" ToolTip.Tip="Copy the URL" Command="{Binding CopyCatchUrlCommand}">
+                            <Path Classes="glyph" Data="{StaticResource WsIcoCopy}"/>
+                        </Button>
+                        <Button Grid.Row="1" Grid.Column="2" Classes="icon" ToolTip.Tip="Show a QR code of the URL">
+                            <Path Classes="glyph" Data="{StaticResource WsIcoQr}"/>
+                            <Button.Flyout>
+                                <Flyout Placement="BottomEdgeAlignedRight">
+                                    <StackPanel Spacing="8">
+                                        <Border CornerRadius="{StaticResource Radius.Md}" ClipToBounds="True" HorizontalAlignment="Center">
+                                            <Image Source="{Binding CatchQr}" Width="164" Height="164" RenderOptions.BitmapInterpolationMode="None"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding SelectedCatchUrl}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource Font.Small}"
+                                                   HorizontalAlignment="Center" Foreground="{DynamicResource Text.Secondary}"/>
+                                    </StackPanel>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                    </Grid>
+
+                    <TextBlock x:Name="CtStatus" Classes="hint" Text="{Binding CatchStatus}" Classes.error="{Binding CatchError}"/>
+
+                    <!-- reply: one summary line; the editor folds open below it -->
+                    <Border Classes="divider"/>
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                        <TextBlock Classes="hint" Text="{Binding ReplySummary}" VerticalAlignment="Center" TextWrapping="NoWrap"
+                                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ReplySummary}"/>
+                        <Button Grid.Column="1" Classes="ghost" Command="{Binding ToggleReplyCommand}"
+                                ToolTip.Tip="Status, content type, body and delay of the answer every request gets (changes apply at once)">
+                            <Panel>
+                                <TextBlock Text="Edit reply" IsVisible="{Binding !IsReplyOpen}"/>
+                                <TextBlock Text="Done" IsVisible="{Binding IsReplyOpen}"/>
+                            </Panel>
+                        </Button>
+                    </Grid>
+                    <Grid x:Name="CtReply" helpers:Responsive.BreakWidth="480" IsVisible="{Binding IsReplyOpen}"
+                          ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto, Auto, Auto, Auto">
+                        <StackPanel x:Name="CtReplyStatus" Width="80" Margin="0,0,8,0">
+                            <TextBlock Classes="fieldLabel" Text="Status"/>
+                            <NumericUpDown Classes="field" Value="{Binding ReplyStatus}" Minimum="200" Maximum="599" ShowButtonSpinner="False" FormatString="0"/>
+                        </StackPanel>
+                        <StackPanel x:Name="CtReplyType">
+                            <TextBlock Classes="fieldLabel" Text="Content type"/>
+                            <AutoCompleteBox Classes="field" Text="{Binding ReplyContentType}" ItemsSource="{Binding ContentTypes}"
+                                             FilterMode="None" MinimumPrefixLength="0" FontFamily="{StaticResource MonoFont}"/>
+                        </StackPanel>
+                        <StackPanel x:Name="CtReplyDelay" Width="92">
+                            <TextBlock Classes="fieldLabel" Text="Delay (ms)"/>
+                            <NumericUpDown Classes="field" Value="{Binding ReplyDelayMs}" Minimum="0" Maximum="60000" Increment="100"
+                                           ShowButtonSpinner="False" FormatString="0"/>
+                        </StackPanel>
+                        <StackPanel x:Name="CtReplyBody" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,10,0,0">
+                            <TextBlock Classes="fieldLabel" Text="Body"/>
+                            <TextBox Classes="field multiline mono replyBody" Text="{Binding ReplyBody}" AcceptsReturn="True" TextWrapping="Wrap"
+                                     PlaceholderText="Empty, or e.g. {&quot;ok&quot;:true}"/>
+                        </StackPanel>
+                        <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Classes="hint error" Margin="2,6,0,0" Text="{Binding ReplyError}"
+                                   IsVisible="{Binding ReplyError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== requests | details ===== -->
+            <Border Grid.Row="1" Classes="card output">
+                <Grid x:Name="CtSplit" helpers:Responsive.BreakWidth="600" ColumnDefinitions="Auto, *" Classes.detail="{Binding IsDetailOpen}">
+
+                    <!-- the list -->
+                    <Grid x:Name="CtListPane" RowDefinitions="Auto, *">
+                        <Grid Margin="12,8,8,6" ColumnDefinitions="*, Auto">
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <TextBlock Classes="panelTitle" Text="REQUESTS"/>
+                                <TextBlock Classes="counts" Text="{Binding CatchCounts}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="icon small" Command="{Binding ClearRequestsCommand}" ToolTip.Tip="Clear the list"
+                                    IsEnabled="{Binding HasRequests}">
+                                <Path Classes="glyph" Data="{StaticResource WsIcoClear}"/>
+                            </Button>
+                        </Grid>
+                        <ListBox x:Name="CtList" Grid.Row="1" Classes="reqs" ItemsSource="{Binding Requests}" SelectedItem="{Binding SelectedRequest}"
+                                 Background="Transparent" BorderThickness="0" Padding="0,0,0,6"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CatcherRow">
+                                    <Grid ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="8">
+                                        <Border Classes="badge method" Classes.info="{Binding IsGet}" Classes.success="{Binding IsPost}"
+                                                Classes.warning="{Binding IsWrite}" Classes.danger="{Binding IsDelete}" Classes.violet="{Binding IsWs}">
+                                            <TextBlock Text="{Binding Method}"/>
+                                        </Border>
+                                        <TextBlock Grid.Column="1" Classes="reqPath" Text="{Binding PathText}" ToolTip.Tip="{Binding PathText}"/>
+                                        <TextBlock Grid.Column="2" Classes="reqStatus" Text="{Binding StatusText}"
+                                                   Classes.ok="{Binding IsOk}" Classes.redirect="{Binding IsRedirect}"
+                                                   Classes.client="{Binding IsClientError}" Classes.server="{Binding IsServerError}"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Classes="reqMeta">
+                                            <Run Text="{Binding TimeText}"/><Run Text="  ·  "/><Run Text="{Binding SizeText}"/><Run Text="  ·  "/><Run Text="{Binding ClientText}"/>
+                                        </TextBlock>
+                                    </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
-                        <TextBlock Text="Point a phone camera at the QR, or open a URL in any browser on the same Wi-Fi/LAN."
-                                   FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap" Margin="2,0"/>
-                    </StackPanel>
+                        <StackPanel Grid.Row="1" Spacing="6" Margin="20" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    IsHitTestVisible="False" IsVisible="{Binding !HasRequests}">
+                            <Path Classes="emptyIcon" Data="{StaticResource WsIcoInbox}"/>
+                            <TextBlock Text="No requests yet" HorizontalAlignment="Center" FontWeight="SemiBold"
+                                       FontSize="{StaticResource Font.Body}" Foreground="{DynamicResource Text.Secondary}"/>
+                            <TextBlock Classes="hint" HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="230"
+                                       Text="Point a webhook, an app or curl at the URL."/>
+                        </StackPanel>
+                    </Grid>
 
-                    <!-- QR of the selected address -->
-                    <Border Grid.Column="1" Background="White" CornerRadius="8" Padding="8" VerticalAlignment="Top"
-                            IsVisible="{Binding QrImage, Converter={x:Static ObjectConverters.IsNotNull}}">
-                        <Image Source="{Binding QrImage}" Width="164" Height="164"
-                               RenderOptions.BitmapInterpolationMode="None"/>
+                    <!-- the details of the selected one -->
+                    <Border x:Name="CtDetailPane" BorderBrush="{DynamicResource Border.Subtle}">
+                        <Panel>
+                            <TextBlock Classes="hint" Text="Select a request to see its details." HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" Margin="20" TextAlignment="Center" IsVisible="{Binding !HasDetail}"/>
+                            <Grid RowDefinitions="Auto, Auto, *" IsVisible="{Binding HasDetail}" Margin="12,10,12,0">
+                                <!-- request line + meta + note -->
+                                <Grid Grid.Row="0" ColumnDefinitions="Auto, *">
+                                    <Button x:Name="CtBack" Classes="icon" Margin="0,0,10,0" Command="{Binding CloseDetailCommand}" ToolTip.Tip="Back to the list"
+                                            VerticalAlignment="Top">
+                                        <Path Classes="glyph" Data="{StaticResource WsIcoBack}"/>
+                                    </Button>
+                                    <StackPanel Grid.Column="1" Spacing="3">
+                                        <SelectableTextBlock Classes="reqLine" Text="{Binding Detail.RequestLine, FallbackValue=''}"/>
+                                        <TextBlock Classes="hint" Text="{Binding Detail.Meta, FallbackValue=''}"/>
+                                        <TextBlock Classes="hint warn" Text="{Binding Detail.Note, FallbackValue=''}"
+                                                   IsVisible="{Binding Detail.HasNote, FallbackValue=False}"/>
+                                    </StackPanel>
+                                </Grid>
+                                <!-- tabs + actions -->
+                                <!-- the tabs and the copy actions share a line when there's room, else the actions wrap under -->
+                                <WrapPanel x:Name="CtTabsRow" Grid.Row="1" Margin="0,10,0,2" Orientation="Horizontal">
+                                    <TabControl x:Name="CtTabs" Classes="seg detailTabs" Padding="0" Margin="0,0,10,8" SelectedIndex="{Binding DetailTabIndex}">
+                                        <TabItem Header="Body"/>
+                                        <TabItem Header="{Binding Detail.HeadersTitle, FallbackValue='Headers'}"/>
+                                        <TabItem Header="{Binding Detail.QueryTitle, FallbackValue='Query'}"/>
+                                    </TabControl>
+                                    <StackPanel x:Name="CtActions" Orientation="Horizontal" Spacing="6" Margin="0,0,0,8">
+                                        <Button Classes="secondary" Content="Copy as curl" Command="{Binding CopyCurlCommand}"
+                                                IsEnabled="{Binding Detail.CanCopyCurl, FallbackValue=False}"
+                                                ToolTip.Tip="A curl command for bash / zsh (not cmd.exe) that sends this request again"/>
+                                        <Button Classes="icon" Command="{Binding CopyBodyCommand}" ToolTip.Tip="Copy the body"
+                                                IsEnabled="{Binding Detail.CanCopyBody, FallbackValue=False}">
+                                            <Path Classes="glyph" Data="{StaticResource WsIcoCopy}"/>
+                                        </Button>
+                                    </StackPanel>
+                                </WrapPanel>
+                                <!-- content -->
+                                <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,4,10">
+                                    <Panel>
+                                        <!-- body -->
+                                        <StackPanel Spacing="6" IsVisible="{Binding IsBodyTab}">
+                                            <TextBlock Classes="bodyLabel" Text="{Binding Detail.Body.Label, FallbackValue=''}"/>
+                                            <TextBlock Classes="hint warn" Text="{Binding Detail.Body.Note, FallbackValue=''}"
+                                                       IsVisible="{Binding Detail.HasBodyNote, FallbackValue=False}"/>
+                                            <SelectableTextBlock Classes="bodyText" Text="{Binding Detail.Body.Text, FallbackValue=''}"
+                                                                 IsVisible="{Binding Detail.BodyIsText, FallbackValue=False}"/>
+                                            <ItemsControl ItemsSource="{Binding Detail.Body.Fields, FallbackValue={x:Null}}"
+                                                          IsVisible="{Binding Detail.BodyIsFields, FallbackValue=False}"
+                                                          ItemTemplate="{StaticResource CtFieldTemplate}"/>
+                                            <ctl:HexDumpView Classes="bodyHex" Data="{Binding Detail.Body.Bytes, FallbackValue={x:Null}}" MaxBytes="16384"
+                                                             IsVisible="{Binding Detail.BodyIsHex, FallbackValue=False}"/>
+                                        </StackPanel>
+                                        <!-- headers -->
+                                        <Panel IsVisible="{Binding IsHeadersTab}">
+                                            <ItemsControl ItemsSource="{Binding Detail.Headers, FallbackValue={x:Null}}" ItemTemplate="{StaticResource CtFieldTemplate}"/>
+                                            <TextBlock Classes="hint" Text="No headers." IsVisible="{Binding !Detail.HasHeaders, FallbackValue=False}"/>
+                                        </Panel>
+                                        <!-- query -->
+                                        <Panel IsVisible="{Binding IsQueryTab}">
+                                            <ItemsControl ItemsSource="{Binding Detail.Query, FallbackValue={x:Null}}" ItemTemplate="{StaticResource CtFieldTemplate}"/>
+                                            <TextBlock Classes="hint" Text="No query parameters." IsVisible="{Binding !Detail.HasQuery, FallbackValue=False}"/>
+                                        </Panel>
+                                    </Panel>
+                                </ScrollViewer>
+                            </Grid>
+                        </Panel>
                     </Border>
                 </Grid>
-            </StackPanel>
-
-            <!-- ===== REQUEST LOG ===== -->
-            <StackPanel Spacing="6">
-                <TextBlock Classes="fieldLabel" Text="REQUESTS"/>
-                <TextBox Text="{Binding Log}" IsReadOnly="True" AcceptsReturn="True" Height="150"
-                         FontFamily="Cascadia Code,Consolas" FontSize="11" Background="#121317" Foreground="#9E9FA8"
-                         BorderBrush="#2A2C33" BorderThickness="1" CornerRadius="8" Padding="10"
-                         TextWrapping="NoWrap"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
-                         PlaceholderText="Incoming download requests appear here."/>
-            </StackPanel>
-
-        </StackPanel>
+            </Border>
+        </Grid>
     </ScrollViewer>
+    </Panel>
 </UserControl>

@@ -2,21 +2,49 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Echoes"
              x:Class="Echoes.App"
+             Name="Echoes"
              RequestedThemeVariant="Dark">
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
-        <!-- Per-tool glyphs shared by the desktop tab rail and the mobile drawer. -->
+        <!-- Design tokens (solid palette, radii, type scale) + solid overrides for Fluent's own brushes. -->
+        <ResourceInclude Source="avares://Echoes/Styles/Tokens.axaml"/>
+        <!-- Per-tool glyphs shared by the desktop sidebar and the mobile drawer. -->
         <ResourceInclude Source="avares://Echoes/Assets/ToolIcons.axaml"/>
       </ResourceDictionary.MergedDictionaries>
+      <!-- Monospace for aligned output (reports, tables, hex, JSON). Cascadia/Consolas only exist on
+           Windows; without the rest of this chain Linux / macOS / Android fell back to a proportional
+           font and every column-aligned report came out ragged. "monospace" is the fontconfig /
+           Android alias, the last resort. -->
+      <FontFamily x:Key="MonoFont">Cascadia Code,Consolas,Menlo,DejaVu Sans Mono,Liberation Mono,Noto Sans Mono,monospace</FontFamily>
     </ResourceDictionary>
   </Application.Resources>
   <Application.Styles>
-    <FluentTheme />
-    <Style Selector="TabItem">
-      <Setter Property="FontSize" Value="11"/>
-      <Setter Property="Padding" Value="15,5"/>
-    </Style>
+    <FluentTheme>
+      <!-- A fully SOLID palette: Fluent normally builds its hover / pressed / selection / border colors
+           with alpha; with solid inputs everything it derives stays a flat fill, on-brand (teal). -->
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Dark"
+                               Accent="#2DD4BF"
+                               RegionColor="#0B0E14"
+                               AltHigh="#0B0E14" AltMediumHigh="#0E1219" AltMedium="#121720" AltMediumLow="#151B25" AltLow="#18202C"
+                               BaseHigh="#E6EAF2" BaseMediumHigh="#C7CEDB" BaseMedium="#A9B2C4" BaseMediumLow="#747F96" BaseLow="#262F40"
+                               ChromeAltLow="#C7CEDB" ChromeBlackHigh="#000000" ChromeBlackLow="#0D1118" ChromeBlackMedium="#0B0E14"
+                               ChromeBlackMediumLow="#0E1219" ChromeDisabledHigh="#262F40" ChromeDisabledLow="#747F96" ChromeGray="#8A94A8"
+                               ChromeHigh="#36415A" ChromeLow="#121720" ChromeMedium="#151B25" ChromeMediumLow="#1A212C" ChromeWhite="#FFFFFF"
+                               ErrorText="#F87171" ListLow="#151B25" ListMedium="#1B2230"/>
+        <!-- light: solid stand-ins for Fluent's light defaults (which are black/white WITH alpha) -->
+        <ColorPaletteResources x:Key="Light"
+                               Accent="#0F766E"
+                               RegionColor="#F4F6FA"
+                               AltHigh="#FFFFFF" AltMediumHigh="#FBFCFD" AltMedium="#F7F9FC" AltMediumLow="#F1F4F8" AltLow="#EEF2F7"
+                               BaseHigh="#141B26" BaseMediumHigh="#344054" BaseMedium="#5B6475" BaseMediumLow="#8A94A6" BaseLow="#D0D7E2"
+                               ChromeAltLow="#1F2937" ChromeBlackHigh="#000000" ChromeBlackLow="#D0D7E2" ChromeBlackMedium="#5B6475"
+                               ChromeBlackMediumLow="#8A94A6" ChromeDisabledHigh="#D0D7E2" ChromeDisabledLow="#8A94A6" ChromeGray="#687387"
+                               ChromeHigh="#D0D7E2" ChromeLow="#F1F4F8" ChromeMedium="#E6EBF2" ChromeMediumLow="#F1F4F8" ChromeWhite="#FFFFFF"
+                               ErrorText="#DC2626" ListLow="#EEF2F7" ListMedium="#E2E7EE"/>
+      </FluentTheme.Palettes>
+    </FluentTheme>
     <StyleInclude Source="avares://Echoes/Styles/AppStyles.axaml"/>
   </Application.Styles>
 </Application>

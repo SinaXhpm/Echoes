@@ -17,6 +17,7 @@ public sealed class AndroidBackgroundGuard : IBackgroundGuard
 
     public void Acquire(string reason)
     {
+        KeepAliveService.StopWanted = false;   // a release still pending from before is overtaken by this start
         var intent = new Intent(_context, typeof(KeepAliveService));
         intent.PutExtra(KeepAliveService.ExtraReason, reason);
 
@@ -28,8 +29,15 @@ public sealed class AndroidBackgroundGuard : IBackgroundGuard
             _context.StartService(intent);
     }
 
+    // Not stopped before it has gone foreground: Android would kill the app (see KeepAliveService.IsForeground). A release
+    // that early is recorded instead, and the service stops itself right after StartForeground.
     public void Release()
     {
+        if (!KeepAliveService.IsForeground)
+        {
+            KeepAliveService.StopWanted = true;
+            return;
+        }
         _context.StopService(new Intent(_context, typeof(KeepAliveService)));
     }
 }

@@ -1,61 +1,249 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.BackupView"
-             x:DataType="vm:BackupViewModel"
-             Background="#0F1012">
+             x:DataType="vm:BackupViewModel">
 
-    <Grid Margin="16">
-        <!-- MaxWidth (not a fixed Width) so the card caps at 468 and centres on desktop but
-             shrinks to fit a narrow phone screen instead of overflowing. -->
-        <Border VerticalAlignment="Center" HorizontalAlignment="Stretch" MaxWidth="468"
-                Background="#17181D" CornerRadius="12" BorderBrush="#2A2C33" BorderThickness="1" Padding="22,18">
-            <StackPanel Spacing="14">
+    <UserControl.Resources>
+        <!-- Stroked glyphs drawn in a 16x16 box (Path.glyph). -->
+        <StreamGeometry x:Key="BakGlyphExport">M8 2.5 V10 M4.75 6.75 L8 10 L11.25 6.75 M2.5 10.5 V12 A1.5 1.5 0 0 0 4 13.5 H12 A1.5 1.5 0 0 0 13.5 12 V10.5</StreamGeometry>
+        <StreamGeometry x:Key="BakGlyphRestore">M8 10 V2.5 M4.75 5.75 L8 2.5 L11.25 5.75 M2.5 10.5 V12 A1.5 1.5 0 0 0 4 13.5 H12 A1.5 1.5 0 0 0 13.5 12 V10.5</StreamGeometry>
+        <StreamGeometry x:Key="BakGlyphInfo">M8 2 A6 6 0 1 0 8 14 A6 6 0 1 0 8 2 Z M8 7.25 V10.75 M8 5 V5.1</StreamGeometry>
+        <StreamGeometry x:Key="BakGlyphCheck">M3.5 8.5 L6.5 11.5 L12.5 4.5</StreamGeometry>
+        <StreamGeometry x:Key="BakGlyphWarning">M8 2.5 L14 13 H2 Z M8 6.5 V9.25 M8 11.25 V11.35</StreamGeometry>
+    </UserControl.Resources>
 
-                <StackPanel Spacing="3">
-                    <TextBlock Text="BACKUP" FontSize="13" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
-                    <TextBlock Text="Save everything to one encrypted file, or restore it. No account — fully offline."
-                               FontSize="10.5" Foreground="#9E9FA8" TextWrapping="Wrap"/>
-                </StackPanel>
+    <UserControl.Styles>
+        <Style Selector="Path.glyph">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.primary Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.OnAccent}"/>
+        </Style>
+        <Style Selector="Button.primary:disabled Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.OnAccentDisabled}"/>
+        </Style>
+        <Style Selector="Button.secondary Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.secondary:disabled Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
 
-                <Border Height="1" Background="#25272E"/>
+        <!-- card header: icon tile + title -->
+        <Style Selector="Border.tile">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+        </Style>
+        <Style Selector="Border.tile > Path">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.tile.accent">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        </Style>
+        <Style Selector="Border.tile.accent > Path">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="TextBlock.body">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="LineHeight" Value="19"/>
+        </Style>
+        <Style Selector="TextBlock.hint">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="2,6,0,0"/>
+        </Style>
 
-                <StackPanel>
-                    <TextBlock Classes="fieldLabel" Text="BACKUP PASSWORD"/>
-                    <TextBox Classes="field" Text="{Binding Password}" PasswordChar="●" PlaceholderText="protects the exported file"/>
-                    <TextBlock Text="Needed to export and to import. Keep it safe — without it the file can't be opened."
-                               FontSize="9.5" Foreground="#6E6F78" Margin="2,5,0,0" TextWrapping="Wrap"/>
-                </StackPanel>
+        <!-- status line, tinted by outcome (code-behind sets .success / .danger / .busy) -->
+        <Style Selector="Border#StatusBox">
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        </Style>
+        <Style Selector="Border#StatusBox Path#StatusIcon">
+            <Setter Property="Data" Value="{StaticResource BakGlyphInfo}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Border#StatusBox TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+        </Style>
+        <Style Selector="Border#StatusBox.success">
+            <Setter Property="Background" Value="{DynamicResource Success.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Success.Border}"/>
+        </Style>
+        <Style Selector="Border#StatusBox.success Path#StatusIcon">
+            <Setter Property="Data" Value="{StaticResource BakGlyphCheck}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Success}"/>
+        </Style>
+        <Style Selector="Border#StatusBox.success TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Success}"/>
+        </Style>
+        <Style Selector="Border#StatusBox.danger">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+        </Style>
+        <Style Selector="Border#StatusBox.danger Path#StatusIcon">
+            <Setter Property="Data" Value="{StaticResource BakGlyphWarning}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Border#StatusBox.danger TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Border#StatusBox.busy">
+            <Setter Property="Background" Value="{DynamicResource Info.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Info.Border}"/>
+        </Style>
+        <Style Selector="Border#StatusBox.busy Path#StatusIcon">
+            <Setter Property="Data" Value="{StaticResource BakGlyphInfo}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Info}"/>
+        </Style>
+        <Style Selector="Border#StatusBox.busy TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Info}"/>
+        </Style>
+    </UserControl.Styles>
 
-                <Grid ColumnDefinitions="*, *" ColumnSpacing="12">
-                    <Button Grid.Column="0" Name="ExportBtn" Click="OnExport" IsEnabled="{Binding !IsBusy}"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                            Background="#42B883" Foreground="#0F1012" BorderThickness="0" CornerRadius="9" Padding="0" Height="82">
-                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="3">
-                            <TextBlock Text="↧" FontSize="23" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#0F1012"/>
-                            <TextBlock Text="EXPORT" FontSize="13" FontWeight="Black" HorizontalAlignment="Center" Foreground="#0F1012"/>
-                            <TextBlock Text="save to a file" FontSize="9.5" Opacity="0.7" HorizontalAlignment="Center" Foreground="#0F1012"/>
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <!-- Wide: [export | restore] side by side, the status line right under their buttons.
+             Narrow (phone): one column, status first so a result is in view whichever card was used.
+             Each column caps at 520 so very wide windows don't stretch the cards (the rest stays empty).
+             The top margin keeps the cards off the History / Backup tab strip. -->
+        <Grid x:Name="BackupRoot" helpers:Responsive.BreakWidth="640" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="12"
+              Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MaxWidth="520"/>
+                <ColumnDefinition Width="*" MaxWidth="520"/>
+            </Grid.ColumnDefinitions>
+            <Grid.Styles>
+                <Style Selector="Grid#BackupRoot > Border.card">
+                    <Setter Property="Padding" Value="20"/>
+                </Style>
+                <Style Selector="Grid#BackupRoot Button.action">
+                    <Setter Property="HorizontalAlignment" Value="Left"/>
+                </Style>
+
+                <Style Selector="Grid#BackupRoot.wide > Border#ExportCard">
+                    <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+                </Style>
+                <Style Selector="Grid#BackupRoot.wide > Border#RestoreCard">
+                    <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+                </Style>
+                <Style Selector="Grid#BackupRoot.wide > Border#StatusBox">
+                    <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+                    <Setter Property="Margin" Value="0,12,0,0"/>
+                </Style>
+
+                <Style Selector="Grid#BackupRoot.narrow > Border#StatusBox">
+                    <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+                    <Setter Property="Margin" Value="0,0,0,12"/>
+                </Style>
+                <Style Selector="Grid#BackupRoot.narrow > Border#ExportCard">
+                    <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+                </Style>
+                <Style Selector="Grid#BackupRoot.narrow > Border#RestoreCard">
+                    <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+                    <Setter Property="Margin" Value="0,12,0,0"/>
+                </Style>
+                <Style Selector="Grid#BackupRoot.narrow > Border.card">
+                    <Setter Property="Padding" Value="16"/>
+                </Style>
+                <!-- full-width actions on phones -->
+                <Style Selector="Grid#BackupRoot.narrow Button.action">
+                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                </Style>
+            </Grid.Styles>
+
+            <!-- ===== Export ===== -->
+            <Border x:Name="ExportCard" Classes="card">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12">
+                        <Border Classes="tile accent">
+                            <Path Classes="glyph" Data="{StaticResource BakGlyphExport}"/>
+                        </Border>
+                        <TextBlock Classes="sectionTitle" Text="Export backup" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Top" Classes="body" Margin="0,14,0,0"
+                               Text="Settings, history, vaults and notes in one encrypted file. Offline, no account."
+                               ToolTip.Tip="Settings, input history, DNS servers, SSH host pins, the Cloudflare vault and your notes, in one AES-256-GCM encrypted file. Fully offline, no account needed."/>
+                    <StackPanel DockPanel.Dock="Top" Margin="0,18,0,0">
+                        <TextBlock Classes="fieldLabel" Text="Backup password"/>
+                        <TextBox Classes="field" Text="{Binding Password}" IsUndoEnabled="False" PasswordChar="●" PlaceholderText="At least 6 characters"/>
+                        <TextBlock Classes="hint" Text="Needed to restore. It can't be recovered."/>
+                    </StackPanel>
+                    <Button DockPanel.Dock="Bottom" Name="ExportBtn" Click="OnExport" IsEnabled="{Binding !IsBusy}"
+                            Classes="primary action" Margin="0,20,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Path Classes="glyph" Data="{StaticResource BakGlyphExport}"/>
+                            <TextBlock Text="Export backup" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Grid.Column="1" Name="ImportBtn" Click="OnImport" IsEnabled="{Binding !IsBusy}"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                            Background="#1D1E25" Foreground="#ECECEF" BorderThickness="1" BorderBrush="#3B3D47" CornerRadius="9" Padding="0" Height="82">
-                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="3">
-                            <TextBlock Text="↥" FontSize="23" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#55C795"/>
-                            <TextBlock Text="IMPORT" FontSize="13" FontWeight="Black" HorizontalAlignment="Center"/>
-                            <TextBlock Text="restore from a file" FontSize="9.5" Opacity="0.7" HorizontalAlignment="Center"/>
+                    <Panel/>
+                </DockPanel>
+            </Border>
+
+            <!-- ===== Restore ===== -->
+            <Border x:Name="RestoreCard" Classes="card">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12">
+                        <Border Classes="tile">
+                            <Path Classes="glyph" Data="{StaticResource BakGlyphRestore}"/>
+                        </Border>
+                        <TextBlock Classes="sectionTitle" Text="Restore backup" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Top" Classes="body" Margin="0,14,0,0"
+                               Text="Pick an .echoesbak file and enter its password."/>
+                    <StackPanel DockPanel.Dock="Top" Margin="0,18,0,0">
+                        <TextBlock Classes="fieldLabel" Text="Backup password"/>
+                        <TextBox Classes="field" Text="{Binding Password}" IsUndoEnabled="False" PasswordChar="●" PlaceholderText="Password used to export"/>
+                    </StackPanel>
+                    <Border DockPanel.Dock="Top" Margin="0,14,0,0" Padding="12,10" CornerRadius="{StaticResource Radius.Md}" BorderThickness="1"
+                            Background="{DynamicResource Warning.Soft}" BorderBrush="{DynamicResource Warning.Border}"
+                            ToolTip.Tip="Existing SSH host pins are kept. Proxy, TLS-skip and Telegram alert switches come back turned off.">
+                        <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10">
+                            <Path Grid.Column="0" Classes="glyph" Data="{StaticResource BakGlyphWarning}"
+                                  Stroke="{DynamicResource Warning}" VerticalAlignment="Top"/>
+                            <TextBlock Grid.Column="1" FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Warning}"
+                                       TextWrapping="Wrap" LineHeight="17"
+                                       Text="Replaces this device's data. Restart Echoes afterwards."/>
+                        </Grid>
+                    </Border>
+                    <Button DockPanel.Dock="Bottom" Name="ImportBtn" Click="OnImport" IsEnabled="{Binding !IsBusy}"
+                            Classes="secondary action" Margin="0,20,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Path Classes="glyph" Data="{StaticResource BakGlyphRestore}"/>
+                            <TextBlock Text="Restore" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
+                    <Panel/>
+                </DockPanel>
+            </Border>
+
+            <!-- ===== Status ===== -->
+            <Border x:Name="StatusBox" Padding="14,10" CornerRadius="{StaticResource Radius.Md}" BorderThickness="1">
+                <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10">
+                    <Path x:Name="StatusIcon" Grid.Column="0" Classes="glyph" VerticalAlignment="Top" Margin="0,1,0,0"/>
+                    <Panel Grid.Column="1">
+                        <TextBlock Text="{Binding Status}" IsVisible="{Binding !IsBusy}"
+                                   FontSize="{StaticResource Font.Body}" TextWrapping="Wrap" LineHeight="19"/>
+                        <TextBlock Text="Working…" IsVisible="{Binding IsBusy}"
+                                   FontSize="{StaticResource Font.Body}" TextWrapping="Wrap" LineHeight="19"/>
+                    </Panel>
                 </Grid>
-
-                <Border Background="#101216" BorderBrush="#242630" BorderThickness="1" CornerRadius="7" Padding="12,9">
-                    <TextBlock FontSize="9.5" Foreground="#9E9FA8" TextWrapping="Wrap" LineHeight="15"
-                               Text="Includes settings, input history, DNS servers, SSH host pins, the encrypted Cloudflare vault, and notes — packed into one AES-256-GCM encrypted file. Import overwrites this device's data; restart Echoes afterwards to load it."/>
-                </Border>
-
-                <TextBlock Text="{Binding Status}" FontSize="10.5" Foreground="#55C795" FontFamily="Cascadia Code,Consolas"
-                           TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center"/>
-            </StackPanel>
-        </Border>
-    </Grid>
+            </Border>
+        </Grid>
+    </ScrollViewer>
 </UserControl>

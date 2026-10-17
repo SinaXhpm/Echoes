@@ -6,5 +6,12 @@
   <style name="MyTheme.NoActionBar" parent="Theme.AppCompat.NoActionBar">
     <item name="android:windowNoTitle">true</item>
     <item name="android:windowActionBar">false</item>
+    <!-- Solid app colours (colors.xml): no grey frame before the first Avalonia render, and where the
+         platform still honours bar colours (Android 14 and older) the status bar continues the app
+         bar while the navigation bar matches the page. Light (white) system-bar icons. -->
+    <item name="android:windowBackground">@color/echoes_bg_app</item>
+    <item name="android:statusBarColor">@color/echoes_bg_bar</item>
+    <item name="android:navigationBarColor">@color/echoes_bg_app</item>
+    <item name="android:windowLightStatusBar">false</item>
   </style>
 </resources>

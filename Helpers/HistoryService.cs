@@ -14,4 +14,7 @@ public sealed class HistoryService
     public ObservableCollection<string> Get(string key) => ProfileService.Instance.GetHistory(key);
     public string? Last(string key) => ProfileService.Instance.LastHistory(key);
     public void Add(string key, string? value) => ProfileService.Instance.AddHistory(key, value);
+
+    /// <summary>Changes whenever any history list changes, so a view can skip rebuilding when nothing did.</summary>
+    public long Version => ProfileService.Instance.HistoryVersion;
 }

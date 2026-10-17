@@ -1,85 +1,159 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.HistoryView"
-             x:DataType="vm:HistoryViewModel"
-             Background="#0F1012">
+             x:DataType="vm:HistoryViewModel">
+
+    <UserControl.Resources>
+        <!-- Stroked glyphs drawn in a 16x16 box (Path.glyph). -->
+        <StreamGeometry x:Key="HistGlyphCopy">M7 5.5 H12 A1.5 1.5 0 0 1 13.5 7 V12 A1.5 1.5 0 0 1 12 13.5 H7 A1.5 1.5 0 0 1 5.5 12 V7 A1.5 1.5 0 0 1 7 5.5 Z M10.5 5.5 V4 A1.5 1.5 0 0 0 9 2.5 H4 A1.5 1.5 0 0 0 2.5 4 V9 A1.5 1.5 0 0 0 4 10.5 H5.5</StreamGeometry>
+        <StreamGeometry x:Key="HistGlyphRefresh">M14 8 A6 6 0 1 1 8 2 C9.68 2 11.29 2.67 12.49 3.83 L14 5.33 M14 2 V5.33 H10.67</StreamGeometry>
+    </UserControl.Resources>
 
     <UserControl.Styles>
-        <Style Selector="Button.copy-btn">
-            <Setter Property="Background" Value="#2A2C33"/>
-            <Setter Property="Foreground" Value="#C7C8CF"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="Width" Value="22"/>
-            <Setter Property="Height" Value="22"/>
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="VerticalAlignment" Value="Top"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Style Selector="Path.glyph">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <Style Selector="Button.copy-btn:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#3A3D47"/>
+        <Style Selector="Button.secondary Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
         </Style>
+        <!-- the system's icon-button hover accent (a later, local Path.glyph stroke would otherwise mask it) -->
+        <Style Selector="Button.icon:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+
+        <!-- one history value (a host, URL, target list …) -->
         <Style Selector="SelectableTextBlock.val">
-            <Setter Property="FontFamily" Value="Cascadia Code,Consolas"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="#ECECEF"/>
-            <Setter Property="SelectionBrush" Value="#3042B883"/>
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <!-- copy: the square icon button, a size down for list rows on desktop, touch-sized on phones -->
+        <Style Selector="Button.icon.copy">
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style Selector="Grid#HistoryRoot.narrow Button.icon.copy">
+            <Setter Property="Width" Value="40"/>
+            <Setter Property="Height" Value="40"/>
+        </Style>
+
+        <!-- Virtualized: only the groups on screen are built (up to 50 wrapped entries each). The ScrollViewer sits
+             INSIDE the template — an outer one hands the panel infinite height and realizes everything (same
+             pattern as NetworkInfoView's tables). The 12px right margin is the scroll bar's gutter, so it never
+             paints over the cards. -->
+        <Style Selector="ItemsControl.groups">
+            <Setter Property="ItemsPanel">
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+            </Setter>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" Margin="0,0,12,0"/>
+                    </ScrollViewer>
+                </ControlTemplate>
+            </Setter>
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto, *" Margin="14,12">
+    <!-- Wide: summary left, actions right. Narrow (phone): the actions drop under the summary. -->
+    <Grid x:Name="HistoryRoot" helpers:Responsive.BreakWidth="520" RowDefinitions="Auto, *" RowSpacing="12">
+        <Grid.Styles>
+            <Style Selector="Grid#HistoryRoot.wide StackPanel#HistoryActions">
+                <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/>
+                <Setter Property="Margin" Value="0"/>
+            </Style>
+            <Style Selector="Grid#HistoryRoot.narrow StackPanel#HistoryActions">
+                <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/>
+                <Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,12,0,0"/>
+            </Style>
+        </Grid.Styles>
 
-        <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto" Margin="0,0,0,10">
-            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
-                <TextBlock Text="HISTORY" FontSize="12" FontWeight="Bold" LetterSpacing="1" Foreground="#ECECEF"/>
-                <TextBlock FontSize="10" Foreground="#9E9FA8" TextWrapping="Wrap">
-                    <Run Text="Recent inputs across every tool ·"/><Run Text="{Binding TotalCount}"/><Run Text=" entries"/>
+        <!-- (the top margin keeps the summary off the History / Backup tab strip; the right one lines the
+             buttons up with the cards, which leave a gutter for the scroll bar) -->
+        <Grid Grid.Row="0" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="12" Margin="0,12,12,0">
+            <StackPanel Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                <TextBlock Text="Recent inputs" FontSize="{StaticResource Font.Body}" FontWeight="SemiBold"
+                           Foreground="{DynamicResource Text.Primary}"/>
+                <TextBlock FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Text.Muted}" TextWrapping="Wrap">
+                    <Run Text="Grouped by tool · "/><Run Text="{Binding TotalCount}"/><Run Text=" total"/>
                 </TextBlock>
             </StackPanel>
-            <Button Grid.Column="1" Classes="secondary" Command="{Binding ReloadCommand}" Content="REFRESH"
-                    FontSize="11" Margin="0,0,8,0"/>
-            <Button Grid.Column="2" Command="{Binding ClearAllCommand}" Content="CLEAR ALL"
-                    Background="#E5484D" Foreground="#ECECEF" FontSize="10" FontWeight="Bold" Padding="12,6" CornerRadius="6"/>
+            <StackPanel x:Name="HistoryActions" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Classes="secondary" Command="{Binding ReloadCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Path Classes="glyph" Data="{StaticResource HistGlyphRefresh}"/>
+                        <TextBlock Text="Refresh" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="danger" Command="{Binding ClearAllCommand}" Content="Clear all"/>
+            </StackPanel>
         </Grid>
 
-        <TextBlock Grid.Row="1" IsVisible="{Binding !HasItems}" Text="No history yet — run a few tools and your recent inputs show up here."
-                   Foreground="#6E6F78" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        <!-- empty -->
+        <StackPanel Grid.Row="1" IsVisible="{Binding !HasItems}" MaxWidth="360" Margin="0,0,0,48"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Border Width="52" Height="52" CornerRadius="{StaticResource Radius.Lg}" BorderThickness="1"
+                    Background="{DynamicResource Bg.Raised}" BorderBrush="{DynamicResource Border.Default}"
+                    HorizontalAlignment="Center">
+                <Path Classes="ico" Data="{StaticResource IcoHistory}" Stroke="{DynamicResource Text.Secondary}"
+                      HorizontalAlignment="Center"/>
+            </Border>
+            <TextBlock Classes="sectionTitle" Text="No history yet" HorizontalAlignment="Center" Margin="0,12,0,0"/>
+            <TextBlock Text="Hosts and URLs you use in the tools show up here."
+                       FontSize="{StaticResource Font.Body}" Foreground="{DynamicResource Text.Muted}" LineHeight="19"
+                       HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0"/>
+        </StackPanel>
 
-        <ScrollViewer Grid.Row="1" IsVisible="{Binding HasItems}" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding Groups}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:HistoryGroup">
-                        <Border Classes="card" Margin="0,0,0,8" Padding="12,10">
-                            <StackPanel Spacing="8">
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Grid.Column="0" Text="{Binding Title}" FontWeight="Bold" Foreground="#42B883" FontSize="12"/>
-                                    <Border Grid.Column="1" Background="#24262E" CornerRadius="4" Padding="6,1">
-                                        <TextBlock Text="{Binding Count}" Foreground="#9E9FA8" FontSize="10" FontFamily="Cascadia Code,Consolas"/>
-                                    </Border>
-                                </Grid>
-                                <Border Height="1" Background="#22242B"/>
-                                <ItemsControl ItemsSource="{Binding Items}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="x:String">
-                                            <Grid ColumnDefinitions="*, Auto" Margin="0,0,0,4">
-                                                <SelectableTextBlock Grid.Column="0" Classes="val" Text="{Binding}"
-                                                                     Foreground="#C7C8CF" TextWrapping="Wrap" Margin="0,0,8,0"/>
-                                                <Button Grid.Column="1" Classes="copy-btn" Content="⧉"
+        <!-- one card per tool field: header, then a row per value (each row's top hairline separates it) -->
+        <ItemsControl Grid.Row="1" Classes="groups" IsVisible="{Binding HasItems}" ItemsSource="{Binding Groups}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:HistoryGroup">
+                    <Border Classes="card" Margin="0,0,0,12">
+                        <StackPanel>
+                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="16,11,14,11">
+                                <TextBlock Grid.Column="0" Text="{Binding Title}" VerticalAlignment="Center"
+                                           FontSize="{StaticResource Font.Body}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Text.Primary}" TextTrimming="CharacterEllipsis"/>
+                                <Border Grid.Column="1" Classes="badge">
+                                    <TextBlock Text="{Binding Count}"/>
+                                </Border>
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding Items}">
+                                <ItemsControl.ItemTemplate>
+                                    <!-- Shows a shortened entry (~300 chars); copy takes the full value. -->
+                                    <DataTemplate x:DataType="vm:HistoryEntry">
+                                        <Border BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0" Padding="16,6,10,6">
+                                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12">
+                                                <SelectableTextBlock Grid.Column="0" Classes="val" Text="{Binding Display}"/>
+                                                <Button Grid.Column="1" Classes="icon copy"
                                                         Command="{Binding ((vm:HistoryViewModel)DataContext).CopyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}" ToolTip.Tip="Copy"/>
+                                                        CommandParameter="{Binding Value}" ToolTip.Tip="Copy" AutomationProperties.Name="Copy">
+                                                    <Path Classes="glyph" Data="{StaticResource HistGlyphCopy}"/>
+                                                </Button>
                                             </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
     </Grid>
 </UserControl>

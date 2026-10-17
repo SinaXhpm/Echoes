@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Mirrors the solid design tokens in Styles/Tokens.axaml (Bg.App / Bg.Sidebar) so the window
+       behind Avalonia and the system bars match the app instead of the AppCompat default grey. -->
+  <color name="echoes_bg_app">#0B0E14</color>
+  <color name="echoes_bg_bar">#0E1219</color>
+</resources>

@@ -1,131 +1,1292 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:Echoes.ViewModels"
+             xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.TgView"
              x:DataType="vm:TgViewModel">
 
+    <UserControl.Resources>
+        <!-- Stroked glyphs drawn in a 16x16 box (Path.glyph, Stretch=None); chip marks in 12x12 -->
+        <StreamGeometry x:Key="TgGlyphSearch">M7 2.5 A4.5 4.5 0 1 0 7 11.5 A4.5 4.5 0 1 0 7 2.5 Z M10.3 10.3 L13.5 13.5</StreamGeometry>
+        <StreamGeometry x:Key="TgGlyphDown">M4 6 L8 10 L12 6</StreamGeometry>
+        <StreamGeometry x:Key="TgGlyphRight">M6 4 L10 8 L6 12</StreamGeometry>
+        <StreamGeometry x:Key="TgGlyphBack">M10 3.5 L5.5 8 L10 12.5</StreamGeometry>
+        <StreamGeometry x:Key="TgGlyphCopy">M6 5.5 H12 A1.5 1.5 0 0 1 13.5 7 V13 A1.5 1.5 0 0 1 12 14.5 H6 A1.5 1.5 0 0 1 4.5 13 V7 A1.5 1.5 0 0 1 6 5.5 Z M2.5 10.5 V4 A1.5 1.5 0 0 1 4 2.5 H10.5</StreamGeometry>
+        <StreamGeometry x:Key="TgGlyphClose">M4.5 4.5 L11.5 11.5 M11.5 4.5 L4.5 11.5</StreamGeometry>
+        <StreamGeometry x:Key="TgGlyphPlus">M8 3.5 V12.5 M3.5 8 H12.5</StreamGeometry>
+        <StreamGeometry x:Key="TgGlyphRerun">M13.5 8 A5.5 5.5 0 1 1 8 2.5 C9.5 2.5 10.9 3.1 12 4.1 L13.5 5.5 M13.5 2.5 V5.5 H10.5</StreamGeometry>
+        <StreamGeometry x:Key="TgGlyphFile">M9.5 2.5 H4.75 A1.25 1.25 0 0 0 3.5 3.75 V12.25 A1.25 1.25 0 0 0 4.75 13.5 H11.25 A1.25 1.25 0 0 0 12.5 12.25 V5.5 Z M9.5 2.5 V5.5 H12.5</StreamGeometry>
+        <StreamGeometry x:Key="TgGlyphSave">M8 2.5 V10 M4.75 6.75 L8 10 L11.25 6.75 M2.5 10.5 V12 A1.5 1.5 0 0 0 4 13.5 H12 A1.5 1.5 0 0 0 13.5 12 V10.5</StreamGeometry>
+        <StreamGeometry x:Key="TgGlyphUse">M2.5 8 H10 M7 5 L10 8 L7 11 M13.5 3.5 V12.5</StreamGeometry>
+        <StreamGeometry x:Key="TgGlyphSend">M13.75 2.25 L2.25 7 L6.5 8.75 L8.5 13.25 Z M6.5 8.75 L13.75 2.25</StreamGeometry>
+        <StreamGeometry x:Key="TgGlyphCheck">M3.5 8.5 L6.5 11.5 L12.5 4.5</StreamGeometry>
+        <StreamGeometry x:Key="TgMarkYes">M2.5 6.25 L5 8.75 L9.5 3.5</StreamGeometry>
+        <StreamGeometry x:Key="TgMarkNo">M3 6 H9</StreamGeometry>
+    </UserControl.Resources>
+
+    <!-- The parameter editors, picked by the field's type. Order matters: the derived types come before TgField. -->
+    <UserControl.DataTemplates>
+        <!-- a file: a local upload, or a file_id / URL as text -->
+        <DataTemplate DataType="vm:TgFileField" x:DataType="vm:TgFileField">
+            <StackPanel Spacing="4">
+                <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                    <TextBlock Classes="pName" Text="{Binding Name}" ToolTip.Tip="{Binding Tip}"/>
+                    <TextBlock Grid.Column="1" Classes="pType" Text="{Binding TypeHint}"/>
+                </Grid>
+                <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="6">
+                    <TextBox Classes="field sendOnEnter" Classes.invalid="{Binding HasError}" Text="{Binding Value}"
+                             PlaceholderText="{Binding Placeholder}" IsVisible="{Binding ShowText}"
+                             AutomationProperties.Name="{Binding Name}"/>
+                    <Border Classes="fileChip" IsVisible="{Binding HasUpload}" ToolTip.Tip="Sent as a multipart upload">
+                        <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="8">
+                            <Path Classes="glyph" Data="{StaticResource TgGlyphFile}"/>
+                            <TextBlock Grid.Column="1" Text="{Binding UploadName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                       FontSize="{StaticResource Font.Small}" FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"/>
+                            <TextBlock Grid.Column="2" Classes="pType" Text="{Binding UploadSize}" Margin="0,0,8,0"/>
+                        </Grid>
+                    </Border>
+                    <Button Grid.Column="1" Classes="quiet danger" Command="{Binding ClearUploadCommand}" IsVisible="{Binding HasUpload}"
+                            ToolTip.Tip="Remove the file" AutomationProperties.Name="Remove the file">
+                        <Path Classes="glyph" Data="{StaticResource TgGlyphClose}"/>
+                    </Button>
+                    <Button Grid.Column="2" Classes="secondary compact" Click="OnChooseFile" ToolTip.Tip="Upload a file from this device">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Path Classes="glyph" Data="{StaticResource TgGlyphFile}"/>
+                            <TextBlock Text="Choose file…" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+                <TextBlock Classes="pError" Text="{Binding Error}" IsVisible="{Binding HasError}"/>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- a bool or a fixed choice: one row, the drop-down on the right -->
+        <DataTemplate DataType="vm:TgChoiceField" x:DataType="vm:TgChoiceField">
+            <StackPanel Spacing="4">
+                <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10">
+                    <StackPanel VerticalAlignment="Center" Spacing="1">
+                        <TextBlock Classes="pName" Text="{Binding Name}" ToolTip.Tip="{Binding Tip}" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Classes="pType" Text="{Binding TypeHint}"/>
+                    </StackPanel>
+                    <ComboBox Grid.Column="1" Classes="field" MinWidth="148" ItemsSource="{Binding Options}" SelectedItem="{Binding Selected}"
+                              AutomationProperties.Name="{Binding Name}"/>
+                </Grid>
+                <TextBlock Classes="pError" Text="{Binding Error}" IsVisible="{Binding HasError}"/>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- text, number, chat id or JSON -->
+        <DataTemplate DataType="vm:TgField" x:DataType="vm:TgField">
+            <StackPanel Spacing="4">
+                <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                    <TextBlock Classes="pName" Text="{Binding Name}" ToolTip.Tip="{Binding Tip}"/>
+                    <TextBlock Grid.Column="1" Classes="pType" Text="{Binding TypeHint}"/>
+                </Grid>
+                <TextBox Classes="field param" Classes.multiline="{Binding IsMultiline}" Classes.mono="{Binding IsMono}"
+                         Classes.sendOnEnter="{Binding !IsMultiline}" Classes.invalid="{Binding HasError}"
+                         Text="{Binding Value}" AcceptsReturn="{Binding IsMultiline}" PlaceholderText="{Binding Placeholder}"
+                         AutomationProperties.Name="{Binding Name}"/>
+                <TextBlock Classes="pError" Text="{Binding Error}" IsVisible="{Binding HasError}"/>
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
     <UserControl.Styles>
-        <Style Selector="Button.mini">
-            <Setter Property="Background" Value="#20222A"/>
-            <Setter Property="Foreground" Value="#C7C8CF"/>
+        <!-- ===== glyphs: a Path doesn't inherit Foreground, so it follows the button's state through Stroke ===== -->
+        <Style Selector="Path.glyph">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Path.mark">
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="12"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.primary Path.glyph, Button.toggle Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.OnAccent}"/>
+        </Style>
+        <Style Selector="Button.toggle.active Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.OnDanger}"/>
+        </Style>
+        <Style Selector="Button.secondary Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.ghost:pointerover Path.glyph, Button.quiet:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button:disabled Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
+
+        <!-- ===== text ===== -->
+        <Style Selector="TextBlock.hint">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.paneLabel">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="LetterSpacing" Value="0.3"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBox.mono">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+        </Style>
+
+        <!-- ===== panes: a card each; ClipToBounds keeps the inset areas inside the rounded corners ===== -->
+        <Style Selector="Border.pane">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="ClipToBounds" Value="True"/>
+        </Style>
+        <Style Selector="Border.paneFooter">
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+            <Setter Property="Padding" Value="12,8"/>
+        </Style>
+        <Style Selector="Border.well">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+        </Style>
+
+        <!-- tinted note: a solid soft fill + hairline per tone -->
+        <Style Selector="Border.note">
+            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+        </Style>
+        <Style Selector="Border.note TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="Border.note.danger">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+        </Style>
+        <Style Selector="Border.note TextBlock.noteTitle, Border.note SelectableTextBlock.noteTitle">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Border.note.danger TextBlock.noteTitle, Border.note.danger SelectableTextBlock.noteTitle">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Border.note.warning">
+            <Setter Property="Background" Value="{DynamicResource Warning.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Warning.Border}"/>
+        </Style>
+        <Style Selector="Border.note.warning TextBlock.noteTitle, Border.note.warning SelectableTextBlock.noteTitle">
+            <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+        </Style>
+
+        <!-- quiet square icon button (copy / clear / rerun / back): no fill until hovered, Control.Height square so
+             it is a 44px touch target on phones -->
+        <Style Selector="Button.quiet">
+            <Setter Property="Width" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="Padding" Value="8,3"/>
-            <Setter Property="FontSize" Value="9.5"/>
-            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
-        <Style Selector="Button.mini:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#2C2F38"/>
-            <Setter Property="Foreground" Value="#ECECEF"/>
+        <Style Selector="Button.quiet Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Button.quiet Path.glyph.copied, Button.quiet:pointerover Path.glyph.copied">
+            <Setter Property="Stroke" Value="{DynamicResource Success}"/>
+        </Style>
+        <Style Selector="Button.quiet:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedHover}"/>
+        </Style>
+        <Style Selector="Button.quiet:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedPressed}"/>
+        </Style>
+        <Style Selector="Button.quiet:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.quiet.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+        </Style>
+        <Style Selector="Button.quiet.danger:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+        </Style>
+        <!-- compact text buttons inside rows (Use chat, Use offset, Save file) -->
+        <Style Selector="Button.compact">
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+        </Style>
+
+        <!-- ===== two- or three-way switch (Form | Raw JSON, Methods | History, Updates | JSON): pills in an inset track ===== -->
+        <Style Selector="ListBox.switch">
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ItemsPanel">
+                <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="ListBox.switch > ListBoxItem">
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="ListBox.switch > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+        </Style>
+        <Style Selector="ListBox.switch > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="ListBox.switch > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.switch > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.switch > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.switch > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Border.count">
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="Padding" Value="5,0"/>
+            <Setter Property="MinWidth" Value="18"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.count TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ===== connection ===== -->
+        <Style Selector="Ellipse.dot">
+            <Setter Property="Width" Value="7"/>
+            <Setter Property="Height" Value="7"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Fill" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
+        <Style Selector="Ellipse.dot.ok"><Setter Property="Fill" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="Ellipse.dot.bad"><Setter Property="Fill" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="Ellipse.dot.warn"><Setter Property="Fill" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="Ellipse.dot.busy"><Setter Property="Fill" Value="{DynamicResource Info}"/></Style>
+        <Style Selector="Border.avatar">
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="CornerRadius" Value="11"/>
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.avatar TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.botName">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.botHandle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.botId">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.chip">
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="Padding" Value="5,1,7,1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.chip TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.chip.on">
+            <Setter Property="Background" Value="{DynamicResource Success.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Success.Border}"/>
+        </Style>
+        <Style Selector="Border.chip.on TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Success}"/>
+        </Style>
+        <Style Selector="Border.chip.on Path.mark">
+            <Setter Property="Stroke" Value="{DynamicResource Success}"/>
+        </Style>
+
+        <!-- ===== method picker: grouped rows (header rows are disabled containers: not selectable, no hover) ===== -->
+        <Style Selector="ListBox.picker">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="6,0,6,6"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        </Style>
+        <Style Selector="ListBox.picker > ListBoxItem" x:DataType="vm:TgNavRow">
+            <Setter Property="IsEnabled" Value="{Binding IsItem}"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="0,1"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="ListBox.picker > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+        </Style>
+        <Style Selector="ListBox.picker > ListBoxItem:disabled /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.picker > ListBoxItem:disabled:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="ListBox.picker > ListBoxItem:disabled">
+            <Setter Property="Cursor" Value="Arrow"/>
+        </Style>
+        <Style Selector="TextBlock.navGroup">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="LetterSpacing" Value="0.3"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="Margin" Value="0,7,0,0"/>
+        </Style>
+        <Style Selector="TextBlock.navName">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.navName.plain">
+            <Setter Property="FontFamily" Value="{StaticResource ContentControlThemeFontFamily}"/>
+        </Style>
+        <Style Selector="TextBlock.navDesc">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="ListBox.picker > ListBoxItem:selected TextBlock.navName">
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="ListBox.picker > ListBoxItem:selected TextBlock.navDesc">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+        </Style>
+
+        <!-- history rows -->
+        <Style Selector="ListBox.history">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="6,0,6,6"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        </Style>
+        <Style Selector="ListBox.history > ListBoxItem">
+            <Setter Property="Padding" Value="8,5,2,5"/>
+            <Setter Property="Margin" Value="0,1"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="ListBox.history > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+        </Style>
+        <Style Selector="TextBlock.histMeta">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="TextBlock.histMeta.ok"><Setter Property="Foreground" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="TextBlock.histMeta.warn"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="TextBlock.histMeta.err"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="TextBlock.histTime">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ===== request ===== -->
+        <Style Selector="TextBlock.methodTitle">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Bright}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.methodDesc">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.endpoint">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <!-- the method name as a picker button (narrow layouts) -->
+        <Style Selector="Button.methodPick">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Padding" Value="10,0,8,0"/>
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.methodPick:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}"/>
+        </Style>
+        <Style Selector="Button.methodPick:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Pressed}"/>
+        </Style>
+
+        <Style Selector="TextBlock.pName">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.pName.plain">
+            <Setter Property="FontFamily" Value="{StaticResource ContentControlThemeFontFamily}"/>
+        </Style>
+        <Style Selector="TextBlock.pType">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.pError">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="2,0,0,0"/>
+        </Style>
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="LetterSpacing" Value="0.3"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <!-- multi-line parameter boxes: a few lines, then they scroll -->
+        <Style Selector="TextBox.field.multiline.param">
+            <Setter Property="MinHeight" Value="52"/>
+            <Setter Property="MaxHeight" Value="168"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <!-- a field that failed validation: a danger hairline in every state -->
+        <Style Selector="TextBox.invalid /template/ Border#PART_BorderElement,
+                         TextBox.invalid:pointerover /template/ Border#PART_BorderElement,
+                         TextBox.invalid:focus /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger}"/>
+        </Style>
+        <!-- the optional section's toggle: a quiet full-width row -->
+        <Style Selector="Button.sectionToggle">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinHeight" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.sectionToggle:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                         Button.sectionToggle:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.sectionToggle:pointerover TextBlock.section">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.sectionToggle Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Button.sectionToggle:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <!-- an attached file, in place of the file_id / URL box -->
+        <Style Selector="Border.fileChip">
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="Padding" Value="10,0,2,0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        </Style>
+        <Style Selector="Border.fileChip Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="TextBlock.formMsg">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.formMsg.error">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="ProgressBar.upload">
+            <Setter Property="Height" Value="3"/>
+            <Setter Property="MinHeight" Value="3"/>
+            <Setter Property="CornerRadius" Value="2"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+            <Setter Property="Background" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="Transitions" Value="{x:Null}"/>
+        </Style>
+
+        <!-- ===== response ===== -->
+        <!-- the JSON viewer sits flush in its inset well: the same surface in every state, monospace -->
+        <Style Selector="TextBox.out">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="CornerRadius" Value="0"/>
+        </Style>
+        <Style Selector="TextBox.out:pointerover /template/ Border#PART_BorderElement,
+                         TextBox.out:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="TextBlock.respMeta">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.respMethod">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="ListBox.updates">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        </Style>
+        <Style Selector="ListBox.updates > ListBoxItem">
+            <Setter Property="Padding" Value="12,7,8,7"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Border.kind">
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="Background" Value="{DynamicResource Info.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Info.Border}"/>
+        </Style>
+        <Style Selector="Border.kind TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Info}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+        </Style>
+        <Style Selector="TextBlock.updTitle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.updLine">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.updMeta">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <!-- empty / first-run states -->
+        <Style Selector="TextBlock.emptyTitle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Title}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Border.step">
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style Selector="Border.step TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.stepText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="LineHeight" Value="17"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ===== Responsive. TgRoot (break 640) gives phone vs desktop; Work (break 900) gives the 3-pane desktop vs the
+             2-pane one. Local values beat styles, so the panes carry no local Grid.* / Width / IsVisible / Margin.
+               wide desktop  : [methods + history | request | response]
+               narrow desktop: [request | response]; the method picker opens in place of the request (browsing)
+               phone         : one pane at a time: Request | Response switch; the picker opens in place of the request
+             Later styles win: keep the order. ===== -->
+        <Style Selector="Border#NavPane">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/>
+            <Setter Property="Width" Value="248"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style Selector="Border#ReqPane">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style Selector="Border#RespPane">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/>
+        </Style>
+        <Style Selector="TabControl#PhoneSwitch">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Button#MethodPickButton, Button#NavBack">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+
+        <!-- narrow desktop (and phone): the picker takes the request's place while browsing -->
+        <Style Selector="Grid#Work.narrow Border#NavPane">
+            <Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Width" Value="NaN"/>
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#Work.narrow Button#MethodPickButton, Grid#Work.narrow Button#NavBack">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="Grid#Work.narrow TextBlock#MethodTitlePlain">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#TgRoot.browsing Grid#Work.narrow Border#NavPane">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="Grid#TgRoot.browsing Grid#Work.narrow Border#ReqPane">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+
+        <!-- phone: one column, the Request | Response switch on top -->
+        <Style Selector="Grid#TgRoot.narrow TabControl#PhoneSwitch">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="Grid#TgRoot.narrow Border#NavPane, Grid#TgRoot.narrow Border#ReqPane, Grid#TgRoot.narrow Border#RespPane">
+            <Setter Property="Grid.Column" Value="0"/>
+            <Setter Property="Grid.ColumnSpan" Value="3"/>
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+        <Style Selector="Grid#TgRoot.narrow.showResp Border#NavPane, Grid#TgRoot.narrow.showResp Border#ReqPane">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#TgRoot.narrow:not(.showResp) Border#RespPane">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <!-- phones: touch-sized rows -->
+        <Style Selector="TabControl#PhoneSwitch > TabItem">
+            <Setter Property="MinHeight" Value="36"/>
+            <Setter Property="Padding" Value="16,0"/>
+        </Style>
+        <Style Selector="Grid#TgRoot.narrow ListBox.picker > ListBoxItem, Grid#TgRoot.narrow ListBox.history > ListBoxItem">
+            <Setter Property="Padding" Value="10,7"/>
+        </Style>
+
+        <!-- connection card. Desktop: badge · identity (or hint) · Proxy on one line; address | user | password.
+             Phone: the identity / hint gets its own line under the badge; the address its own row, user | password
+             50/50 under it (columns are 2*, *, *). Defaults first: the phone overrides must come later. -->
+        <Style Selector="Panel#StatusInfo">
+            <Setter Property="Grid.Column" Value="1"/>
+        </Style>
+        <Style Selector="TextBox#ProxyUserBox">
+            <Setter Property="Grid.Column" Value="1"/>
+        </Style>
+        <Style Selector="TextBox#ProxyPassBox">
+            <Setter Property="Grid.Column" Value="2"/>
+        </Style>
+        <Style Selector="Grid#TgRoot.narrow Panel#StatusInfo">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#TgRoot.narrow AutoCompleteBox#ProxyAddrBox">
+            <Setter Property="Grid.ColumnSpan" Value="3"/>
+        </Style>
+        <Style Selector="Grid#TgRoot.narrow TextBox#ProxyUserBox">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#TgRoot.narrow TextBox#ProxyPassBox">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto, Auto, *" Margin="14" Background="#0F1012">
+    <Grid x:Name="TgRoot" RowDefinitions="Auto, *" helpers:Responsive.BreakWidth="640"
+          Classes.browsing="{Binding IsBrowsing}" Classes.showResp="{Binding ShowResponseOnPhone}">
 
-        <!-- Token + execute -->
-        <Grid Grid.Row="0" ColumnDefinitions="*, 120" ColumnSpacing="10" Margin="0,0,0,10">
-            <StackPanel Grid.Column="0">
-                <TextBlock Classes="fieldLabel" Text="BOT TOKEN"/>
-                <TextBox Classes="field"
-                         Text="{Binding BotToken}"
-                         PlaceholderText="123456:ABC-DEF1234ghIkl..."
-                         PasswordChar="●">
-                    <TextBox.KeyBindings>
-                        <KeyBinding Command="{Binding ExecuteTgCommand}" Gesture="Enter"/>
-                    </TextBox.KeyBindings>
-                </TextBox>
-            </StackPanel>
+        <!-- ================= CONNECTION: token, Connect, status (identity), proxy ================= -->
+        <Border Grid.Row="0" Classes="card" Padding="12,10">
+            <StackPanel Spacing="8">
+                <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                    <TextBox x:Name="TokenBox" Classes="field"
+                             helpers:InputAssist.PasteMode="Token" helpers:InputAssist.PasteButton="True"
+                             Text="{Binding BotToken}" PasswordChar="●" IsUndoEnabled="False"
+                             PlaceholderText="Bot token" ToolTip.Tip="The token @BotFather gave you. Saved encrypted on this device."
+                             AutomationProperties.Name="Bot token">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding ConnectCommand}"/>
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                    <Button Grid.Column="1" Classes.primary="{Binding !IsConnected}" Classes.secondary="{Binding IsConnected}"
+                            Command="{Binding ConnectCommand}" MinWidth="96"
+                            ToolTip.Tip="Check the token with getMe and show the bot">
+                        <Panel>
+                            <TextBlock Text="Connect" IsVisible="{Binding !IsConnecting}"/>
+                            <TextBlock Text="Checking…" IsVisible="{Binding IsConnecting}"/>
+                        </Panel>
+                    </Button>
+                </Grid>
 
-            <Button Grid.Column="1"
-                    Classes="primary"
-                    Command="{Binding ExecuteTgCommand}"
-                    IsDefault="True"
-                    IsEnabled="{Binding !IsBusy}"
-                    VerticalAlignment="Bottom"
-                    HorizontalAlignment="Stretch">
-                <Panel>
-                    <TextBlock Text="EXECUTE" IsVisible="{Binding !IsBusy}"/>
-                    <TextBlock Text="· · ·" IsVisible="{Binding IsBusy}"/>
-                </Panel>
-            </Button>
-        </Grid>
-
-        <!-- Method + proxy -->
-        <Grid Grid.Row="1" ColumnDefinitions="*, *" ColumnSpacing="10" Margin="0,0,0,10">
-            <StackPanel Grid.Column="0">
-                <TextBlock Classes="fieldLabel" Text="METHOD"/>
-                <ComboBox Classes="field"
-                          ItemsSource="{Binding AvailableMethods}"
-                          SelectedItem="{Binding SelectedMethod}"
-                          HorizontalAlignment="Stretch"/>
-                <TextBlock FontSize="9.5" Foreground="#6E6F78" FontFamily="Cascadia Code,Consolas" Margin="2,4,0,0"
-                           TextTrimming="CharacterEllipsis">
-                    <Run Text="POST api.telegram.org/bot…/"/><Run Text="{Binding SelectedMethod}" Foreground="#9E9FA8"/>
-                </TextBlock>
-            </StackPanel>
-
-            <StackPanel Grid.Column="1">
-                <TextBlock Classes="fieldLabel" Text="PROXY (OPTIONAL)"/>
-                <AutoCompleteBox Classes="field"
-                         Text="{Binding ProxyAddress}"
-                         ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                         PlaceholderText="http://127.0.0.1:1080"/>
-            </StackPanel>
-        </Grid>
-
-        <!-- Params / Response are tabbed so the active one gets the full area -->
-        <TabControl Grid.Row="2" Padding="0,4,0,0">
-            <TabControl.Styles>
-                <Style Selector="TabItem">
-                    <Setter Property="FontSize" Value="11.5"/>
-                    <Setter Property="MinHeight" Value="30"/>
-                    <Setter Property="Padding" Value="14,0"/>
-                    <Setter Property="Foreground" Value="#9E9FA8"/>
-                </Style>
-                <Style Selector="TabItem:selected">
-                    <Setter Property="Foreground" Value="#55C795"/>
-                </Style>
-            </TabControl.Styles>
-
-            <TabItem Header="PARAMETERS">
-                <Border Classes="card">
-                    <TextBox Text="{Binding CustomParameters}"
-                             AcceptsReturn="True"
-                             PlaceholderText="key=value&#x0a;chat_id=123&#x0a;text=Hello"
-                             FontFamily="Cascadia Code,Consolas"
-                             FontSize="12"
-                             Foreground="#ECECEF"
-                             CaretBrush="#42B883"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             Padding="12"/>
-                </Border>
-            </TabItem>
-
-            <TabItem Header="RESPONSE">
-                <Border Classes="card output">
-                    <Grid RowDefinitions="Auto, *">
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6" Margin="0,6,8,4">
-                            <Button Classes="mini" Content="COPY" Command="{Binding CopyResponseCommand}"/>
-                            <Button Classes="mini" Content="CLEAR" Command="{Binding ClearResponseCommand}"/>
+                <!-- status: badge · bot identity (or a hint / problem) · proxy switch -->
+                <Grid ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="10">
+                    <Border Grid.Column="0" Classes="badge" Classes.success="{Binding ConnOk}" Classes.danger="{Binding ConnBad}"
+                            Classes.warning="{Binding ConnWarn}" Classes.info="{Binding ConnBusy}" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Ellipse Classes="dot" Classes.ok="{Binding ConnOk}" Classes.bad="{Binding ConnBad}"
+                                     Classes.warn="{Binding ConnWarn}" Classes.busy="{Binding ConnBusy}"/>
+                            <TextBlock Text="{Binding ConnBadge}"/>
                         </StackPanel>
-                        <TextBox Grid.Row="1" Text="{Binding ResponseLog}"
-                                 IsReadOnly="True"
-                                 AcceptsReturn="True"
-                                 TextWrapping="NoWrap"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                 FontFamily="Cascadia Code,Consolas"
-                                 Background="Transparent"
-                                 Foreground="#55C795"
-                                 FontSize="12"
-                                 BorderThickness="0"
-                                 Padding="12,0,12,12"/>
-                    </Grid>
-                </Border>
-            </TabItem>
-        </TabControl>
+                    </Border>
 
+                    <!-- no local Grid.* here: the styles place it (beside the badge, or under it on phones) -->
+                    <Panel x:Name="StatusInfo" VerticalAlignment="Center">
+                        <!-- one item per piece, so a narrow line wraps between them instead of clipping -->
+                        <WrapPanel IsVisible="{Binding HasBot}" ItemSpacing="8" LineSpacing="6" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border Classes="avatar"><TextBlock Text="{Binding BotInitial}"/></Border>
+                                <TextBlock Classes="botName" Text="{Binding BotName}" MaxWidth="220" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                            <SelectableTextBlock Classes="botHandle" Text="{Binding BotUsername}"/>
+                            <SelectableTextBlock Classes="botId" Text="{Binding BotIdText}" Margin="0,0,4,0"/>
+                            <Border Classes="chip" Classes.on="{Binding CanJoinGroups}"
+                                    ToolTip.Tip="can_join_groups: the bot can be added to groups (@BotFather → /setjoingroups).">
+                                <StackPanel Orientation="Horizontal" Spacing="3">
+                                    <Path Classes="mark" Data="{StaticResource TgMarkYes}" IsVisible="{Binding CanJoinGroups}"/>
+                                    <Path Classes="mark" Data="{StaticResource TgMarkNo}" IsVisible="{Binding !CanJoinGroups}"/>
+                                    <TextBlock Text="Joins groups"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="chip" Classes.on="{Binding CanReadAllMessages}"
+                                    ToolTip.Tip="can_read_all_group_messages: off means privacy mode, the bot only sees commands and replies in groups (@BotFather → /setprivacy).">
+                                <StackPanel Orientation="Horizontal" Spacing="3">
+                                    <Path Classes="mark" Data="{StaticResource TgMarkYes}" IsVisible="{Binding CanReadAllMessages}"/>
+                                    <Path Classes="mark" Data="{StaticResource TgMarkNo}" IsVisible="{Binding !CanReadAllMessages}"/>
+                                    <TextBlock Text="Reads all messages"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="chip" Classes.on="{Binding SupportsInline}"
+                                    ToolTip.Tip="supports_inline_queries: inline mode (@BotFather → /setinline).">
+                                <StackPanel Orientation="Horizontal" Spacing="3">
+                                    <Path Classes="mark" Data="{StaticResource TgMarkYes}" IsVisible="{Binding SupportsInline}"/>
+                                    <Path Classes="mark" Data="{StaticResource TgMarkNo}" IsVisible="{Binding !SupportsInline}"/>
+                                    <TextBlock Text="Inline queries"/>
+                                </StackPanel>
+                            </Border>
+                        </WrapPanel>
+                        <TextBlock Classes="hint" Text="{Binding StatusLine}" IsVisible="{Binding !HasBot}"/>
+                    </Panel>
+
+                    <CheckBox Grid.Column="2" Content="Proxy" IsChecked="{Binding UseProxy}" VerticalAlignment="Center"
+                              ToolTip.Tip="Send the bot's calls through an HTTP or SOCKS5 proxy"/>
+                </Grid>
+
+                <!-- proxy: address | user | password (password kept in memory only) -->
+                <Grid IsVisible="{Binding UseProxy}" ColumnDefinitions="2*, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="8">
+                    <AutoCompleteBox x:Name="ProxyAddrBox" Classes="field" helpers:InputAssist.SelectAllOnFocus="True"
+                                     Text="{Binding ProxyAddress}" ItemsSource="{Binding ProxyHistory}"
+                                     FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                     PlaceholderText="Proxy, e.g. 127.0.0.1:1080"
+                                     ToolTip.Tip="host:port. Ports 1080 / 1081 / 9050 mean SOCKS5, others HTTP; or write the scheme (http://, socks5://)."/>
+                    <TextBox x:Name="ProxyUserBox" Classes="field" Text="{Binding ProxyUser}" PlaceholderText="User (optional)"/>
+                    <TextBox x:Name="ProxyPassBox" Classes="field" Text="{Binding ProxyPass}" PasswordChar="●" IsUndoEnabled="False"
+                             PlaceholderText="Password (optional)" ToolTip.Tip="Saved encrypted on this device"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- ================= WORKSPACE ================= -->
+        <Grid x:Name="Work" Grid.Row="1" Margin="0,10,0,0" helpers:Responsive.BreakWidth="900"
+              ColumnDefinitions="Auto, *, *" RowDefinitions="Auto, *">
+
+            <!-- phone: which pane -->
+            <TabControl x:Name="PhoneSwitch" Grid.Row="0" Grid.ColumnSpan="3" Classes="seg" Padding="0" Margin="0,0,0,8"
+                        SelectedIndex="{Binding PhoneTabIndex}">
+                <TabItem Header="Request"/>
+                <TabItem Header="Response"/>
+            </TabControl>
+
+            <!-- ============ NAVIGATOR: methods (grouped, searchable) | history ============ -->
+            <Border x:Name="NavPane" Classes="card pane">
+                <Grid RowDefinitions="Auto, Auto, *, Auto">
+                    <Grid Grid.Row="0" ColumnDefinitions="Auto, *" ColumnSpacing="4" Margin="8,8,8,0">
+                        <Button x:Name="NavBack" Classes="quiet" Command="{Binding CloseBrowseCommand}"
+                                ToolTip.Tip="Back to the request" AutomationProperties.Name="Back to the request">
+                            <Path Classes="glyph" Data="{StaticResource TgGlyphBack}"/>
+                        </Button>
+                        <ListBox Grid.Column="1" Classes="switch" SelectedIndex="{Binding NavTabIndex}" HorizontalAlignment="Stretch">
+                            <ListBoxItem>Methods</ListBoxItem>
+                            <ListBoxItem>
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="History" VerticalAlignment="Center"/>
+                                    <Border Classes="count" IsVisible="{Binding HasHistory}">
+                                        <TextBlock Text="{Binding HistoryCountText}"/>
+                                    </Border>
+                                </StackPanel>
+                            </ListBoxItem>
+                        </ListBox>
+                    </Grid>
+
+                    <!-- methods -->
+                    <TextBox Grid.Row="1" x:Name="MethodSearchBox" Classes="field" Margin="8,8,8,4"
+                             Text="{Binding MethodSearch}" PlaceholderText="Search methods"
+                             IsVisible="{Binding ShowMethods}" AutomationProperties.Name="Search methods">
+                        <TextBox.InnerLeftContent>
+                            <Path Classes="glyph" Data="{StaticResource TgGlyphSearch}" Margin="10,0,0,0" Stroke="{DynamicResource Text.Muted}"/>
+                        </TextBox.InnerLeftContent>
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding PickFirstMatchCommand}"/>
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                    <ListBox Grid.Row="2" x:Name="MethodList" Classes="picker" IsVisible="{Binding ShowMethods}"
+                             ItemsSource="{Binding NavRows}" SelectedItem="{Binding SelectedNavRow}"
+                             Tapped="OnMethodTapped" AutomationProperties.Name="Methods">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TgNavRow">
+                                <Panel>
+                                    <TextBlock Classes="navGroup" Text="{Binding Title}" IsVisible="{Binding IsHeader}"/>
+                                    <StackPanel IsVisible="{Binding IsItem}" Spacing="1">
+                                        <TextBlock Classes="navName" Classes.plain="{Binding IsCustom}" Text="{Binding Title}"/>
+                                        <TextBlock Classes="navDesc" Text="{Binding Description}"/>
+                                    </StackPanel>
+                                </Panel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <StackPanel Grid.Row="2" Margin="14,10,14,0" Spacing="10" IsVisible="{Binding ShowNoMatches}">
+                        <TextBlock Classes="hint" Text="{Binding NoMatchText}"/>
+                        <Button Classes="secondary compact" HorizontalAlignment="Left" Command="{Binding CallSearchAsCustomCommand}"
+                                IsVisible="{Binding CanCallSearchAsCustom}">
+                            <TextBlock Text="{Binding CallSearchAsCustomText}" TextTrimming="CharacterEllipsis"/>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- history -->
+                    <ListBox Grid.Row="1" Grid.RowSpan="2" x:Name="HistoryList" Classes="history" Margin="0,8,0,0"
+                             IsVisible="{Binding ShowHistory}" ItemsSource="{Binding History}"
+                             Tapped="OnHistoryTapped" AutomationProperties.Name="History">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TgHistoryItem">
+                                <Grid ColumnDefinitions="*, Auto" ColumnSpacing="4">
+                                    <StackPanel Spacing="1">
+                                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
+                                            <TextBlock Classes="navName" Text="{Binding Method}"/>
+                                            <TextBlock Grid.Column="1" Classes="histTime" Text="{Binding Time}"/>
+                                        </Grid>
+                                        <TextBlock Classes="navDesc" Text="{Binding Summary}"/>
+                                        <TextBlock Classes="histMeta" Classes.ok="{Binding IsOk}" Classes.warn="{Binding IsWarn}" Classes.err="{Binding IsError}">
+                                            <Run Text="{Binding StatusText}"/><Run Text=" · "/><Run Text="{Binding ElapsedText}"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Classes="quiet" VerticalAlignment="Center"
+                                            Command="{Binding $parent[UserControl].((vm:TgViewModel)DataContext).RerunCommand}"
+                                            CommandParameter="{Binding}" ToolTip.Tip="Send again" AutomationProperties.Name="Send again">
+                                        <Path Classes="glyph" Data="{StaticResource TgGlyphRerun}"/>
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <StackPanel Grid.Row="1" Grid.RowSpan="2" Margin="14,14,14,0" Spacing="6" IsVisible="{Binding ShowHistoryEmpty}">
+                        <TextBlock Classes="hint" Text="Sent calls show up here until you close Echoes. Click one to reopen it."/>
+                    </StackPanel>
+                    <Border Grid.Row="3" Classes="paneFooter" Padding="8,6">
+                        <Border.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="ShowHistory"/>
+                                <Binding Path="HasHistory"/>
+                            </MultiBinding>
+                        </Border.IsVisible>
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                            <TextBlock Classes="hint" VerticalAlignment="Center" Text="This session only"/>
+                            <Button Grid.Column="1" Classes="ghost compact" Content="Clear" Command="{Binding ClearHistoryCommand}"
+                                    ToolTip.Tip="Forget the calls of this session"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- ============ REQUEST: method, form or raw JSON, Send ============ -->
+            <Border x:Name="ReqPane" Classes="card pane">
+                <Grid RowDefinitions="Auto, *, Auto">
+                    <!-- header -->
+                    <StackPanel Grid.Row="0" Margin="12,10,12,10" Spacing="3">
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                            <TextBlock x:Name="MethodTitlePlain" Classes="methodTitle" Text="{Binding MethodTitle}"/>
+                            <Button x:Name="MethodPickButton" Classes="methodPick" Command="{Binding BrowseCommand}"
+                                    ToolTip.Tip="Pick another method" AutomationProperties.Name="Pick a method">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Classes="methodTitle" Text="{Binding MethodTitle}" MaxWidth="260"/>
+                                    <Path Classes="glyph" Data="{StaticResource TgGlyphDown}"/>
+                                </StackPanel>
+                            </Button>
+                            <ListBox Grid.Column="1" Classes="switch" SelectedIndex="{Binding EditorModeIndex}"
+                                     ToolTip.Tip="Edit the parameters as a form, or as the raw JSON request">
+                                <ListBoxItem>Form</ListBoxItem>
+                                <ListBoxItem>JSON</ListBoxItem>
+                            </ListBox>
+                        </Grid>
+                        <TextBlock Classes="methodDesc" Text="{Binding MethodDescription}"/>
+                        <TextBlock Classes="endpoint" Text="{Binding EndpointText}"/>
+                    </StackPanel>
+
+                    <!-- the form -->
+                    <ScrollViewer Grid.Row="1" IsVisible="{Binding IsFormMode}" HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto" Background="{DynamicResource Bg.Card}">
+                        <StackPanel Margin="12,0,12,12" Spacing="10">
+                            <Border Classes="divider"/>
+
+                            <!-- custom method: its name -->
+                            <StackPanel Spacing="4" IsVisible="{Binding IsCustom}">
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <TextBlock Classes="pName plain" Text="Method name"/>
+                                    <TextBlock Grid.Column="1" Classes="pType" Text="any Bot API method"/>
+                                </Grid>
+                                <TextBox Classes="field mono sendOnEnter" Classes.invalid="{Binding HasCustomNameError}"
+                                         Text="{Binding CustomMethodName}" PlaceholderText="e.g. getMyName"/>
+                                <TextBlock Classes="pError" Text="{Binding CustomNameError}" IsVisible="{Binding HasCustomNameError}"/>
+                            </StackPanel>
+
+                            <Border Classes="note" IsVisible="{Binding TakesNoParams}">
+                                <TextBlock Text="No parameters: just press Send."/>
+                            </Border>
+
+                            <!-- required -->
+                            <StackPanel Spacing="3" IsVisible="{Binding HasRequired}">
+                                <TextBlock Classes="section" Text="Required"/>
+                                <TextBlock Classes="hint" Text="{Binding RequiredNote}" IsVisible="{Binding HasRequiredNote}"/>
+                            </StackPanel>
+                            <ItemsControl ItemsSource="{Binding RequiredFields}" IsVisible="{Binding HasRequired}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Spacing="10"/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+
+                            <!-- optional (folded unless the method has no required ones, or the user opened it) -->
+                            <Button Classes="sectionToggle" Command="{Binding ToggleOptionalCommand}" IsVisible="{Binding HasOptional}">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <Path Classes="glyph" Data="{StaticResource TgGlyphRight}" IsVisible="{Binding !IsOptionalOpen}"/>
+                                    <Path Classes="glyph" Data="{StaticResource TgGlyphDown}" IsVisible="{Binding IsOptionalOpen}"/>
+                                    <TextBlock Classes="section" Text="{Binding OptionalHeader}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <ItemsControl ItemsSource="{Binding OptionalFields}">
+                                <ItemsControl.IsVisible>
+                                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                        <Binding Path="HasOptional"/>
+                                        <Binding Path="IsOptionalOpen"/>
+                                    </MultiBinding>
+                                </ItemsControl.IsVisible>
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Spacing="10"/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+
+                            <!-- extra key / value parameters -->
+                            <ItemsControl ItemsSource="{Binding ExtraParams}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Spacing="8"/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TgExtraParam">
+                                        <StackPanel Spacing="4">
+                                            <Grid ColumnDefinitions="2*, 3*, Auto" ColumnSpacing="6">
+                                                <TextBox Classes="field mono sendOnEnter" Classes.invalid="{Binding HasError}" Text="{Binding Key}"
+                                                         PlaceholderText="name" AutomationProperties.Name="Parameter name"/>
+                                                <TextBox Grid.Column="1" Classes="field sendOnEnter" Text="{Binding Value}"
+                                                         PlaceholderText="value (text or JSON)" AutomationProperties.Name="Parameter value"/>
+                                                <Button Grid.Column="2" Classes="quiet danger"
+                                                        Command="{Binding $parent[UserControl].((vm:TgViewModel)DataContext).RemoveExtraCommand}"
+                                                        CommandParameter="{Binding}" ToolTip.Tip="Remove" AutomationProperties.Name="Remove parameter">
+                                                    <Path Classes="glyph" Data="{StaticResource TgGlyphClose}"/>
+                                                </Button>
+                                            </Grid>
+                                            <TextBlock Classes="pError" Text="{Binding Error}" IsVisible="{Binding HasError}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Button Classes="ghost compact" HorizontalAlignment="Left" Command="{Binding AddExtraCommand}"
+                                    ToolTip.Tip="Add a parameter the form doesn't list">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Path Classes="glyph" Data="{StaticResource TgGlyphPlus}"/>
+                                    <TextBlock Text="Add parameter" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- raw JSON -->
+                    <Grid Grid.Row="1" IsVisible="{Binding IsJsonMode}" RowDefinitions="Auto, *, Auto" Margin="12,0,12,12" RowSpacing="8">
+                        <Border Grid.Row="0" Classes="divider"/>
+                        <TextBox Grid.Row="1" Classes="field multiline mono" Classes.invalid="{Binding HasJsonError}"
+                                 Text="{Binding RawJson}" AcceptsReturn="True" TextWrapping="NoWrap"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 PlaceholderText="{}{ &quot;chat_id&quot;: 123, &quot;text&quot;: &quot;Hello&quot; }"
+                                 AutomationProperties.Name="Request JSON"/>
+                        <Grid Grid.Row="2" ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Classes="pError" Text="{Binding JsonError}" IsVisible="{Binding HasJsonError}"/>
+                                <TextBlock Classes="hint" Text="{Binding JsonModeUploadNote}"
+                                           IsVisible="{Binding JsonModeUploadNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                <TextBlock Classes="hint" Text="Comments and trailing commas are OK."
+                                           ToolTip.Tip="The request is sent as strict JSON." IsVisible="{Binding !HasJsonError}"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="ghost compact" Content="Format" Command="{Binding FormatJsonCommand}"
+                                    ToolTip.Tip="Indent the JSON (and check it)"/>
+                        </Grid>
+                    </Grid>
+
+                    <!-- footer: Send / Stop, what happened, Reset -->
+                    <Border Grid.Row="2" Classes="paneFooter">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10">
+                                <Button x:Name="SendButton" Classes="toggle" Classes.active="{Binding IsSending}" Command="{Binding SendCommand}"
+                                        MinWidth="92" ToolTip.Tip="Send (Ctrl+Enter)">
+                                    <Panel>
+                                        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !IsSending}">
+                                            <Path Classes="glyph" Data="{StaticResource TgGlyphSend}"/>
+                                            <TextBlock Text="Send" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Stop" IsVisible="{Binding IsSending}"/>
+                                    </Panel>
+                                </Button>
+                                <Panel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Classes="formMsg" Classes.error="{Binding FormMessageIsError}" Text="{Binding FormMessage}"
+                                               IsVisible="{Binding !IsSending}"/>
+                                    <TextBlock Classes="formMsg" Text="{Binding SendingText}" IsVisible="{Binding IsSending}"/>
+                                </Panel>
+                                <Button Grid.Column="2" Classes="ghost compact" Content="Reset" Command="{Binding ResetFormCommand}"
+                                        ToolTip.Tip="Clear this method's fields"/>
+                            </Grid>
+                            <ProgressBar Classes="upload" Minimum="0" Maximum="100" Value="{Binding UploadPercent}"
+                                         IsVisible="{Binding IsUploading}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- ============ RESPONSE: status, timing, JSON / updates ============ -->
+            <Border x:Name="RespPane" Classes="card pane">
+                <Grid RowDefinitions="Auto, Auto, *">
+                    <!-- header -->
+                    <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto" ColumnSpacing="8" Margin="12,8,6,8" MinHeight="{DynamicResource Control.Height}">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <TextBlock Classes="paneLabel" Text="Response" IsVisible="{Binding !HasResponse}"/>
+                            <Border Classes="badge info" IsVisible="{Binding IsSending}">
+                                <TextBlock Text="Sending…"/>
+                            </Border>
+                            <Border Classes="badge" Classes.success="{Binding RespOk}" Classes.warning="{Binding RespWarn}"
+                                    Classes.danger="{Binding RespError}" IsVisible="{Binding HasResponse}">
+                                <TextBlock Text="{Binding RespBadge}"/>
+                            </Border>
+                            <TextBlock Classes="respMethod" Text="{Binding RespMethod}" IsVisible="{Binding HasResponse}"/>
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Classes="respMeta" Text="{Binding RespMeta}" IsVisible="{Binding HasResponse}"/>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" IsVisible="{Binding HasResponse}">
+                            <Button Classes="quiet" Command="{Binding CopyResponseCommand}" ToolTip.Tip="Copy the whole response"
+                                    AutomationProperties.Name="Copy response">
+                                <Panel>
+                                    <Path Classes="glyph" Data="{StaticResource TgGlyphCopy}" IsVisible="{Binding !JustCopied}"/>
+                                    <Path Classes="glyph copied" Data="{StaticResource TgGlyphCheck}" IsVisible="{Binding JustCopied}"/>
+                                </Panel>
+                            </Button>
+                            <Button Classes="quiet" Command="{Binding ClearResponseCommand}" ToolTip.Tip="Clear"
+                                    AutomationProperties.Name="Clear response">
+                                <Path Classes="glyph" Data="{StaticResource TgGlyphClose}"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- what went wrong, in plain words; OK extras (updates switch, offset, file download) -->
+                    <StackPanel Grid.Row="1" Margin="12,0,12,8" Spacing="8">
+                        <Border Classes="note" Classes.danger="{Binding RespError}" Classes.warning="{Binding RespWarn}"
+                                IsVisible="{Binding HasRespProblem}">
+                            <StackPanel Spacing="3">
+                                <SelectableTextBlock Classes="noteTitle" Text="{Binding RespTitle}" TextWrapping="Wrap"
+                                                     FontSize="{StaticResource Font.Small}" IsVisible="{Binding HasRespTitle}"/>
+                                <TextBlock Text="{Binding RespHint}" IsVisible="{Binding HasRespHint}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="8" IsVisible="{Binding IsUpdatesResponse}">
+                            <ListBox Classes="switch" SelectedIndex="{Binding RespViewIndex}">
+                                <ListBoxItem Content="{Binding UpdatesTabText}"/>
+                                <ListBoxItem>JSON</ListBoxItem>
+                            </ListBox>
+                            <Button Grid.Column="2" Classes="ghost compact" Command="{Binding UseNextOffsetCommand}"
+                                    IsVisible="{Binding HasNextOffset}" Content="{Binding NextOffsetText}"
+                                    ToolTip.Tip="Put last update_id + 1 into getUpdates' offset: the next call confirms these updates, so they aren't returned again"/>
+                        </Grid>
+
+                        <Border Classes="note" IsVisible="{Binding CanDownload}">
+                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                                <StackPanel Spacing="2" VerticalAlignment="Center"
+                                            ToolTip.Tip="Telegram keeps this download link valid for about an hour">
+                                    <TextBlock Classes="noteTitle" Text="Ready to download"/>
+                                    <TextBlock FontFamily="{StaticResource MonoFont}" Text="{Binding DownloadUrlText}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="secondary compact" Click="OnSaveFile" VerticalAlignment="Center"
+                                        ToolTip.Tip="Download it (up to 20 MB) and save it">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Path Classes="glyph" Data="{StaticResource TgGlyphSave}"/>
+                                        <TextBlock Text="Save file…" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- body: the inset well -->
+                    <Border Grid.Row="2" Classes="well">
+                        <Panel>
+                            <!-- JSON (capped for display; Copy takes the whole text) -->
+                            <TextBox Classes="out" IsVisible="{Binding ShowJson}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Text="{Binding RespJson, Converter={x:Static helpers:DisplayCapConverter.Instance}, Mode=OneWay}"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Response JSON"/>
+
+                            <!-- getUpdates as a list (virtualized) -->
+                            <ListBox Classes="updates" IsVisible="{Binding ShowUpdatesList}" ItemsSource="{Binding Updates}"
+                                     DoubleTapped="OnUpdateDoubleTapped" AutomationProperties.Name="Updates">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TgUpdateRow">
+                                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                                            <StackPanel Spacing="2">
+                                                <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="8">
+                                                    <Border Classes="badge kind"><TextBlock Text="{Binding KindText}"/></Border>
+                                                    <TextBlock Grid.Column="1" Classes="updTitle" Text="{Binding Title}"/>
+                                                    <TextBlock Grid.Column="2" Classes="histTime" Text="{Binding Time}"/>
+                                                </Grid>
+                                                <TextBlock Classes="updLine" Text="{Binding Line}"/>
+                                                <TextBlock Classes="updMeta">
+                                                    <Run Text="{Binding UpdateIdText}"/><Run Text="   chat "/><Run Text="{Binding ChatIdText}"/><Run Text="   "/><Run Text="{Binding ChatType}"/>
+                                                </TextBlock>
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Classes="secondary compact" VerticalAlignment="Center" IsVisible="{Binding HasChat}"
+                                                    Command="{Binding $parent[UserControl].((vm:TgViewModel)DataContext).UseChatCommand}"
+                                                    CommandParameter="{Binding}" ToolTip.Tip="Put this chat's id into chat_id">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <Path Classes="glyph" Data="{StaticResource TgGlyphUse}"/>
+                                                    <TextBlock Text="Use chat" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <!-- getUpdates came back empty -->
+                            <StackPanel IsVisible="{Binding ShowNoUpdates}" Margin="16,16,16,0" Spacing="8" MaxWidth="460" HorizontalAlignment="Left">
+                                <TextBlock Classes="emptyTitle" Text="No updates waiting"/>
+                                <TextBlock Classes="stepText" Text="Message your bot in Telegram (or add it to a group), then run getUpdates again."/>
+                                <TextBlock Classes="stepText" Text="Still empty? A webhook may be set: see getWebhookInfo, or remove it with deleteWebhook."/>
+                            </StackPanel>
+
+                            <!-- first run: nothing sent yet -->
+                            <ScrollViewer IsVisible="{Binding ShowEmptyState}" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Margin="16,16,16,16" Spacing="12" MaxWidth="460" HorizontalAlignment="Left">
+                                    <TextBlock Classes="emptyTitle" Text="Nothing sent yet"/>
+                                    <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10">
+                                        <Border Classes="step"><TextBlock Text="1"/></Border>
+                                        <TextBlock Grid.Column="1" Classes="stepText" Text="Paste your bot's token and press Connect."/>
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10">
+                                        <Border Classes="step"><TextBlock Text="2"/></Border>
+                                        <TextBlock Grid.Column="1" Classes="stepText" Text="Pick a method. getUpdates lists who wrote to the bot; Use chat fills chat_id."/>
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10">
+                                        <Border Classes="step"><TextBlock Text="3"/></Border>
+                                        <TextBlock Grid.Column="1" Classes="stepText" Text="Fill in the fields and press Send (Ctrl+Enter)."/>
+                                    </Grid>
+                                </StackPanel>
+                            </ScrollViewer>
+
+                            <TextBlock IsVisible="{Binding ShowWaiting}" Classes="hint" Margin="16" Text="Waiting for Telegram…"/>
+                            <TextBlock IsVisible="{Binding ShowNoBody}" Classes="hint" Margin="16" Text="No response body came back."/>
+                        </Panel>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

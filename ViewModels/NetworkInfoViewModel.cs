@@ -56,8 +56,19 @@ public partial class NetworkInfoViewModel : ObservableObject
     [ObservableProperty] private bool _routesHasRows;
     [ObservableProperty] private string _routesNote = string.Empty;
 
+    /// <summary>The sub-tab shown (0 Interfaces · 1 Wi-Fi · 2 Neighbors · 3 Ports · 4 Routing): the one used last.</summary>
+    [ObservableProperty] private int _tabIndex = Math.Clamp(ProfileService.Instance.GetInt(TabKey, 0), 0, 4);
+    private const string TabKey = "net.tab";
+
+    partial void OnTabIndexChanged(int value)
+    {
+        if (value >= 0 && ProfileService.Instance.GetInt(TabKey, 0) != value)
+            ProfileService.Instance.SetSetting(TabKey, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
     public NetworkInfoViewModel()
     {
+        RestoreWifiSort();
         _ = RefreshAsync();
         _ = RefreshPorts();
         _ = RefreshNeighbors();
@@ -187,9 +198,12 @@ public partial class NetworkInfoViewModel : ObservableObject
             catch { /* skip an interface that fails to build entirely */ }
         }
 
-        // Active (Up) adapters first, then alphabetically — the ones the user cares about on top.
+        // Active (Up) adapters with an IPv4 address first, then the other active ones, then alphabetically — the ones
+        // the user cares about on top. (Android reports its virtual dummy0 / ifb0 / tunnel devices as Up with no address,
+        // which used to push wlan0 below them.)
         return result
             .OrderByDescending(a => a.IsUp)
+            .ThenByDescending(a => System.Net.IPAddress.TryParse(a.IPv4, out _))
             .ThenBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="12" android:versionName="0.3.7">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="13" android:versionName="0.4.0">
 	<uses-sdk android:minSdkVersion="23" android:targetSdkVersion="34" />
 	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -8,7 +8,14 @@
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 	<uses-permission android:name="android.permission.WAKE_LOCK" />
+	<!-- "Start monitoring when the phone starts" (Monitor settings): BootReceiver, off unless the user turns it on. -->
+	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 	<!-- allowBackup=false: app-private files include encrypted vaults and plaintext proxy passwords;
-	     leaving backup on would let Android Auto Backup / `adb backup` carry them off-device. -->
-	<application android:label="Echoes" android:icon="@mipmap/icon" android:roundIcon="@mipmap/icon" android:allowBackup="false" android:supportsRtl="true" />
+	     leaving backup on would let Android Auto Backup / `adb backup` carry them off-device.
+	     From Android 12 (targetSdk 31+) allowBackup=false no longer covers device-to-device transfer, so
+	     dataExtractionRules (Resources/xml/data_extraction_rules.xml) excludes everything from both.
+	     usesCleartextTraffic: since targetSdk 28 Android blocks plain http:// by default, so the cURL WEB tab's WebView
+	     couldn't load http:// pages or their http:// sub-resources. A network tool has to inspect plain-HTTP sites.
+	     The app's own requests (HttpClient over the managed SocketsHttpHandler) aren't affected either way. -->
+	<application android:label="Echoes" android:icon="@mipmap/icon" android:roundIcon="@mipmap/icon" android:allowBackup="false" android:dataExtractionRules="@xml/data_extraction_rules" android:supportsRtl="true" android:usesCleartextTraffic="true" />
 </manifest>

@@ -1,81 +1,616 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
+             xmlns:ctl="using:Echoes.Views.Controls"
              x:Class="Echoes.Views.PingView"
              x:DataType="vm:PingViewModel"
              x:CompileBindings="True">
 
-    <Grid RowDefinitions="Auto, Auto, *, Auto" Margin="12" Background="#0F1012">
+    <UserControl.Resources>
+        <StreamGeometry x:Key="GlyphSliders">M4 7.5h9 M17 7.5h3 M15 5.5v4 M4 16.5h3 M11 16.5h9 M9 14.5v4</StreamGeometry>
+    </UserControl.Resources>
 
-        <Grid Grid.Row="0" ColumnDefinitions="*, 96" Margin="0,0,0,10">
-            <AutoCompleteBox Grid.Column="0" Classes="field" x:Name="HostBox"
-                     Text="{Binding TargetHost}"
-                     ItemsSource="{Binding TargetHostHistory}"
-                     FilterMode="ContainsOrdinal"
-                     MinimumPrefixLength="0"
-                     PlaceholderText="Enter Host or IP (e.g. 8.8.8.8)"
-                     Margin="0,0,8,0">
-                <AutoCompleteBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding TogglePingCommand}" />
-                </AutoCompleteBox.KeyBindings>
-            </AutoCompleteBox>
+    <UserControl.Styles>
+        <!-- the options button beside Copy: sliders glyph + "Options", or the non-default values in accent -->
+        <Style Selector="Path.btnIco">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.7"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button:pointerover Path.btnIco">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.opts.set Path.btnIco">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="TextBlock.optSummary">
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.ghost.opts">
+            <Setter Property="Padding" Value="10,0"/>
+        </Style>
+        <!-- a phone's header row is short of room: the summary gets less, Copy keeps its place -->
+        <Style Selector="Grid#OutHead.narrow TextBlock.optSummary">
+            <Setter Property="MaxWidth" Value="120"/>
+        </Style>
+        <Style Selector="Grid#OutHead.wide TextBlock.optSummary">
+            <Setter Property="MaxWidth" Value="300"/>
+        </Style>
 
-            <Button Grid.Column="1" Classes="toggle"
-                    Command="{Binding TogglePingCommand}"
-                    HorizontalAlignment="Stretch"
-                    Classes.active="{Binding IsPinging}">
-                <Panel>
-                    <TextBlock Text="START" IsVisible="{Binding !IsPinging}" FontSize="12"/>
-                    <TextBlock Text="STOP" IsVisible="{Binding IsPinging}" FontSize="12"/>
-                </Panel>
-            </Button>
-        </Grid>
+        <!-- options flyout: a short label beside each box, two pairs a row -->
+        <Style Selector="StackPanel.optForm TextBlock.optLabel">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="StackPanel.optForm NumericUpDown">
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+        <Style Selector="StackPanel.optForm TextBlock.unit">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
 
-        <!-- WrapPanel so the third checkbox drops to a second line instead of clipping on a phone -->
-        <WrapPanel Grid.Row="1" Margin="2,0,0,10">
-            <CheckBox IsChecked="{Binding IsTraceRoute}" Content="Trace Route" FontSize="12" FontWeight="SemiBold" Margin="0,0,18,4"/>
-            <CheckBox IsChecked="{Binding NotifyOnline}" Content="Alert Online" FontSize="12" FontWeight="SemiBold" Margin="0,0,18,4"/>
-            <CheckBox IsChecked="{Binding NotifyOffline}" Content="Alert Offline" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4"/>
-        </WrapPanel>
+        <!-- log rows: compact, monospace; a solid hover fill (no alpha) -->
+        <Style Selector="ListBox#LogList ListBoxItem">
+            <Setter Property="Padding" Value="12,3"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+        </Style>
+        <Style Selector="ListBox#LogList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+        </Style>
 
-        <Border Grid.Row="2" Classes="card output">
-            <ListBox Name="LogList"
-                     ItemsSource="{Binding LogItems}"
-                     Background="Transparent"
-                     BorderThickness="0"
-                     Padding="4"
-                     FontSize="11.5"
-                     Foreground="#4FCB97"
-                     FontFamily="Cascadia Code,Consolas,Monospace">
-                <ListBox.Styles>
-                    <Style Selector="ListBoxItem">
-                        <Setter Property="Padding" Value="6,2"/>
-                        <Setter Property="MinHeight" Value="0"/>
-                        <Setter Property="Background" Value="Transparent"/>
-                    </Style>
-                    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
-                        <Setter Property="Background" Value="#2042B883"/>
-                    </Style>
-                </ListBox.Styles>
-                <ListBox.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <VirtualizingStackPanel />
-                    </ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-            </ListBox>
+        <!-- ===== mode switch: one segmented control [Ping | Traceroute | MTR | TCP] ===== -->
+        <Style Selector="ListBox.modeSwitch">
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ItemsPanel">
+                <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="ListBox.modeSwitch > ListBoxItem">
+            <Setter Property="Padding" Value="14,0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="ListBox.modeSwitch > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+        </Style>
+        <Style Selector="ListBox.modeSwitch > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="ListBox.modeSwitch > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.modeSwitch > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.modeSwitch > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.modeSwitch > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <!-- locked while a run goes on: the chosen mode stays marked, the others read as unavailable -->
+        <Style Selector="ListBox.modeSwitch:disabled > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
+        <Style Selector="ListBox.modeSwitch:disabled > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <!-- (after the shared item style, which sets MinWidth 0) -->
+        <Style Selector="ListBox.modeSwitch.modes > ListBoxItem">
+            <Setter Property="MinWidth" Value="58"/>
+        </Style>
+        <Style Selector="ListBox.modeSwitch.ipSeg > ListBoxItem">
+            <Setter Property="Padding" Value="10,0"/>
+        </Style>
+
+        <!-- ===== status strip at the foot of an output card (packet statistics / MTR progress) ===== -->
+        <Style Selector="Border.foot">
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+            <Setter Property="CornerRadius" Value="0,0,9,9"/>
+            <Setter Property="Padding" Value="16,8"/>
+        </Style>
+        <Style Selector="StackPanel.stat">
+            <Setter Property="Spacing" Value="1"/>
+            <Setter Property="MinWidth" Value="40"/>
+        </Style>
+        <Style Selector="TextBlock.statCap">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="TextBlock.statVal">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="TextBlock.statVal.warn"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="TextBlock.statVal.bad"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="TextBlock.footText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.footText.error"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+
+        <!-- ping stats: the sparkline beside the numbers when there's room, under them otherwise -->
+        <Style Selector="Grid#PingStats.wide > ctl|LatencySparkline">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="24,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#PingStats.narrow > ctl|LatencySparkline">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#PingStats.narrow > WrapPanel">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+
+        <!-- custom-drawn charts: colors are tokens -->
+        <Style Selector="ctl|LatencySparkline">
+            <Setter Property="LineBrush" Value="{DynamicResource Accent}"/>
+            <Setter Property="FillBrush" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="LossBrush" Value="{DynamicResource Danger}"/>
+        </Style>
+
+        <!-- ===== MTR table ===== -->
+        <Style Selector="ListBox#MtrList">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0,4"/>
+        </Style>
+        <Style Selector="ListBox#MtrList ListBoxItem">
+            <Setter Property="Padding" Value="12,3"/>
+            <Setter Property="Margin" Value="4,0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="ListBox#MtrList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+        </Style>
+        <Style Selector="Grid#MtrRoot.narrow ListBox#MtrList ListBoxItem">
+            <Setter Property="Padding" Value="10,5"/>
+        </Style>
+
+        <!-- cells: the header and every row share these widths, so the columns line up -->
+        <Style Selector="Grid.hop TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Grid.hop TextBlock:not(.head)">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+        </Style>
+        <Style Selector="Grid.hop > TextBlock.num">
+            <Setter Property="Width" Value="52"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
+        <Style Selector="Grid.hop > TextBlock.cTtl">
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Grid.hop > TextBlock.cLoss"><Setter Property="Width" Value="60"/></Style>
+        <Style Selector="Grid.hop > TextBlock.cSent"><Setter Property="Width" Value="46"/></Style>
+        <Style Selector="Grid.hop > TextBlock.cLoss.warn"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="Grid.hop > TextBlock.cLoss.bad"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="Grid.hop > TextBlock.cAvg"><Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/></Style>
+        <Style Selector="Grid.hop > ctl|LatencySparkline.cGraph">
+            <Setter Property="Width" Value="92"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Margin" Value="16,0,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="StrokeThickness" Value="1.25"/>
+        </Style>
+        <Style Selector="Grid.hop > TextBlock.cSum">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="0,3,0,0"/>
+        </Style>
+        <Style Selector="TextBlock.hostIp">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="TextBlock.hostIp.silent"><Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/></Style>
+        <Style Selector="TextBlock.hostIp.dest"><Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/></Style>
+        <Style Selector="TextBlock.hostName">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="10,0,0,0"/>
+        </Style>
+        <Style Selector="Border.rowBadge">
+            <Setter Property="Padding" Value="5,0"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+        </Style>
+        <Style Selector="Border.rowBadge TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="10"/>
+        </Style>
+        <!-- the header row: captions, not data -->
+        <Style Selector="Grid.hop > TextBlock.head">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+
+        <!-- wide: one line per hop -->
+        <Style Selector="Grid#MtrRoot.wide Grid.hop > :is(Control).cHost"><Setter Property="Grid.Column" Value="1"/></Style>
+        <Style Selector="Grid#MtrRoot.wide Grid.hop > :is(Control).cLoss"><Setter Property="Grid.Column" Value="2"/></Style>
+        <Style Selector="Grid#MtrRoot.wide Grid.hop > :is(Control).cSent"><Setter Property="Grid.Column" Value="3"/></Style>
+        <Style Selector="Grid#MtrRoot.wide Grid.hop > :is(Control).cLast"><Setter Property="Grid.Column" Value="4"/></Style>
+        <Style Selector="Grid#MtrRoot.wide Grid.hop > :is(Control).cAvg"><Setter Property="Grid.Column" Value="5"/></Style>
+        <Style Selector="Grid#MtrRoot.wide Grid.hop > :is(Control).cBest"><Setter Property="Grid.Column" Value="6"/></Style>
+        <Style Selector="Grid#MtrRoot.wide Grid.hop > :is(Control).cWorst"><Setter Property="Grid.Column" Value="7"/></Style>
+        <Style Selector="Grid#MtrRoot.wide Grid.hop > :is(Control).cStd"><Setter Property="Grid.Column" Value="8"/></Style>
+        <Style Selector="Grid#MtrRoot.wide Grid.hop > :is(Control).cGraph"><Setter Property="Grid.Column" Value="9"/></Style>
+        <Style Selector="Grid#MtrRoot.wide Grid.hop > :is(Control).cSum"><Setter Property="IsVisible" Value="False"/></Style>
+
+        <!-- narrow (a phone, a slim window): two lines per hop — # · host · loss, then the numbers in one line + graph -->
+        <Style Selector="Grid#MtrRoot.narrow Grid.hop > :is(Control).cTtl"><Setter Property="VerticalAlignment" Value="Top"/></Style>
+        <Style Selector="Grid#MtrRoot.narrow Grid.hop > :is(Control).cHost">
+            <Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="8"/>
+        </Style>
+        <Style Selector="Grid#MtrRoot.narrow Grid.hop > :is(Control).cLoss"><Setter Property="Grid.Column" Value="9"/></Style>
+        <Style Selector="Grid#MtrRoot.narrow Grid.hop > :is(Control).cSum">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="8"/>
+        </Style>
+        <Style Selector="Grid#MtrRoot.narrow Grid.hop > :is(Control).cGraph">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="9"/>
+            <Setter Property="Width" Value="60"/><Setter Property="Height" Value="12"/>
+            <Setter Property="Margin" Value="8,3,0,0"/>
+        </Style>
+        <Style Selector="Grid#MtrRoot.narrow Grid.hop > :is(Control).wideOnly"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#MtrRoot.narrow Grid#MtrHead, Grid#MtrRoot.narrow Border#MtrHeadRule">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto, *" RowSpacing="12">
+
+        <!-- ===== target + run options ===== -->
+        <Border Grid.Row="0" Classes="card" Padding="12">
+            <StackPanel Spacing="12">
+                <!-- host · port (TCP mode) · Start. No column spacing: the hidden port column would still take one. -->
+                <Grid x:Name="TargetRow" ColumnDefinitions="*, Auto, Auto" RowDefinitions="Auto, Auto">
+                    <TextBlock Classes="fieldLabel" Text="Host"/>
+                    <TextBlock Grid.Column="1" Classes="fieldLabel" Text="Port" Margin="10,0,0,4" IsVisible="{Binding IsTcpMode}"/>
+                    <AutoCompleteBox Grid.Row="1" Grid.Column="0" Classes="field" x:Name="HostBox" helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Host" helpers:InputAssist.PasteButton="True"
+                                     helpers:InputAssist.PortTarget="{Binding PortTargetName}"
+                                     Text="{Binding TargetHost}"
+                                     ItemsSource="{Binding TargetHostHistory}"
+                                     FilterMode="ContainsOrdinal"
+                                     MinimumPrefixLength="0"
+                                     PlaceholderText="{Binding HostPlaceholder}"
+                                     AutomationProperties.Name="Host name or IP">
+                        <AutoCompleteBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding TogglePingCommand}" />
+                        </AutoCompleteBox.KeyBindings>
+                    </AutoCompleteBox>
+
+                    <!-- TCP mode: the port to connect to. A pasted "host:port" or URL with a port fills it. -->
+                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="TcpPortBox" Classes="field mono" Width="72" Margin="8,0,0,0"
+                             Text="{Binding TcpPortText}" PlaceholderText="443" MaxLength="5" TextInputOptions.ContentType="Digits"
+                             helpers:InputAssist.SelectAllOnFocus="True"
+                             IsVisible="{Binding IsTcpMode}" IsEnabled="{Binding !IsPinging}"
+                             ToolTip.Tip="TCP port to connect to (1-65535): 443 HTTPS, 80 HTTP, 22 SSH, 53 DNS"
+                             AutomationProperties.Name="Port">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding TogglePingCommand}" />
+                        </TextBox.KeyBindings>
+                    </TextBox>
+
+                    <Button Grid.Row="1" Grid.Column="2" x:Name="StartBtn" Classes="toggle" MinWidth="96" Margin="8,0,0,0"
+                            Command="{Binding TogglePingCommand}"
+                            Classes.active="{Binding IsPinging}">
+                        <Panel>
+                            <TextBlock Text="Start" IsVisible="{Binding !IsPinging}"/>
+                            <TextBlock Text="Stop" IsVisible="{Binding IsPinging}"/>
+                        </Panel>
+                    </Button>
+                </Grid>
+
+                <!-- the mode is chosen at Start, so the switch is locked while a run goes on (ICMP vs UDP needs no choice:
+                     IcmpPinger falls back by itself). The alerts only mean something for ping and TCP ping; they wrap
+                     onto a second line on a phone instead of clipping. -->
+                <WrapPanel ItemSpacing="24" LineSpacing="8">
+                    <ListBox x:Name="ModeSwitch" Classes="modeSwitch modes" SelectedIndex="{Binding ModeIndex}" IsEnabled="{Binding !IsPinging}"
+                             AutomationProperties.Name="Mode">
+                        <!-- four modes: segments sized to their labels (four of Traceroute's width didn't fit a phone,
+                             nor beside the alerts on the desktop) -->
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBoxItem ToolTip.Tip="ICMP ping every interval, with live statistics">Ping</ListBoxItem>
+                        <ListBoxItem ToolTip.Tip="Trace the route hop by hop, once">Traceroute</ListBoxItem>
+                        <ListBoxItem ToolTip.Tip="Trace the route and keep probing every hop once a second: loss and latency per hop">MTR</ListBoxItem>
+                        <ListBoxItem ToolTip.Tip="TCP ping: connect to a port every interval and time it (SYN to SYN/ACK). Works where ICMP is blocked">TCP</ListBoxItem>
+                    </ListBox>
+                    <WrapPanel ItemSpacing="24" LineSpacing="4" VerticalAlignment="Center" IsVisible="{Binding IsLoopMode}">
+                        <CheckBox IsChecked="{Binding NotifyOnline}" Content="Alert when up" VerticalAlignment="Center"
+                                  ToolTip.Tip="Play a sound when the host (TCP: the port) starts answering again"/>
+                        <CheckBox IsChecked="{Binding NotifyOffline}" Content="Alert when down" VerticalAlignment="Center"
+                                  ToolTip.Tip="Play a sound when the host (TCP: the port) stops answering"/>
+                    </WrapPanel>
+                </WrapPanel>
+            </StackPanel>
         </Border>
 
-        <Button Grid.Row="2" Classes="ghost" Command="{Binding CopyLogCommand}" Content="COPY"
-                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,12,0"
-                Height="26" FontSize="9" Padding="10,0"/>
+        <!-- ===== ping / TCP ping / traceroute: header (options, copy) / log / packet statistics ===== -->
+        <Border Grid.Row="1" Classes="card output" IsVisible="{Binding IsLogMode}">
+            <Grid RowDefinitions="Auto, Auto, *, Auto">
+                <Grid Grid.Row="0" x:Name="OutHead" helpers:Responsive.BreakWidth="480" ColumnDefinitions="*, Auto, Auto" Margin="16,8,8,8">
+                    <TextBlock Classes="cardHeader" Text="Output" Margin="0" VerticalAlignment="Center"/>
 
-        <Border Grid.Row="3" Classes="card" Margin="0,10,0,0" Padding="12,7">
-            <TextBlock Text="{Binding StatsSummary}"
-                       FontSize="11.5"
-                       FontFamily="Cascadia Code,Consolas,Monospace"
-                       Foreground="#C7C8CF"
-                       FontWeight="Medium"
-                       TextWrapping="Wrap"/>
+                    <!-- packet / timing options (ping and TCP ping): the values that differ from the defaults show
+                         on the button itself, so the page needs no extra row for them -->
+                    <Button Grid.Column="1" x:Name="OptionsBtn" Classes="ghost opts" Classes.set="{Binding HasOptionsSummary}"
+                            Margin="0,0,8,0" IsVisible="{Binding IsLoopMode}"
+                            ToolTip.Tip="{Binding OptionsTip}" AutomationProperties.Name="Options">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <Path Classes="btnIco" Data="{StaticResource GlyphSliders}"/>
+                            <TextBlock Text="Options" VerticalAlignment="Center" IsVisible="{Binding !HasOptionsSummary}"/>
+                            <TextBlock Classes="optSummary" Text="{Binding OptionsSummary}" IsVisible="{Binding HasOptionsSummary}"/>
+                        </StackPanel>
+                        <Button.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedRight">
+                                <StackPanel x:Name="OptForm" Classes="optForm" Width="292" Spacing="8">
+                                    <!-- the packet: ICMP only -->
+                                    <Grid ColumnDefinitions="62, *, 12, 44, *" RowDefinitions="Auto, Auto" RowSpacing="8"
+                                          IsVisible="{Binding IsPingMode}">
+                                        <TextBlock Classes="optLabel" Text="Size" ToolTip.Tip="{Binding SizeTip}"/>
+                                        <NumericUpDown Grid.Column="1" x:Name="SizeBox" Classes="field" Value="{Binding PayloadSize}"
+                                                       Minimum="0" Maximum="65500" Increment="1" FormatString="0" ShowButtonSpinner="False"
+                                                       IsEnabled="{Binding !SizeLocked}" ToolTip.Tip="{Binding SizeTip}"
+                                                       AutomationProperties.Name="Payload size (bytes)">
+                                            <NumericUpDown.InnerRightContent><TextBlock Classes="unit" Text="B"/></NumericUpDown.InnerRightContent>
+                                        </NumericUpDown>
+                                        <TextBlock Grid.Column="3" Classes="optLabel" Text="TTL"/>
+                                        <NumericUpDown Grid.Column="4" x:Name="TtlBox" Classes="field" Value="{Binding TtlValue}"
+                                                       Minimum="1" Maximum="255" Increment="1" FormatString="0" ShowButtonSpinner="False"
+                                                       PlaceholderText="Auto"
+                                                       ToolTip.Tip="Time to live: routers the packet may cross (1-255). Empty = the system's default"
+                                                       AutomationProperties.Name="TTL"/>
+                                        <CheckBox Grid.Row="1" Grid.ColumnSpan="5" x:Name="DfBox" IsChecked="{Binding DontFragment}" Content="Don't fragment"
+                                                  ToolTip.Tip="A packet bigger than the path MTU fails with &quot;Packet too big&quot; instead of being split (for finding the MTU). IPv4 flag"/>
+                                    </Grid>
+                                    <!-- timing: ping and TCP -->
+                                    <Grid ColumnDefinitions="62, *, 12, 44, *" RowDefinitions="Auto, Auto" RowSpacing="8">
+                                        <TextBlock Classes="optLabel" Text="Interval"/>
+                                        <NumericUpDown Grid.Column="1" x:Name="IntervalBox" Classes="field" Value="{Binding IntervalSec}"
+                                                       Minimum="0.2" Maximum="3600" Increment="0.5" FormatString="0.##" ShowButtonSpinner="False"
+                                                       ToolTip.Tip="Seconds from one probe to the next (0.2 or more)"
+                                                       AutomationProperties.Name="Interval (seconds)">
+                                            <NumericUpDown.InnerRightContent><TextBlock Classes="unit" Text="s"/></NumericUpDown.InnerRightContent>
+                                        </NumericUpDown>
+                                        <TextBlock Grid.Column="3" Classes="optLabel" Text="Count"/>
+                                        <NumericUpDown Grid.Column="4" x:Name="CountBox" Classes="field" Value="{Binding CountValue}"
+                                                       Minimum="0" Maximum="1000000" Increment="1" FormatString="0" ShowButtonSpinner="False"
+                                                       PlaceholderText="∞"
+                                                       ToolTip.Tip="Probes to send, then stop. Empty or 0 = until stopped"
+                                                       AutomationProperties.Name="Count"/>
+                                        <TextBlock Grid.Row="1" Classes="optLabel" Text="Timeout"/>
+                                        <NumericUpDown Grid.Row="1" Grid.Column="1" x:Name="TimeoutBox" Classes="field" Value="{Binding TimeoutSec}"
+                                                       Minimum="0.1" Maximum="60" Increment="0.5" FormatString="0.##" ShowButtonSpinner="False"
+                                                       ToolTip.Tip="Seconds to wait for each reply (TCP: for the SYN/ACK)"
+                                                       AutomationProperties.Name="Timeout (seconds)">
+                                            <NumericUpDown.InnerRightContent><TextBlock Classes="unit" Text="s"/></NumericUpDown.InnerRightContent>
+                                        </NumericUpDown>
+                                    </Grid>
+                                    <!-- which address of a name that has both; picks the target, so only between runs -->
+                                    <Grid ColumnDefinitions="62, *">
+                                        <TextBlock Classes="optLabel" Text="IP"/>
+                                        <ListBox Grid.Column="1" x:Name="IpSwitch" Classes="modeSwitch ipSeg" SelectedIndex="{Binding IpVersionIndex}"
+                                                 IsEnabled="{Binding !IsPinging}" AutomationProperties.Name="IP version"
+                                                 ToolTip.Tip="Which address to use when the name has both (Auto: IPv4 first). Stop to change">
+                                            <ListBoxItem>Auto</ListBoxItem>
+                                            <ListBoxItem>IPv4</ListBoxItem>
+                                            <ListBoxItem>IPv6</ListBoxItem>
+                                        </ListBox>
+                                    </Grid>
+                                    <Border Classes="divider" Margin="0,2,0,0"/>
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock Classes="muted" FontSize="{StaticResource Font.Small}" VerticalAlignment="Center"
+                                                   Text="Applies from the next probe"/>
+                                        <Button Grid.Column="1" Classes="ghost" Content="Defaults" Command="{Binding ResetOptionsCommand}"
+                                                ToolTip.Tip="Every option back to its default"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+
+                    <Button Grid.Column="2" Classes="ghost" Command="{Binding CopyLogCommand}" Content="Copy"
+                            ToolTip.Tip="Copy the whole log"/>
+                </Grid>
+                <Border Grid.Row="1" Classes="divider"/>
+
+                <Panel Grid.Row="2">
+                    <ListBox Name="LogList"
+                             ItemsSource="{Binding LogItems}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="4,8"
+                             FontSize="{StaticResource Font.Small}"
+                             Foreground="{DynamicResource Text.Secondary}"
+                             FontFamily="{StaticResource MonoFont}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                    </ListBox>
+
+                    <!-- empty state -->
+                    <TextBlock Classes="muted" IsHitTestVisible="False"
+                               IsVisible="{Binding !LogItems.Count}"
+                               Text="{Binding EmptyHint}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                               TextWrapping="Wrap" MaxWidth="320" Margin="24"/>
+                </Panel>
+
+                <!-- ping statistics (ping's own summary, live) + the recent round trips; not for a traceroute -->
+                <Border Grid.Row="3" Classes="foot" IsVisible="{Binding IsLoopMode}">
+                    <Grid x:Name="PingStats" helpers:Responsive.BreakWidth="600" ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
+                        <!-- two groups (packets · round trips) that wrap as wholes on a phone -->
+                        <WrapPanel ItemSpacing="18" LineSpacing="8" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="18">
+                                <StackPanel Classes="stat">
+                                    <TextBlock Classes="statCap" Text="Sent"/>
+                                    <TextBlock Classes="statVal" Text="{Binding SentText}"/>
+                                </StackPanel>
+                                <StackPanel Classes="stat">
+                                    <TextBlock Classes="statCap" Text="Received"/>
+                                    <TextBlock Classes="statVal" Text="{Binding ReceivedText}"/>
+                                </StackPanel>
+                                <StackPanel Classes="stat">
+                                    <TextBlock Classes="statCap" Text="Loss"/>
+                                    <TextBlock Classes="statVal" Classes.warn="{Binding SomeLoss}" Classes.bad="{Binding AllLost}"
+                                               Text="{Binding LossText}"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="18">
+                                <StackPanel Classes="stat" ToolTip.Tip="Fastest reply">
+                                    <TextBlock Classes="statCap" Text="Min"/>
+                                    <TextBlock Classes="statVal" Text="{Binding MinText}"/>
+                                </StackPanel>
+                                <StackPanel Classes="stat" ToolTip.Tip="Average round trip">
+                                    <TextBlock Classes="statCap" Text="Avg"/>
+                                    <TextBlock Classes="statVal" Text="{Binding AvgText}"/>
+                                </StackPanel>
+                                <StackPanel Classes="stat" ToolTip.Tip="Slowest reply">
+                                    <TextBlock Classes="statCap" Text="Max"/>
+                                    <TextBlock Classes="statVal" Text="{Binding MaxText}"/>
+                                </StackPanel>
+                                <StackPanel Classes="stat" ToolTip.Tip="Mean deviation (jitter): how much the round trips vary">
+                                    <TextBlock Classes="statCap" Text="Mdev"/>
+                                    <TextBlock Classes="statVal" Text="{Binding MdevText}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </WrapPanel>
+                        <ctl:LatencySparkline Height="30" Points="60" MinScale="5" Headroom="1.25" VerticalAlignment="Center"
+                                              Series="{Binding PingSeries}" Version="{Binding PingSeriesVersion}"
+                                              ToolTip.Tip="Round trips of the last 60 probes; red marks one that got no reply"/>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- ===== MTR: header / hop table / progress ===== -->
+        <Border Grid.Row="1" Classes="card output" IsVisible="{Binding IsMtrMode}">
+            <Grid x:Name="MtrRoot" helpers:Responsive.BreakWidth="640" RowDefinitions="Auto, Auto, Auto, Auto, *, Auto">
+                <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="16,8,8,8">
+                    <TextBlock Classes="cardHeader" Text="Hops" Margin="0" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Classes="ghost" Command="{Binding CopyLogCommand}" Content="Copy"
+                            ToolTip.Tip="Copy the table as an mtr-style report"/>
+                </Grid>
+                <Border Grid.Row="1" Classes="divider"/>
+
+                <!-- column captions (the one-line table only) -->
+                <Grid Grid.Row="2" x:Name="MtrHead" Classes="hop" Margin="16,6,16,6"
+                      ColumnDefinitions="Auto, *, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto">
+                    <TextBlock Classes="head cTtl" Text="#"/>
+                    <TextBlock Classes="head cHost" Text="Host"/>
+                    <TextBlock Classes="head num cLoss" Text="Loss"/>
+                    <TextBlock Classes="head num cSent" Text="Sent"/>
+                    <TextBlock Classes="head num cLast" Text="Last"/>
+                    <TextBlock Classes="head num cAvg" Text="Avg"/>
+                    <TextBlock Classes="head num cBest" Text="Best"/>
+                    <TextBlock Classes="head num cWorst" Text="Worst"/>
+                    <TextBlock Classes="head num cStd" Text="StDev" ToolTip.Tip="Standard deviation of the round trips (ms)"/>
+                    <TextBlock Classes="head cGraph" Text="Recent" Width="92" Margin="16,0,0,0"/>
+                </Grid>
+                <Border Grid.Row="3" x:Name="MtrHeadRule" Classes="divider"/>
+
+                <Panel Grid.Row="4">
+                    <ListBox x:Name="MtrList" ItemsSource="{Binding Mtr.Hops}">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel/>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:MtrHopRow">
+                                <Grid Classes="hop" ColumnDefinitions="Auto, *, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto"
+                                      RowDefinitions="Auto, Auto">
+                                    <TextBlock Classes="cTtl" Text="{Binding TtlText}"/>
+                                    <Grid Classes="cHost" ColumnDefinitions="Auto, *, Auto" ToolTip.Tip="{Binding HostTip}" Background="Transparent">
+                                        <TextBlock Classes="hostIp" Classes.silent="{Binding IsSilent}" Classes.dest="{Binding IsDestination}"
+                                                   Text="{Binding Host}" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Classes="hostName" Text="{Binding Name}" IsVisible="{Binding HasName}"
+                                                   VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
+                                            <Border Classes="badge info rowBadge" IsVisible="{Binding HasMultipath}" ToolTip.Tip="{Binding MultipathTip}">
+                                                <TextBlock Text="{Binding Multipath}"/>
+                                            </Border>
+                                            <Border Classes="badge danger rowBadge" IsVisible="{Binding HasNote}">
+                                                <TextBlock Text="{Binding Note}"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock Classes="num cLoss" Classes.warn="{Binding SomeLoss}" Classes.bad="{Binding AllLost}" Text="{Binding LossText}"/>
+                                    <TextBlock Classes="num cSent wideOnly" Text="{Binding SentText}"/>
+                                    <TextBlock Classes="num cLast wideOnly" Text="{Binding LastText}"/>
+                                    <TextBlock Classes="num cAvg wideOnly" Text="{Binding AvgText}"/>
+                                    <TextBlock Classes="num cBest wideOnly" Text="{Binding BestText}"/>
+                                    <TextBlock Classes="num cWorst wideOnly" Text="{Binding WorstText}"/>
+                                    <TextBlock Classes="num cStd wideOnly" Text="{Binding StDevText}"/>
+                                    <ctl:LatencySparkline Classes="cGraph" Points="30" MinScale="10" Headroom="1.3"
+                                                          Series="{Binding Series}" Version="{Binding SeriesVersion}"/>
+                                    <TextBlock Classes="cSum" Text="{Binding Summary}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- empty state -->
+                    <TextBlock Classes="muted" IsHitTestVisible="False"
+                               IsVisible="{Binding Mtr.ShowHint}"
+                               Text="Enter a host and press Start: loss and latency per hop show up here."
+                               HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                               TextWrapping="Wrap" MaxWidth="360" Margin="24"/>
+                </Panel>
+
+                <Border Grid.Row="5" Classes="foot" IsVisible="{Binding Mtr.Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Classes="footText" Classes.error="{Binding Mtr.StatusIsError}" Text="{Binding Mtr.Status}"/>
+                </Border>
+            </Grid>
         </Border>
     </Grid>
 </UserControl>

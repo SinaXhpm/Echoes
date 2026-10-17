@@ -1,0 +1,465 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
+             x:Class="Echoes.Views.DoctorView"
+             x:DataType="vm:DoctorViewModel"
+             x:CompileBindings="True">
+
+    <UserControl.Resources>
+        <!-- verdict glyphs (24x24 grid, stroked like the nav icons) -->
+        <StreamGeometry x:Key="DocIcoIdle">M6 3.5 V8.5 A4.5 4.5 0 0 0 15 8.5 V3.5 M4.8 3.5 H7.2 M13.8 3.5 H16.2 M10.5 13 V15.5 A4 4 0 0 0 18.5 15.5 V13.5 M18.5 13.5 A2 2 0 1 0 18.5 9.5 A2 2 0 1 0 18.5 13.5 Z</StreamGeometry>
+        <StreamGeometry x:Key="DocIcoRunning">M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M12 7.5 V12 L15 14</StreamGeometry>
+        <StreamGeometry x:Key="DocIcoWorks">M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M8 12.3 L10.8 15.1 L16.2 9.4</StreamGeometry>
+        <StreamGeometry x:Key="DocIcoProblem">M12 3.8 L21 19.5 H3 Z M12 10 V14 M12 16.9 V17.1</StreamGeometry>
+        <StreamGeometry x:Key="DocIcoDown">M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M9 9 L15 15 M15 9 L9 15</StreamGeometry>
+        <StreamGeometry x:Key="DocIcoUnknown">M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M9.6 9.4 A2.5 2.5 0 1 1 13.3 11.6 C12.5 12 12 12.6 12 13.5 V14 M12 16.9 V17.1</StreamGeometry>
+        <StreamGeometry x:Key="DocIcoStopped">M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M9.5 9.5 H14.5 V14.5 H9.5 Z</StreamGeometry>
+        <!-- row glyphs (16x16 grid) -->
+        <StreamGeometry x:Key="DocStOk">M3.5 8.5 L6.5 11.5 L12.5 4.5</StreamGeometry>
+        <StreamGeometry x:Key="DocStWarn">M8 2.5 L14 13.5 H2 Z M8 6.5 V9.3 M8 11.4 V11.6</StreamGeometry>
+        <StreamGeometry x:Key="DocStFail">M4.5 4.5 L11.5 11.5 M11.5 4.5 L4.5 11.5</StreamGeometry>
+        <StreamGeometry x:Key="DocStSkip">M4.5 8 H11.5</StreamGeometry>
+        <StreamGeometry x:Key="DocStRunning">M4 8 V8.01 M8 8 V8.01 M12 8 V8.01</StreamGeometry>
+        <StreamGeometry x:Key="DocStPending">M8 5.5 A2.5 2.5 0 1 0 8 10.5 A2.5 2.5 0 1 0 8 5.5 Z</StreamGeometry>
+        <!-- chevron for the expand/collapse of a check's sub-steps -->
+        <StreamGeometry x:Key="DocChevRight">M5 3 L9.5 7.5 L5 12</StreamGeometry>
+        <StreamGeometry x:Key="DocChevDown">M3 5 L7.5 9.5 L12 5</StreamGeometry>
+        <!-- sub-step dots (12x12) -->
+        <StreamGeometry x:Key="DocSubOk">M2.5 6.2 L5 8.7 L9.5 3.7</StreamGeometry>
+        <StreamGeometry x:Key="DocSubFail">M3.5 3.5 L8.5 8.5 M8.5 3.5 L3.5 8.5</StreamGeometry>
+        <StreamGeometry x:Key="DocSubWarn">M6 2.5 L10.5 10 H1.5 Z</StreamGeometry>
+        <StreamGeometry x:Key="DocSubSkip">M3 6 H9</StreamGeometry>
+        <StreamGeometry x:Key="DocSubDot">M6 4.2 A1.8 1.8 0 1 0 6 7.8 A1.8 1.8 0 1 0 6 4.2 Z</StreamGeometry>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- ===== verdict card: one solid tint per outcome ===== -->
+        <Style Selector="Border.verdict">
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="14,12"/>
+        </Style>
+        <Style Selector="Border.verdict.works">
+            <Setter Property="Background" Value="{DynamicResource Success.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Success.Border}"/>
+        </Style>
+        <Style Selector="Border.verdict.problem">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+        </Style>
+        <Style Selector="Border.verdict.down">
+            <Setter Property="Background" Value="{DynamicResource Warning.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Warning.Border}"/>
+        </Style>
+        <Style Selector="Border.verdict.unknown">
+            <Setter Property="Background" Value="{DynamicResource Info.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Info.Border}"/>
+        </Style>
+
+        <Style Selector="Path.vIco">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="StrokeThickness" Value="1.8"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="Data" Value="{StaticResource DocIcoIdle}"/>
+        </Style>
+        <Style Selector="Path.vIco.running"><Setter Property="Data" Value="{StaticResource DocIcoRunning}"/></Style>
+        <Style Selector="Path.vIco.stopped">
+            <Setter Property="Data" Value="{StaticResource DocIcoStopped}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Path.vIco.works">
+            <Setter Property="Data" Value="{StaticResource DocIcoWorks}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Success}"/>
+        </Style>
+        <Style Selector="Path.vIco.problem">
+            <Setter Property="Data" Value="{StaticResource DocIcoProblem}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Path.vIco.down">
+            <Setter Property="Data" Value="{StaticResource DocIcoDown}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="Path.vIco.unknown">
+            <Setter Property="Data" Value="{StaticResource DocIcoUnknown}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Info}"/>
+        </Style>
+
+        <Style Selector="TextBlock.vTitle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Title}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.vTitle.works"><Setter Property="Foreground" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="TextBlock.vTitle.problem"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="TextBlock.vTitle.down"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="TextBlock.vTitle.unknown"><Setter Property="Foreground" Value="{DynamicResource Info}"/></Style>
+        <Style Selector="SelectableTextBlock.vText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.vAdvice">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+        </Style>
+
+        <!-- ===== check rows ===== -->
+        <Style Selector="Grid.step">
+            <Setter Property="Margin" Value="12,0"/>
+            <Setter Property="MinHeight" Value="26"/>
+        </Style>
+        <Style Selector="Path.st">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="Margin" Value="0,5,10,0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="StrokeThickness" Value="1.7"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+            <Setter Property="Data" Value="{StaticResource DocStPending}"/>
+        </Style>
+        <Style Selector="Path.st.ok">
+            <Setter Property="Data" Value="{StaticResource DocStOk}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Success}"/>
+            <Setter Property="StrokeThickness" Value="2"/>
+        </Style>
+        <Style Selector="Path.st.warn">
+            <Setter Property="Data" Value="{StaticResource DocStWarn}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="Path.st.fail">
+            <Setter Property="Data" Value="{StaticResource DocStFail}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+            <Setter Property="StrokeThickness" Value="2"/>
+        </Style>
+        <Style Selector="Path.st.skip">
+            <Setter Property="Data" Value="{StaticResource DocStSkip}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Path.st.running">
+            <Setter Property="Data" Value="{StaticResource DocStRunning}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="StrokeThickness" Value="2.4"/>
+        </Style>
+
+        <Style Selector="TextBlock.stTitle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="Margin" Value="0,5,10,0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.stTitle.quiet"><Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/></Style>
+        <Style Selector="TextBlock.stDetail">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="MaxLines" Value="3"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="0,6,0,5"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style Selector="TextBlock.stDetail.quiet"><Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/></Style>
+        <Style Selector="TextBlock.stTime">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="MinWidth" Value="46"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="Margin" Value="10,7,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+
+        <!-- the expand chevron + "N steps" badge for a check that has sub-steps -->
+        <Style Selector="StackPanel.stepExpand">
+            <Setter Property="Orientation" Value="Horizontal"/>
+            <Setter Property="Spacing" Value="4"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Margin" Value="8,6,0,0"/>
+        </Style>
+        <Style Selector="TextBlock.stepCount">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Path.chev">
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="Data" Value="{StaticResource DocChevRight}"/>
+        </Style>
+        <Style Selector="Path.chev.open"><Setter Property="Data" Value="{StaticResource DocChevDown}"/></Style>
+        <!-- the row header: clickable when it has sub-steps -->
+        <Style Selector="Grid.step.clickable:pointerover"><Setter Property="Background" Value="{DynamicResource Bg.Hover}"/></Style>
+
+        <!-- ===== sub-steps (the granular trace under a check) ===== -->
+        <Style Selector="ItemsControl.traceList">
+            <Setter Property="Margin" Value="38,0,12,6"/>
+        </Style>
+        <Style Selector="Grid.trace">
+            <Setter Property="MinHeight" Value="18"/>
+            <Setter Property="Margin" Value="0,0,0,1"/>
+        </Style>
+        <Style Selector="Path.sub">
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="12"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="Margin" Value="0,3,8,0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="Data" Value="{StaticResource DocSubDot}"/>
+        </Style>
+        <Style Selector="Path.sub.ok"><Setter Property="Data" Value="{StaticResource DocSubOk}"/><Setter Property="Stroke" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="Path.sub.warn"><Setter Property="Data" Value="{StaticResource DocSubWarn}"/><Setter Property="Stroke" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="Path.sub.fail"><Setter Property="Data" Value="{StaticResource DocSubFail}"/><Setter Property="Stroke" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="Path.sub.skip"><Setter Property="Data" Value="{StaticResource DocSubSkip}"/><Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/></Style>
+        <Style Selector="TextBlock.subStep">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="Margin" Value="0,2,8,0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.subDetail">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="MaxLines" Value="2"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style Selector="TextBlock.subTime">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Disabled}"/>
+            <Setter Property="MinWidth" Value="42"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="Margin" Value="8,2,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <!-- wide: step | detail | time on one line; narrow: detail under the step -->
+        <Style Selector="Grid#DocRoot.narrow Grid.trace > TextBlock.subDetail">
+            <Setter Property="Grid.Row" Value="1"/>
+            <Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Grid.ColumnSpan" Value="3"/>
+            <Setter Property="Margin" Value="0,0,0,2"/>
+        </Style>
+
+        <!-- the group header in the list ("Through the proxy") -->
+        <Style Selector="StackPanel.group">
+            <Setter Property="Margin" Value="12,4,12,2"/>
+            <Setter Property="Spacing" Value="1"/>
+        </Style>
+        <Style Selector="Border.groupRule">
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+        <Style Selector="TextBlock.groupTitle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="LetterSpacing" Value="0.4"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="TextBlock.groupNote">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
+        <!-- the proxy row: address | user | password on a wide page; address over user | password on a phone -->
+        <Style Selector="Grid#DocRoot.wide Grid#ProxyRow > :is(Control).proxyAddr"><Setter Property="Grid.ColumnSpan" Value="2"/></Style>
+        <Style Selector="Grid#DocRoot.wide Grid#ProxyRow > :is(Control).proxyUser"><Setter Property="Grid.Column" Value="2"/></Style>
+        <Style Selector="Grid#DocRoot.wide Grid#ProxyRow > :is(Control).proxyPass"><Setter Property="Grid.Column" Value="3"/></Style>
+        <Style Selector="Grid#DocRoot.narrow Grid#ProxyRow > :is(Control).proxyAddr"><Setter Property="Grid.ColumnSpan" Value="4"/></Style>
+        <Style Selector="Grid#DocRoot.narrow Grid#ProxyRow > :is(Control).proxyUser">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#DocRoot.narrow Grid#ProxyRow > :is(Control).proxyPass">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <!-- desktop: the check box sits in the label line without making it taller (phones keep their touch height) -->
+        <Style Selector="Grid#DocRoot.wide CheckBox#ProxyToggle">
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Padding" Value="6,0,0,0"/>
+            <Setter Property="Margin" Value="0,-5,0,2"/>
+        </Style>
+
+        <!-- wide: glyph · title · detail · time on one line; narrow (a phone): the detail goes under the title -->
+        <Style Selector="Grid#DocRoot.wide Grid.step > TextBlock.stDetail">
+            <Setter Property="Grid.Column" Value="2"/>
+        </Style>
+        <Style Selector="Grid#DocRoot.narrow Grid.step > TextBlock.stTitle">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#DocRoot.narrow Grid.step > TextBlock.stDetail">
+            <Setter Property="Grid.Row" Value="1"/>
+            <Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Grid.ColumnSpan" Value="3"/>
+            <Setter Property="Margin" Value="0,1,0,6"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid x:Name="DocRoot" helpers:Responsive.BreakWidth="560" RowDefinitions="Auto, Auto, *" RowSpacing="12">
+
+        <!-- ===== the target ===== -->
+        <Border Grid.Row="0" Classes="card" Padding="12">
+            <StackPanel Spacing="8">
+                <StackPanel>
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TextBlock Classes="fieldLabel" Text="Site or server" VerticalAlignment="Bottom"/>
+                        <CheckBox Grid.Column="1" x:Name="ProxyToggle" Content="Use a proxy" IsChecked="{Binding UseProxy}"
+                                  VerticalAlignment="Center"
+                                  ToolTip.Tip="Also test through a proxy: http://, https://, socks4:// or socks5://"/>
+                    </Grid>
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                        <AutoCompleteBox x:Name="TargetBox" Classes="field"
+                                         helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Endpoint"
+                                         helpers:InputAssist.PasteButton="True"
+                                         Text="{Binding Target}" ItemsSource="{Binding TargetHistory}"
+                                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                         PlaceholderText="A site, URL or host:port, e.g. example.com"
+                                         AutomationProperties.Name="Site or server to diagnose">
+                            <AutoCompleteBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding ToggleRunCommand}"/>
+                            </AutoCompleteBox.KeyBindings>
+                        </AutoCompleteBox>
+                        <Button Grid.Column="1" x:Name="RunButton" Classes="toggle" MinWidth="100"
+                                Command="{Binding ToggleRunCommand}" Classes.active="{Binding IsRunning}"
+                                ToolTip.Tip="Run every check and say what's wrong">
+                            <Panel>
+                                <TextBlock Text="Diagnose" IsVisible="{Binding !IsRunning}"/>
+                                <TextBlock Text="Stop" IsVisible="{Binding IsRunning}"/>
+                            </Panel>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+
+                <!-- the proxy: address, user, password side by side (stacked on a phone) -->
+                <Grid x:Name="ProxyRow" IsVisible="{Binding UseProxy}" ColumnDefinitions="*, *, *, *" RowDefinitions="Auto, Auto"
+                      ColumnSpacing="8">
+                    <AutoCompleteBox x:Name="ProxyBox" Classes="field proxyAddr"
+                                     helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Endpoint"
+                                     Text="{Binding ProxyAddress}" ItemsSource="{Binding ProxyHistory}"
+                                     FilterMode="ContainsOrdinal" MinimumPrefixLength="0" FontFamily="{StaticResource MonoFont}"
+                                     PlaceholderText="Proxy, e.g. socks5://127.0.0.1:1080"
+                                     ToolTip.Tip="http://, https://, socks4:// or socks5:// — host:port alone is detected"
+                                     AutomationProperties.Name="Proxy address"/>
+                    <TextBox x:Name="ProxyUserBox" Classes="field proxyUser" Text="{Binding ProxyUser}" PlaceholderText="User"
+                             ToolTip.Tip="Only if the proxy wants a login" AutomationProperties.Name="Proxy user"/>
+                    <TextBox x:Name="ProxyPassBox" Classes="field proxyPass" Text="{Binding ProxyPass}" PlaceholderText="Password"
+                             PasswordChar="•" IsUndoEnabled="False" ToolTip.Tip="Stored encrypted on this device"
+                             AutomationProperties.Name="Proxy password"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- ===== the verdict: one sentence + what to do ===== -->
+        <Border Grid.Row="1" x:Name="VerdictCard" Classes="verdict"
+                Classes.works="{Binding CardWorks}" Classes.problem="{Binding CardProblem}"
+                Classes.down="{Binding CardDown}" Classes.unknown="{Binding CardUnknown}">
+            <Grid ColumnDefinitions="Auto, *" ColumnSpacing="12">
+                <Path Classes="vIco" Classes.running="{Binding CardRunning}" Classes.stopped="{Binding CardStopped}"
+                      Classes.works="{Binding CardWorks}" Classes.problem="{Binding CardProblem}"
+                      Classes.down="{Binding CardDown}" Classes.unknown="{Binding CardUnknown}"/>
+                <StackPanel Grid.Column="1" Spacing="3">
+                    <TextBlock Classes="vTitle" Text="{Binding CardTitle}"
+                               Classes.works="{Binding CardWorks}" Classes.problem="{Binding CardProblem}"
+                               Classes.down="{Binding CardDown}" Classes.unknown="{Binding CardUnknown}"/>
+                    <SelectableTextBlock x:Name="VerdictText" Classes="vText" Text="{Binding CardText}"/>
+                    <TextBlock Classes="vAdvice" IsVisible="{Binding HasAdvice}">
+                        <Run Text="What to do: " FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"/><Run Text="{Binding CardAdvice}"/>
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ===== the checks behind it ===== -->
+        <Border Grid.Row="2" Classes="card output">
+            <Grid RowDefinitions="Auto, Auto, *">
+                <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto" Margin="16,6,8,6" ColumnSpacing="8">
+                    <TextBlock Classes="cardHeader" Text="Checks" Margin="0" VerticalAlignment="Center"/>
+                    <CheckBox Grid.Column="1" x:Name="DetailsToggle" Content="Details" IsChecked="{Binding ShowDetails}"
+                              VerticalAlignment="Center" MinHeight="0"
+                              ToolTip.Tip="Show every step of every check (a problem check opens on its own)"/>
+                    <Button Grid.Column="2" x:Name="CopyButton" Classes="ghost" Content="Copy report"
+                            Command="{Binding CopyReportCommand}" IsEnabled="{Binding CanCopy}"
+                            ToolTip.Tip="Copy the verdict and every check (with its steps) as plain text"/>
+                </Grid>
+                <Border Grid.Row="1" Classes="divider"/>
+                <ScrollViewer Grid.Row="2" x:Name="StepScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Items}" Margin="0,4,0,6">
+                        <ItemsControl.DataTemplates>
+                            <DataTemplate DataType="vm:DoctorStepRow">
+                                <StackPanel>
+                                    <Grid Classes="step" Classes.clickable="{Binding HasTrace}"
+                                          ColumnDefinitions="Auto, 104, *, Auto, Auto" RowDefinitions="Auto, Auto"
+                                          ToolTip.Tip="{Binding Detail}" AutomationProperties.Name="{Binding Title}"
+                                          Background="Transparent" Tapped="OnStepTapped">
+                                        <Path Classes="st" Classes.ok="{Binding IsOk}" Classes.warn="{Binding IsWarning}"
+                                              Classes.fail="{Binding IsFail}" Classes.skip="{Binding IsSkipped}"
+                                              Classes.running="{Binding IsRunning}"/>
+                                        <TextBlock Grid.Column="1" Classes="stTitle" Classes.quiet="{Binding IsPending}" Text="{Binding Title}"/>
+                                        <TextBlock Classes="stDetail" Classes.quiet="{Binding IsPending}" Text="{Binding Detail}"/>
+                                        <TextBlock Grid.Column="3" Classes="stTime" Text="{Binding Time}"/>
+                                        <StackPanel Grid.Column="4" Classes="stepExpand" IsVisible="{Binding HasTrace}">
+                                            <TextBlock Classes="stepCount" Text="{Binding StepCountText}" IsVisible="{Binding !IsExpanded}"/>
+                                            <Path Classes="chev" Classes.open="{Binding IsExpanded}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                    <ItemsControl Classes="traceList" ItemsSource="{Binding Trace}" IsVisible="{Binding ShowTrace}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="vm:DoctorTraceRow">
+                                                <Grid Classes="trace" ColumnDefinitions="Auto, Auto, *, Auto" RowDefinitions="Auto, Auto">
+                                                    <Path Classes="sub" Classes.ok="{Binding IsOk}" Classes.warn="{Binding IsWarning}"
+                                                          Classes.fail="{Binding IsFail}" Classes.skip="{Binding IsSkipped}"/>
+                                                    <TextBlock Grid.Column="1" Classes="subStep" Text="{Binding Step}"/>
+                                                    <TextBlock Grid.Column="2" Classes="subDetail" Text="{Binding Detail}"/>
+                                                    <TextBlock Grid.Column="3" Classes="subTime" Text="{Binding Time}"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </DataTemplate>
+                            <!-- "Through the proxy" and what can't go through it -->
+                            <DataTemplate DataType="vm:DoctorStepGroup">
+                                <StackPanel Classes="group" ToolTip.Tip="{Binding Note}">
+                                    <Border Classes="groupRule"/>
+                                    <TextBlock Classes="groupTitle" Text="{Binding Title}"/>
+                                    <TextBlock Classes="groupNote" Text="{Binding Note}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.DataTemplates>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

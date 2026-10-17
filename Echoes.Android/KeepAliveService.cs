@@ -24,6 +24,14 @@ public class KeepAliveService : Service
 
     private PowerManager.WakeLock? _wakeLock;
 
+    // Set by AndroidBackgroundGuard (mostly from the UI thread) and this service's callbacks. A service started with
+    // StartForegroundService MUST reach StartForeground before it is stopped — otherwise Android kills the whole app
+    // ("Context.startForegroundService() did not then call Service.startForeground()"), and no catch can prevent it.
+    // So a release that comes before OnStartCommand (a boot start with nothing to monitor, a scan that ends at once)
+    // is only recorded in StopWanted, and OnStartCommand stops the service right after going foreground.
+    internal static volatile bool IsForeground;
+    internal static volatile bool StopWanted;
+
     public override IBinder? OnBind(Intent? intent) => null;
 
     public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
@@ -38,6 +46,15 @@ public class KeepAliveService : Service
             StartForeground(NotificationId, notification, global::Android.Content.PM.ForegroundService.TypeDataSync);
         else
             StartForeground(NotificationId, notification);
+        IsForeground = true;
+
+        if (StopWanted)
+        {
+            // released before it got here: it had to go foreground first (see IsForeground), now it can go
+            StopWanted = false;
+            StopSelf();
+            return StartCommandResult.NotSticky;
+        }
 
         AcquireWakeLock();
 
@@ -46,9 +63,9 @@ public class KeepAliveService : Service
         return StartCommandResult.NotSticky;
     }
 
-    // Android 14 (API 34) time-boxes dataSync foreground services (~6h/day). When the platform
-    // calls onTimeout the service MUST stop promptly, or Android raises a RemoteServiceException
-    // and kills the process. Monitoring simply ends in the background — a documented platform limit.
+    // When the platform calls onTimeout the service MUST stop within a few seconds, or Android raises a
+    // RemoteServiceException and kills the process. Monitoring simply ends in the background — a documented
+    // platform limit. This API 34 overload is only called for the shortService type; kept as a harmless fallback.
     public override void OnTimeout(int startId)
     {
         ReleaseWakeLock();
@@ -56,8 +73,22 @@ public class KeepAliveService : Service
         base.OnTimeout(startId);
     }
 
+#if ANDROID35_0_OR_GREATER || __ANDROID_35__
+    // Android 15 (API 35) time-boxes dataSync foreground services (6 h per rolling 24 h) for apps targeting SDK 35+,
+    // and reports the timeout through THIS overload, not the one above — required before targetSdk goes to 35.
+    // (Compiled only against API 35+ bindings, where it exists; the type is bound as the ForegroundService enum.)
+    [System.Runtime.Versioning.SupportedOSPlatform("android35.0")]
+    public override void OnTimeout(int startId, global::Android.Content.PM.ForegroundService fgsType)
+    {
+        ReleaseWakeLock();
+        StopSelf();
+        base.OnTimeout(startId, fgsType);
+    }
+#endif
+
     public override void OnDestroy()
     {
+        IsForeground = false;
         ReleaseWakeLock();
         try
         {

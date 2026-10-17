@@ -1,175 +1,1101 @@
 <UserControl xmlns="https://github.com/avaloniaui"
-			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-			 xmlns:vm="using:Echoes.ViewModels"
-			 xmlns:helpers="using:Echoes.Helpers"
-			 x:Class="Echoes.Views.SshView"
-			 x:DataType="vm:SshViewModel">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
+             x:Class="Echoes.Views.SshView"
+             x:DataType="vm:SshViewModel">
 
-	<UserControl.Styles>
-		<Style Selector="CheckBox">
-			<Setter Property="Foreground" Value="#C7C8CF"/>
-			<Setter Property="FontSize" Value="10"/>
-			<Setter Property="Padding" Value="8,0,0,0"/>
-		</Style>
-		<Style Selector="CheckBox:checked /template/ Border#NormalRectangle">
-			<Setter Property="Background" Value="#42B883"/>
-			<Setter Property="BorderBrush" Value="#42B883"/>
-		</Style>
-		<Style Selector="CheckBox /template/ Path#CheckGlyph">
-			<Setter Property="Fill" Value="#08130D"/>
-		</Style>
+    <UserControl.Resources>
+        <!-- stroked glyphs on the 24x24 grid the nav icons use -->
+        <StreamGeometry x:Key="SshIcoTerminal">M4 17 L10 11 L4 5 M12 19 H20</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoPlus">M12 5 V19 M5 12 H19</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoSave">M6 4 H15 L19 8 V19 A1 1 0 0 1 18 20 H6 A1 1 0 0 1 5 19 V5 A1 1 0 0 1 6 4 Z M8.5 4 V8.5 H14 V4 M8 20 V14 H16 V20</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoTrash">M4.5 7 H19.5 M9.5 7 V4.5 H14.5 V7 M6.5 7 L7.5 19.5 H16.5 L17.5 7</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoFolder">M3.5 7 A1.5 1.5 0 0 1 5 5.5 H9.5 L11.5 7.5 H19 A1.5 1.5 0 0 1 20.5 9 V17.5 A1.5 1.5 0 0 1 19 19 H5 A1.5 1.5 0 0 1 3.5 17.5 Z</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoNewFolder">M3.5 7 A1.5 1.5 0 0 1 5 5.5 H9.5 L11.5 7.5 H19 A1.5 1.5 0 0 1 20.5 9 V17.5 A1.5 1.5 0 0 1 19 19 H5 A1.5 1.5 0 0 1 3.5 17.5 Z M12 10.5 V16 M9.25 13.25 H14.75</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoFile">M7 3.5 H13.5 L18 8 V20.5 H7 Z M13.5 3.5 V8 H18</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoLink">M10 14 L14 10 M9 7.5 L11 5.5 A3.5 3.5 0 0 1 18.5 13 L16.5 15 M15 16.5 L13 18.5 A3.5 3.5 0 0 1 5.5 11 L7.5 9</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoUp">M12 19 V5 M6 11 L12 5 L18 11</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoRefresh">M19 12 A7 7 0 1 1 16.9 7 M19 4.5 V8.5 H15</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoUpload">M12 15 V4 M7.5 8.5 L12 4 L16.5 8.5 M5 19.5 H19</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoDownload">M12 4 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoRename">M14.5 5.5 L18.5 9.5 L9 19 H5 V15 Z M12.5 7.5 L16.5 11.5</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoClose">M7 7 L17 17 M17 7 L7 17</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoServer">M5 5 H19 V10.5 H5 Z M5 13.5 H19 V19 H5 Z M8 7.75 H10 M8 16.25 H10</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoForward">M4 12 H18 M13 7 L18 12 L13 17</StreamGeometry>
+    </UserControl.Resources>
 
-		<Style Selector="TextBox.proxyInput">
-			<Setter Property="Height" Value="28"/>
-			<Setter Property="FontSize" Value="11"/>
-			<Setter Property="FontFamily" Value="Cascadia Code,Consolas"/>
-			<Setter Property="Foreground" Value="#ECECEF"/>
-			<Setter Property="CaretBrush" Value="#42B883"/>
-			<Setter Property="Background" Value="#1D1E25"/>
-			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="BorderBrush" Value="#3B3D47"/>
-			<Setter Property="CornerRadius" Value="6"/>
-			<Setter Property="VerticalContentAlignment" Value="Center"/>
-		</Style>
-		<Style Selector="TextBox.proxyInput:focus">
-			<Setter Property="BorderBrush" Value="#42B883"/>
-		</Style>
-	</UserControl.Styles>
+    <UserControl.Styles>
+        <!-- ===== page: one screen tall on desktop (the sub-tab takes what the connection card leaves; lists scroll
+             inside). Phone: the same, but never shorter than 760px, so the page scrolls instead of squeezing. ===== -->
+        <Style Selector="ScrollViewer#SshPage.wide">
+            <Setter Property="VerticalScrollBarVisibility" Value="Disabled"/>
+        </Style>
+        <Style Selector="ScrollViewer#SshPage.narrow">
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+        </Style>
+        <Style Selector="ScrollViewer#SshPage.narrow > Grid#SshRoot">
+            <Setter Property="Height" Value="{Binding $parent[ScrollViewer].Bounds.Height}"/>
+            <Setter Property="MinHeight" Value="760"/>
+        </Style>
 
-	<Grid RowDefinitions="Auto, Auto, *, Auto" Margin="14">
+        <!-- ===== glyph buttons ===== -->
+        <Style Selector="Button.icon Path.glyph, Button Path.btnGlyph">
+            <Setter Property="Width" Value="15"/>
+            <Setter Property="Height" Value="15"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+        </Style>
+        <Style Selector="Button Path.btnGlyph">
+            <Setter Property="Width" Value="13"/>
+            <Setter Property="Height" Value="13"/>
+            <Setter Property="Stroke" Value="{Binding $parent[Button].Foreground}"/>
+        </Style>
+        <Style Selector="Button.icon:disabled Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
+        <Style Selector="Button.icon:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        </Style>
+        <Style Selector="Button.icon.dangerIcon:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Button.rowBtn">
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.rowBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+        </Style>
+        <Style Selector="Button.rowBtn Path">
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="12"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Button.rowBtn:pointerover Path">
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Grid#SshRoot.touch Button.rowBtn">
+            <Setter Property="Width" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+        </Style>
 
-		<StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,10">
+        <!-- ===== connection bar: [saved server picker][new · save · delete][status · connect]; a phone puts the
+             status + connect button on their own row ===== -->
+        <Style Selector="Grid#SshBar.wide > StackPanel#SshPickerTools">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/>
+        </Style>
+        <Style Selector="Grid#SshBar.wide > Grid#SshConnectWrap">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#SshBar.narrow > StackPanel#SshPickerTools">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/>
+        </Style>
+        <Style Selector="Grid#SshBar.narrow > Grid#SshConnectWrap">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#SshBar.wide Button#SshConnect">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+        <Style Selector="Grid#SshBar.narrow Button#SshConnect">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="ComboBox#SshPicker TextBlock.pickName">
+            <Setter Property="FontSize" Value="{DynamicResource Font.Input}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="ComboBox#SshPicker TextBlock.pickDetail">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.summary">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.note">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.hint">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
 
-			<Grid ColumnDefinitions="*, 80">
-				<AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Host}" ItemsSource="{Binding HostHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0" PlaceholderText="Host / IP" Margin="0,0,8,0">
-					<AutoCompleteBox.KeyBindings>
-						<KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
-					</AutoCompleteBox.KeyBindings>
-				</AutoCompleteBox>
-				<TextBox Grid.Column="1" Classes="field" Text="{Binding Port}" PlaceholderText="Port" HorizontalContentAlignment="Center">
-					<TextBox.KeyBindings>
-						<KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
-					</TextBox.KeyBindings>
-				</TextBox>
-			</Grid>
+        <!-- ===== connection form. Wide: [host · port][user][password] / [key file][passphrase][name] / [proxy];
+             narrow: two columns at most ===== -->
+        <Style Selector="Grid#SshForm.wide > Grid#SshFHost"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/></Style>
+        <Style Selector="Grid#SshForm.wide > StackPanel#SshFUser"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/></Style>
+        <Style Selector="Grid#SshForm.wide > StackPanel#SshFPass"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Grid.ColumnSpan" Value="1"/></Style>
+        <Style Selector="Grid#SshForm.wide > StackPanel#SshFKey"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
+        <Style Selector="Grid#SshForm.wide > StackPanel#SshFPhrase"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
+        <Style Selector="Grid#SshForm.wide > StackPanel#SshFName"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
+        <Style Selector="Grid#SshForm.wide > Grid#SshFProxy"><Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
 
-			<!-- username+password | CONNECT. One line when wide; CONNECT drops to a full-width
-			     row under the credentials below the Responsive break (phone). -->
-			<Grid helpers:Responsive.BreakWidth="430" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto"
-				  ColumnSpacing="8" RowSpacing="8">
-				<Grid.Styles>
-					<Style Selector="Grid.wide > Button#SshConnect">
-						<Setter Property="Grid.Row" Value="0"/>
-						<Setter Property="Grid.Column" Value="1"/>
-						<Setter Property="Width" Value="110"/>
-					</Style>
-					<Style Selector="Grid.narrow > Button#SshConnect">
-						<Setter Property="Grid.Row" Value="1"/>
-						<Setter Property="Grid.Column" Value="0"/>
-						<Setter Property="HorizontalAlignment" Value="Stretch"/>
-					</Style>
-				</Grid.Styles>
+        <Style Selector="Grid#SshForm.narrow > Grid#SshFHost"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/></Style>
+        <Style Selector="Grid#SshForm.narrow > StackPanel#SshFUser"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
+        <Style Selector="Grid#SshForm.narrow > StackPanel#SshFPass"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
+        <Style Selector="Grid#SshForm.narrow > StackPanel#SshFKey"><Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
+        <Style Selector="Grid#SshForm.narrow > StackPanel#SshFPhrase"><Setter Property="Grid.Row" Value="3"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
+        <Style Selector="Grid#SshForm.narrow > StackPanel#SshFName"><Setter Property="Grid.Row" Value="3"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
+        <Style Selector="Grid#SshForm.narrow > Grid#SshFProxy"><Setter Property="Grid.Row" Value="4"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
 
-				<Grid Grid.Row="0" Grid.Column="0" ColumnDefinitions="*, *" ColumnSpacing="8">
-					<AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Username}" ItemsSource="{Binding UserHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0" PlaceholderText="Username">
-						<AutoCompleteBox.KeyBindings>
-							<KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
-						</AutoCompleteBox.KeyBindings>
-					</AutoCompleteBox>
-					<TextBox Grid.Column="1" Classes="field" Text="{Binding Password}" PasswordChar="*" PlaceholderText="Password">
-						<TextBox.KeyBindings>
-							<KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
-						</TextBox.KeyBindings>
-					</TextBox>
-				</Grid>
+        <!-- proxy row: [x] via SOCKS5 [host][port] on one line; the fields go to a second line on a phone -->
+        <Style Selector="Grid#SshFProxy.wide > Grid#SshFProxyFields">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Margin" Value="12,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#SshFProxy.narrow > Grid#SshFProxyFields">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
 
-				<Button x:Name="SshConnect" Classes="toggle"
-						Command="{Binding ToggleConnectCommand}"
-						HorizontalAlignment="Stretch"
-						Classes.active="{Binding IsConnected}">
-					<Panel>
-						<TextBlock Text="CONNECT" IsVisible="{Binding !IsConnected}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-						<TextBlock Text="STOP" IsVisible="{Binding IsConnected}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-					</Panel>
-				</Button>
-			</Grid>
-		</StackPanel>
+        <!-- ===== notes / confirmation strips ===== -->
+        <Style Selector="Border.note">
+            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+        </Style>
+        <Style Selector="Border.note TextBlock.noteText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.note.danger">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+        </Style>
+        <Style Selector="Border.note.danger TextBlock.noteText">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Border.note.warning">
+            <Setter Property="Background" Value="{DynamicResource Warning.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Warning.Border}"/>
+        </Style>
+        <Style Selector="Border.note.warning TextBlock.noteText">
+            <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="Border.note Button">
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Grid#SshRoot.touch Border.note Button">
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+        </Style>
 
-		<!-- INBOUND | OUTBOUND cards side by side when wide; stacked on a phone. -->
-		<Grid Grid.Row="1" helpers:Responsive.BreakWidth="430" ColumnDefinitions="*, *" RowDefinitions="Auto, Auto"
-			  ColumnSpacing="12" RowSpacing="10" Margin="0,0,0,10">
-			<Grid.Styles>
-				<Style Selector="Grid.wide > Border#SshIn">
-					<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
-				</Style>
-				<Style Selector="Grid.narrow > Border#SshIn">
-					<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
-				</Style>
-				<Style Selector="Grid.wide > Border#SshOut">
-					<Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
-				</Style>
-				<Style Selector="Grid.narrow > Border#SshOut">
-					<Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
-				</Style>
-			</Grid.Styles>
+        <!-- ===== sub-tabs ===== -->
+        <Style Selector="TabControl#SshTabs > TabItem">
+            <Setter Property="Padding" Value="14,0"/>
+        </Style>
 
-			<Border x:Name="SshIn" Classes="card" Padding="8,5">
-				<Grid ColumnDefinitions="Auto, 8, *, 5, 40">
-					<CheckBox Grid.Column="0" IsChecked="{Binding ConnectViaProxy}" Margin="0">
-						<TextBlock Text="INBOUND" FontSize="9" FontWeight="Bold" Foreground="#9E9FA8"/>
-					</CheckBox>
+        <!-- ===== terminal ===== -->
+        <Style Selector="TextBlock.prompt">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Disabled}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.prompt.live">
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Path.emptyIcon">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.emptyTitle">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+        </Style>
+        <Style Selector="TextBlock.emptyText">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="MaxWidth" Value="320"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
 
-					<TextBox Grid.Column="2" Classes="proxyInput"
-							 Text="{Binding ProxyInHost}" PlaceholderText="Host"
-							 IsVisible="{Binding ConnectViaProxy}"/>
+        <!-- ===== files ===== -->
+        <Style Selector="Grid#SshFilesBar.wide > StackPanel#SshFActions">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="10,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#SshFilesBar.narrow > StackPanel#SshFActions">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="ListBox#SshFileList">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="ListBox#SshFileList > ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="ListBox#SshFileList > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+        </Style>
+        <Style Selector="ListBox#SshFileList > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Selected}"/>
+        </Style>
+        <Style Selector="Path.fIco">
+            <Setter Property="Width" Value="15"/>
+            <Setter Property="Height" Value="15"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Path.fIco.dir">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Path.fIco.link">
+            <Setter Property="Stroke" Value="{DynamicResource Info}"/>
+        </Style>
+        <Style Selector="TextBlock.fName">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.fCell">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.fSize">
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
+        <Style Selector="TextBlock.fMod">
+            <Setter Property="Width" Value="112"/>
+        </Style>
+        <Style Selector="TextBlock.fPerm">
+            <Setter Property="Width" Value="80"/>
+        </Style>
+        <Style Selector="TextBlock.fMeta">
+            <Setter Property="IsVisible" Value="False"/>
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.colHead">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="LetterSpacing" Value="0.3"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <!-- phone: name + size on the row, permissions and date under the name -->
+        <Style Selector="Grid#SshFilesPane.narrow TextBlock.fMod, Grid#SshFilesPane.narrow TextBlock.fPerm">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#SshFilesPane.narrow TextBlock.fMeta">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="ProgressBar.bar">
+            <Setter Property="Height" Value="6"/>
+            <Setter Property="MinHeight" Value="6"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Minimum" Value="0"/>
+            <Setter Property="Maximum" Value="100"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="ProgressBar.bar.warn">
+            <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="ProgressBar.bar.high">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Border.card.output ProgressBar.bar">
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+        </Style>
+        <Style Selector="TextBlock.status">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
 
-					<TextBox Grid.Column="4" Classes="proxyInput"
-							 Text="{Binding ProxyInPort}" PlaceholderText="Port"
-							 Padding="0" MinWidth="0" HorizontalContentAlignment="Center"
-							 IsVisible="{Binding ConnectViaProxy}"/>
-				</Grid>
-			</Border>
+        <!-- ===== forwarding ===== -->
+        <!-- desktop: one screen, the list fills the rest and scrolls inside; phone: the whole tab scrolls -->
+        <Style Selector="ScrollViewer#SshFwdScroll.wide > Grid#SshFwdGrid">
+            <Setter Property="Height" Value="{Binding $parent[ScrollViewer].Bounds.Height}"/>
+        </Style>
+        <Style Selector="CheckBox.strong">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Grid#SshDyn.wide > Grid#SshDynFields">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Margin" Value="16,0,0,0"/>
+            <Setter Property="Width" Value="250"/>
+        </Style>
+        <Style Selector="Grid#SshDyn.narrow > Grid#SshDynFields">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+        <Style Selector="Border.tunnelState > TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="Border.tunnelState.live > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Success}"/>
+        </Style>
+        <Style Selector="Border.tunnelState.failed > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Border.tunnelState.exposed">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="Padding" Value="8,4"/>
+        </Style>
+        <Style Selector="Border.tunnelState.exposed > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Grid#SshFwdAdd.wide > StackPanel#SshFwdKind"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/></Style>
+        <Style Selector="Grid#SshFwdAdd.wide > StackPanel#SshFwdBind"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/></Style>
+        <Style Selector="Grid#SshFwdAdd.wide > Path#SshFwdArrow"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/></Style>
+        <Style Selector="Grid#SshFwdAdd.wide > StackPanel#SshFwdTarget"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Grid.ColumnSpan" Value="1"/></Style>
+        <Style Selector="Grid#SshFwdAdd.wide > Button#SshFwdAddBtn"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="4"/></Style>
+        <Style Selector="Grid#SshFwdAdd.narrow > StackPanel#SshFwdKind"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/></Style>
+        <Style Selector="Grid#SshFwdAdd.narrow > Button#SshFwdAddBtn"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="4"/></Style>
+        <Style Selector="Grid#SshFwdAdd.narrow > StackPanel#SshFwdBind"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="5"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
+        <Style Selector="Grid#SshFwdAdd.narrow > Path#SshFwdArrow"><Setter Property="IsVisible" Value="False"/></Style>
+        <Style Selector="Grid#SshFwdAdd.narrow > StackPanel#SshFwdTarget"><Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="5"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
+        <Style Selector="Grid#SshFwdAdd.wide > StackPanel#SshFwdKind ComboBox">
+            <Setter Property="Width" Value="118"/>
+        </Style>
+        <Style Selector="Path.arrow">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style Selector="TextBlock.fwdTitle">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.fwdSub">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.fwdState">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.fwdState.ok"><Setter Property="Foreground" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="TextBlock.fwdState.bad"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="TextBlock.fwdState.exposed"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="Border.fwdRow">
+            <Setter Property="Padding" Value="12,7"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        </Style>
 
-			<Border x:Name="SshOut" Classes="card" Padding="8,5">
-				<Grid ColumnDefinitions="Auto, 8, *, 5, 40, Auto">
-					<CheckBox Grid.Column="0" IsChecked="{Binding EnableSocksTunnel}" Margin="0">
-						<TextBlock Text="OUTBOUND" FontSize="9" FontWeight="Bold" Foreground="#9E9FA8"/>
-					</CheckBox>
+        <!-- ===== server ===== -->
+        <Style Selector="UniformGrid#SshTiles">
+            <Setter Property="Columns" Value="4"/>
+        </Style>
+        <Style Selector="Grid#SshServerPane.narrow UniformGrid#SshTiles">
+            <Setter Property="Columns" Value="2"/>
+        </Style>
+        <Style Selector="Border.tile">
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+        </Style>
+        <Style Selector="TextBlock.tileLabel">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="LetterSpacing" Value="0.3"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="TextBlock.tileValue">
+            <Setter Property="FontSize" Value="17"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.tileValue.mono">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Margin" Value="0,3,0,2"/>
+        </Style>
+        <Style Selector="TextBlock.tileDetail">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Grid#SshLists.wide > Border#SshProcCard">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Margin" Value="0"/>
+        </Style>
+        <Style Selector="Grid#SshLists.narrow > Border#SshProcCard">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#SshLists.wide > Border#SshDiskCard">
+            <Setter Property="Grid.ColumnSpan" Value="1"/><Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+        <Style Selector="Grid#SshLists.narrow > Border#SshDiskCard">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="TextBlock.cell">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.cell.strong">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+    </UserControl.Styles>
 
-					<TextBox Grid.Column="2" Classes="proxyInput"
-							 Text="{Binding TunnelHost}" PlaceholderText="Listen"
-							 IsVisible="{Binding EnableSocksTunnel}"/>
+    <ScrollViewer x:Name="SshPage" helpers:Responsive.BreakWidth="560" HorizontalScrollBarVisibility="Disabled">
+        <Grid x:Name="SshRoot" RowDefinitions="Auto, *" RowSpacing="10">
 
-					<TextBox Grid.Column="4" Classes="proxyInput"
-							 Text="{Binding TunnelPort}" PlaceholderText="Port"
-							 Padding="0" MinWidth="0" HorizontalContentAlignment="Center"
-							 IsVisible="{Binding EnableSocksTunnel}"/>
+            <!-- ======================= connection ======================= -->
+            <Border Grid.Row="0" Classes="card" Padding="12">
+                <StackPanel Spacing="10">
 
-					<TextBlock Grid.Column="5" Text="●" IsVisible="{Binding IsConnected}"
-							   VerticalAlignment="Center" Margin="8,0,0,0" FontSize="10" Foreground="#42B883"/>
-				</Grid>
-			</Border>
-		</Grid>
+                    <Grid x:Name="SshBar" helpers:Responsive.BreakWidth="520" ColumnDefinitions="*, Auto, Auto" RowDefinitions="Auto, Auto">
+                        <ComboBox x:Name="SshPicker" Classes="field" Grid.Column="0"
+                                  ItemsSource="{Binding SavedServers}" SelectedItem="{Binding SelectedServer}"
+                                  PlaceholderText="{Binding PickerPlaceholder}" IsEnabled="{Binding CanEditConnection}"
+                                  ToolTip.Tip="Saved servers: picking one fills the connection">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="helpers:SshServerEntry">
+                                    <Grid ColumnDefinitions="Auto, *" ColumnSpacing="8">
+                                        <TextBlock Classes="pickName" Text="{Binding Name}" MaxWidth="200"/>
+                                        <TextBlock Grid.Column="1" Classes="pickDetail" Text="{Binding Detail}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <StackPanel x:Name="SshPickerTools" Orientation="Horizontal" Spacing="6" Margin="6,0,0,0">
+                            <Button Classes="icon" Command="{Binding NewServerCommand}" IsEnabled="{Binding CanEditConnection}"
+                                    ToolTip.Tip="New connection (clears the form)" AutomationProperties.Name="New connection">
+                                <Path Classes="glyph" Data="{StaticResource SshIcoPlus}"/>
+                            </Button>
+                            <Button x:Name="SshSaveServer" Classes="icon" Command="{Binding SaveServerCommand}"
+                                    ToolTip.Tip="{Binding SaveServerTip}" AutomationProperties.Name="Save server">
+                                <Path Classes="glyph" Data="{StaticResource SshIcoSave}"/>
+                            </Button>
+                            <Button Classes="icon dangerIcon" Command="{Binding RequestDeleteServerCommand}"
+                                    ToolTip.Tip="Delete the saved server" AutomationProperties.Name="Delete saved server">
+                                <Path Classes="glyph" Data="{StaticResource SshIcoTrash}"/>
+                            </Button>
+                        </StackPanel>
+                        <Grid x:Name="SshConnectWrap" ColumnDefinitions="Auto, *" ColumnSpacing="10">
+                            <Border Classes="badge" Classes.success="{Binding IsConnected}" Classes.info="{Binding IsConnecting}"
+                                    Classes.danger="{Binding HasConnectError}">
+                                <TextBlock Text="{Binding StatusText}"/>
+                            </Border>
+                            <Button x:Name="SshConnect" Grid.Column="1" Classes="toggle" MinWidth="108"
+                                    Command="{Binding ToggleConnectCommand}" Classes.active="{Binding IsSessionActive}">
+                                <TextBlock Text="{Binding ConnectLabel}" HorizontalAlignment="Center"/>
+                            </Button>
+                        </Grid>
+                    </Grid>
 
-		<Border Grid.Row="2" Classes="card output">
-			<ScrollViewer Name="TermScroll">
-				<SelectableTextBlock Name="TerminalOutputBlock"
-									 Text="{Binding TerminalOutput}"
-									 Padding="12"
-									 FontFamily="Cascadia Code,Consolas"
-									 FontSize="12"
-									 Foreground="#4FCB97"
-									 TextWrapping="Wrap"/>
-			</ScrollViewer>
-		</Border>
+                    <!-- delete a saved server: asks first -->
+                    <Border Classes="note danger" IsVisible="{Binding DeleteServerConfirm}">
+                        <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8">
+                            <TextBlock Classes="noteText" Text="{Binding DeleteServerPrompt}"/>
+                            <Button Grid.Column="1" Classes="danger" Content="Delete" Command="{Binding ConfirmDeleteServerCommand}"/>
+                            <Button Grid.Column="2" Classes="ghost" Content="Cancel" Command="{Binding CancelDeleteServerCommand}"/>
+                        </Grid>
+                    </Border>
+                    <TextBlock Classes="note" Text="{Binding ServerNote}" IsVisible="{Binding HasServerNote}"/>
 
-		<Grid Grid.Row="3" ColumnDefinitions="Auto, *" Margin="0,10,0,0">
-			<TextBlock Grid.Column="0" Text="&gt;_" VerticalAlignment="Center" Margin="2,0,10,0" FontFamily="Cascadia Code,Consolas" FontSize="13" FontWeight="Bold" Foreground="#4FCB97"/>
-			<TextBox Grid.Column="1" Classes="field" Text="{Binding CommandInput}" PlaceholderText="Enter shell command..." Height="34" FontSize="12" FontFamily="Cascadia Code,Consolas">
-				<TextBox.KeyBindings>
-					<KeyBinding Gesture="Enter" Command="{Binding SendCommandCommand}"/>
-				</TextBox.KeyBindings>
-			</TextBox>
-		</Grid>
-	</Grid>
+                    <!-- connected: one line for what this session is -->
+                    <TextBlock Classes="summary" Text="{Binding ConnectionSummary}" IsVisible="{Binding IsConnected}"
+                               ToolTip.Tip="{Binding ConnectionSummary}"/>
+
+                    <!-- the form (hidden while connected: a live session doesn't follow edits) -->
+                    <Grid x:Name="SshForm" helpers:Responsive.BreakWidth="560" IsVisible="{Binding ShowForm}" IsEnabled="{Binding CanEditConnection}"
+                          ColumnDefinitions="*, *, *, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto" ColumnSpacing="10">
+
+                        <Grid x:Name="SshFHost" ColumnDefinitions="*, 72" ColumnSpacing="10">
+                            <StackPanel>
+                                <TextBlock Classes="fieldLabel" Text="Host"/>
+                                <AutoCompleteBox x:Name="SshHostBox" Classes="field" helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Host"
+                                                 helpers:InputAssist.PasteButton="True" helpers:InputAssist.UserTarget="SshUserBox" helpers:InputAssist.PortTarget="SshPortBox"
+                                                 Text="{Binding Host}" ItemsSource="{Binding HostHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                                 PlaceholderText="Host or IP">
+                                    <AutoCompleteBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
+                                    </AutoCompleteBox.KeyBindings>
+                                </AutoCompleteBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Classes="fieldLabel" Text="Port"/>
+                                <TextBox x:Name="SshPortBox" Classes="field" Text="{Binding Port}" PlaceholderText="22">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
+                                    </TextBox.KeyBindings>
+                                </TextBox>
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel x:Name="SshFUser">
+                            <TextBlock Classes="fieldLabel" Text="User"/>
+                            <AutoCompleteBox x:Name="SshUserBox" Classes="field" Text="{Binding Username}" ItemsSource="{Binding UserHistory}"
+                                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0" PlaceholderText="User name">
+                                <AutoCompleteBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
+                                </AutoCompleteBox.KeyBindings>
+                            </AutoCompleteBox>
+                        </StackPanel>
+
+                        <StackPanel x:Name="SshFPass">
+                            <TextBlock Classes="fieldLabel" Text="Password"/>
+                            <TextBox Classes="field" Text="{Binding Password}" IsUndoEnabled="False" PasswordChar="*" PlaceholderText="Password">
+                                <TextBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
+                                </TextBox.KeyBindings>
+                            </TextBox>
+                        </StackPanel>
+
+                        <StackPanel x:Name="SshFKey">
+                            <TextBlock Classes="fieldLabel" Text="Private key"/>
+                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
+                                <TextBox x:Name="SshKeyBox" Classes="field mono" Text="{Binding KeyPath}" PlaceholderText="Optional"
+                                         ToolTip.Tip="OpenSSH, PEM or PuTTY (.ppk) private key, tried before the password. Leave it empty to sign in with the password only.">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
+                                    </TextBox.KeyBindings>
+                                </TextBox>
+                                <Button Grid.Column="1" Classes="icon" Click="OnBrowseKey" ToolTip.Tip="Pick a private key file" AutomationProperties.Name="Pick a private key file">
+                                    <Path Classes="glyph" Data="{StaticResource SshIcoFolder}"/>
+                                </Button>
+                            </Grid>
+                        </StackPanel>
+
+                        <StackPanel x:Name="SshFPhrase">
+                            <TextBlock Classes="fieldLabel" Text="Passphrase"/>
+                            <TextBox Classes="field" Text="{Binding KeyPassphrase}" IsUndoEnabled="False" PasswordChar="*"
+                                     PlaceholderText="If the key has one" IsEnabled="{Binding HasKeyPath}"
+                                     ToolTip.Tip="The private key's passphrase, if it has one">
+                                <TextBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
+                                </TextBox.KeyBindings>
+                            </TextBox>
+                        </StackPanel>
+
+                        <StackPanel x:Name="SshFName">
+                            <TextBlock Classes="fieldLabel" Text="Save as"/>
+                            <TextBox Classes="field" Text="{Binding ServerName}" PlaceholderText="Name" MaxLength="80"
+                                     ToolTip.Tip="A name for the saved server (optional)"/>
+                        </StackPanel>
+
+                        <Grid x:Name="SshFProxy" helpers:Responsive.BreakWidth="420" ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
+                            <CheckBox VerticalAlignment="Center" IsChecked="{Binding ConnectViaProxy}" Content="Via SOCKS5 proxy"
+                                      ToolTip.Tip="Reach the server through a SOCKS5 proxy"/>
+                            <Grid x:Name="SshFProxyFields" ColumnDefinitions="*, 72" ColumnSpacing="10" IsVisible="{Binding ConnectViaProxy}">
+                                <TextBox Classes="field mono" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding ProxyInHost}" PlaceholderText="Proxy host"/>
+                                <TextBox Grid.Column="1" Classes="field mono" Text="{Binding ProxyInPort}" PlaceholderText="Port"/>
+                            </Grid>
+                        </Grid>
+                    </Grid>
+
+                    <Border Classes="note danger" IsVisible="{Binding HasConnectError}">
+                        <SelectableTextBlock Classes="noteText" Text="{Binding ConnectError}" FontSize="{StaticResource Font.Small}"
+                                             Foreground="{DynamicResource Danger}" TextWrapping="Wrap"/>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- ======================= sub-tabs ======================= -->
+            <TabControl x:Name="SshTabs" Grid.Row="1" Classes="seg" Padding="0" SelectedIndex="{Binding SelectedTab}">
+
+                <!-- ============ terminal ============ -->
+                <TabItem Header="Terminal">
+                    <Border x:Name="SshTerm" Classes="card output" Margin="0,10,0,0" MinHeight="120">
+                        <Grid RowDefinitions="*, Auto">
+                            <Panel Grid.Row="0">
+                                <ScrollViewer Name="TermScroll" HorizontalScrollBarVisibility="Disabled">
+                                    <SelectableTextBlock Name="TerminalOutputBlock" Text="{Binding TerminalOutput}" Padding="14,12"
+                                                         FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource Font.Small}"
+                                                         Foreground="{DynamicResource Text.Primary}" TextWrapping="Wrap"/>
+                                </ScrollViewer>
+                                <Panel IsHitTestVisible="False" IsVisible="{Binding !IsConnected}">
+                                    <StackPanel Spacing="6" Margin="24" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                IsVisible="{Binding TerminalOutput, Converter={x:Static StringConverters.IsNullOrEmpty}}">
+                                        <Path Classes="emptyIcon" Data="{StaticResource SshIcoTerminal}"/>
+                                        <TextBlock Classes="emptyTitle" Text="Not connected"/>
+                                        <TextBlock Classes="emptyText" Text="Enter a host or pick a saved server, then connect."/>
+                                    </StackPanel>
+                                </Panel>
+                            </Panel>
+                            <Border Grid.Row="1" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0" Padding="12,10">
+                                <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10">
+                                    <TextBlock Grid.Column="0" Classes="prompt" Classes.live="{Binding IsConnected}" Text="&gt;_" Margin="2,0,0,0"/>
+                                    <!-- Only usable while a shell is open. -->
+                                    <TextBox Grid.Column="1" Classes="field mono" Text="{Binding CommandInput}" PlaceholderText="Type a command"
+                                             IsEnabled="{Binding IsConnected}" ToolTip.Tip="Enter sends it; Up / Down recall earlier commands">
+                                        <TextBox.KeyBindings>
+                                            <KeyBinding Gesture="Enter" Command="{Binding SendCommandCommand}"/>
+                                            <!-- command history, as in a shell: Up = the previous command, Down = the next -->
+                                            <KeyBinding Gesture="Up" Command="{Binding HistoryUpCommand}"/>
+                                            <KeyBinding Gesture="Down" Command="{Binding HistoryDownCommand}"/>
+                                        </TextBox.KeyBindings>
+                                    </TextBox>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </TabItem>
+
+                <!-- ============ files (SFTP) ============ -->
+                <TabItem Header="Files">
+                    <Grid x:Name="SshFilesPane" helpers:Responsive.BreakWidth="560" RowDefinitions="Auto, Auto, *, Auto" Margin="0,10,0,0">
+                        <Grid x:Name="SshFilesBar" helpers:Responsive.BreakWidth="560" ColumnDefinitions="Auto, *, Auto, Auto" RowDefinitions="Auto, Auto">
+                            <Button Classes="icon" Command="{Binding FilesUpCommand}" IsEnabled="{Binding IsConnected}"
+                                    ToolTip.Tip="Up one folder" AutomationProperties.Name="Up one folder">
+                                <Path Classes="glyph" Data="{StaticResource SshIcoUp}"/>
+                            </Button>
+                            <TextBox x:Name="SshPathBox" Grid.Column="1" Classes="field mono" Margin="6,0" Text="{Binding FilesPath}"
+                                     PlaceholderText="Server path" IsEnabled="{Binding IsConnected}">
+                                <TextBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding FilesGoCommand}"/>
+                                </TextBox.KeyBindings>
+                            </TextBox>
+                            <Button Grid.Column="2" Classes="icon" Command="{Binding FilesRefreshCommand}" IsEnabled="{Binding IsConnected}"
+                                    ToolTip.Tip="Refresh" AutomationProperties.Name="Refresh">
+                                <Path Classes="glyph" Data="{StaticResource SshIcoRefresh}"/>
+                            </Button>
+                            <StackPanel x:Name="SshFActions" Orientation="Horizontal" Spacing="6" IsEnabled="{Binding IsConnected}">
+                                <Button Classes="icon" Command="{Binding StartNewFolderCommand}" IsEnabled="{Binding CanTransfer}"
+                                        ToolTip.Tip="New folder" AutomationProperties.Name="New folder">
+                                    <Path Classes="glyph" Data="{StaticResource SshIcoNewFolder}"/>
+                                </Button>
+                                <Button Classes="icon" Click="OnUpload" IsEnabled="{Binding CanTransfer}"
+                                        ToolTip.Tip="Upload files here" AutomationProperties.Name="Upload">
+                                    <Path Classes="glyph" Data="{StaticResource SshIcoUpload}"/>
+                                </Button>
+                                <Button Classes="icon" Click="OnDownload" IsEnabled="{Binding CanDownload}"
+                                        ToolTip.Tip="Download the selected file" AutomationProperties.Name="Download">
+                                    <Path Classes="glyph" Data="{StaticResource SshIcoDownload}"/>
+                                </Button>
+                                <Button Classes="icon" Command="{Binding StartRenameCommand}" IsEnabled="{Binding HasSelectedFile}"
+                                        ToolTip.Tip="Rename" AutomationProperties.Name="Rename">
+                                    <Path Classes="glyph" Data="{StaticResource SshIcoRename}"/>
+                                </Button>
+                                <Button Classes="icon dangerIcon" Command="{Binding RequestDeleteFileCommand}" IsEnabled="{Binding HasSelectedFile}"
+                                        ToolTip.Tip="Delete" AutomationProperties.Name="Delete">
+                                    <Path Classes="glyph" Data="{StaticResource SshIcoTrash}"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- inline: name box, confirmations, errors -->
+                        <StackPanel Grid.Row="1" Spacing="8">
+                            <Border Classes="note" Margin="0,8,0,0" IsVisible="{Binding IsNaming}">
+                                <Grid ColumnDefinitions="Auto, *, Auto, Auto" ColumnSpacing="8">
+                                    <TextBlock Classes="noteText" Text="{Binding FilesNameLabel}"/>
+                                    <TextBox x:Name="SshNameBox" Grid.Column="1" Classes="field mono" Text="{Binding FilesNameInput}" MaxLength="255">
+                                        <TextBox.KeyBindings>
+                                            <KeyBinding Gesture="Enter" Command="{Binding ConfirmNameCommand}"/>
+                                            <KeyBinding Gesture="Escape" Command="{Binding CancelNameCommand}"/>
+                                        </TextBox.KeyBindings>
+                                    </TextBox>
+                                    <Button Grid.Column="2" Classes="primary" Content="{Binding FilesNameAction}" Command="{Binding ConfirmNameCommand}"/>
+                                    <Button Grid.Column="3" Classes="ghost" Content="Cancel" Command="{Binding CancelNameCommand}"/>
+                                </Grid>
+                            </Border>
+                            <Border Classes="note danger" Margin="0,8,0,0" IsVisible="{Binding FilesDeleteConfirm}">
+                                <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8">
+                                    <TextBlock Classes="noteText" Text="{Binding FilesDeletePrompt}"/>
+                                    <Button Grid.Column="1" Classes="danger" Content="Delete" Command="{Binding ConfirmDeleteFileCommand}"/>
+                                    <Button Grid.Column="2" Classes="ghost" Content="Cancel" Command="{Binding CancelDeleteFileCommand}"/>
+                                </Grid>
+                            </Border>
+                            <Border Classes="note warning" Margin="0,8,0,0" IsVisible="{Binding UploadReplaceConfirm}">
+                                <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8">
+                                    <TextBlock Classes="noteText" Text="{Binding UploadReplacePrompt}"/>
+                                    <Button Grid.Column="1" Classes="secondary" Content="Replace" Command="{Binding ConfirmReplaceCommand}"/>
+                                    <Button Grid.Column="2" Classes="ghost" Content="Cancel" Command="{Binding CancelReplaceCommand}"/>
+                                </Grid>
+                            </Border>
+                            <Border Classes="note danger" Margin="0,8,0,0" IsVisible="{Binding HasFilesError}">
+                                <TextBlock Classes="noteText" Text="{Binding FilesError}"/>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- the listing -->
+                        <Border Grid.Row="2" Classes="card output" Margin="0,8,0,0" ClipToBounds="True">
+                            <Grid RowDefinitions="Auto, *">
+                                <Border BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1" Padding="12,6">
+                                    <Grid ColumnDefinitions="Auto, *, Auto, Auto, Auto" ColumnSpacing="10">
+                                        <Border Width="15"/>
+                                        <TextBlock Grid.Column="1" Classes="colHead" Text="Name"/>
+                                        <TextBlock Grid.Column="2" Classes="colHead fCell fSize" Text="Size" FontFamily="{x:Static FontFamily.Default}"/>
+                                        <TextBlock Grid.Column="3" Classes="colHead fCell fMod" Text="Modified" FontFamily="{x:Static FontFamily.Default}"/>
+                                        <TextBlock Grid.Column="4" Classes="colHead fCell fPerm" Text="Permissions" FontFamily="{x:Static FontFamily.Default}"/>
+                                    </Grid>
+                                </Border>
+                                <ListBox x:Name="SshFileList" Grid.Row="1" ItemsSource="{Binding FileRows}" SelectedItem="{Binding SelectedFile}"
+                                         SelectionMode="Single" ScrollViewer.HorizontalScrollBarVisibility="Disabled" DoubleTapped="OnFileDoubleTapped">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="helpers:SshFileRow">
+                                            <Grid ColumnDefinitions="Auto, *, Auto, Auto, Auto" ColumnSpacing="10" Margin="12,4" Background="Transparent">
+                                                <Panel VerticalAlignment="Center">
+                                                    <Path Classes="fIco dir" Data="{StaticResource SshIcoFolder}" IsVisible="{Binding IsDirectory}"/>
+                                                    <Path Classes="fIco link" Data="{StaticResource SshIcoLink}" IsVisible="{Binding IsLink}"/>
+                                                    <Path Classes="fIco" Data="{StaticResource SshIcoFile}" IsVisible="{Binding IsFile}"/>
+                                                </Panel>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Classes="fName" Text="{Binding Name}"/>
+                                                    <TextBlock Classes="fMeta" Text="{Binding MetaText}"/>
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="2" Classes="fCell fSize" Text="{Binding SizeText}"/>
+                                                <TextBlock Grid.Column="3" Classes="fCell fMod" Text="{Binding ModifiedText}"/>
+                                                <TextBlock Grid.Column="4" Classes="fCell fPerm" Text="{Binding Permissions}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <!-- empty states -->
+                                <StackPanel Grid.Row="1" Spacing="6" Margin="24" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                            IsHitTestVisible="False" IsVisible="{Binding !IsConnected}">
+                                    <Path Classes="emptyIcon" Data="{StaticResource SshIcoFolder}"/>
+                                    <TextBlock Classes="emptyTitle" Text="Not connected"/>
+                                    <TextBlock Classes="emptyText" Text="Connect to browse its files over SFTP."/>
+                                </StackPanel>
+                                <TextBlock Grid.Row="1" Classes="emptyText" Margin="24" VerticalAlignment="Center" Text="Loading…"
+                                           IsHitTestVisible="False">
+                                    <TextBlock.IsVisible>
+                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                            <Binding Path="FilesBusy"/>
+                                            <Binding Path="!HasFiles"/>
+                                        </MultiBinding>
+                                    </TextBlock.IsVisible>
+                                </TextBlock>
+                                <TextBlock Grid.Row="1" Classes="emptyText" Margin="24" VerticalAlignment="Center" Text="This folder is empty."
+                                           IsHitTestVisible="False" IsVisible="{Binding ShowFilesEmpty}"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- transfer progress, or the status line -->
+                        <Panel Grid.Row="3" Margin="0,8,0,0" MinHeight="24">
+                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10" IsVisible="{Binding TransferActive}">
+                                <StackPanel VerticalAlignment="Center" Spacing="4">
+                                    <TextBlock Classes="status" Text="{Binding TransferText}" Foreground="{DynamicResource Text.Secondary}"/>
+                                    <ProgressBar Classes="bar" Value="{Binding TransferPercent}" IsVisible="{Binding !TransferIndeterminate}"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="ghost" Content="Cancel" Command="{Binding CancelTransferCommand}" VerticalAlignment="Center"/>
+                            </Grid>
+                            <TextBlock Classes="status" Text="{Binding FilesInfo}" IsVisible="{Binding !TransferActive}"/>
+                        </Panel>
+                    </Grid>
+                </TabItem>
+
+                <!-- ============ forwarding ============ -->
+                <TabItem Header="Forwarding">
+                    <ScrollViewer x:Name="SshFwdScroll" helpers:Responsive.BreakWidth="560" HorizontalScrollBarVisibility="Disabled" Margin="0,10,0,0">
+                    <Grid x:Name="SshFwdGrid" RowDefinitions="Auto, Auto, *" RowSpacing="10">
+
+                        <!-- dynamic SOCKS5 tunnel (-D) -->
+                        <Border Classes="card" Padding="12">
+                            <StackPanel Spacing="8">
+                                <Grid x:Name="SshDyn" helpers:Responsive.BreakWidth="560" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <CheckBox Classes="strong" IsChecked="{Binding EnableSocksTunnel}" Content="SOCKS5 tunnel (-D)"
+                                                  ToolTip.Tip="A local SOCKS5 proxy that relays through the server (ssh -D)"/>
+                                    </StackPanel>
+                                    <Grid x:Name="SshDynFields" ColumnDefinitions="*, 72" ColumnSpacing="10" IsEnabled="{Binding CanEditTunnel}">
+                                        <StackPanel>
+                                            <TextBlock Classes="fieldLabel" Text="Listen on"/>
+                                            <TextBox Classes="field mono" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding TunnelHost}" PlaceholderText="127.0.0.1"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Classes="fieldLabel" Text="Port"/>
+                                            <TextBox Classes="field mono" Text="{Binding TunnelPort}" PlaceholderText="Port"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
+                                <Border Classes="tunnelState" Classes.exposed="{Binding TunnelExposed}" Classes.live="{Binding TunnelActive}"
+                                        Classes.failed="{Binding TunnelFailed}" HorizontalAlignment="Left"
+                                        IsVisible="{Binding IsConnected}" ToolTip.Tip="{Binding TunnelStatus}">
+                                    <TextBlock Text="{Binding TunnelStatus}"/>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- add a -L / -R forward -->
+                        <Border Grid.Row="1" Classes="card" Padding="12">
+                            <StackPanel Spacing="8">
+                                <Grid x:Name="SshFwdAdd" helpers:Responsive.BreakWidth="560" ColumnDefinitions="Auto, *, Auto, *, Auto" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="8">
+                                    <StackPanel x:Name="SshFwdKind">
+                                        <TextBlock Classes="fieldLabel" Text="Forward"/>
+                                        <ComboBox Classes="field" SelectedIndex="{Binding NewForwardKind}">
+                                            <ComboBoxItem Content="Local (-L)"/>
+                                            <ComboBoxItem Content="Remote (-R)"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel x:Name="SshFwdBind">
+                                        <TextBlock Classes="fieldLabel" Text="{Binding NewForwardBindLabel}"/>
+                                        <Grid ColumnDefinitions="*, 64" ColumnSpacing="6">
+                                            <TextBox Classes="field mono" Text="{Binding NewForwardBindHost}" PlaceholderText="127.0.0.1"/>
+                                            <TextBox Grid.Column="1" Classes="field mono" Text="{Binding NewForwardBindPort}" PlaceholderText="Port">
+                                                <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding AddForwardCommand}"/></TextBox.KeyBindings>
+                                            </TextBox>
+                                        </Grid>
+                                    </StackPanel>
+                                    <Path x:Name="SshFwdArrow" Classes="arrow" Data="{StaticResource SshIcoForward}"/>
+                                    <StackPanel x:Name="SshFwdTarget">
+                                        <TextBlock Classes="fieldLabel" Text="{Binding NewForwardTargetLabel}"/>
+                                        <Grid ColumnDefinitions="*, 64" ColumnSpacing="6">
+                                            <TextBox Classes="field mono" Text="{Binding NewForwardTargetHost}" PlaceholderText="Host">
+                                                <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding AddForwardCommand}"/></TextBox.KeyBindings>
+                                            </TextBox>
+                                            <TextBox Grid.Column="1" Classes="field mono" Text="{Binding NewForwardTargetPort}" PlaceholderText="Port">
+                                                <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding AddForwardCommand}"/></TextBox.KeyBindings>
+                                            </TextBox>
+                                        </Grid>
+                                    </StackPanel>
+                                    <Button x:Name="SshFwdAddBtn" Classes="secondary" VerticalAlignment="Bottom" Command="{Binding AddForwardCommand}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Path Classes="btnGlyph" Data="{StaticResource SshIcoPlus}"/>
+                                            <TextBlock Text="Add" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                                <TextBlock Classes="hint" Text="{Binding NewForwardHint}"/>
+                                <TextBlock Classes="hint" Foreground="{DynamicResource Danger}" Text="{Binding ForwardError}" IsVisible="{Binding HasForwardError}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- the forwards -->
+                        <Border Grid.Row="2" Classes="card output" ClipToBounds="True" MinHeight="150">
+                            <Panel>
+                                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsControl ItemsSource="{Binding Forwards}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:SshForwardRule">
+                                                <Border Classes="fwdRow">
+                                                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10">
+                                                        <Border Classes="badge accent" VerticalAlignment="Top" Margin="0,1,0,0">
+                                                            <TextBlock Text="{Binding Flag}" FontFamily="{StaticResource MonoFont}"/>
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1" Spacing="1">
+                                                            <TextBlock Classes="fwdTitle" Text="{Binding Title}" ToolTip.Tip="{Binding Title}"/>
+                                                            <TextBlock Classes="fwdSub" Text="{Binding Direction}"/>
+                                                            <TextBlock Classes="fwdState" Classes.ok="{Binding IsActive}" Classes.bad="{Binding IsFailed}"
+                                                                       Classes.exposed="{Binding IsExposed}" Text="{Binding StatusText}"/>
+                                                            <TextBlock Classes="fwdSub" Foreground="{DynamicResource Warning}" Text="{Binding LastError}"
+                                                                       IsVisible="{Binding HasLastError}" TextWrapping="Wrap"/>
+                                                        </StackPanel>
+                                                        <Button Grid.Column="2" Classes="rowBtn" VerticalAlignment="Top"
+                                                                Command="{Binding $parent[UserControl].((vm:SshViewModel)DataContext).RemoveForwardCommand}"
+                                                                CommandParameter="{Binding}" ToolTip.Tip="Remove this forward" AutomationProperties.Name="Remove forward">
+                                                            <Path Data="{StaticResource SshIcoClose}"/>
+                                                        </Button>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                                <StackPanel Spacing="6" Margin="24" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                            IsHitTestVisible="False" IsVisible="{Binding !HasForwards}">
+                                    <Path Classes="emptyIcon" Data="{StaticResource SshIcoForward}"/>
+                                    <TextBlock Classes="emptyTitle" Text="No port forwards"/>
+                                    <TextBlock Classes="emptyText" Text="Add one above. Forwards run while connected."/>
+                                </StackPanel>
+                            </Panel>
+                        </Border>
+                    </Grid>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- ============ server health ============ -->
+                <TabItem Header="Server">
+                    <Grid x:Name="SshServerPane" helpers:Responsive.BreakWidth="560" Margin="0,10,0,0">
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasHealth}">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10">
+                                    <StackPanel VerticalAlignment="Center" Spacing="1">
+                                        <SelectableTextBlock Classes="sectionTitle" Text="{Binding HealthHost}" FontSize="{StaticResource Font.Title}" FontWeight="SemiBold"/>
+                                        <TextBlock Classes="tileDetail" Text="{Binding HealthOs}" ToolTip.Tip="{Binding HealthOs}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                        <StackPanel VerticalAlignment="Center" Spacing="1">
+                                            <TextBlock Classes="tileDetail" HorizontalAlignment="Right" Text="{Binding HealthUptime}" Foreground="{DynamicResource Text.Secondary}"/>
+                                            <TextBlock Classes="tileDetail" HorizontalAlignment="Right" Text="{Binding HealthUpdated}"/>
+                                        </StackPanel>
+                                        <Button Classes="icon" Command="{Binding RefreshHealthCommand}" ToolTip.Tip="Refresh now" AutomationProperties.Name="Refresh">
+                                            <Path Classes="glyph" Data="{StaticResource SshIcoRefresh}"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+
+                                <UniformGrid x:Name="SshTiles" Margin="0,0,-8,-8">
+                                    <Border Classes="card tile">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Classes="tileLabel" Text="CPU"/>
+                                            <TextBlock Classes="tileValue" Text="{Binding CpuText}"/>
+                                            <ProgressBar Classes="bar" Classes.high="{Binding CpuHigh}" Value="{Binding CpuPercent}"/>
+                                            <TextBlock Classes="tileDetail" Text="{Binding CpuDetail}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Classes="card tile">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Classes="tileLabel" Text="Load"/>
+                                            <TextBlock Classes="tileValue mono" FontFamily="{StaticResource MonoFont}" Text="{Binding LoadText}"/>
+                                            <TextBlock Classes="tileDetail" Text="{Binding LoadDetail}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Classes="card tile">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Classes="tileLabel" Text="Memory"/>
+                                            <TextBlock Classes="tileValue" Text="{Binding MemText}"/>
+                                            <ProgressBar Classes="bar" Classes.high="{Binding MemHigh}" Value="{Binding MemPercent}"/>
+                                            <TextBlock Classes="tileDetail" Text="{Binding MemDetail}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Classes="card tile">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Classes="tileLabel" Text="Swap"/>
+                                            <TextBlock Classes="tileValue" Text="{Binding SwapText}"/>
+                                            <ProgressBar Classes="bar" Classes.warn="{Binding SwapHigh}" Value="{Binding SwapPercent}"/>
+                                            <TextBlock Classes="tileDetail" Text="{Binding SwapDetail}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </UniformGrid>
+
+                                <TextBlock Classes="hint" Text="{Binding HealthNote}" IsVisible="{Binding HealthNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                                <Grid x:Name="SshLists" helpers:Responsive.BreakWidth="560" ColumnDefinitions="*, *" RowDefinitions="Auto, Auto">
+                                    <Border x:Name="SshDiskCard" Classes="card" Padding="12,10">
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Classes="cardHeader" Margin="0" Text="Disks"/>
+                                            <ItemsControl ItemsSource="{Binding Disks}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:SshDiskRow">
+                                                        <StackPanel Spacing="3" Margin="0,0,0,8">
+                                                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                                                                <TextBlock Classes="cell strong" Text="{Binding Mount}" ToolTip.Tip="{Binding Filesystem}"/>
+                                                                <TextBlock Grid.Column="1" Classes="cell strong" Text="{Binding PercentText}"/>
+                                                            </Grid>
+                                                            <ProgressBar Classes="bar" Classes.warn="{Binding IsWarn}" Classes.high="{Binding IsHigh}" Value="{Binding Percent}"/>
+                                                            <TextBlock Classes="tileDetail" Text="{Binding SizeText}"/>
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border x:Name="SshProcCard" Classes="card" Padding="12,10">
+                                        <StackPanel Spacing="6">
+                                            <TextBlock Classes="cardHeader" Margin="0" Text="Top processes (CPU)"/>
+                                            <Grid ColumnDefinitions="48, 64, 40, 40, *" ColumnSpacing="6">
+                                                <TextBlock Classes="colHead" Text="PID"/>
+                                                <TextBlock Grid.Column="1" Classes="colHead" Text="User"/>
+                                                <TextBlock Grid.Column="2" Classes="colHead" Text="CPU%" TextAlignment="Right"/>
+                                                <TextBlock Grid.Column="3" Classes="colHead" Text="MEM%" TextAlignment="Right"/>
+                                                <TextBlock Grid.Column="4" Classes="colHead" Text="Command"/>
+                                            </Grid>
+                                            <ItemsControl ItemsSource="{Binding Processes}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:SshProcRow">
+                                                        <Grid ColumnDefinitions="48, 64, 40, 40, *" ColumnSpacing="6" Margin="0,2">
+                                                            <TextBlock Classes="cell" Text="{Binding Pid}"/>
+                                                            <TextBlock Grid.Column="1" Classes="cell" Text="{Binding User}"/>
+                                                            <TextBlock Grid.Column="2" Classes="cell strong" Text="{Binding CpuText}" TextAlignment="Right"/>
+                                                            <TextBlock Grid.Column="3" Classes="cell" Text="{Binding MemText}" TextAlignment="Right"/>
+                                                            <TextBlock Grid.Column="4" Classes="cell strong" Text="{Binding Command}" ToolTip.Tip="{Binding Command}"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- not connected / first refresh / no answer -->
+                        <Border Classes="card output" IsVisible="{Binding !HasHealth}">
+                            <StackPanel Spacing="6" Margin="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Path Classes="emptyIcon" Data="{StaticResource SshIcoServer}"/>
+                                <TextBlock Classes="emptyTitle" Text="Not connected" IsVisible="{Binding !IsConnected}"/>
+                                <TextBlock Classes="emptyText" IsVisible="{Binding !IsConnected}"
+                                           Text="Connect to see CPU, memory, disks and top processes. Nothing is installed."/>
+                                <TextBlock Classes="emptyText" Text="Reading the server's status…">
+                                    <TextBlock.IsVisible>
+                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                            <Binding Path="IsConnected"/>
+                                            <Binding Path="ShowHealthLoading"/>
+                                        </MultiBinding>
+                                    </TextBlock.IsVisible>
+                                </TextBlock>
+                                <TextBlock Classes="emptyText" Foreground="{DynamicResource Danger}" Text="{Binding HealthError}" IsVisible="{Binding HasHealthError}"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </ScrollViewer>
 </UserControl>

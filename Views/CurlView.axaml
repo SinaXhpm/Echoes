@@ -2,221 +2,1550 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
              xmlns:helpers="using:Echoes.Helpers"
+             xmlns:ctl="using:Echoes.Views.Controls"
              x:Class="Echoes.Views.CurlView"
              x:DataType="vm:CurlViewModel">
 
+    <UserControl.KeyBindings>
+        <KeyBinding Gesture="Ctrl+Enter" Command="{Binding ToggleCurlCommand}"/>
+        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveRequestCommand}"/>
+        <!-- macOS: Cmd (Meta) is the shortcut key there -->
+        <KeyBinding Gesture="Meta+Enter" Command="{Binding ToggleCurlCommand}"/>
+        <KeyBinding Gesture="Meta+S" Command="{Binding SaveRequestCommand}"/>
+    </UserControl.KeyBindings>
+
+    <UserControl.Resources>
+        <!-- The WEB tab's page canvas: the one deliberate non-token color in this view. It stands in for a
+             browser's default white page behind the native web engine (the rendered response itself defaults
+             to a white page too — CurlViewModel injects a white html background), so the frame reads as one
+             white page while the engine starts up / between renders instead of flashing the dark app surface. -->
+        <SolidColorBrush x:Key="WebPage.Background" Color="#FFFFFF"/>
+
+        <!-- stroked glyphs in a 16x16 box (Path.glyph, Stretch=None) -->
+        <StreamGeometry x:Key="CurlGlyphMore">M3.5 8 L3.6 8 M8 8 L8.1 8 M12.5 8 L12.6 8</StreamGeometry>
+        <StreamGeometry x:Key="CurlGlyphClose">M4.5 4.5 L11.5 11.5 M11.5 4.5 L4.5 11.5</StreamGeometry>
+        <StreamGeometry x:Key="CurlGlyphCopy">M6 5.5 H12 A1.5 1.5 0 0 1 13.5 7 V13 A1.5 1.5 0 0 1 12 14.5 H6 A1.5 1.5 0 0 1 4.5 13 V7 A1.5 1.5 0 0 1 6 5.5 Z M2.5 10.5 V4 A1.5 1.5 0 0 1 4 2.5 H10.5</StreamGeometry>
+        <StreamGeometry x:Key="CurlGlyphSave">M8 2.5 V10 M4.75 6.75 L8 10 L11.25 6.75 M2.5 10.5 V12 A1.5 1.5 0 0 0 4 13.5 H12 A1.5 1.5 0 0 0 13.5 12 V10.5</StreamGeometry>
+        <StreamGeometry x:Key="CurlGlyphFile">M9.5 2.5 H4.75 A1.25 1.25 0 0 0 3.5 3.75 V12.25 A1.25 1.25 0 0 0 4.75 13.5 H11.25 A1.25 1.25 0 0 0 12.5 12.25 V5.5 Z M9.5 2.5 V5.5 H12.5</StreamGeometry>
+        <StreamGeometry x:Key="CurlGlyphUp">M4 10 L8 6 L12 10</StreamGeometry>
+        <StreamGeometry x:Key="CurlGlyphDown">M4 6 L8 10 L12 6</StreamGeometry>
+        <StreamGeometry x:Key="CurlGlyphSearch">M7 2.5 A4.5 4.5 0 1 0 7 11.5 A4.5 4.5 0 1 0 7 2.5 Z M10.3 10.3 L13.5 13.5</StreamGeometry>
+        <StreamGeometry x:Key="CurlGlyphWrap">M2.5 4 H13.5 M2.5 8 H11 A2 2 0 0 1 11 12 H8 M9.5 10.5 L8 12 L9.5 13.5 M2.5 12 H5.5</StreamGeometry>
+        <StreamGeometry x:Key="CurlGlyphEdit">M10.5 3 L13 5.5 L6 12.5 L3 13 L3.5 10 Z</StreamGeometry>
+        <StreamGeometry x:Key="CurlGlyphTrash">M3 4.5 H13 M6.5 4.5 V3 H9.5 V4.5 M4.5 4.5 L5.1 13.5 H10.9 L11.5 4.5</StreamGeometry>
+        <StreamGeometry x:Key="CurlGlyphRerun">M13.5 8 A5.5 5.5 0 1 1 8 2.5 C9.5 2.5 10.9 3.1 12 4.1 L13.5 5.5 M13.5 2.5 V5.5 H10.5</StreamGeometry>
+        <StreamGeometry x:Key="CurlGlyphCheck">M3.5 8.5 L6.5 11.5 L12.5 4.5</StreamGeometry>
+        <!-- the clipboard outline the other inputs' paste button uses (24x24, drawn at 14x14) -->
+        <StreamGeometry x:Key="CurlPasteIcon">M9 2.5h6v3.5H9z M8 4.25H6.5A1.5 1.5 0 0 0 5 5.75v14.5a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5V5.75a1.5 1.5 0 0 0-1.5-1.5H16 M9 11.5h6 M9 15.5h4</StreamGeometry>
+    </UserControl.Resources>
+
     <UserControl.Styles>
-        <!-- Read-only log/body panes: scroll instead of wrapping (faster + keeps alignment) -->
-        <Style Selector="TextBox[IsReadOnly=True]">
+        <!-- ===== glyphs follow their button's state through Stroke (a Path doesn't inherit Foreground) ===== -->
+        <Style Selector="Path.glyph">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Path.glyph.dots">
+            <Setter Property="StrokeThickness" Value="2.4"/>
+        </Style>
+        <Style Selector="Button.secondary Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button:disabled Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
+
+        <!-- quiet square icon button (copy / save / remove / rename …): no fill until hovered, Control.Height square
+             so it is a 44px touch target on phones -->
+        <Style Selector="Button.quiet">
+            <Setter Property="Width" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.quiet Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Button.quiet:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedHover}"/>
+        </Style>
+        <Style Selector="Button.quiet:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.quiet:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedPressed}"/>
+        </Style>
+        <Style Selector="Button.quiet:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.quiet.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+        </Style>
+        <Style Selector="Button.quiet.danger:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Button.compact">
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+        </Style>
+
+        <!-- ===== text ===== -->
+        <Style Selector="TextBlock.hint">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.colHead">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="LetterSpacing" Value="0.3"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="2,0,0,0"/>
+        </Style>
+        <Style Selector="TextBlock.inlineLabel">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.statValue">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.flash">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.method">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.method.get"><Setter Property="Foreground" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="TextBlock.method.post"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="TextBlock.method.put"><Setter Property="Foreground" Value="{DynamicResource Info}"/></Style>
+        <Style Selector="TextBlock.method.patch"><Setter Property="Foreground" Value="{DynamicResource Violet}"/></Style>
+        <Style Selector="TextBlock.method.delete"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+
+        <!-- ===== surfaces ===== -->
+        <!-- a tinted note: solid soft fill + hairline per tone -->
+        <Style Selector="Border.note">
+            <Setter Property="Padding" Value="10,6,4,6"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Info.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Info.Border}"/>
+        </Style>
+        <Style Selector="Border.note TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.note.danger">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+        </Style>
+        <Style Selector="Border.note.warning">
+            <Setter Property="Background" Value="{DynamicResource Warning.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Warning.Border}"/>
+        </Style>
+        <Style Selector="Border.note TextBlock.noteTitle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Border.note.danger TextBlock.noteTitle"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="Border.note.neutral">
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+        </Style>
+
+        <!-- option chips under the request line -->
+        <Style Selector="Button.chip">
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedHover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.chip.saved">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Button.chip.saved:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent.SoftHover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <!-- in-tab counts (Headers 3) -->
+        <Style Selector="Border.count">
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="Padding" Value="5,0"/>
+            <Setter Property="MinWidth" Value="16"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.count TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TabItem:selected Border.count">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+        </Style>
+        <Style Selector="TabItem:selected Border.count TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+
+        <!-- ===== a two-to-five way switch: pills in an inset track ===== -->
+        <Style Selector="ListBox.switch">
+            <Setter Property="SelectionMode" Value="AlwaysSelected"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ItemsPanel">
+                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="ListBox.switch > ListBoxItem">
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="ListBox.switch > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+        </Style>
+        <Style Selector="ListBox.switch > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="ListBox.switch > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.switch > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.switch > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.switch > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+
+        <!-- ===== inputs ===== -->
+        <Style Selector="TextBox.code">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+        </Style>
+        <!-- read-only output text (logs, TLS, snippets) sits flush in its Border.card.output: one inset surface in every state -->
+        <Style Selector="TextBox.out">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
             <Setter Property="TextWrapping" Value="NoWrap"/>
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
             <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
         </Style>
-        <Style Selector="TabItem">
-            <Setter Property="FontSize" Value="11.5"/>
-            <Setter Property="MinHeight" Value="30"/>
-            <Setter Property="Padding" Value="13,0"/>
-            <Setter Property="Foreground" Value="#9E9FA8"/>
+        <Style Selector="TextBox.out:pointerover /template/ Border#PART_BorderElement, TextBox.out:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderThickness" Value="0"/>
         </Style>
-        <Style Selector="TabItem:selected">
-            <Setter Property="Foreground" Value="#ECECEF"/>
+        <!-- a field that failed validation: danger hairline in every state -->
+        <Style Selector="TextBox.invalid /template/ Border#PART_BorderElement,
+                         TextBox.invalid:pointerover /template/ Border#PART_BorderElement,
+                         TextBox.invalid:focus /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger}"/>
         </Style>
-        <!-- primary REQUEST / RESPONSE section tabs -->
-        <Style Selector="TabItem.section">
-            <Setter Property="FontSize" Value="12.5"/>
+        <!-- a check box without a label (the rows' on/off) -->
+        <Style Selector="CheckBox.rowCheck">
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <!-- the selected file, in place of a value box -->
+        <Style Selector="Border.fileChip">
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="Padding" Value="10,0,2,0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        </Style>
+        <Style Selector="Border.fileChip Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Border.fileChip TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
+        <!-- the paste button inside the URL box (the shared .pasteBtn look) -->
+        <Style Selector="Button.pasteBtn Path">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+        </Style>
+
+        <!-- ===== response ===== -->
+        <Style Selector="ctl|CurlCodeView">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="LineNumberBrush" Value="{DynamicResource Text.Disabled}"/>
+            <Setter Property="GutterBorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="KeyBrush" Value="{DynamicResource Info}"/>
+            <Setter Property="StringBrush" Value="{DynamicResource Success}"/>
+            <Setter Property="NumberBrush" Value="{DynamicResource Warning}"/>
+            <Setter Property="LiteralBrush" Value="{DynamicResource Violet}"/>
+            <Setter Property="PunctBrush" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TagBrush" Value="{DynamicResource Info}"/>
+            <Setter Property="AttrBrush" Value="{DynamicResource Violet}"/>
+            <Setter Property="CommentBrush" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="SelectionBrush" Value="{DynamicResource Selection}"/>
+            <Setter Property="MatchBrush" Value="{DynamicResource Warning.Soft}"/>
+            <Setter Property="CurrentMatchBrush" Value="{DynamicResource Warning.Border}"/>
+        </Style>
+        <Style Selector="ctl|CurlTimingBar">
+            <Setter Property="Track" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="Fill" Value="{DynamicResource Accent}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="ctl|CurlTimingBar.dns"><Setter Property="Fill" Value="{DynamicResource Info}"/></Style>
+        <Style Selector="ctl|CurlTimingBar.connect"><Setter Property="Fill" Value="{DynamicResource Violet}"/></Style>
+        <Style Selector="ctl|CurlTimingBar.tls"><Setter Property="Fill" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="ctl|CurlTimingBar.wait"><Setter Property="Fill" Value="{DynamicResource Accent}"/></Style>
+        <Style Selector="ctl|CurlTimingBar.download"><Setter Property="Fill" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="TextBlock.hName">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.hValue">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="Border.hRow">
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        </Style>
+        <Style Selector="Border.hRow > Grid > SelectableTextBlock.hValue">
+            <Setter Property="Grid.Column" Value="1"/>
+        </Style>
+
+        <!-- library rows (saved / history): the whole row opens it -->
+        <Style Selector="Button.libRow">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="MinHeight" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.libRow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+        </Style>
+        <Style Selector="Button.libRow:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Pressed}"/>
+        </Style>
+        <Style Selector="Border.libItem">
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Margin" Value="0,0,0,2"/>
+        </Style>
+        <Style Selector="Border.libItem.current">
+            <Setter Property="Background" Value="{DynamicResource Bg.Selected}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        </Style>
+        <Style Selector="TextBlock.libName">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.libUrl">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.libStatus">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Padding" Value="16,0"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.libStatus.ok"><Setter Property="Foreground" Value="{DynamicResource Success}"/></Style>
+        <Style Selector="TextBlock.libStatus.redirect"><Setter Property="Foreground" Value="{DynamicResource Info}"/></Style>
+        <Style Selector="TextBlock.libStatus.client"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="TextBlock.libStatus.bad"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+
+        <!-- ===== Responsive. CurlRoot (break 620): wide = [method][URL][Send][⋯] on one line, status at the right of the
+             section strip; narrow (phone / slim window) = URL on its own line, method · Send · ⋯ under it, the status on
+             its own line above the sections. Later styles win: keep the order. ===== -->
+        <Style Selector="AutoCompleteBox#UrlBox">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow AutoCompleteBox#UrlBox">
+            <Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow ComboBox#MethodBox">
+            <Setter Property="Grid.Row" Value="1"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow Button#SendButton">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow Button#MoreButton">
+            <Setter Property="Grid.Row" Value="1"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="StackPanel#Summary">
+            <Setter Property="Grid.Row" Value="2"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Height" Value="28"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow StackPanel#Summary">
+            <Setter Property="Grid.Row" Value="1"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="Margin" Value="2,10,0,0"/>
+            <Setter Property="Height" Value="24"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow TabItem">
+            <Setter Property="Margin" Value="0,0,16,0"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow TabControl.seg > TabItem">
+            <Setter Property="Margin" Value="0,0,6,0"/>
+        </Style>
+        <!-- response toolbar: search shares the line when wide, gets its own under the switch when narrow -->
+        <Style Selector="Grid#CurlRoot.narrow Border#SearchBox">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+            <Setter Property="Width" Value="NaN"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow TextBlock#BodyKind">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <!-- headers table: name | value side by side when wide, stacked on phones -->
+        <Style Selector="Grid#CurlRoot.narrow Border.hRow > Grid > TextBlock.hName">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow Border.hRow > Grid > SelectableTextBlock.hValue">
+            <Setter Property="Grid.Column" Value="0"/>
+            <Setter Property="Grid.Row" Value="1"/>
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <!-- request key / value rows (params, headers, form, multipart, cookies): side by side when wide, the name over its
+             value on phones so both stay readable -->
+        <Style Selector="Grid.kv">
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+        <Style Selector="Grid.kv > :is(Control).kvName">
+            <Setter Property="Grid.Column" Value="1"/>
+        </Style>
+        <Style Selector="Grid.kv > :is(Control).kvValue">
+            <Setter Property="Grid.Column" Value="2"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow Grid.kv">
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow Grid.kv > :is(Control).kvName">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow Grid.kv > :is(Control).kvValue">
+            <Setter Property="Grid.Row" Value="1"/>
+            <Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow :is(Control).kvValueHead">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow TextBlock.codeHint">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Button#SendButton">
+            <Setter Property="Grid.Column" Value="2"/>
+        </Style>
+        <Style Selector="Border#SearchBox">
+            <Setter Property="Grid.Column" Value="2"/>
+            <Setter Property="Width" Value="230"/>
+        </Style>
+        <Style Selector="Grid.authBasic > StackPanel:nth-child(2)">
+            <Setter Property="Grid.Column" Value="1"/>
+        </Style>
+        <Style Selector="TextBlock.hint.err">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <!-- the wrap toggle: a quiet square that stays tinted while on -->
+        <Style Selector="ToggleButton.quiet">
+            <Setter Property="Width" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="ToggleButton.quiet Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="ToggleButton.quiet:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedHover}"/>
+        </Style>
+        <Style Selector="ToggleButton.quiet:checked /template/ ContentPresenter#PART_ContentPresenter,
+                         ToggleButton.quiet:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+        </Style>
+        <Style Selector="ToggleButton.quiet:checked Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <!-- options: interface | override side by side, stacked on phones -->
+        <Style Selector="Grid#CurlRoot.narrow StackPanel#OverrideField">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+        <Style Selector="StackPanel#OverrideField">
+            <Setter Property="Grid.Column" Value="1"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow StackPanel#InterfaceField">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow StackPanel#ProxyAddrField">
+            <Setter Property="Grid.ColumnSpan" Value="3"/>
+        </Style>
+        <Style Selector="StackPanel#ProxyUserField"><Setter Property="Grid.Column" Value="1"/></Style>
+        <Style Selector="StackPanel#ProxyPassField"><Setter Property="Grid.Column" Value="2"/></Style>
+        <Style Selector="Grid#CurlRoot.narrow StackPanel#ProxyUserField">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow StackPanel#ProxyPassField">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow Grid.authBasic > StackPanel:nth-child(2)">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow Grid.authBasic > StackPanel:nth-child(1)">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#CurlRoot.narrow Grid.authBasic > StackPanel:nth-child(2)">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto, *" Margin="12">
+    <Grid x:Name="CurlRoot" RowDefinitions="Auto, Auto, *" helpers:Responsive.BreakWidth="620">
 
-        <!-- ============ TOP CONTROLS ============ -->
-        <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,10">
+        <!-- ================= REQUEST LINE ================= -->
+        <Border Grid.Row="0" Classes="card" Padding="12">
+            <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="Auto, *, Auto, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="8">
+                    <ComboBox x:Name="MethodBox" Classes="field" ItemsSource="{Binding HttpMethods}" SelectedItem="{Binding HttpMethod}"
+                              MinWidth="104" FontFamily="{StaticResource MonoFont}" FontWeight="SemiBold"
+                              AutomationProperties.Name="Method"/>
+                    <AutoCompleteBox x:Name="UrlBox" Classes="field" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding Url}"
+                                     ItemsSource="{Binding UrlHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                     PlaceholderText="URL or curl command"
+                                     ToolTip.Tip="Enter a URL, or paste a curl command (bash, cmd or PowerShell) to import it whole"
+                                     AutomationProperties.Name="URL">
+                        <AutoCompleteBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}"/>
+                        </AutoCompleteBox.KeyBindings>
+                        <AutoCompleteBox.InnerRightContent>
+                            <Button x:Name="UrlPasteButton" Classes="pasteBtn" Focusable="False" Click="OnUrlPasteClick"
+                                    ToolTip.Tip="Paste a URL — or a curl command, imported whole" AutomationProperties.Name="Paste">
+                                <Path Data="{StaticResource CurlPasteIcon}" Stretch="Uniform" Width="14" Height="14"/>
+                            </Button>
+                        </AutoCompleteBox.InnerRightContent>
+                    </AutoCompleteBox>
+                    <Button x:Name="SendButton" Classes="toggle" Command="{Binding ToggleCurlCommand}"
+                            MinWidth="88" Classes.active="{Binding IsWorking}" ToolTip.Tip="Send (Enter, Ctrl+Enter)">
+                        <Panel>
+                            <TextBlock Text="Send" IsVisible="{Binding !IsWorking}"/>
+                            <TextBlock Text="Stop" IsVisible="{Binding IsWorking}"/>
+                        </Panel>
+                    </Button>
+                    <Button x:Name="MoreButton" Grid.Column="3" Classes="icon" ToolTip.Tip="Import, save, copy as curl"
+                            AutomationProperties.Name="More actions">
+                        <Path Classes="glyph dots" Data="{StaticResource CurlGlyphMore}"/>
+                        <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                <MenuItem Header="Import curl command…" Command="{Binding OpenImportCommand}"/>
+                                <MenuItem Header="Copy as curl" Command="{Binding CopyAsCurlCommand}"/>
+                                <Separator/>
+                                <MenuItem Header="{Binding SaveMenuText}" Command="{Binding SaveRequestCommand}" InputGesture="Ctrl+S"/>
+                                <MenuItem Header="Save as new…" Command="{Binding OpenSaveCommand}"/>
+                                <MenuItem Header="New request" Command="{Binding NewRequestCommand}"/>
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                </Grid>
 
-            <!-- Row 1: method (left of address) + address + RUN -->
-            <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="8">
-                <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding HttpMethods}" SelectedItem="{Binding HttpMethod}"
-                          MinWidth="90" HorizontalAlignment="Stretch"/>
-                <AutoCompleteBox Grid.Column="1" Classes="field" Text="{Binding Url}"
-                         ItemsSource="{Binding UrlHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                         PlaceholderText="Target URL (https://...)">
-                    <AutoCompleteBox.KeyBindings>
-                        <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}" />
-                    </AutoCompleteBox.KeyBindings>
-                </AutoCompleteBox>
-                <Button Grid.Column="2" Classes="toggle" Command="{Binding ToggleCurlCommand}"
-                        Width="82" Classes.active="{Binding IsWorking}">
-                    <Panel>
-                        <TextBlock Text="RUN" IsVisible="{Binding !IsWorking}" FontSize="12"/>
-                        <TextBlock Text="STOP" IsVisible="{Binding IsWorking}" FontSize="12"/>
-                    </Panel>
-                </Button>
-            </Grid>
+                <!-- what isn't default (a click opens Options) + the saved request this is -->
+                <WrapPanel IsVisible="{Binding HasOptionChips}" ItemSpacing="6" LineSpacing="6">
+                    <Button Classes="chip saved" IsVisible="{Binding HasSavedName}" Command="{Binding OpenSaveCommand}"
+                            ToolTip.Tip="Opened from Saved — Ctrl+S saves the changes to it">
+                        <TextBlock Text="{Binding CurrentSavedName}" MaxWidth="220" TextTrimming="CharacterEllipsis"/>
+                    </Button>
+                    <ItemsControl ItemsSource="{Binding OptionChips}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6"/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <Button Classes="chip" Content="{Binding}" Click="OnChipClick" ToolTip.Tip="Change in Request › Options"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </WrapPanel>
 
-            <!-- Row 2: engine mode = a switch; independent form options = checkboxes (applied on RUN) -->
-            <WrapPanel VerticalAlignment="Center">
-                <ToggleSwitch IsChecked="{Binding UseDotNetEngine}"
-                              OnContent=".NET" OffContent="curl" FontSize="11" FontWeight="SemiBold"
-                              MinWidth="0" Margin="0,2,18,2" VerticalAlignment="Center"
-                              ToolTip.Tip="Engine: system curl binary, or built-in .NET HttpClient (no curl needed)"/>
-                <CheckBox IsChecked="{Binding FollowRedirects}" Content="Follow redirects" FontSize="11.5"
-                          Foreground="#C7C8CF" FontWeight="SemiBold" MinHeight="0" Margin="0,2,16,2" VerticalAlignment="Center"
-                          ToolTip.Tip="curl -L — follow 3xx redirects (on by default)"/>
-                <CheckBox Name="ProxyToggle" IsChecked="{Binding UseProxy}" Content="Proxy" FontSize="11.5"
-                          Foreground="#C7C8CF" FontWeight="SemiBold" MinHeight="0" Margin="0,2,16,2" VerticalAlignment="Center"/>
-                <CheckBox IsChecked="{Binding SkipSslVerify}" Content="Insecure" FontSize="11.5"
-                          Foreground="#C7C8CF" FontWeight="SemiBold" MinHeight="0" Margin="0,2,16,2" VerticalAlignment="Center"
-                          ToolTip.Tip="curl -k — skip TLS certificate verification"/>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,0,2">
-                    <TextBlock Text="Timeout" FontSize="11" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <NumericUpDown Value="{Binding TimeoutSec}" Minimum="0" Maximum="999" ShowButtonSpinner="False"
-                                   Height="28" Width="45" MinWidth="0" Padding="4,0" FontSize="11"
-                                   VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                   CornerRadius="6" Foreground="#ECECEF" Background="#1D1E25" BorderBrush="#3B3D47"/>
-                    <TextBlock Text="s" FontSize="10.5" Foreground="#9E9FA8" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                <!-- import result / an automatic change: one line, dismissable -->
+                <Border Classes="note" Classes.danger="{Binding NoteIsError}" IsVisible="{Binding HasNote}">
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="6">
+                        <SelectableTextBlock Text="{Binding NoteText}" TextWrapping="Wrap" VerticalAlignment="Center"
+                                             FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Text.Secondary}"/>
+                        <Button Grid.Column="1" Classes="quiet" Height="24" Width="24" Command="{Binding DismissNoteCommand}"
+                                ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss">
+                            <Path Classes="glyph" Data="{StaticResource CurlGlyphClose}"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- Import panel -->
+                <StackPanel IsVisible="{Binding IsImportOpen}" Spacing="8">
+                    <TextBox Classes="field multiline code" Text="{Binding ImportText}" AcceptsReturn="True" TextWrapping="Wrap"
+                             Height="120" Classes.invalid="{Binding HasImportError}"
+                             PlaceholderText="Paste a curl command"
+                             ToolTip.Tip="A curl command in bash, cmd or PowerShell form, e.g. from a browser's Copy as cURL, Postman or the docs"
+                             AutomationProperties.Name="curl command to import">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Escape" Command="{Binding CloseImportCommand}"/>
+                            <KeyBinding Gesture="Ctrl+Enter" Command="{Binding ImportFromPanelCommand}"/>
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                    <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8">
+                        <TextBlock Classes="hint" Text="{Binding ImportError}" IsVisible="{Binding HasImportError}"
+                                   Foreground="{DynamicResource Danger}" VerticalAlignment="Center"/>
+                        <TextBlock Classes="hint" IsVisible="{Binding !HasImportError}" VerticalAlignment="Center"
+                                   Text="Fills in the whole request."
+                                   ToolTip.Tip="Method, URL, headers, cookies, body, auth and options are filled in"/>
+                        <Button Grid.Column="1" Classes="ghost" Content="Cancel" Command="{Binding CloseImportCommand}"/>
+                        <Button Grid.Column="2" Classes="primary" Content="Import" Command="{Binding ImportFromPanelCommand}"/>
+                    </Grid>
                 </StackPanel>
-            </WrapPanel>
 
-            <!-- Row 3: connection settings (moved out of the CONN tab): interface + override IP -->
-            <Grid ColumnDefinitions="*, *" ColumnSpacing="8">
-                <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding Interfaces}" SelectedItem="{Binding SelectedInterface}"
-                          HorizontalAlignment="Stretch"
-                          ToolTip.Tip="Outgoing network interface (binds the source IP). Auto = let the OS route."/>
-                <TextBox Grid.Column="1" Classes="field" Text="{Binding OverrideIp}" PlaceholderText="Override IP (--resolve, optional)">
-                    <TextBox.KeyBindings>
-                        <KeyBinding Gesture="Enter" Command="{Binding ToggleCurlCommand}"/>
-                    </TextBox.KeyBindings>
-                </TextBox>
-            </Grid>
+                <!-- Save panel -->
+                <Grid IsVisible="{Binding IsSaveOpen}" ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8">
+                    <TextBox x:Name="SaveNameBox" Classes="field" Text="{Binding SaveName}" PlaceholderText="Name"
+                             AutomationProperties.Name="Name for the saved request">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding ConfirmSaveCommand}"/>
+                            <KeyBinding Gesture="Escape" Command="{Binding CloseSaveCommand}"/>
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                    <Button Grid.Column="1" Classes="ghost" Content="Cancel" Command="{Binding CloseSaveCommand}"/>
+                    <Button Grid.Column="2" Classes="primary" Content="Save" Command="{Binding ConfirmSaveCommand}"/>
+                </Grid>
+            </StackPanel>
+        </Border>
 
-            <!-- Proxy credentials — revealed when Proxy is on -->
-            <Grid ColumnDefinitions="*, 110, 110" ColumnSpacing="6" IsVisible="{Binding #ProxyToggle.IsChecked}">
-                <AutoCompleteBox Grid.Column="0" Classes="field" Text="{Binding Proxy}"
-                         ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                         PlaceholderText="Proxy (IP:Port)"/>
-                <TextBox Grid.Column="1" Classes="field" Text="{Binding ProxyUser}" PlaceholderText="User"/>
-                <TextBox Grid.Column="2" Classes="field" Text="{Binding ProxyPass}" PlaceholderText="Pass" PasswordChar="*"/>
-            </Grid>
-        </StackPanel>
-
-        <!-- ============ REQUEST / RESPONSE — only one section shown at a time (full space) ============ -->
-        <Grid Grid.Row="1">
-        <TabControl Padding="0,2,0,0" SelectedIndex="{Binding SectionIndex}">
+        <!-- ================= SECTIONS: Request · Response · Code · Saved ================= -->
+        <TabControl x:Name="Sections" Grid.Row="2" Classes="seg" Margin="0,12,0,0" Padding="0,10,0,0" SelectedIndex="{Binding SectionIndex}">
             <TabControl.ItemsPanel>
                 <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
             </TabControl.ItemsPanel>
 
-            <!-- REQUEST: what to send -->
-            <TabItem Header="REQUEST" Classes="section">
-                <TabControl Padding="0,4,0,0">
+            <!-- ======== REQUEST ======== -->
+            <TabItem Header="Request">
+                <TabControl SelectedIndex="{Binding RequestTabIndex}" Padding="0,10,0,0">
                     <TabControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
                     </TabControl.ItemsPanel>
 
-                    <TabItem Header="BODY">
-                        <Border Classes="card output">
-                            <TextBox Text="{Binding RequestBody}" AcceptsReturn="True" TextWrapping="Wrap"
-                                     Foreground="#ECECEF" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"
-                                     PlaceholderText="Request body — sent with POST / PUT / PATCH (e.g. JSON). Add a Content-Type header if needed."/>
-                        </Border>
-                    </TabItem>
-
-                    <TabItem Header="HEADERS">
-                        <Border Classes="card output">
-                            <TextBox Text="{Binding RequestHeaders}" AcceptsReturn="True" TextWrapping="NoWrap"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                     Foreground="#ECECEF" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"
-                                     PlaceholderText="Request headers — one per line:&#x0a;Content-Type: application/json&#x0a;Authorization: Bearer ..."/>
-                        </Border>
-                    </TabItem>
-                </TabControl>
-            </TabItem>
-
-            <!-- RESPONSE: the result only -->
-            <TabItem Header="RESPONSE" Classes="section">
-                <TabControl Padding="0,4,0,0">
-                    <TabControl.ItemsPanel>
-                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
-                    </TabControl.ItemsPanel>
-
-                    <TabItem Header="BODY">
-                        <Border Classes="card output">
-                            <Grid RowDefinitions="Auto, *">
-                                <CheckBox Grid.Row="0" IsChecked="{Binding WrapRawBody}" Content="Wrap" FontSize="11"
-                                          Foreground="#9E9FA8" FontWeight="SemiBold" MinHeight="0"
-                                          HorizontalAlignment="Right" Margin="0,0,2,4"/>
-                                <TextBox Grid.Row="1" Text="{Binding RawBody}" IsReadOnly="True" AcceptsReturn="True"
-                                         TextWrapping="{Binding RawBodyWrapping}"
-                                         Foreground="#4FCB97" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
+                    <!-- params -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="Params"/>
+                                <Border Classes="count" IsVisible="{Binding ParamsBadge, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                    <TextBlock Text="{Binding ParamsBadge}"/>
+                                </Border>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <Grid RowDefinitions="Auto, *, Auto" RowSpacing="6">
+                            <Grid ColumnDefinitions="28, 4*, 5*, Auto" ColumnSpacing="6">
+                                <TextBlock Grid.Column="1" Classes="colHead" Text="Key"/>
+                                <TextBlock Grid.Column="2" Classes="colHead kvValueHead" Text="Value"/>
+                                <Border Grid.Column="3" Width="{DynamicResource Control.Height}"/>
                             </Grid>
-                        </Border>
+                            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel>
+                                <ItemsControl ItemsSource="{Binding Params.Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:CurlKvRow">
+                                            <Grid Classes="kv" ColumnDefinitions="28, 4*, 5*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="6">
+                                                <CheckBox Classes="rowCheck" IsChecked="{Binding Enabled}" IsVisible="{Binding IsReal}" ToolTip.Tip="Include this parameter"/>
+                                                <TextBox Classes="field kvName" Text="{Binding Name}" PlaceholderText="Add param"/>
+                                                <TextBox Classes="field kvValue" Text="{Binding Value}" PlaceholderText="Value"/>
+                                                <Button Grid.Column="3" Classes="quiet danger" Command="{Binding RemoveCommand}"
+                                                        IsVisible="{Binding IsReal}" ToolTip.Tip="Remove" AutomationProperties.Name="Remove parameter">
+                                                    <Path Classes="glyph" Data="{StaticResource CurlGlyphClose}"/>
+                                                </Button>
+                                                <Border Grid.Column="3" Width="{DynamicResource Control.Height}" IsVisible="{Binding IsNew}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Classes="hint" Margin="34,2,0,0" Text="Kept in sync with the URL."/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
                     </TabItem>
 
-                    <TabItem Header="HEADERS">
-                        <Border Classes="card output">
-                            <TextBox Text="{Binding HeadersLog}" IsReadOnly="True" AcceptsReturn="True"
-                                     Foreground="#FFEA00" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
-                        </Border>
+                    <!-- headers -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="Headers"/>
+                                <Border Classes="count" IsVisible="{Binding HeadersBadge, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                    <TextBlock Text="{Binding HeadersBadge}"/>
+                                </Border>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <Grid RowDefinitions="Auto, *, Auto" RowSpacing="6">
+                            <Grid ColumnDefinitions="28, 4*, 5*, Auto" ColumnSpacing="6">
+                                <TextBlock Grid.Column="1" Classes="colHead" Text="Name" IsVisible="{Binding !HeadersBulk}"/>
+                                <Panel Grid.Column="2" Classes="kvValueHead"><TextBlock Classes="colHead" Text="Value" IsVisible="{Binding !HeadersBulk}"/></Panel>
+                                <TextBlock Grid.ColumnSpan="3" Classes="colHead" IsVisible="{Binding HeadersBulk}"
+                                           Text="Name: value per line · # turns it off"/>
+                                <Button Grid.Column="3" Classes="ghost compact" Command="{Binding ToggleHeadersBulkCommand}"
+                                        ToolTip.Tip="Edit all headers as text (paste many at once)">
+                                    <Panel>
+                                        <TextBlock Text="Bulk edit" IsVisible="{Binding !HeadersBulk}"/>
+                                        <TextBlock Text="Done" IsVisible="{Binding HeadersBulk}"/>
+                                    </Panel>
+                                </Button>
+                            </Grid>
+                            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding !HeadersBulk}">
+                                <StackPanel>
+                                <ItemsControl ItemsSource="{Binding Headers.Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:CurlKvRow">
+                                            <Grid Classes="kv" ColumnDefinitions="28, 4*, 5*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="6">
+                                                <CheckBox Classes="rowCheck" IsChecked="{Binding Enabled}" IsVisible="{Binding IsReal}" ToolTip.Tip="Send this header"/>
+                                                <AutoCompleteBox Classes="field kvName" Text="{Binding Name}" PlaceholderText="Add header"
+                                                                 ItemsSource="{x:Static vm:CurlViewModel.CommonHeaderNames}"
+                                                                 FilterMode="StartsWith" MinimumPrefixLength="1"/>
+                                                <AutoCompleteBox Classes="field kvValue" Text="{Binding Value}" PlaceholderText="Value"
+                                                                 ItemsSource="{Binding ValueSuggestions}" FilterMode="StartsWith" MinimumPrefixLength="0"/>
+                                                <Button Grid.Column="3" Classes="quiet danger" Command="{Binding RemoveCommand}"
+                                                        IsVisible="{Binding IsReal}" ToolTip.Tip="Remove" AutomationProperties.Name="Remove header">
+                                                    <Path Classes="glyph" Data="{StaticResource CurlGlyphClose}"/>
+                                                </Button>
+                                                <Border Grid.Column="3" Width="{DynamicResource Control.Height}" IsVisible="{Binding IsNew}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Classes="hint" Margin="34,2,0,0" Text="{Binding AutoHeadersText}" IsVisible="{Binding HasAutoHeaders}"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <TextBox Grid.Row="1" Classes="field multiline code" IsVisible="{Binding HeadersBulk}" Text="{Binding HeadersBulkText}"
+                                     ToolTip.Tip="One header per line as Name: value. Start a line with # to switch it off."
+                                     AcceptsReturn="True" TextWrapping="NoWrap" ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                     PlaceholderText="Content-Type: application/json&#x0a;Authorization: Bearer …&#x0a;# X-Off: not sent"/>
+                        </Grid>
                     </TabItem>
 
-                    <TabItem Header="LOGS">
-                        <Border Classes="card output">
-                            <TextBox Text="{Binding FullLog}" IsReadOnly="True" AcceptsReturn="True"
-                                     Foreground="#ECECEF" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
-                        </Border>
+                    <!-- body -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="Body"/>
+                                <Border Classes="count" IsVisible="{Binding BodyBadge, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                    <TextBlock Text="{Binding BodyBadge}"/>
+                                </Border>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <Grid RowDefinitions="Auto, *, Auto" RowSpacing="8">
+                            <WrapPanel ItemSpacing="8" LineSpacing="8">
+                                <ListBox Classes="switch" SelectedIndex="{Binding BodyModeIndex}" AutomationProperties.Name="Body type">
+                                    <ListBoxItem Content="None"/>
+                                    <ListBoxItem Content="Raw" ToolTip.Tip="JSON, XML, text …"/>
+                                    <ListBoxItem Content="Form" ToolTip.Tip="application/x-www-form-urlencoded"/>
+                                    <ListBoxItem Content="Multipart" ToolTip.Tip="multipart/form-data — fields and files"/>
+                                    <ListBoxItem Content="File" ToolTip.Tip="A file sent as the whole body"/>
+                                </ListBox>
+                                <ComboBox Classes="field" ItemsSource="{Binding RawTypeNames}" SelectedIndex="{Binding RawTypeIndex}"
+                                          IsVisible="{Binding BodyIsRaw}" MinWidth="112" HorizontalAlignment="Left"
+                                          ToolTip.Tip="Sets Content-Type (unless a header does)"/>
+                                <Button Classes="secondary compact" Command="{Binding FormatBodyCommand}" IsVisible="{Binding BodyIsRaw}"
+                                        IsEnabled="{Binding CanFormatBody}" Content="Format" ToolTip.Tip="Pretty-print the JSON / XML"/>
+                            </WrapPanel>
+
+                            <Panel Grid.Row="1">
+                                <TextBlock IsVisible="{Binding BodyIsNone}" Classes="hint" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           TextAlignment="Center" Text="No body. Pick a type above to send one."/>
+
+                                <TextBox IsVisible="{Binding BodyIsRaw}" Classes="field multiline code" Classes.invalid="{Binding BodyStatusError}"
+                                         Text="{Binding RequestBody}" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
+                                         PlaceholderText="{}{ &quot;name&quot;: &quot;value&quot; }" AutomationProperties.Name="Request body"/>
+
+                                <Grid IsVisible="{Binding BodyIsForm}" RowDefinitions="Auto, *" RowSpacing="6">
+                                    <Grid ColumnDefinitions="28, 4*, 5*, Auto" ColumnSpacing="6">
+                                        <TextBlock Grid.Column="1" Classes="colHead" Text="Field"/>
+                                        <TextBlock Grid.Column="2" Classes="colHead kvValueHead" Text="Value"/>
+                                        <Border Grid.Column="3" Width="{DynamicResource Control.Height}"/>
+                                    </Grid>
+                                    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsControl ItemsSource="{Binding FormFields.Rows}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:CurlKvRow">
+                                                    <Grid Classes="kv" ColumnDefinitions="28, 4*, 5*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="6">
+                                                        <CheckBox Classes="rowCheck" IsChecked="{Binding Enabled}" IsVisible="{Binding IsReal}"/>
+                                                        <TextBox Classes="field kvName" Text="{Binding Name}" PlaceholderText="Add field"/>
+                                                        <TextBox Classes="field kvValue" Text="{Binding Value}" PlaceholderText="Value"/>
+                                                        <Button Grid.Column="3" Classes="quiet danger" Command="{Binding RemoveCommand}"
+                                                                IsVisible="{Binding IsReal}" ToolTip.Tip="Remove" AutomationProperties.Name="Remove field">
+                                                            <Path Classes="glyph" Data="{StaticResource CurlGlyphClose}"/>
+                                                        </Button>
+                                                        <Border Grid.Column="3" Width="{DynamicResource Control.Height}" IsVisible="{Binding IsNew}"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Grid>
+
+                                <Grid IsVisible="{Binding BodyIsMultipart}" RowDefinitions="Auto, *" RowSpacing="6">
+                                    <Grid ColumnDefinitions="28, 4*, 5*, Auto" ColumnSpacing="6">
+                                        <TextBlock Grid.Column="1" Classes="colHead" Text="Field"/>
+                                        <TextBlock Grid.Column="2" Classes="colHead kvValueHead" Text="Text or file"/>
+                                        <Border Grid.Column="3" Width="{DynamicResource Control.Height}"/>
+                                    </Grid>
+                                    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsControl ItemsSource="{Binding Parts.Rows}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:CurlPartRow">
+                                                    <Grid Classes="kv" ColumnDefinitions="28, 4*, 5*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="6">
+                                                        <CheckBox Classes="rowCheck" IsChecked="{Binding Enabled}" IsVisible="{Binding IsReal}"/>
+                                                        <TextBox Classes="field kvName" Text="{Binding Name}" PlaceholderText="Add field"/>
+                                                        <Grid Classes="kvValue" ColumnDefinitions="*, Auto" ColumnSpacing="4">
+                                                            <TextBox Classes="field" Text="{Binding Value}" PlaceholderText="Text value"
+                                                                     IsVisible="{Binding IsText}"/>
+                                                            <Border Classes="fileChip" IsVisible="{Binding HasFile}" ToolTip.Tip="{Binding FilePath}">
+                                                                <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="6">
+                                                                    <Path Classes="glyph" Data="{StaticResource CurlGlyphFile}"/>
+                                                                    <TextBlock Grid.Column="1" Text="{Binding FileLabel}"/>
+                                                                    <Button Grid.Column="2" Classes="quiet" Height="24" Width="24" Command="{Binding ClearFileCommand}"
+                                                                            ToolTip.Tip="Remove the file" AutomationProperties.Name="Remove the file">
+                                                                        <Path Classes="glyph" Data="{StaticResource CurlGlyphClose}"/>
+                                                                    </Button>
+                                                                </Grid>
+                                                            </Border>
+                                                            <Button Classes="secondary compact" IsVisible="{Binding NeedsFile}" Click="OnChoosePartFile"
+                                                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                    <Path Classes="glyph" Data="{StaticResource CurlGlyphFile}"/>
+                                                                    <TextBlock Text="Choose file…" VerticalAlignment="Center"/>
+                                                                </StackPanel>
+                                                            </Button>
+                                                            <Button Grid.Column="1" Classes="quiet" Click="OnChoosePartFile" IsVisible="{Binding IsText}"
+                                                                    ToolTip.Tip="Send a file in this field instead" AutomationProperties.Name="Use a file">
+                                                                <Path Classes="glyph" Data="{StaticResource CurlGlyphFile}"/>
+                                                            </Button>
+                                                            <Button Grid.Column="1" Classes="quiet" Command="{Binding UseTextCommand}" IsVisible="{Binding IsFile}"
+                                                                    ToolTip.Tip="Send text in this field instead" AutomationProperties.Name="Use text">
+                                                                <TextBlock Text="Aa" FontSize="{StaticResource Font.Small}" FontWeight="SemiBold"
+                                                                           Foreground="{DynamicResource Text.Muted}" VerticalAlignment="Center"/>
+                                                            </Button>
+                                                        </Grid>
+                                                        <Button Grid.Column="3" Classes="quiet danger" Command="{Binding RemoveCommand}"
+                                                                IsVisible="{Binding IsReal}" ToolTip.Tip="Remove" AutomationProperties.Name="Remove field">
+                                                            <Path Classes="glyph" Data="{StaticResource CurlGlyphClose}"/>
+                                                        </Button>
+                                                        <Border Grid.Column="3" Width="{DynamicResource Control.Height}" IsVisible="{Binding IsNew}"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Grid>
+
+                                <StackPanel IsVisible="{Binding BodyIsFile}" Spacing="8" VerticalAlignment="Top">
+                                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                                        <Border Classes="fileChip" IsVisible="{Binding HasBodyFile}" ToolTip.Tip="{Binding BodyFilePath}">
+                                            <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="6">
+                                                <Path Classes="glyph" Data="{StaticResource CurlGlyphFile}"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding BodyFileLabel}"/>
+                                                <Button Grid.Column="2" Classes="quiet" Height="24" Width="24" Command="{Binding ClearBodyFileCommand}"
+                                                        ToolTip.Tip="Remove the file" AutomationProperties.Name="Remove the file">
+                                                    <Path Classes="glyph" Data="{StaticResource CurlGlyphClose}"/>
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                        <TextBlock Classes="hint" IsVisible="{Binding !HasBodyFile}" VerticalAlignment="Center"
+                                                   Text="No file chosen"/>
+                                        <Button Grid.Column="1" Classes="secondary compact" Click="OnChooseBodyFile"
+                                                ToolTip.Tip="Its bytes are sent as the whole body. Content-Type follows the file's extension unless a header sets it.">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <Path Classes="glyph" Data="{StaticResource CurlGlyphFile}"/>
+                                                <TextBlock Text="Choose file…" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                    <TextBlock Classes="hint" Text="Content-Type follows the extension."/>
+                                </StackPanel>
+                            </Panel>
+
+                            <StackPanel Grid.Row="2" Spacing="2">
+                                <TextBlock Classes="hint" Text="{Binding BodyStatus}" IsVisible="{Binding HasBodyStatus}"
+                                           Classes.err="{Binding BodyStatusError}"/>
+                                <TextBlock Classes="hint" Text="{Binding BodyIgnoredNote}" IsVisible="{Binding HasBodyIgnoredNote}"
+                                           Foreground="{DynamicResource Warning}"/>
+                            </StackPanel>
+                        </Grid>
                     </TabItem>
 
-                    <TabItem Header="SSL">
-                        <Border Classes="card output">
-                            <TextBox Text="{Binding SslLog}" IsReadOnly="True" AcceptsReturn="True"
-                                     Foreground="#55CCFF" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
-                        </Border>
+                    <!-- auth -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="Auth"/>
+                                <Border Classes="count" IsVisible="{Binding AuthBadge, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                    <TextBlock Text="{Binding AuthBadge}"/>
+                                </Border>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Spacing="12">
+                                <ListBox Classes="switch" SelectedIndex="{Binding AuthModeIndex}" AutomationProperties.Name="Auth type">
+                                    <ListBoxItem Content="None"/>
+                                    <ListBoxItem Content="Basic"/>
+                                    <ListBoxItem Content="Bearer" ToolTip.Tip="Bearer token"/>
+                                </ListBox>
+                                <Grid Classes="authBasic" IsVisible="{Binding AuthIsBasic}" ColumnDefinitions="*, *" RowDefinitions="Auto, Auto" ColumnSpacing="12">
+                                    <StackPanel>
+                                        <TextBlock Classes="fieldLabel" Text="Username"/>
+                                        <TextBox Classes="field" Text="{Binding AuthUser}" AutomationProperties.Name="Username"/>
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Classes="fieldLabel" Text="Password"/>
+                                        <TextBox Classes="field" Text="{Binding AuthPass}" PasswordChar="●" IsUndoEnabled="False" AutomationProperties.Name="Password"/>
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel IsVisible="{Binding AuthIsBearer}">
+                                    <TextBlock Classes="fieldLabel" Text="Token"/>
+                                    <TextBox Classes="field code" Text="{Binding AuthToken}" PasswordChar="●" IsUndoEnabled="False"
+                                             PlaceholderText="eyJhbGciOi…" AutomationProperties.Name="Bearer token"/>
+                                </StackPanel>
+                                <TextBlock Classes="hint" FontFamily="{StaticResource MonoFont}" Text="{Binding AuthPreview}"/>
+                                <TextBlock Classes="hint" Text="Not stored unless you save the request."
+                                           ToolTip.Tip="Credentials stay in memory: they are kept only in requests you save."/>
+                            </StackPanel>
+                        </ScrollViewer>
                     </TabItem>
 
-                    <!-- Renders the ACTUAL response body (code-behind calls NavigateToString) rather
-                         than re-navigating to the URL, so it reflects the exact document the configured
-                         request returned — via the same proxy / override IP / interface.
-                         White backdrop like a real browser: a page that sets no background of its own
-                         defaults to black-on-white (readable) instead of black-on-dark-app. -->
-                    <TabItem Header="WEB">
-                        <Border Classes="card" Background="White" Padding="0" ClipToBounds="True">
-                            <NativeWebView x:Name="Web"/>
-                        </Border>
+                    <!-- cookies -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="Cookies"/>
+                                <Border Classes="count" IsVisible="{Binding CookiesBadge, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                    <TextBlock Text="{Binding CookiesBadge}"/>
+                                </Border>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <Grid RowDefinitions="Auto, *, Auto" RowSpacing="6">
+                            <Grid ColumnDefinitions="28, 4*, 5*, Auto" ColumnSpacing="6">
+                                <TextBlock Grid.Column="1" Classes="colHead" Text="Name"/>
+                                <TextBlock Grid.Column="2" Classes="colHead kvValueHead" Text="Value"/>
+                                <Border Grid.Column="3" Width="{DynamicResource Control.Height}"/>
+                            </Grid>
+                            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel>
+                                <ItemsControl ItemsSource="{Binding Cookies.Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:CurlKvRow">
+                                            <Grid Classes="kv" ColumnDefinitions="28, 4*, 5*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="6">
+                                                <CheckBox Classes="rowCheck" IsChecked="{Binding Enabled}" IsVisible="{Binding IsReal}"/>
+                                                <TextBox Classes="field kvName" Text="{Binding Name}" PlaceholderText="Add cookie"/>
+                                                <TextBox Classes="field kvValue" Text="{Binding Value}" PlaceholderText="Value"/>
+                                                <Button Grid.Column="3" Classes="quiet danger" Command="{Binding RemoveCommand}"
+                                                        IsVisible="{Binding IsReal}" ToolTip.Tip="Remove" AutomationProperties.Name="Remove cookie">
+                                                    <Path Classes="glyph" Data="{StaticResource CurlGlyphClose}"/>
+                                                </Button>
+                                                <Border Grid.Column="3" Width="{DynamicResource Control.Height}" IsVisible="{Binding IsNew}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Classes="hint" Margin="34,2,0,0" Text="Sent as one Cookie header."
+                                           ToolTip.Tip="Cookies a server sets are under Response › Headers › Cookies."/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- options -->
+                    <TabItem Header="Options">
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Spacing="14">
+                                <WrapPanel ItemSpacing="20" LineSpacing="10">
+                                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding CanChooseEngine}">
+                                        <TextBlock Classes="inlineLabel" Text="Engine"/>
+                                        <ListBox Classes="switch" SelectedIndex="{Binding EngineIndex}"
+                                                 ToolTip.Tip="The system curl binary, or .NET's HttpClient. A feature this curl lacks (HTTP/2, HTTP/3) is sent with .NET automatically.">
+                                            <ListBoxItem Content="curl"/>
+                                            <ListBoxItem Content=".NET"/>
+                                        </ListBox>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Classes="inlineLabel" Text="HTTP"/>
+                                        <ComboBox Classes="field" ItemsSource="{Binding HttpVersionNames}" SelectedIndex="{Binding HttpVersionIndex}" MinWidth="104"
+                                                  ToolTip.Tip="Auto = HTTP/2 over TLS where the engine can, else HTTP/1.1. HTTP/3 falls back when the server or system can't."/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Classes="inlineLabel" Text="Timeout"/>
+                                        <NumericUpDown Classes="field" Value="{Binding TimeoutSec}" Minimum="0" Maximum="3600" ShowButtonSpinner="False"
+                                                       Width="64" HorizontalContentAlignment="Center" FormatString="0"
+                                                       ToolTip.Tip="Whole request, in seconds (0 = no limit)"/>
+                                        <TextBlock Classes="inlineLabel" Text="s"/>
+                                    </StackPanel>
+                                </WrapPanel>
+                                <!-- every on/off option in one wrapping row; the proxy fields open right under it -->
+                                <WrapPanel ItemSpacing="20" LineSpacing="6">
+                                    <CheckBox IsChecked="{Binding FollowRedirects}" Content="Follow redirects" ToolTip.Tip="curl -L — follow 3xx responses"/>
+                                    <CheckBox IsChecked="{Binding Compressed}" Content="Compressed" ToolTip.Tip="curl --compressed — ask for gzip / deflate / br and decode it"/>
+                                    <CheckBox IsChecked="{Binding SkipSslVerify}" Content="Insecure" ToolTip.Tip="curl -k — don't verify the server's TLS certificate"/>
+                                    <CheckBox x:Name="ProxyToggle" IsChecked="{Binding UseProxy}" Content="Proxy" ToolTip.Tip="Send through an HTTP or SOCKS proxy"/>
+                                </WrapPanel>
+                                <Grid ColumnDefinitions="2*, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="12" IsVisible="{Binding UseProxy}">
+                                    <StackPanel x:Name="ProxyAddrField">
+                                        <TextBlock Classes="fieldLabel" Text="Address"/>
+                                        <AutoCompleteBox Classes="field" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding Proxy}"
+                                                         ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                                         PlaceholderText="host:port"
+                                                         ToolTip.Tip="host:port or socks5://host:port. Ports 1080 / 1081 / 9050 mean SOCKS5, others HTTP — or write the scheme."
+                                                         AutomationProperties.Name="Proxy address"/>
+                                    </StackPanel>
+                                    <StackPanel x:Name="ProxyUserField">
+                                        <TextBlock Classes="fieldLabel" Text="User"/>
+                                        <TextBox Classes="field" Text="{Binding ProxyUser}" PlaceholderText="Optional"/>
+                                    </StackPanel>
+                                    <StackPanel x:Name="ProxyPassField">
+                                        <TextBlock Classes="fieldLabel" Text="Password"/>
+                                        <TextBox Classes="field" Text="{Binding ProxyPass}" PlaceholderText="Optional" IsUndoEnabled="False" PasswordChar="●"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid ColumnDefinitions="3*, 2*" RowDefinitions="Auto, Auto" ColumnSpacing="12">
+                                    <StackPanel x:Name="InterfaceField">
+                                        <TextBlock Classes="fieldLabel" Text="Interface"/>
+                                        <ComboBox Classes="field" ItemsSource="{Binding Interfaces}" SelectedItem="{Binding SelectedInterface}"
+                                                  ToolTip.Tip="Outgoing network interface (binds the source IP). Auto = let the OS route."/>
+                                    </StackPanel>
+                                    <StackPanel x:Name="OverrideField">
+                                        <TextBlock Classes="fieldLabel" Text="Override IP"/>
+                                        <TextBox Classes="field" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding OverrideIp}" PlaceholderText="IP or IP:port"
+                                                 ToolTip.Tip="Optional. Connect to this address instead of resolving the host (curl --resolve / --connect-to)"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
                     </TabItem>
                 </TabControl>
             </TabItem>
 
-            <!-- COMMAND: the request as a copyable snippet for curl / PowerShell / Python / … -->
-            <TabItem Header="COMMAND" Classes="section">
-                <Grid RowDefinitions="Auto, *" Margin="0,4,0,0" RowSpacing="8">
-                    <Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="8">
-                        <ComboBox Grid.Column="0" Classes="field" ItemsSource="{Binding SnippetLanguages}"
-                                  SelectedItem="{Binding SnippetLanguage}" HorizontalAlignment="Left" MinWidth="190"/>
-                        <Button Grid.Column="1" Classes="secondary" Command="{Binding CopySnippetCommand}"
-                                Content="COPY" Height="30" Padding="18,0" FontSize="11"/>
+            <!-- ======== RESPONSE ======== -->
+            <TabItem Header="Response">
+                <Grid>
+                    <TabControl SelectedIndex="{Binding ResponseTabIndex}" Padding="0,10,0,0">
+                        <TabControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                        </TabControl.ItemsPanel>
+
+                        <TabItem Header="Body">
+                            <Grid RowDefinitions="Auto, Auto, *" RowSpacing="8">
+                                <!-- toolbar -->
+                                <Grid IsVisible="{Binding ShowBodyToolbar}" ColumnDefinitions="Auto, *, Auto, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="6">
+                                    <ListBox Classes="switch" SelectedIndex="{Binding BodyViewIndex}" IsVisible="{Binding PrettyAvailable}">
+                                        <ListBoxItem Content="Pretty"/>
+                                        <ListBoxItem Content="Raw"/>
+                                    </ListBox>
+                                    <TextBlock x:Name="BodyKind" Grid.Column="1" Classes="hint" Text="{Binding BodyKindText}" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Margin="4,0,0,0"/>
+                                    <Border x:Name="SearchBox" IsVisible="{Binding HasBodyText}">
+                                        <TextBox x:Name="SearchInput" Classes="field" Text="{Binding SearchText}" PlaceholderText="Search"
+                                                 AutomationProperties.Name="Search the body">
+                                            <TextBox.InnerLeftContent>
+                                                <Path Classes="glyph" Data="{StaticResource CurlGlyphSearch}" Margin="8,0,0,0" Stroke="{DynamicResource Text.Muted}"/>
+                                            </TextBox.InnerLeftContent>
+                                            <TextBox.InnerRightContent>
+                                                <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center" Margin="0,0,2,0">
+                                                    <TextBlock Classes="hint" Text="{Binding #BodyView.MatchSummary}" VerticalAlignment="Center"
+                                                               TextWrapping="NoWrap" Margin="0,0,4,0"/>
+                                                    <Button Classes="quiet" Width="24" Height="24" Click="OnFindPrev" ToolTip.Tip="Previous (Shift+Enter)"
+                                                            AutomationProperties.Name="Previous match">
+                                                        <Path Classes="glyph" Data="{StaticResource CurlGlyphUp}"/>
+                                                    </Button>
+                                                    <Button Classes="quiet" Width="24" Height="24" Click="OnFindNext" ToolTip.Tip="Next (Enter)"
+                                                            AutomationProperties.Name="Next match">
+                                                        <Path Classes="glyph" Data="{StaticResource CurlGlyphDown}"/>
+                                                    </Button>
+                                                </StackPanel>
+                                            </TextBox.InnerRightContent>
+                                        </TextBox>
+                                    </Border>
+                                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
+                                        <ToggleButton Classes="quiet" IsChecked="{Binding WrapBody}" IsVisible="{Binding HasBodyText}" ToolTip.Tip="Wrap long lines"
+                                                      AutomationProperties.Name="Wrap lines" Width="{DynamicResource Control.Height}" Height="{DynamicResource Control.Height}"
+                                                      Padding="0" Background="Transparent" BorderThickness="0" CornerRadius="{StaticResource Radius.Md}">
+                                            <Path Classes="glyph" Data="{StaticResource CurlGlyphWrap}"/>
+                                        </ToggleButton>
+                                        <Button Classes="quiet" Command="{Binding CopyBodyCommand}" IsEnabled="{Binding CanCopyBody}"
+                                                ToolTip.Tip="Copy the body" AutomationProperties.Name="Copy the body">
+                                            <Path Classes="glyph" Data="{StaticResource CurlGlyphCopy}"/>
+                                        </Button>
+                                        <Button Classes="quiet" Click="OnSaveBody" IsEnabled="{Binding CanSaveBody}" ToolTip.Tip="Save the body to a file"
+                                                AutomationProperties.Name="Save the body">
+                                            <Path Classes="glyph" Data="{StaticResource CurlGlyphSave}"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- the one error (and what to do) / a note about the body -->
+                                <StackPanel Grid.Row="1" Spacing="6">
+                                    <Border Classes="note" Classes.danger="{Binding StatusDanger}" Classes.neutral="{Binding StatusNeutral}"
+                                            Classes.warning="{Binding !StatusDanger}" IsVisible="{Binding HasError}">
+                                        <StackPanel Spacing="2" Margin="0,0,6,0">
+                                            <TextBlock Classes="noteTitle" Text="{Binding ErrorTitle}"/>
+                                            <SelectableTextBlock Text="{Binding ErrorDetail}" TextWrapping="Wrap" FontSize="{StaticResource Font.Small}"
+                                                                 Foreground="{DynamicResource Text.Secondary}"/>
+                                            <TextBlock Text="{Binding ErrorHint}" IsVisible="{Binding HasErrorHint}" Foreground="{DynamicResource Text.Primary}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <TextBlock Classes="hint" Text="{Binding BodyNote}" IsVisible="{Binding HasBodyNote}"/>
+                                    <TextBlock Classes="hint" Text="{Binding ResultNote}" IsVisible="{Binding HasResultNote}" Foreground="{DynamicResource Info}"/>
+                                </StackPanel>
+
+                                <Panel Grid.Row="2">
+                                    <Border Classes="card output" IsVisible="{Binding ShowBodyText}" ClipToBounds="True">
+                                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                            <ctl:CurlCodeView x:Name="BodyView" Document="{Binding BodyDocument}" Wrap="{Binding WrapBody}"
+                                                              SearchText="{Binding SearchText}"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                    <Border Classes="card output" IsVisible="{Binding HasImage}" Padding="12">
+                                        <Image Source="{Binding BodyImage}" Stretch="Uniform" StretchDirection="DownOnly"
+                                               RenderOptions.BitmapInterpolationMode="HighQuality"/>
+                                    </Border>
+                                    <StackPanel IsVisible="{Binding ShowEmptyResponse}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6" MaxWidth="380">
+                                        <TextBlock Text="No response yet" HorizontalAlignment="Center" FontSize="{StaticResource Font.Title}"
+                                                   FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"/>
+                                        <TextBlock Classes="hint" TextAlignment="Center"
+                                                   Text="Send a request, or paste a curl command into the URL box."/>
+                                    </StackPanel>
+                                    <TextBlock IsVisible="{Binding ShowWaiting}" Classes="hint" Text="Waiting for the response…"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Panel>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem>
+                            <TabItem.Header>
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <TextBlock Text="Headers"/>
+                                    <Border Classes="count" IsVisible="{Binding ResponseHeadersBadge, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                        <TextBlock Text="{Binding ResponseHeadersBadge}"/>
+                                    </Border>
+                                </StackPanel>
+                            </TabItem.Header>
+                            <Grid RowDefinitions="Auto, *" RowSpacing="8">
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <ListBox Classes="switch" SelectedIndex="{Binding HeadersViewIndex}">
+                                        <ListBoxItem Content="Response"/>
+                                        <ListBoxItem Content="Sent"/>
+                                        <ListBoxItem Content="{Binding CookiesCountText}"/>
+                                    </ListBox>
+                                    <Button Grid.Column="1" Classes="quiet" Command="{Binding CopyHeadersCommand}" ToolTip.Tip="Copy as text"
+                                            AutomationProperties.Name="Copy the headers">
+                                        <Path Classes="glyph" Data="{StaticResource CurlGlyphCopy}"/>
+                                    </Button>
+                                </Grid>
+                                <Border Grid.Row="1" Classes="card output" ClipToBounds="True">
+                                    <Panel>
+                                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HeadersShowResponse}">
+                                            <ItemsControl ItemsSource="{Binding ResponseHeaders}">
+                                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:CurlHeaderRow">
+                                                        <Border Classes="hRow">
+                                                            <Grid ColumnDefinitions="0.36*, 0.64*" RowDefinitions="Auto, Auto" ColumnSpacing="12">
+                                                                <TextBlock Classes="hName" Text="{Binding Name}"/>
+                                                                <SelectableTextBlock Classes="hValue" Text="{Binding Value}"/>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HeadersShowRequest}">
+                                            <ItemsControl ItemsSource="{Binding RequestHeadersSent}">
+                                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:CurlHeaderRow">
+                                                        <Border Classes="hRow">
+                                                            <Grid ColumnDefinitions="0.36*, 0.64*" RowDefinitions="Auto, Auto" ColumnSpacing="12">
+                                                                <TextBlock Classes="hName" Text="{Binding Name}"/>
+                                                                <SelectableTextBlock Classes="hValue" Text="{Binding Value}"/>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HeadersShowCookies}">
+                                            <ItemsControl ItemsSource="{Binding ResponseCookies}">
+                                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="helpers:CurlCookie">
+                                                        <Border Classes="hRow">
+                                                            <StackPanel Spacing="2">
+                                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                    <TextBlock Classes="hName" Text="{Binding Name}"/>
+                                                                    <TextBlock Classes="hint" Text="="/>
+                                                                    <SelectableTextBlock Classes="hValue" Text="{Binding Value}"/>
+                                                                </StackPanel>
+                                                                <TextBlock Classes="hint" Text="{Binding Attributes}"
+                                                                           IsVisible="{Binding Attributes, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                        <TextBlock Classes="hint" Text="The response set no cookies."
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock.IsVisible>
+                                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                    <Binding Path="HeadersShowCookies"/>
+                                                    <Binding Path="NoCookies"/>
+                                                </MultiBinding>
+                                            </TextBlock.IsVisible>
+                                        </TextBlock>
+                                    </Panel>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Timing">
+                            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Classes="hint" Text="Send a request to see where the time went." IsVisible="{Binding !HasTiming}"/>
+                                    <ItemsControl ItemsSource="{Binding TimingRows}" IsVisible="{Binding HasTiming}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:CurlTimingRow">
+                                                <Grid ColumnDefinitions="116, *, 76" ColumnSpacing="12" Height="26">
+                                                    <TextBlock Classes="inlineLabel" Text="{Binding Label}" Foreground="{DynamicResource Text.Secondary}"/>
+                                                    <ctl:CurlTimingBar Grid.Column="1" Start="{Binding Start}" Length="{Binding Length}"
+                                                                       Classes.dns="{Binding IsDns}" Classes.connect="{Binding IsConnect}" Classes.tls="{Binding IsTls}"
+                                                                       Classes.wait="{Binding IsWait}" Classes.download="{Binding IsDownload}"/>
+                                                    <TextBlock Grid.Column="2" Classes="statValue" Text="{Binding Value}" HorizontalAlignment="Right"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <Border Classes="divider" IsVisible="{Binding HasTiming}"/>
+                                    <StackPanel Spacing="4" IsVisible="{Binding HasTiming}">
+                                        <TextBlock Classes="statValue" Text="{Binding TimingTotalText}" Foreground="{DynamicResource Text.Primary}"/>
+                                        <SelectableTextBlock Text="{Binding TimingMetaText}" FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Text.Muted}"
+                                                             TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="6" IsVisible="{Binding HasHops}">
+                                        <TextBlock Classes="colHead" Text="Redirects"/>
+                                        <ItemsControl ItemsSource="{Binding Hops}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:CurlHopRow">
+                                                    <Grid ColumnDefinitions="40, 52, *" ColumnSpacing="8" Margin="0,0,0,4">
+                                                        <TextBlock Classes="libStatus" Text="{Binding Status}" Classes.ok="{Binding IsSuccess}"
+                                                                   Classes.redirect="{Binding IsInfo}" Classes.client="{Binding IsWarning}" Classes.bad="{Binding IsDanger}"/>
+                                                        <TextBlock Grid.Column="1" Classes="libStatus" Text="{Binding Method}"/>
+                                                        <SelectableTextBlock Grid.Column="2" Text="{Binding Url}" TextWrapping="Wrap" FontFamily="{StaticResource MonoFont}"
+                                                                             FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Text.Secondary}"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <TabItem Header="Logs">
+                            <Border Classes="card output" ClipToBounds="True">
+                                <TextBox Classes="out" Text="{Binding FullLog}" IsReadOnly="True" AcceptsReturn="True"
+                                         PlaceholderText="The verbose exchange shows up here."/>
+                            </Border>
+                        </TabItem>
+
+                        <TabItem Header="TLS">
+                            <Border Classes="card output" ClipToBounds="True">
+                                <TextBox Classes="out" Text="{Binding SslLog}" IsReadOnly="True" AcceptsReturn="True"
+                                         PlaceholderText="Certificate, chain and cipher of an https:// request."/>
+                            </Border>
+                        </TabItem>
+
+                        <!-- Renders the ACTUAL response body (code-behind calls NavigateToString) rather than re-navigating to the
+                             URL, so it reflects the exact document the configured request returned — via the same proxy /
+                             override IP / interface. White page canvas (WebPage.Background) like a real browser. WebNotice takes
+                             the page's place when no native web engine comes up (e.g. WebKitGTK missing on Linux). -->
+                        <TabItem Header="Preview">
+                            <Border Classes="card" Background="{StaticResource WebPage.Background}" Padding="0" ClipToBounds="True">
+                                <Panel x:Name="WebHost">
+                                    <NativeWebView x:Name="Web"/>
+                                    <Border x:Name="WebNotice" IsVisible="False" Background="{DynamicResource Bg.Inset}" CornerRadius="9">
+                                        <TextBlock x:Name="WebNoticeText" Margin="24" TextWrapping="Wrap" TextAlignment="Center"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   FontSize="{StaticResource Font.Body}" Foreground="{DynamicResource Text.Secondary}"/>
+                                    </Border>
+                                </Panel>
+                            </Border>
+                        </TabItem>
+                    </TabControl>
+                </Grid>
+            </TabItem>
+
+            <!-- ======== CODE ======== -->
+            <TabItem Header="Code">
+                <Grid RowDefinitions="Auto, *" RowSpacing="10">
+                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="8">
+                        <ComboBox Classes="field" ItemsSource="{Binding SnippetLanguages}" SelectedItem="{Binding SnippetLanguage}" MinWidth="160"/>
+                        <TextBlock Grid.Column="1" Classes="hint codeHint" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                                   Text="Paste curl into the URL box to import it."
+                                   ToolTip.Tip="The request as it would be sent. Paste a curl one back into the URL box to import it."/>
+                        <Button Grid.Column="2" Classes="secondary" Command="{Binding CopySnippetCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Path Classes="glyph" Data="{StaticResource CurlGlyphCopy}"/>
+                                <TextBlock Text="Copy" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
                     </Grid>
-                    <Border Grid.Row="1" Classes="card output">
-                        <TextBox Text="{Binding SnippetCode}" IsReadOnly="True" AcceptsReturn="True"
-                                 Foreground="#8CE6B0" FontFamily="Cascadia Code,Consolas" FontSize="11.5" BorderThickness="0"/>
+                    <Border Grid.Row="1" Classes="card output" ClipToBounds="True">
+                        <TextBox Classes="out" Text="{Binding SnippetCode}" IsReadOnly="True" AcceptsReturn="True"/>
                     </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ======== SAVED + HISTORY ======== -->
+            <TabItem Header="Saved">
+                <Grid RowDefinitions="Auto, *, Auto" RowSpacing="8">
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                        <ListBox Classes="switch" SelectedIndex="{Binding LibraryIndex}">
+                            <ListBoxItem Content="{Binding SavedTabText}"/>
+                            <ListBoxItem Content="{Binding HistoryTabText}"/>
+                        </ListBox>
+                        <Button Grid.Column="1" Classes="secondary compact" Content="Save current…" Command="{Binding OpenSaveCommand}"
+                                IsVisible="{Binding LibraryShowSaved}"/>
+                        <Button Grid.Column="1" Classes="ghost compact" Content="Clear" Command="{Binding ClearRecentCommand}"
+                                IsVisible="{Binding LibraryShowHistory}" IsEnabled="{Binding !NoRecent}"/>
+                    </Grid>
+
+                    <Panel Grid.Row="1">
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding LibraryShowSaved}">
+                            <ItemsControl ItemsSource="{Binding SavedRequests}">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:CurlSavedItem">
+                                        <Border Classes="libItem" Classes.current="{Binding IsCurrent}">
+                                            <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="2">
+                                                <Button Classes="libRow" IsVisible="{Binding IsNotEditing}"
+                                                        Command="{Binding $parent[UserControl].((vm:CurlViewModel)DataContext).OpenSavedCommand}"
+                                                        CommandParameter="{Binding}" ToolTip.Tip="Open">
+                                                    <Grid ColumnDefinitions="56, *" ColumnSpacing="8">
+                                                        <TextBlock Classes="method" Text="{Binding MethodName}" Classes.get="{Binding IsGet}" Classes.post="{Binding IsPost}"
+                                                                   Classes.put="{Binding IsPut}" Classes.patch="{Binding IsPatch}" Classes.delete="{Binding IsDelete}"/>
+                                                        <StackPanel Grid.Column="1" Spacing="1">
+                                                            <TextBlock Classes="libName" Text="{Binding Name}"/>
+                                                            <TextBlock Classes="libUrl" Text="{Binding UrlText}"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Button>
+                                                <TextBox Classes="field renameBox" Text="{Binding EditName}" IsVisible="{Binding IsEditing}" Margin="6,4" LostFocus="OnRenameLostFocus"
+                                                         KeyDown="OnRenameKeyDown" AutomationProperties.Name="New name"/>
+                                                <Button Grid.Column="1" Classes="quiet" IsVisible="{Binding IsEditing}"
+                                                        Command="{Binding $parent[UserControl].((vm:CurlViewModel)DataContext).CommitRenameCommand}" CommandParameter="{Binding}"
+                                                        ToolTip.Tip="Keep the name" AutomationProperties.Name="Keep the name">
+                                                    <Path Classes="glyph" Data="{StaticResource CurlGlyphCheck}"/>
+                                                </Button>
+                                                <Button Grid.Column="1" Classes="quiet" IsVisible="{Binding IsNotEditing}"
+                                                        Command="{Binding $parent[UserControl].((vm:CurlViewModel)DataContext).RenameSavedCommand}" CommandParameter="{Binding}"
+                                                        ToolTip.Tip="Rename" AutomationProperties.Name="Rename">
+                                                    <Path Classes="glyph" Data="{StaticResource CurlGlyphEdit}"/>
+                                                </Button>
+                                                <Button Grid.Column="2" Classes="quiet danger"
+                                                        Command="{Binding $parent[UserControl].((vm:CurlViewModel)DataContext).DeleteSavedCommand}" CommandParameter="{Binding}"
+                                                        ToolTip.Tip="Delete" AutomationProperties.Name="Delete">
+                                                    <Path Classes="glyph" Data="{StaticResource CurlGlyphTrash}"/>
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="360" Spacing="6">
+                            <StackPanel.IsVisible>
+                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="LibraryShowSaved"/>
+                                    <Binding Path="NoSaved"/>
+                                </MultiBinding>
+                            </StackPanel.IsVisible>
+                            <TextBlock Text="No saved requests" HorizontalAlignment="Center" FontSize="{StaticResource Font.Title}"
+                                       FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"/>
+                            <TextBlock Classes="hint" TextAlignment="Center" Text="Ctrl+S keeps the request with its headers, body and auth."/>
+                        </StackPanel>
+
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding LibraryShowHistory}">
+                            <ItemsControl ItemsSource="{Binding RecentRequests}">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:CurlRecentItem">
+                                        <Border Classes="libItem">
+                                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="2">
+                                                <Button Classes="libRow" Command="{Binding $parent[UserControl].((vm:CurlViewModel)DataContext).OpenRecentCommand}"
+                                                        CommandParameter="{Binding}" ToolTip.Tip="Open">
+                                                    <Grid ColumnDefinitions="56, 34, *" ColumnSpacing="8">
+                                                        <TextBlock Classes="method" Text="{Binding MethodName}" Classes.get="{Binding IsGet}" Classes.post="{Binding IsPost}"
+                                                                   Classes.put="{Binding IsPut}" Classes.patch="{Binding IsPatch}" Classes.delete="{Binding IsDelete}"/>
+                                                        <TextBlock Grid.Column="1" Classes="libStatus" Text="{Binding StatusText}" Classes.ok="{Binding StatusOk}"
+                                                                   Classes.redirect="{Binding StatusRedirect}" Classes.client="{Binding StatusClientError}" Classes.bad="{Binding StatusBad}"/>
+                                                        <StackPanel Grid.Column="2" Spacing="1">
+                                                            <TextBlock Classes="libUrl" Text="{Binding Url}" Foreground="{DynamicResource Text.Primary}"/>
+                                                            <TextBlock Classes="libUrl" Text="{Binding MetaText}"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Button>
+                                                <Button Grid.Column="1" Classes="quiet" Command="{Binding $parent[UserControl].((vm:CurlViewModel)DataContext).RerunRecentCommand}"
+                                                        CommandParameter="{Binding}" ToolTip.Tip="Send again" AutomationProperties.Name="Send again">
+                                                    <Path Classes="glyph" Data="{StaticResource CurlGlyphRerun}"/>
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="360" Spacing="6">
+                            <StackPanel.IsVisible>
+                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="LibraryShowHistory"/>
+                                    <Binding Path="NoRecent"/>
+                                </MultiBinding>
+                            </StackPanel.IsVisible>
+                            <TextBlock Text="Nothing sent yet" HorizontalAlignment="Center" FontSize="{StaticResource Font.Title}"
+                                       FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"/>
+                            <TextBlock Classes="hint" TextAlignment="Center" Text="Your last 50 requests show up here."/>
+                        </StackPanel>
+                    </Panel>
+
+                    <TextBlock Grid.Row="2" Classes="hint"
+                               Text="Saved: full request, auth too · History: method, URL, status."
+                               ToolTip.Tip="Saved requests are stored in your Echoes profile — headers, body and auth included. History keeps only method, URL and status between sessions."/>
                 </Grid>
             </TabItem>
         </TabControl>
 
-            <!-- request timer + response size — floats on the right of the REQUEST/RESPONSE tab strip -->
-            <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,4,0" IsHitTestVisible="False">
-                <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" Margin="0,0,12,0">
-                    <TextBlock Text="&#x23F1;" FontSize="12" Foreground="#9E9FA8" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding RequestTimeText}" FontSize="11.5" FontWeight="SemiBold" Foreground="#7FCBA6"
-                               FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-                    <TextBlock Text="&#x2B07;" FontSize="12" Foreground="#9E9FA8" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding ResponseSizeText}" FontSize="11.5" FontWeight="SemiBold" Foreground="#7FCBA6"
-                               FontFamily="Cascadia Code,Consolas" VerticalAlignment="Center"/>
-                </StackPanel>
-            </WrapPanel>
-        </Grid>
+        <!-- status · time · size (+ a short confirmation). Wide: floats at the right end of the section strip; narrow: its own
+             line above it. Not hit-testable, so it never steals a tab click. -->
+        <StackPanel x:Name="Summary" Orientation="Horizontal" Spacing="10" Margin="0,12,0,0" IsHitTestVisible="False" IsVisible="{Binding ShowSummary}">
+            <TextBlock Classes="flash" Text="{Binding FlashText}" IsVisible="{Binding HasFlash}" MaxWidth="260"/>
+            <Border Classes="badge" IsVisible="{Binding HasResponse}" Classes.success="{Binding StatusSuccess}" Classes.info="{Binding StatusInfo}"
+                    Classes.warning="{Binding StatusWarning}" Classes.danger="{Binding StatusDanger}">
+                <TextBlock Text="{Binding StatusText}" FontFamily="{StaticResource MonoFont}"/>
+            </Border>
+            <TextBlock Classes="statValue" Text="{Binding RequestTimeText}">
+                <TextBlock.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                        <Binding Path="HasResponse"/>
+                        <Binding Path="IsWorking"/>
+                    </MultiBinding>
+                </TextBlock.IsVisible>
+            </TextBlock>
+            <TextBlock Classes="statValue" Text="{Binding ResponseSizeText}" IsVisible="{Binding HasBodySize}"/>
+        </StackPanel>
     </Grid>
 </UserControl>
