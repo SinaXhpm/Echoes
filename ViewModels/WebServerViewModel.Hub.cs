@@ -289,6 +289,7 @@ public partial class WebServerViewModel : IShareHubSink
         IsHttpsActive = false;
         ShowRunningPin = false;
         UpdateShareLink();
+        RefreshStored();    // partial uploads the hub dropped on stop no longer count
         if (wasRunning)
         {
             BackgroundGuard.Release();

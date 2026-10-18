@@ -68,6 +68,30 @@ public partial class WebServerViewModel
     private IStorageFolder? _androidFolder;
     private bool _restoringInbox;
 
+    // ---- what is stored, and Clean up. Desktop: a list of the files THIS app received (path, size, sender, time) is kept
+    // in the profile, so they are listed again after a restart and Clean up deletes those and nothing else — the folder may
+    // be Downloads itself. A file whose size changed since (edited, replaced) is the user's now: left alone, dropped from
+    // the list. A backup never brings the list along (ProfileService.ClearedOnImport). Android: the app's own inbox folder
+    // only ever holds what Echoes received, so it is measured and cleaned as a whole; files moved into a picked folder are
+    // out of the app's storage and not touched.
+    private const string KReceived = "webserver.received";
+    private const int MaxTracked = 500;
+    private readonly record struct Tracked(string Path, long Size, string From, long TimeMs);
+    private readonly object _trackedGate = new();
+    private List<Tracked>? _tracked;   // under _trackedGate
+
+    /// <summary>"4 files · 12.4 MB" (what Clean up would free), or what's stored when nothing is.</summary>
+    [ObservableProperty] private string _storedText = string.Empty;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanCleanUp))] private long _storedBytes;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanCleanUp))] private int _storedFiles;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsNotConfirmingCleanup))] private bool _isConfirmingCleanup;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanCleanUp))] private bool _isCleaning;
+    public bool CanCleanUp => (StoredFiles > 0 || StoredBytes > 0) && !IsCleaning;
+    public bool IsNotConfirmingCleanup => !IsConfirmingCleanup;
+    public string CleanupPrompt => $"Delete {FileCount(StoredFiles)} ({FileHttpServer.HumanSize(StoredBytes)}) that Echoes received?";
+
+    private static string FileCount(int n) => n == 1 ? "1 file" : $"{n.ToString(CultureInfo.InvariantCulture)} files";
+
     public bool HasReceived => ReceivedFiles.Count > 0;
     public long MaxUploadBytes => (long)Math.Clamp(MaxUploadMb, 1, 1_048_576) * 1024 * 1024;
     public string InboxDisplay => OperatingSystem.IsAndroid() || AppPlatform.IsMobile && InboxPath.Length == 0
@@ -96,6 +120,8 @@ public partial class WebServerViewModel
         }
         finally { _restoringInbox = false; }
         if (OperatingSystem.IsAndroid()) _ = Task.Run(ListEarlierAndroidFiles);
+        else _ = Task.Run(ListTrackedFiles);
+        RefreshStored();
     }
 
     partial void OnMaxUploadMbChanged(int value)
@@ -164,17 +190,276 @@ public partial class WebServerViewModel
         LinkHelper.OpenFolder(Path.GetDirectoryName(path));
     }
 
-    /// <summary>Removes the finished rows (desktop: the files stay in the folder; phone: rows not saved yet stay).</summary>
+    // ---------------------------------------------------------------- stored files, Clean up
+
     [RelayCommand]
-    private void ClearReceived()
+    private void AskCleanUp()
     {
-        foreach (var r in ReceivedFiles.ToList())
+        if (!CanCleanUp) return;
+        OnPropertyChanged(nameof(CleanupPrompt));
+        IsConfirmingCleanup = true;
+    }
+
+    [RelayCommand]
+    private void CancelCleanUp() => IsConfirmingCleanup = false;
+
+    /// <summary>Deletes what Echoes received (desktop: the tracked files; Android: the app's inbox), then the rows of
+    /// files that are gone. Partial files of uploads still running stay.</summary>
+    [RelayCommand]
+    private async Task ConfirmCleanUp()
+    {
+        IsConfirmingCleanup = false;
+        if (IsCleaning) return;
+        IsCleaning = true;
+        try
         {
-            if (r.IsPending) continue;
-            if (OperatingSystem.IsAndroid() && r.IsDone && r.Path is not null && r.SavedTo is null) continue;
-            ReceivedFiles.Remove(r);
+            bool hubRunning = _hub is not null;
+            string inbox = HubInboxFolder();
+            var (deleted, failed, bytes) = await Task.Run(() => OperatingSystem.IsAndroid() ? CleanAppInbox(hubRunning) : CleanTracked(inbox, hubRunning));
+            foreach (var row in ReceivedFiles.Where(x => !x.IsPending && x.Path is not null && !File.Exists(x.Path)).ToList())
+                ReceivedFiles.Remove(row);
+            OnPropertyChanged(nameof(HasReceived));
+            FilesError = failed > 0 ? $"{FileCount(failed)} couldn't be deleted (open in another app?)." : null;
+            AppendLog($"clean up: {FileCount(deleted)} deleted, {FileHttpServer.HumanSize(bytes)} freed" + (failed > 0 ? $", {FileCount(failed)} left (in use)" : string.Empty));
         }
-        OnPropertyChanged(nameof(HasReceived));
+        catch (Exception ex) { FilesError = "Clean up failed: " + ex.Message; }
+        finally
+        {
+            IsCleaning = false;
+            RefreshStored();
+        }
+    }
+
+    // Background: the tracked files that are still the ones Echoes wrote (same size, a plain file) are deleted; vanished or
+    // changed ones just leave the list; leftover partial uploads go too when no upload can be running.
+    private (int Deleted, int Failed, long Bytes) CleanTracked(string inbox, bool hubRunning)
+    {
+        int deleted = 0, failed = 0;
+        long bytes = 0;
+        List<Tracked> snapshot;
+        lock (_trackedGate) snapshot = new List<Tracked>(TrackedLocked());
+        var keep = new List<Tracked>();
+        foreach (var t in snapshot)
+        {
+            try
+            {
+                var fi = new FileInfo(t.Path);
+                if (!fi.Exists || (fi.Attributes & FileAttributes.ReparsePoint) != 0 || fi.Length != t.Size) continue;
+                fi.Delete();
+                deleted++;
+                bytes += t.Size;
+            }
+            catch
+            {
+                failed++;
+                keep.Add(t);
+            }
+        }
+        if (!hubRunning) bytes += DeletePartials(inbox, ref deleted);
+        lock (_trackedGate)
+        {
+            // files that arrived during the clean up stay tracked
+            var now = TrackedLocked();
+            _tracked = now.Where(e => !snapshot.Contains(e)).Concat(keep).ToList();
+        }
+        SaveTracked();
+        return (deleted, failed, bytes);
+    }
+
+    // Android: the app's inbox only ever holds what Echoes received (until it is saved / moved out).
+    private static (int Deleted, int Failed, long Bytes) CleanAppInbox(bool hubRunning)
+    {
+        int deleted = 0, failed = 0;
+        long bytes = 0;
+        string dir = ShareInbox.AppInboxFolder();
+        if (!Directory.Exists(dir)) return (0, 0, 0);
+        foreach (var f in new DirectoryInfo(dir).EnumerateFiles())
+        {
+            if (hubRunning && f.Name.StartsWith(".echoes-", StringComparison.Ordinal)) continue;
+            try
+            {
+                long len = f.Length;
+                f.Delete();
+                deleted++;
+                bytes += len;
+            }
+            catch { failed++; }
+        }
+        return (deleted, failed, bytes);
+    }
+
+    private static long DeletePartials(string folder, ref int deleted)
+    {
+        long bytes = 0;
+        try
+        {
+            if (!Directory.Exists(folder)) return 0;
+            foreach (var f in new DirectoryInfo(folder).EnumerateFiles(".echoes-*.part"))
+            {
+                try
+                {
+                    long len = f.Length;
+                    f.Delete();
+                    deleted++;
+                    bytes += len;
+                }
+                catch { }
+            }
+        }
+        catch { }
+        return bytes;
+    }
+
+    /// <summary>Measures what is stored (off the UI thread) and shows it: the count and size Clean up would free.</summary>
+    private void RefreshStored()
+    {
+        bool hubRunning = _hub is not null;
+        string inbox = HubInboxFolder();
+        _ = Task.Run(() =>
+        {
+            int files = 0;
+            long bytes = 0;
+            try
+            {
+                if (OperatingSystem.IsAndroid())
+                {
+                    string dir = ShareInbox.AppInboxFolder();
+                    if (Directory.Exists(dir))
+                        foreach (var f in new DirectoryInfo(dir).EnumerateFiles())
+                        {
+                            if (hubRunning && f.Name.StartsWith(".echoes-", StringComparison.Ordinal)) continue;
+                            files++;
+                            bytes += f.Length;
+                        }
+                }
+                else
+                {
+                    List<Tracked> list;
+                    lock (_trackedGate) list = new List<Tracked>(TrackedLocked());
+                    foreach (var t in list)
+                    {
+                        var fi = new FileInfo(t.Path);
+                        if (!fi.Exists || fi.Length != t.Size) continue;
+                        files++;
+                        bytes += t.Size;
+                    }
+                    if (!hubRunning && Directory.Exists(inbox))
+                        foreach (var f in new DirectoryInfo(inbox).EnumerateFiles(".echoes-*.part"))
+                        {
+                            files++;
+                            bytes += f.Length;
+                        }
+                }
+            }
+            catch { }
+            Dispatcher.UIThread.Post(() =>
+            {
+                StoredFiles = files;
+                StoredBytes = bytes;
+                StoredText = files == 0 && bytes == 0
+                    ? "Nothing stored"
+                    : $"{FileCount(files)} · {FileHttpServer.HumanSize(bytes)}" + (OperatingSystem.IsAndroid() ? " in the app" : string.Empty);
+                OnPropertyChanged(nameof(CleanupPrompt));
+            });
+        });
+    }
+
+    // ---- the tracked list (desktop) ----
+
+    private List<Tracked> TrackedLocked() => _tracked ??= ParseTracked(ProfileService.Instance.GetSetting(KReceived));
+
+    private void Track(string path, string from)
+    {
+        long size;
+        try { size = new FileInfo(path).Length; } catch { return; }
+        lock (_trackedGate)
+        {
+            var list = TrackedLocked();
+            list.RemoveAll(t => string.Equals(t.Path, path, StringComparison.OrdinalIgnoreCase));
+            list.Insert(0, new Tracked(path, size, from, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
+            if (list.Count > MaxTracked) list.RemoveRange(MaxTracked, list.Count - MaxTracked);
+        }
+        SaveTracked();
+        RefreshStored();
+    }
+
+    private void SaveTracked()
+    {
+        string json;
+        lock (_trackedGate)
+        {
+            using var ms = new MemoryStream();
+            using (var w = new System.Text.Json.Utf8JsonWriter(ms))
+            {
+                w.WriteStartArray();
+                foreach (var t in TrackedLocked())
+                {
+                    w.WriteStartObject();
+                    w.WriteString("p", t.Path);
+                    w.WriteNumber("s", t.Size);
+                    w.WriteString("f", t.From);
+                    w.WriteNumber("t", t.TimeMs);
+                    w.WriteEndObject();
+                }
+                w.WriteEndArray();
+            }
+            json = System.Text.Encoding.UTF8.GetString(ms.ToArray());
+        }
+        ProfileService.Instance.SetSetting(KReceived, json);
+    }
+
+    private static List<Tracked> ParseTracked(string? json)
+    {
+        var list = new List<Tracked>();
+        if (string.IsNullOrWhiteSpace(json)) return list;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array) return list;
+            foreach (var e in doc.RootElement.EnumerateArray())
+            {
+                if (e.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+                string? p = e.TryGetProperty("p", out var pv) && pv.ValueKind == System.Text.Json.JsonValueKind.String ? pv.GetString() : null;
+                if (p is null || !Path.IsPathFullyQualified(p)) continue;
+                long s = e.TryGetProperty("s", out var sv) && sv.TryGetInt64(out long sl) && sl >= 0 ? sl : -1;
+                if (s < 0) continue;
+                string f = e.TryGetProperty("f", out var fv) && fv.ValueKind == System.Text.Json.JsonValueKind.String ? fv.GetString() ?? "" : "";
+                long t = e.TryGetProperty("t", out var tv) && tv.TryGetInt64(out long tl) ? tl : 0;
+                list.Add(new Tracked(p, s, ShareHub.CleanName(f), t));
+                if (list.Count >= MaxTracked) break;
+            }
+        }
+        catch (System.Text.Json.JsonException) { }
+        return list;
+    }
+
+    // Desktop: the files received in earlier runs (still there, still the same size) are listed again.
+    private void ListTrackedFiles()
+    {
+        try
+        {
+            List<Tracked> list;
+            lock (_trackedGate) list = new List<Tracked>(TrackedLocked());
+            var rows = new List<ReceivedFileRow>();
+            foreach (var t in list.Take(MaxReceivedRows))
+            {
+                var fi = new FileInfo(t.Path);
+                if (!fi.Exists || fi.Length != t.Size) continue;
+                rows.Add(new ReceivedFileRow
+                {
+                    Id = "t:" + t.Path, Name = fi.Name, Size = t.Size, From = t.From.Length > 0 ? t.From : "earlier",
+                    Time = t.TimeMs > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(t.TimeMs).LocalDateTime : fi.LastWriteTime, Path = fi.FullName,
+                });
+            }
+            if (rows.Count == 0) return;
+            Dispatcher.UIThread.Post(() =>
+            {
+                foreach (var r in rows)
+                    if (ReceivedFiles.All(x => !string.Equals(x.Path, r.Path, StringComparison.OrdinalIgnoreCase))) ReceivedFiles.Add(r);
+                OnPropertyChanged(nameof(HasReceived));
+            });
+        }
+        catch { }
     }
 
     // UI thread (FlushUi): upload events into rows, and the progress of the ones arriving.
@@ -206,7 +491,12 @@ public partial class WebServerViewModel
                 row.Name = Path.GetFileName(u.Path);
                 row.Path = u.Path;
                 row.Percent = 100;
-                if (OperatingSystem.IsAndroid() && _androidFolder is not null) _ = DeliverAsync(row);
+                if (OperatingSystem.IsAndroid())
+                {
+                    if (_androidFolder is not null) _ = DeliverAsync(row);
+                    RefreshStored();
+                }
+                else Track(u.Path, u.Upload.From);
             }
             else if (u.Error is "Canceled by the sender.") ReceivedFiles.Remove(row);
             else row.Error = u.Error ?? "Not received.";
@@ -257,6 +547,7 @@ public partial class WebServerViewModel
         {
             AppendLog($"couldn't move {row.Name} into {folder.Name}: {ex.Message} — it stays in the app (Save)");
         }
+        RefreshStored();
     }
 
     private static async Task<string> FreeNameAsync(IStorageFolder folder, string name)
@@ -294,6 +585,7 @@ public partial class WebServerViewModel
             }
         }
         catch (Exception ex) { AppendLog($"saving {row.Name} failed: {ex.Message}"); }
+        RefreshStored();
     }
 
     // Android: files from an earlier run still in the app's storage (never saved) are listed again.

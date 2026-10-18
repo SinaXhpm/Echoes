@@ -134,6 +134,7 @@ public partial class BackupViewModel : ObservableObject
         ["webserver.plainHttp"] = "Web Server plain HTTP",
         ["webserver.pin"] = "Web Server PIN (a new one is made)",
         ["webserver.cert"] = "Web Server certificate (a new one is made)",
+        ["webserver.received"] = "Web Server's list of received files (not imported)",
         ["socket.wsProxy"] = "WebSocket proxy (not imported)",
         ["ssh.forwards"] = "SSH port forwards (not imported)",
         ["ssh.servers/proxy"] = "saved SSH servers' proxy",

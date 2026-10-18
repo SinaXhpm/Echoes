@@ -223,7 +223,8 @@ public sealed class ProfileService
     // Routing with no switch at all (used whenever it is set): not taken over from a backup.
     // (the Web Server hub's PIN and certificate key too: a backup must not bring ones someone else knows; this install
     // makes new ones by itself)
-    private static readonly string[] ClearedOnImport = { "socket.wsProxy", "webserver.pin", "webserver.cert" };
+    // (and its list of received files: a planted list could point Clean up at files that were never received)
+    private static readonly string[] ClearedOnImport = { "socket.wsProxy", "webserver.pin", "webserver.cert", "webserver.received" };
 
     private static bool IsRiskyToggle(string key)
         => Array.IndexOf(RiskyToggles, key) >= 0

@@ -7,10 +7,10 @@
 [![Latest release](https://img.shields.io/github/v/release/SinaXhpm/Echoes)](https://github.com/SinaXhpm/Echoes/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/SinaXhpm/Echoes/total)](https://github.com/SinaXhpm/Echoes/releases)
 
-**[Download](https://github.com/SinaXhpm/Echoes/releases/latest)** · [Tools](#tools-at-a-glance) · [Install](#download-and-install) · [FAQ](#faq) · [Telegram](https://t.me/the_pink_palace)
+**[Download](https://github.com/SinaXhpm/Echoes/releases/latest)** · [Tools](#tools-at-a-glance) · [Screenshots](#screenshots) · [Install](#download-and-install) · [FAQ](#faq) · [Telegram](https://t.me/the_pink_palace)
 
 <p align="center">
-  <img src="docs/screenshots/demo.gif" width="640" alt="Echoes network toolkit in action: ping and MTR, DNS lookup, cURL HTTP client, check host, port scanner, file sharing web server, uptime monitor, SSH client and String Lab">
+  <img src="docs/screenshots/demo.gif" width="860" alt="Echoes network toolkit slideshow: connection doctor finding SNI filtering with an anti-DPI fragment test, internet speed test with bufferbloat grade, ping latency graph, LAN file sharing and chat with QR code, uptime monitor, DNS over HTTPS resolver comparison, Wi-Fi analyzer, port scanner, cURL HTTP client, SSL/TLS inspector, proxy checker, Cloudflare DNS manager, SSH server health and String Lab JWT decoder">
 </p>
 
 ## What is Echoes?
@@ -29,6 +29,7 @@ Echoes is a free, open-source network toolkit with a simple graphical interface.
 
 - [Download and install](#download-and-install)
 - [Tools at a glance](#tools-at-a-glance)
+- [Screenshots](#screenshots)
 - [Network diagnostics](#network-diagnostics)
 - [Web and API tools](#web-and-api-tools)
 - [Servers and connections](#servers-and-connections)
@@ -63,6 +64,10 @@ First launch:
 
 Echoes shows a small notice in the sidebar when a new version is out. The **About** box (the ⓘ button next to the name, or **About** in the Android menu) shows your version, checks for updates on demand, links to GitHub, the releases and the issue tracker, and copies your version and platform details for a bug report.
 
+<p align="center">
+  <img src="docs/screenshots/about-box.png" width="640" alt="Echoes About box: version, update check against GitHub releases, platform and runtime details, data folder, and links to GitHub, releases and bug reports">
+</p>
+
 ## Tools at a glance
 
 | Tool | What it does | Similar to |
@@ -88,11 +93,96 @@ Echoes shows a small notice in the sidebar when a new version is out. The **Abou
 | [Notes](#encrypted-notes) | Notes locked with a master password | encrypted notepad |
 | [History & Backup](#history-and-encrypted-backup) | Recent inputs per tool, and one encrypted backup file | — |
 
+## Screenshots
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/doctor-sni-filtering.png" width="380" alt="Connection doctor finding SNI filtering, with the TLS handshake trace and anti-DPI retries"><br><b>Doctor</b>: SNI filtering found, and the fix that gets through</td>
+    <td><img src="docs/screenshots/doctor-step-trace.png" width="380" alt="Connection doctor with Details on: TCP, QUIC, TLS and HTTPS checks traced step by step"><br><b>Doctor</b>: every check traced step by step, with timings</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/speed-test-result.png" width="380" alt="Internet speed test result with download, upload, ping, jitter, bufferbloat grade and history"><br><b>Speed test</b>: speed, latency under load, bufferbloat</td>
+    <td><img src="docs/screenshots/speed-test-server-picker.png" width="380" alt="Speed test server picker: Cloudflare and test-file hosts by region, searchable"><br><b>Speed test</b>: pick the server, or add your own</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/ping-live-graph.png" width="380" alt="Ping with live replies, packet loss, min / avg / max / mdev and a latency graph"><br><b>Ping</b>: live replies, stats and latency graph</td>
+    <td><img src="docs/screenshots/ping-packet-options.png" width="380" alt="Ping packet options: payload size, Don't fragment, TTL, interval, count, timeout, IPv4 / IPv6"><br><b>Ping</b>: size, Don't fragment, TTL, count and more</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/share-chat.png" width="380" alt="File sharing web server: HTTPS link, PIN and QR code, and a chat with a phone and a laptop"><br><b>Share &amp; chat</b>: link, PIN and QR code, live chat</td>
+    <td><img src="docs/screenshots/share-files.png" width="380" alt="Share and chat files: shared and received files, the download folder, stored size and Clean up"><br><b>Share &amp; chat</b>: files both ways, folder and Clean up</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/share-browser-desktop.png" width="380" alt="The share page in a desktop browser: chat, drop files to send, shared files to download"><br><b>The other side</b>: just a browser, no app</td>
+    <td><img src="docs/screenshots/uptime-monitor.png" width="380" alt="Uptime monitor with up, down, pending and paused servers, history bars and uptime"><br><b>Monitor</b>: up, down and pending, history and uptime</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/uptime-monitor-telegram-alerts.png" width="380" alt="Uptime monitor settings: checks, thresholds, alert sounds and Telegram alerts through a proxy"><br><b>Monitor</b>: sounds and Telegram alerts</td>
+    <td><img src="docs/screenshots/dns-compare-resolvers.png" width="380" alt="DNS resolver comparison over plain DNS, DNS over HTTPS and DNS over TLS, with tampered and filtered answers flagged"><br><b>DNS</b>: compare resolvers, tampering flagged</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/android-drawer.png" width="185" alt="Echoes on Android: the slide-out tool menu"> <img src="docs/screenshots/android-doctor.png" width="185" alt="Connection doctor on an Android phone"><br><b>Android</b>: menu and Doctor</td>
+    <td><img src="docs/screenshots/android-share-chat.png" width="185" alt="Share and chat on an Android phone"> <img src="docs/screenshots/share-browser-phone.png" width="185" alt="The share page in a phone browser"><br><b>Phones</b>: the app, and the page in a phone browser</td>
+  </tr>
+</table>
+
+<details>
+<summary><b>More screenshots</b>: TCP ping, email check, DoH / DoT, port scanner, network and Wi-Fi, cURL, TLS, proxy, Cloudflare, SSH, String Lab, About, light theme</summary>
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/ping-tcp.png" width="380" alt="TCP ping to port 443 with connect times"><br><b>Ping</b>: TCP ping to a port</td>
+    <td><img src="docs/screenshots/dns-email-check.png" width="380" alt="Email check: MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT and blocklists"><br><b>DNS</b>: email check (MX, SPF, DKIM, DMARC…)</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/dns-doh-dot-lookup.png" width="380" alt="DNS lookup over DNS over HTTPS, DNS over TLS and plain DNS"><br><b>DNS</b>: lookups over DoH, DoT and plain DNS</td>
+    <td><img src="docs/screenshots/port-scanner.png" width="380" alt="Port scanner results with open and closed ports and service version detection"><br><b>Port scanner</b>: open ports and service versions</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/network-interfaces.png" width="380" alt="Network interfaces with IPv4, IPv6, gateway, DNS servers and MAC"><br><b>Network</b>: interfaces</td>
+    <td><img src="docs/screenshots/wifi-analyzer.png" width="380" alt="Wi-Fi analyzer with signal, channel chart per band and nearby networks"><br><b>Network</b>: Wi-Fi analyzer and channel chart</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/curl-http-client.png" width="380" alt="cURL HTTP client with a POST request and a pretty-printed JSON response"><br><b>cURL</b>: request and pretty JSON response</td>
+    <td><img src="docs/screenshots/tls-inspector.png" width="380" alt="SSL/TLS inspector: trusted certificate, TLS versions, HSTS, OCSP and the chain"><br><b>TLS inspector</b>: verdict, versions, HSTS, chain</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/proxy-server.png" width="380" alt="SOCKS5 and HTTP proxy server with a live connection log and traffic stats"><br><b>Proxy</b>: server with a live log</td>
+    <td><img src="docs/screenshots/proxy-checker.png" width="380" alt="Proxy checker results: type, speed, exit IP and country for each proxy"><br><b>Proxy</b>: checker with exit IP and country</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/cloudflare-dns-records.png" width="380" alt="Cloudflare DNS records with proxied and DNS-only switches"><br><b>Cloudflare</b>: DNS records</td>
+    <td><img src="docs/screenshots/cloudflare-overview.png" width="380" alt="Cloudflare overview: traffic for 24 hours, cache share, threats and quick switches"><br><b>Cloudflare</b>: traffic overview</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/ssh-server-health.png" width="380" alt="SSH client server health: CPU, load, memory, swap, disks and top processes"><br><b>SSH</b>: server health</td>
+    <td><img src="docs/screenshots/string-lab-jwt.png" width="380" alt="String Lab JWT decoder verifying an HS256 signature"><br><b>String Lab</b>: JWT decode and verify</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/about-box.png" width="380" alt="About box with version, update check and platform details"><br><b>About</b>: version, update check, bug-report info</td>
+    <td><img src="docs/screenshots/doctor-sni-filtering-light.png" width="380" alt="Connection doctor in the light theme"><br><b>Light theme</b>: Doctor</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/speed-test-result-light.png" width="380" alt="Internet speed test in the light theme"><br><b>Light theme</b>: speed test</td>
+    <td><img src="docs/screenshots/share-chat-light.png" width="380" alt="Share and chat in the light theme"><br><b>Light theme</b>: share &amp; chat</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/android-speed-test.png" width="185" alt="Internet speed test on an Android phone"> <img src="docs/screenshots/android-monitor.png" width="185" alt="Uptime monitor on an Android phone"><br><b>Android</b>: speed test and monitor</td>
+    <td><img src="docs/screenshots/android-share-files.png" width="185" alt="Received files on an Android phone with Save and Clean up"><br><b>Android</b>: received files, Save and Clean up</td>
+  </tr>
+</table>
+
+</details>
+
 ## Network diagnostics
 
 ### Ping, traceroute and MTR
 
 See whether a host is up, how fast it answers, which route your traffic takes, and where packets get lost.
+
+<p align="center">
+  <img src="docs/screenshots/ping-live-graph.png" width="640" alt="Echoes ping tool: live ICMP replies with packet loss, min / avg / max / mdev and a latency graph">
+</p>
 
 - **Ping:** live replies with loss and min / avg / max / mdev, plus a latency graph. IPv4 and IPv6.
 - **Packet options:** payload size, interval, count, timeout, TTL, Don't fragment and IPv4 / IPv6. With Don't fragment, a packet too big for the path says so ("Packet too big", with the MTU where the system reports it): an easy way to find the path MTU.
@@ -105,6 +195,10 @@ See whether a host is up, how fast it answers, which route your traffic takes, a
 ### Connection doctor
 
 Type a site or server and press Diagnose. Echoes checks everything between you and it, then says in one plain sentence why it doesn't work, and what to do.
+
+<p align="center">
+  <img src="docs/screenshots/doctor-sni-filtering.png" width="640" alt="Echoes connection doctor diagnosing SNI filtering: the TLS handshake traced step by step, anti-DPI fragment retries that get through, and the filter's HTTP block page">
+</p>
 
 - **Your network:** adapter, gateway, VPN and system proxy, internet access, and captive portals.
 - **DNS:** your system resolver and plain DNS compared with encrypted DNS (DoH). Spots tampered answers (including the known filter addresses such as `10.10.34.x`), forged replies, and names whose lookups are dropped.
@@ -119,6 +213,10 @@ Type a site or server and press Diagnose. Echoes checks everything between you a
 
 ### DNS lookup and WHOIS
 
+<p align="center">
+  <img src="docs/screenshots/dns-compare-resolvers.png" width="640" alt="Echoes DNS resolver comparison: plain DNS, DNS over HTTPS and DNS over TLS resolvers ranked by speed, with tampered, filtered and differing answers flagged">
+</p>
+
 - Look up A, AAAA, MX, NS, TXT, CNAME, SOA, SRV, CAA and PTR records, several types at once.
 - **Encrypted DNS:** use plain resolvers (`1.1.1.1`, `8.8.8.8:53`), DNS over HTTPS (`https://1.1.1.1/dns-query`) or DNS over TLS (`tls://1.1.1.1`), picked from a presets menu (Cloudflare, Google, Quad9, OpenDNS, AdGuard, Shecan, Electro) or typed in. Each answer shows which transport answered and how fast.
 - **Compare resolvers:** query one name through many resolvers at once: median speed, success rate and answers, with tampered or filtered answers flagged and the fastest trustworthy resolver recommended.
@@ -129,6 +227,10 @@ Type a site or server and press Diagnose. Echoes checks everything between you a
 ### Port scanner
 
 A fast and accurate TCP / UDP port scanner that reports ports the way nmap does.
+
+<p align="center">
+  <img src="docs/screenshots/port-scanner.png" width="640" alt="Echoes port scanner results like nmap -sV: open and closed TCP ports with service and version detection (FTP, SSH, SMTP, HTTP)">
+</p>
 
 - **Targets:** IPs, host names, ranges (`10.0.0.1-50`) and CIDR blocks (`10.0.0.0/24`), IPv4 and IPv6. Paste any text and the addresses are picked out of it.
 - **Ports:** ready-made lists (top 20 / 100 / 1000), your own ranges, and `U:` for UDP ports.
@@ -152,6 +254,10 @@ Test a website or server from many countries at once, powered by [check-host.net
 
 Keep an eye on your servers and websites, and hear when something changes.
 
+<p align="center">
+  <img src="docs/screenshots/uptime-monitor.png" width="640" alt="Echoes uptime monitor: websites and servers up, down, pending and paused, with history bars, uptime and response times">
+</p>
+
 - Ping, TCP and HTTP checks for every target, with your own interval and timeout. Paste a whole list at once.
 - Live uptime, response-time graphs and an event log.
 - **No false alarms:** a target counts as down only after several failed checks in a row, and as up again after several successes (you choose how many).
@@ -165,6 +271,10 @@ Keep an eye on your servers and websites, and hear when something changes.
 
 ### Network info
 
+<p align="center">
+  <img src="docs/screenshots/wifi-analyzer.png" width="640" alt="Echoes Wi-Fi analyzer: the connected network's signal and link rate, a 5 GHz channel chart with the clearest channels, and nearby Wi-Fi networks">
+</p>
+
 - **Interfaces:** every adapter with its IPv4 / IPv6 addresses, MAC, gateway, DNS servers and link speed.
 - **Wi-Fi analyzer:** your connection (signal in % and dBm, channel and width, band, link rate, security), nearby networks, and a channel chart per band (2.4 / 5 / 6 GHz) with a hint about the clearest channel. Windows and Linux.
 - **Neighbors:** the devices your computer has talked to (the ARP cache, IP ↔ MAC).
@@ -176,6 +286,10 @@ Interfaces work everywhere. Open ports are listed on every desktop system; neigh
 ### Internet speed test
 
 Measure your connection the way it feels in real use.
+
+<p align="center">
+  <img src="docs/screenshots/speed-test-result.png" width="640" alt="Echoes internet speed test: download and upload speed, ping, jitter, loaded latency with a bufferbloat grade, and the test history">
+</p>
 
 - Download and upload speed, ping and jitter.
 - **Bufferbloat grade:** your latency while the line is busy, the reason calls and games lag during big downloads.
@@ -189,6 +303,10 @@ Measure your connection the way it feels in real use.
 
 A complete HTTP client, like Postman or Insomnia, that understands curl.
 
+<p align="center">
+  <img src="docs/screenshots/curl-http-client.png" width="640" alt="Echoes cURL HTTP client: a POST request with a JSON body and the pretty-printed JSON response with status, time and size">
+</p>
+
 - **Import curl commands:** paste any `curl` command (bash, cmd or PowerShell, or a browser's "Copy as cURL") and the method, URL, headers, body, auth, cookies, proxy and options are filled in.
 - Edit query parameters, headers, the body (JSON / XML / text with validation, form, multipart with files), auth and cookies.
 - Send with your system's curl or the built-in engine (HTTP/1.1, HTTP/2, and HTTP/3 on Windows 11 and on Linux with libmsquic), through an HTTP or SOCKS proxy, with an IP override or from a chosen network interface.
@@ -199,6 +317,10 @@ A complete HTTP client, like Postman or Insomnia, that understands curl.
 ### SSL/TLS inspector
 
 Check a site's certificate and TLS setup in seconds.
+
+<p align="center">
+  <img src="docs/screenshots/tls-inspector.png" width="640" alt="Echoes SSL/TLS inspector: trusted certificate verdict, TLS 1.3 and 1.2 supported, cipher, ALPN, HSTS, OCSP stapling, expiry and the certificate chain">
+</p>
 
 - A clear verdict, with the exact problem when there is one: name mismatch, untrusted, expired, revoked, …
 - The full certificate chain with details, fingerprints and PEM export.
@@ -215,6 +337,10 @@ Check a site's certificate and TLS setup in seconds.
 ### Cloudflare manager
 
 Manage your Cloudflare domains without opening the dashboard.
+
+<p align="center">
+  <img src="docs/screenshots/cloudflare-dns-records.png" width="640" alt="Echoes Cloudflare manager: a zone's DNS records with proxied and DNS-only switches, dynamic DNS, backup and restore">
+</p>
 
 - **Overview:** traffic for the last 24 hours or 7 days (requests, cached share, bandwidth, visitors, threats, top countries) and quick switches for "I'm under attack" and development mode.
 - **DNS records** (A, AAAA, CNAME, TXT, MX, NS, PTR, CAA, SRV): search, edit, a one-click proxied / DNS-only switch, TTL and comments. DNSSEC on / off, with the DS record for your registrar.
@@ -238,6 +364,10 @@ Manage your Cloudflare domains without opening the dashboard.
 
 ### SSH client
 
+<p align="center">
+  <img src="docs/screenshots/ssh-server-health.png" width="640" alt="Echoes SSH client: server health over SSH with CPU, load, memory, swap, disk usage and the top processes, and a saved server">
+</p>
+
 - An SSH terminal with command history; password, private key (OpenSSH, PEM, PuTTY .ppk) or keyboard-interactive login, tried automatically in that order.
 - **Saved servers:** pick one and connect in one click; passwords and passphrases are stored encrypted.
 - **Files (SFTP):** browse, upload, download, rename and delete, with progress and cancel.
@@ -259,14 +389,22 @@ A netcat-style tool for raw TCP and UDP, plus a WebSocket client.
 
 Chat and swap files with any phone or computer on your network. The other side only needs a web browser, even when the two systems can't reach each other any other way (no remote desktop, no shared folder).
 
+<p align="center">
+  <img src="docs/screenshots/share-chat.png" width="640" alt="Echoes LAN file sharing and chat: HTTPS share link, 6-digit PIN and QR code, and a live chat with a phone and a laptop in their browsers">
+</p>
+
 - **Share & chat:** one link or QR code opens a page that works in every browser, phones included: a live chat with copy buttons and clickable links, sending files to this device (drag & drop, paste, resumed after a dropped connection), and downloads of the files you share. Files you share also appear in the chat.
 - **HTTPS by default** with this device's own certificate (the browser warns once; compare the fingerprint shown in Echoes), on the same port that redirects plain HTTP. A 6-digit **PIN** protects the page, and the QR code carries it, so scanning logs straight in.
-- Received files land in Downloads\Echoes (or a folder you pick; on Android one you choose), are never overwritten, are marked as downloaded on Windows, and respect a size cap and the free disk space.
+- Received files land in Downloads\Echoes (or a folder you pick; on Android one you choose), are never overwritten, are marked as downloaded on Windows, and respect a size cap and the free disk space. The Files tab shows that folder in full and how much Echoes has stored there; **Clean up** deletes the files Echoes received (nothing else in the folder) after asking.
 - Choose the network interface and port, limit connections, and see live stats and a request log. Scripts can download with the PIN as the password (`curl -k -u :PIN -OJ <link>`).
 - **Catch requests (webhook tester):** a local endpoint that lists every request it receives (method, path, headers, query, body as pretty JSON, form fields or hex) with "Copy as curl", a reply you choose (status, body, delay), automatic CORS, and a WebSocket echo endpoint.
 - Built in, no extra software: works on desktop and Android.
 
 ### SOCKS5 and HTTP proxy server and proxy checker
+
+<p align="center">
+  <img src="docs/screenshots/proxy-checker.png" width="640" alt="Echoes proxy checker: a SOCKS5 and HTTP proxy list tested for type, connect time, first byte, exit IP and country">
+</p>
 
 - A SOCKS5 and HTTP proxy on a single port; the protocol is detected for each connection.
 - Optional username and password, a live connection log and traffic stats.
@@ -279,6 +417,10 @@ Chat and swap files with any phone or computer on your network. The other side o
 ### String Lab
 
 Everyday developer text tools in one place.
+
+<p align="center">
+  <img src="docs/screenshots/string-lab-jwt.png" width="640" alt="Echoes String Lab JWT decoder: an HS256 token decoded and its signature verified">
+</p>
 
 - **Encode / decode:** Base64 and Base64URL, URL encoding (plus a URL parser), hex, binary, and HTML / XML / JSON / Unicode escaping.
 - **Hashes:** MD5, SHA-1, SHA-2, SHA-3 (where the system supports it: Windows 11, Linux), CRC32 and HMAC, file checksums with comparison, and a hash identifier that guesses a hash's type (bcrypt, Argon2, NTLM, SHA, …).
@@ -303,6 +445,10 @@ Everyday developer text tools in one place.
 
 ## Interface
 
+<p align="center">
+  <img src="docs/screenshots/doctor-sni-filtering-light.png" width="640" alt="Echoes in the light theme: the connection doctor's SNI filtering verdict with the sidebar of all 20 tools">
+</p>
+
 - **Dark and light themes,** built only from solid colors (no blur or transparency), so they stay light on older computers. Switch with the sun / moon button next to the Echoes logo (in the drawer on Android). The change is instant and remembered.
 - **Compact window:** the sidebar groups the tools (Diagnose, Web & API, Serve & Connect, Workspace) and always shows their names; the window opens just tall enough for the list.
 - **Runs in the system tray:** closing the window keeps the web server, proxy, monitor and scans running. Reopen Echoes from the tray icon or by launching it again; quit from the tray menu, where "Close to tray" can also be turned off.
@@ -312,6 +458,10 @@ Everyday developer text tools in one place.
 ## Android
 
 The Android app has the same tools, made for touch: a slide-out menu, bigger touch targets and layouts that fit phone screens. The Uptime Monitor, Port Scanner, Web Server and Proxy keep running in the background, so a scan or a file share isn't cut off when you switch apps.
+
+<p align="center">
+  <img src="docs/screenshots/android-screens.png" width="640" alt="Echoes on Android: the slide-out tool menu, the connection doctor and the file sharing chat on a phone">
+</p>
 
 Not available on Android: the system curl engine (the built-in engine is used instead), the Wi-Fi analyzer, and the Neighbors / Ports / Routing views of the Network tool. Dynamic DNS updates run while the app is running.
 

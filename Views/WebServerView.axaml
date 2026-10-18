@@ -438,29 +438,58 @@
             <Setter Property="TextTrimming" Value="LeadingCharacterEllipsis"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <!-- received: [RECEIVED][folder ..][change][open][max MB][clear] on one line; on a phone the folder gets its own line -->
-        <Style Selector="Grid#ShInboxRow.wide > Border#ShFolder">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        <!-- received: the folder in full (wrapping), then [stored ........ Open Change Clean up]; on a phone the buttons
+             go under the stored line -->
+        <Style Selector="SelectableTextBlock.folderFull">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <Style Selector="Grid#ShInboxRow.wide > StackPanel#ShFolderBtns">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        <Style Selector="TextBlock.stored">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="2,0,8,0"/>
         </Style>
-        <Style Selector="Grid#ShInboxRow.wide > StackPanel#ShCap">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Grid.ColumnSpan" Value="1"/>
-            <Setter Property="Margin" Value="6,0,0,0"/>
+        <Style Selector="Grid#ShStoreRow.wide > StackPanel#ShStoreBtns">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/>
         </Style>
-        <Style Selector="Grid#ShInboxRow.narrow > StackPanel#ShCap">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        <Style Selector="Grid#ShStoreRow.narrow > TextBlock#ShStored">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#ShStoreRow.narrow > StackPanel#ShStoreBtns">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
             <Setter Property="HorizontalAlignment" Value="Right"/>
-        </Style>
-        <Style Selector="Grid#ShInboxRow.narrow > Border#ShFolder">
-            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
             <Setter Property="Margin" Value="0,6,0,0"/>
         </Style>
-        <Style Selector="Grid#ShInboxRow.narrow > StackPanel#ShFolderBtns">
-            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Grid.ColumnSpan" Value="2"/>
-            <Setter Property="Margin" Value="0,6,0,0"/>
-            <Setter Property="HorizontalAlignment" Value="Right"/>
+        <Style Selector="Button.rowBtn.cleanup:not(:disabled)">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Button.rowBtn.danger">
+            <Setter Property="Background" Value="{DynamicResource Danger.Solid}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Solid}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.OnDanger}"/>
+        </Style>
+        <Style Selector="Button.rowBtn.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Danger.SolidHover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.SolidHover}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.OnDanger}"/>
+        </Style>
+        <Style Selector="Border.confirmLine">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Padding" Value="10,5"/>
+        </Style>
+        <Style Selector="TextBlock.confirmText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
         <!-- request log: a read-only text area that blends into its inset card -->
@@ -935,36 +964,51 @@
                                 </ScrollViewer>
                             </Panel>
 
-                            <!-- RECEIVED · where they go · size cap · clear — one line on desktop, two on a phone -->
-                            <Grid x:Name="ShInboxRow" Grid.Row="2" helpers:Responsive.BreakWidth="540" ColumnDefinitions="Auto, *, Auto, Auto, Auto"
-                                  RowDefinitions="Auto, Auto" ColumnSpacing="6" Margin="0,8,0,6">
-                                <StackPanel x:Name="ShRecvTitle" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,4,0">
-                                    <TextBlock Classes="panelTitle" Text="RECEIVED"/>
-                                    <TextBlock Classes="counts" Text="{Binding ReceivedFiles.Count}" IsVisible="{Binding HasReceived}"/>
-                                </StackPanel>
-                                <Border x:Name="ShFolder" Classes="emptyLine" Padding="8,0" Margin="0" MinHeight="{DynamicResource Control.Height}"
-                                        ToolTip.Tip="{Binding InboxDisplay}">
-                                    <Grid ColumnDefinitions="Auto, *" ColumnSpacing="6">
-                                        <Path Classes="fileIcon" Data="{StaticResource WsIcoFolder}" Width="14" Height="14"/>
-                                        <TextBlock Grid.Column="1" Classes="folder" Text="{Binding InboxDisplay}"/>
+                            <!-- RECEIVED: the folder they go to (in full), what is stored there and Clean up, the size cap -->
+                            <StackPanel x:Name="ShInboxRow" Grid.Row="2" Spacing="5" Margin="0,8,0,6">
+                                <Grid ColumnDefinitions="Auto, *, Auto">
+                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <TextBlock Classes="panelTitle" Text="RECEIVED"/>
+                                        <TextBlock Classes="counts" Text="{Binding ReceivedFiles.Count}" IsVisible="{Binding HasReceived}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6"
+                                                ToolTip.Tip="The largest file a browser may send (MB). Free space is checked too.">
+                                        <TextBlock Classes="inlineLabel" Text="Max MB"/>
+                                        <NumericUpDown Classes="field" Width="72" Value="{Binding MaxUploadMb}" Minimum="1" Maximum="1048576"
+                                                       ShowButtonSpinner="False" FormatString="0"/>
+                                    </StackPanel>
+                                </Grid>
+                                <!-- the folder, never cut short: it wraps -->
+                                <Border x:Name="ShFolder" Classes="emptyLine" Padding="8,6" Margin="0">
+                                    <Grid ColumnDefinitions="Auto, *" ColumnSpacing="8">
+                                        <Path Classes="fileIcon" Data="{StaticResource WsIcoFolder}" Width="14" Height="14" VerticalAlignment="Top" Margin="0,1,0,0"/>
+                                        <SelectableTextBlock Grid.Column="1" Classes="folderFull" Text="{Binding InboxDisplay}"
+                                                             ToolTip.Tip="Where files sent from a browser are saved"/>
                                     </Grid>
                                 </Border>
-                                <StackPanel x:Name="ShFolderBtns" Orientation="Horizontal" Spacing="6">
-                                    <Button Classes="rowBtn" Content="Change" Click="ChangeInbox_Click" ToolTip.Tip="Pick the folder received files go to"/>
-                                    <Button Classes="rowBtn" Content="Open" Command="{Binding OpenInboxCommand}" IsVisible="{Binding CanOpenInbox}"
-                                            ToolTip.Tip="Open the folder"/>
-                                </StackPanel>
-                                <StackPanel x:Name="ShCap" Orientation="Horizontal" Spacing="6"
-                                            ToolTip.Tip="The largest file a browser may send (MB). Free space is checked too.">
-                                    <TextBlock Classes="inlineLabel" Text="Max MB"/>
-                                    <NumericUpDown Classes="field" Width="72" Value="{Binding MaxUploadMb}" Minimum="1" Maximum="1048576"
-                                                   ShowButtonSpinner="False" FormatString="0"/>
-                                </StackPanel>
-                                <Button x:Name="ShRecvClear" Grid.Column="4" Classes="icon small" Command="{Binding ClearReceivedCommand}" IsEnabled="{Binding HasReceived}"
-                                        VerticalAlignment="Center" ToolTip.Tip="Clear the list (the files stay where they are)">
-                                    <Path Classes="glyph" Data="{StaticResource WsIcoClear}"/>
-                                </Button>
-                            </Grid>
+                                <!-- what is stored + Open / Change / Clean up; Clean up asks first -->
+                                <Grid x:Name="ShStoreRow" helpers:Responsive.BreakWidth="440" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto"
+                                      IsVisible="{Binding IsNotConfirmingCleanup}">
+                                    <TextBlock x:Name="ShStored" Classes="stored" Text="{Binding StoredText}"
+                                               ToolTip.Tip="What Echoes received and still keeps: what Clean up would free"/>
+                                    <StackPanel x:Name="ShStoreBtns" Orientation="Horizontal" Spacing="6">
+                                        <Button Classes="rowBtn" Content="Open" Command="{Binding OpenInboxCommand}" IsVisible="{Binding CanOpenInbox}"
+                                                ToolTip.Tip="Open the folder"/>
+                                        <Button Classes="rowBtn" Content="Change" Click="ChangeInbox_Click" ToolTip.Tip="Pick the folder received files go to"/>
+                                        <Button Classes="rowBtn cleanup" Content="Clean up" Command="{Binding AskCleanUpCommand}" IsEnabled="{Binding CanCleanUp}"
+                                                ToolTip.Tip="Delete the files Echoes received to free the space (only those: nothing else in the folder)"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Border Classes="confirmLine" IsVisible="{Binding IsConfirmingCleanup}">
+                                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                                        <TextBlock Classes="confirmText" Text="{Binding CleanupPrompt}"/>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                            <Button Classes="rowBtn danger" Content="Delete" Command="{Binding ConfirmCleanUpCommand}"/>
+                                            <Button Classes="rowBtn" Content="Cancel" Command="{Binding CancelCleanUpCommand}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
                             <Panel Grid.Row="3">
                                 <Border Classes="emptyLine" VerticalAlignment="Top" IsVisible="{Binding !HasReceived}">
                                     <TextBlock Classes="hint" Text="Files sent from a browser land in the folder above."/>
