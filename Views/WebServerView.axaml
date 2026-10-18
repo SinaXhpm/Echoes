@@ -28,21 +28,13 @@
         <StreamGeometry x:Key="WsIcoCopy">M10 8 H18 A2 2 0 0 1 20 10 V18 A2 2 0 0 1 18 20 H10 A2 2 0 0 1 8 18 V10 A2 2 0 0 1 10 8 Z M5 16 A1.5 1.5 0 0 1 4 14.5 V5.5 A1.5 1.5 0 0 1 5.5 4 H14.5 A1.5 1.5 0 0 1 16 5</StreamGeometry>
         <StreamGeometry x:Key="WsIcoOpen">M14 4 H20 V10 M20 4 L11 13 M18 14 V18.5 A1.5 1.5 0 0 1 16.5 20 H5.5 A1.5 1.5 0 0 1 4 18.5 V7.5 A1.5 1.5 0 0 1 5.5 6 H10</StreamGeometry>
         <StreamGeometry x:Key="WsIcoInbox">M4 13 H8.5 L10 15.5 H14 L15.5 13 H20 M4 13 L6.5 5.5 H17.5 L20 13 V18.5 A1.5 1.5 0 0 1 18.5 20 H5.5 A1.5 1.5 0 0 1 4 18.5 Z</StreamGeometry>
+        <StreamGeometry x:Key="WsIcoChat">M5 5.5 H19 A1.5 1.5 0 0 1 20.5 7 V15 A1.5 1.5 0 0 1 19 16.5 H11 L7 20 V16.5 H5 A1.5 1.5 0 0 1 3.5 15 V7 A1.5 1.5 0 0 1 5 5.5 Z</StreamGeometry>
+        <StreamGeometry x:Key="WsIcoFolder">M3.5 7 A1.5 1.5 0 0 1 5 5.5 H9.5 L11.5 7.5 H19 A1.5 1.5 0 0 1 20.5 9 V17.5 A1.5 1.5 0 0 1 19 19 H5 A1.5 1.5 0 0 1 3.5 17.5 Z</StreamGeometry>
+        <StreamGeometry x:Key="WsIcoLock">M7 11 V8 A5 5 0 0 1 17 8 V11 M6 11 H18 A1 1 0 0 1 19 12 V19 A1 1 0 0 1 18 20 H6 A1 1 0 0 1 5 19 V12 A1 1 0 0 1 6 11 Z</StreamGeometry>
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <!-- ===== page rhythm: 16px between cards on desktop, 12px on a phone. A margin on every card but the
-             first (not RowSpacing), so the cards hidden while stopped leave no doubled gap. ===== -->
-        <Style Selector="Grid#WsPage > :is(Control):not(:nth-child(1))">
-            <Setter Property="Margin" Value="0,12,0,0"/>
-        </Style>
-        <Style Selector="Grid#WsPage.narrow > :is(Control):not(:nth-child(1))">
-            <Setter Property="Margin" Value="0,12,0,0"/>
-        </Style>
         <Style Selector="Border.card.section">
-            <Setter Property="Padding" Value="12"/>
-        </Style>
-        <Style Selector="Grid#WsPage.narrow Border.card.section">
             <Setter Property="Padding" Value="12"/>
         </Style>
         <Style Selector="TextBlock.hint">
@@ -65,154 +57,11 @@
             <Setter Property="Width" Value="12"/>
             <Setter Property="Height" Value="12"/>
         </Style>
-
-        <!-- ===== server settings: [listen on][port][max connections] on one line, stacked on a phone ===== -->
-        <Style Selector="Grid#WsFields.wide > StackPanel#WsBind">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
-        </Style>
-        <Style Selector="Grid#WsFields.narrow > StackPanel#WsBind">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
-        </Style>
-        <Style Selector="Grid#WsFields.wide > Grid#WsLimits">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
-            <Setter Property="Width" Value="280"/>
-        </Style>
-        <Style Selector="Grid#WsFields.narrow > Grid#WsLimits">
-            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
-            <Setter Property="Margin" Value="0,12,0,0"/>
-        </Style>
-        <!-- START + status: side by side; on a phone the button is a full-width row above the status -->
-        <Style Selector="Grid#WsAction.wide > Button#WsToggle">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
-        </Style>
-        <Style Selector="Grid#WsAction.narrow > Button#WsToggle">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-        </Style>
-        <Style Selector="Grid#WsAction.wide > TextBlock#WsStatus">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
-            <Setter Property="Margin" Value="16,0,0,0"/>
-        </Style>
-        <Style Selector="Grid#WsAction.narrow > TextBlock#WsStatus">
-            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
-            <Setter Property="Margin" Value="2,10,0,0"/>
-        </Style>
-        <Style Selector="TextBlock#WsStatus">
-            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-        <!-- credentials: next to "Require password" on desktop (two fields of at most 200px each: a full-width pair
-             would be oddly long), on their own line in halves on a phone -->
-        <Style Selector="Grid#WsPage.wide Grid#WsAuthRow > CheckBox">
-            <Setter Property="VerticalAlignment" Value="Bottom"/>
-        </Style>
-        <Style Selector="Grid#WsPage.wide Grid#WsAuthRow > Grid#WsAuth">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
-            <Setter Property="Margin" Value="16,0,0,0"/>
-        </Style>
-        <Style Selector="Grid#WsPage.narrow Grid#WsAuthRow > Grid#WsAuth">
-            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
-            <Setter Property="Margin" Value="0,8,0,0"/>
-        </Style>
         <Style Selector="Border.badge Ellipse.dot">
             <Setter Property="Width" Value="6"/>
             <Setter Property="Height" Value="6"/>
             <Setter Property="Fill" Value="{DynamicResource Success}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
-        <!-- ===== live stats: metric tiles, 5 across; 2 + 2 + 1 compact rows below 640px (10-column grid, spans) ===== -->
-        <Style Selector="Border.card.tile">
-            <Setter Property="Padding" Value="14,12"/>
-        </Style>
-        <!-- tile = label over value; on a phone a compact row (label left, value right) -->
-        <Style Selector="TextBlock.tileLabel">
-            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
-        </Style>
-        <Style Selector="TextBlock.tileValue">
-            <Setter Property="FontSize" Value="17"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-            <Setter Property="Margin" Value="0,4,0,0"/>
-            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
-        </Style>
-        <Style Selector="Grid#WsStats.narrow > Border.tile">
-            <Setter Property="Padding" Value="12,10"/>
-        </Style>
-        <Style Selector="Grid#WsStats.narrow TextBlock.tileLabel">
-            <Setter Property="Grid.ColumnSpan" Value="1"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-        <Style Selector="Grid#WsStats.narrow TextBlock.tileValue">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
-            <Setter Property="FontSize" Value="{StaticResource Font.Title}"/>
-            <Setter Property="Margin" Value="8,0,0,0"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-        <Style Selector="Grid#WsStats > Border">
-            <Setter Property="Grid.ColumnSpan" Value="2"/>
-        </Style>
-        <Style Selector="Grid#WsStats.narrow > Border">
-            <Setter Property="Grid.ColumnSpan" Value="5"/>
-        </Style>
-        <Style Selector="Grid#WsStats > Border#WsStat2"><Setter Property="Grid.Column" Value="2"/></Style>
-        <Style Selector="Grid#WsStats > Border#WsStat3"><Setter Property="Grid.Column" Value="4"/></Style>
-        <Style Selector="Grid#WsStats > Border#WsStat4"><Setter Property="Grid.Column" Value="6"/></Style>
-        <Style Selector="Grid#WsStats > Border#WsStat5"><Setter Property="Grid.Column" Value="8"/></Style>
-        <Style Selector="Grid#WsStats.narrow > Border#WsStat2"><Setter Property="Grid.Column" Value="5"/></Style>
-        <Style Selector="Grid#WsStats.narrow > Border#WsStat3">
-            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Margin" Value="0,12,0,0"/>
-        </Style>
-        <Style Selector="Grid#WsStats.narrow > Border#WsStat4">
-            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="5"/><Setter Property="Margin" Value="0,12,0,0"/>
-        </Style>
-        <Style Selector="Grid#WsStats.narrow > Border#WsStat5">
-            <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="10"/><Setter Property="Margin" Value="0,12,0,0"/>
-        </Style>
-
-        <!-- ===== share links: selectable tiles (the selected one is the QR target) ===== -->
-        <Style Selector="ListBox.links > ListBoxItem">
-            <Setter Property="Padding" Value="12,4,4,4"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
-            <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style Selector="ListBox.links > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
-        </Style>
-        <Style Selector="ListBox.links > ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource Bg.Pressed}"/>
-        </Style>
-        <Style Selector="ListBox.links > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
-        </Style>
-        <Style Selector="ListBox.links > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource Accent.SoftHover}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
-        </Style>
-        <Style Selector="TextBlock.url">
-            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
-            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-        <Style Selector="ListBox.links > ListBoxItem:selected TextBlock.url">
-            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
         </Style>
         <Style Selector="Button.icon Path.glyph">
             <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
@@ -220,45 +69,307 @@
         <Style Selector="Button.icon:pointerover Path.glyph">
             <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
         </Style>
-        <!-- QR next to the links; centered under them on a phone -->
-        <Style Selector="Grid#WsShare.wide > ListBox#WsLinks">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        <Style Selector="Button.icon:disabled Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
         </Style>
-        <Style Selector="Grid#WsShare.narrow > ListBox#WsLinks">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
-        </Style>
-        <Style Selector="Grid#WsShare.wide > Border#WsQr">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
-            <Setter Property="Margin" Value="16,0,0,0"/>
-        </Style>
-        <Style Selector="Grid#WsShare.narrow > Border#WsQr">
-            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        <Style Selector="Path.emptyIcon">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Stretch" Value="None"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="0,6,0,0"/>
+        </Style>
+        <Style Selector="TextBlock.hint.error">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="TextBlock.hint.warn">
+            <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="TabControl.wsmode > TabItem">
+            <Setter Property="Padding" Value="12,0"/>
         </Style>
 
-        <!-- ===== shared files list ===== -->
-        <Style Selector="Border.fileRow">
-            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+        <!-- ===================== SHARE & CHAT ===================== -->
+        <!-- page: one screen tall on desktop; on a phone the lower card keeps its room and the page scrolls -->
+        <Style Selector="ScrollViewer#ShPage.wide">
+            <Setter Property="VerticalScrollBarVisibility" Value="Disabled"/>
+        </Style>
+        <Style Selector="ScrollViewer#ShPage.narrow">
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+        </Style>
+        <Style Selector="ScrollViewer#ShPage.narrow > Grid#ShRoot">
+            <Setter Property="Height" Value="{Binding $parent[ScrollViewer].Bounds.Height}"/>
+            <Setter Property="MinHeight" Value="720"/>
+        </Style>
+        <Style Selector="ScrollViewer#ShPage.narrow > Grid#ShRoot.running">
+            <Setter Property="MinHeight" Value="780"/>
+        </Style>
+
+        <!-- [listen on][port][HTTPS][PIN][start] on one line; the address on its own line on a phone -->
+        <Style Selector="Grid#ShFields.wide > Grid#ShRest">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="10,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#ShFields.narrow > Grid#ShRest">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+        <Style Selector="Grid#ShFields.narrow > StackPanel#ShBind">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#ShRest > CheckBox">
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Margin" Value="10,0,0,2"/>
+        </Style>
+        <!-- start: after the switches on desktop; its own full-width row on a phone -->
+        <Style Selector="Grid#ShFields.wide Button#ShToggle">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#ShFields.narrow Button#ShToggle">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <!-- phone, while sharing: the (locked) address, port and switches fold away — the card keeps Stop and the link -->
+        <Style Selector="ScrollViewer#ShPage.narrow Grid#ShRoot.running StackPanel#ShBind, ScrollViewer#ShPage.narrow Grid#ShRoot.running StackPanel#ShPortBox, ScrollViewer#ShPage.narrow Grid#ShRoot.running Grid#ShRest > CheckBox">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="ScrollViewer#ShPage.narrow Grid#ShRoot.running Grid#ShRest">
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+        <Style Selector="ScrollViewer#ShPage.narrow Grid#ShRoot.running Button#ShToggle">
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+
+        <!-- live: link / PIN / certificate, QR beside them (desktop) or behind a button (phone) -->
+        <Style Selector="Grid#ShLive.narrow > Border#ShQr">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#ShLive.wide Button#ShQrBtn">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#ShLive.wide TextBlock#ShTlsHint">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/>
+        </Style>
+        <Style Selector="Grid#ShLive.narrow TextBlock#ShTlsHint">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+        </Style>
+        <Style Selector="TextBlock.liveLabel">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Width" Value="34"/>
+        </Style>
+        <Style Selector="TextBlock.inlineLabel">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.pin">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="17"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="LetterSpacing" Value="1"/>
+        </Style>
+        <Style Selector="TextBlock.cert">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.url">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="TextTrimming" Value="LeadingCharacterEllipsis"/>
+        </Style>
+        <Style Selector="Path.lock">
+            <Setter Property="Stroke" Value="{DynamicResource Success}"/>
+            <Setter Property="StrokeThickness" Value="1.7"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Width" Value="13"/>
+            <Setter Property="Height" Value="13"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Path.lock.plain">
+            <Setter Property="Stroke" Value="{DynamicResource Warning}"/>
+        </Style>
+
+        <!-- the lower card: sub-tabs Chat | Files | Log -->
+        <Style Selector="TabControl.subtabs > TabItem">
+            <Setter Property="Padding" Value="11,0"/>
+        </Style>
+        <Style Selector="Border.badge.unread">
+            <Setter Property="Padding" Value="5,0"/>
+            <Setter Property="MinWidth" Value="18"/>
+            <Setter Property="Background" Value="{DynamicResource Accent}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="Border.badge.unread TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Text.OnAccent}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.panelTitle">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="LetterSpacing" Value="0.4"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.counts">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Button.icon.small">
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="26"/>
+        </Style>
+        <Style Selector="Button.icon.small Path.glyph">
+            <Setter Property="Width" Value="13"/>
+            <Setter Property="Height" Value="13"/>
+        </Style>
+
+        <!-- chat: a virtualized transcript (the scroll viewer inside the template), own messages tinted and indented -->
+        <Style Selector="ItemsControl.chat">
+            <Setter Property="ItemsPanel">
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+            </Setter>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ScrollViewer Name="PART_Scroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                        <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" Margin="10,8,10,4"/>
+                    </ScrollViewer>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="StackPanel.chatMsg">
+            <Setter Property="Margin" Value="0,0,44,8"/>
+        </Style>
+        <Style Selector="StackPanel.chatMsg.mine">
+            <Setter Property="Margin" Value="44,0,0,8"/>
+        </Style>
+        <Style Selector="Grid#ShLower.narrow StackPanel.chatMsg">
+            <Setter Property="Margin" Value="0,0,24,8"/>
+        </Style>
+        <Style Selector="Grid#ShLower.narrow StackPanel.chatMsg.mine">
+            <Setter Property="Margin" Value="24,0,0,8"/>
+        </Style>
+        <Style Selector="TextBlock.chatWho">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="StackPanel.chatMsg.mine TextBlock.chatWho">
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="TextBlock.chatTime">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.bubble">
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
-            <Setter Property="Padding" Value="12,4,4,4"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Padding" Value="10,6"/>
+        </Style>
+        <Style Selector="StackPanel.chatMsg.mine Border.bubble">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.chatText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.chatText.file">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+        </Style>
+        <Style Selector="Button.tiny">
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.tiny:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+        </Style>
+        <Style Selector="Button.tiny Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="12"/>
+        </Style>
+        <Style Selector="Button.tiny:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="TextBox.chatInput">
+            <Setter Property="MinHeight" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="MaxHeight" Value="96"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <!-- file rows (shared + received) -->
+        <Style Selector="Border.fileRow">
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Padding" Value="10,2,4,2"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+            <Setter Property="MinHeight" Value="32"/>
         </Style>
         <Style Selector="Path.fileIcon">
             <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
             <Setter Property="StrokeThickness" Value="1.6"/>
             <Setter Property="StrokeJoin" Value="Round"/>
-            <Setter Property="Width" Value="16"/>
-            <Setter Property="Height" Value="16"/>
+            <Setter Property="Width" Value="15"/>
+            <Setter Property="Height" Value="15"/>
             <Setter Property="Stretch" Value="Uniform"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <!-- remove (×): no fill until hovered, so a long list stays calm -->
+        <Style Selector="TextBlock.fileName">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.fileMeta">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.fileMeta.error">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
         <Style Selector="Button.rowAction">
-            <Setter Property="Width" Value="30"/>
-            <Setter Property="Height" Value="30"/>
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="28"/>
             <Setter Property="MinWidth" Value="0"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -276,31 +387,83 @@
         </Style>
         <Style Selector="Button.rowAction Path.glyph">
             <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
-            <Setter Property="Width" Value="12"/>
-            <Setter Property="Height" Value="12"/>
+            <Setter Property="Width" Value="11"/>
+            <Setter Property="Height" Value="11"/>
         </Style>
         <Style Selector="Button.rowAction:pointerover Path.glyph">
             <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
         </Style>
-        <Style Selector="Border.empty">
-            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+        <Style Selector="Button.rowBtn">
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="9,0"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.rowBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedHover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}"/>
+        </Style>
+        <Style Selector="ProgressBar.upload">
+            <Setter Property="Height" Value="3"/>
+            <Setter Property="MinHeight" Value="3"/>
+            <Setter Property="Minimum" Value="0"/>
+            <Setter Property="Maximum" Value="100"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+            <Setter Property="Background" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="CornerRadius" Value="2"/>
+            <Setter Property="Margin" Value="0,3,0,1"/>
+        </Style>
+        <Style Selector="Border.emptyLine">
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
-            <Setter Property="Padding" Value="16,12"/>
+            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
         </Style>
-        <Style Selector="Path.emptyIcon">
-            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
-            <Setter Property="StrokeThickness" Value="1.6"/>
-            <Setter Property="StrokeLineCap" Value="Round"/>
-            <Setter Property="StrokeJoin" Value="Round"/>
-            <Setter Property="Width" Value="24"/>
-            <Setter Property="Height" Value="24"/>
-            <Setter Property="Stretch" Value="None"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Style Selector="TextBlock.folder">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextTrimming" Value="LeadingCharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <!-- received: [RECEIVED][folder ..][change][open][max MB][clear] on one line; on a phone the folder gets its own line -->
+        <Style Selector="Grid#ShInboxRow.wide > Border#ShFolder">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        </Style>
+        <Style Selector="Grid#ShInboxRow.wide > StackPanel#ShFolderBtns">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        </Style>
+        <Style Selector="Grid#ShInboxRow.wide > StackPanel#ShCap">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#ShInboxRow.narrow > StackPanel#ShCap">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+        <Style Selector="Grid#ShInboxRow.narrow > Border#ShFolder">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+            <Setter Property="Margin" Value="0,6,0,0"/>
+        </Style>
+        <Style Selector="Grid#ShInboxRow.narrow > StackPanel#ShFolderBtns">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,6,0,0"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
         </Style>
 
-        <!-- ===== request log: a read-only text area that blends into its inset card ===== -->
+        <!-- request log: a read-only text area that blends into its inset card -->
         <Style Selector="TextBox.log">
             <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
             <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
@@ -317,11 +480,12 @@
         <Style Selector="TextBox.log:pointerover, TextBox.log:focus">
             <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
         </Style>
+        <Style Selector="Grid#ShLogHead.narrow > TextBlock#ShStats">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+            <Setter Property="Margin" Value="0,6,0,0"/>
+        </Style>
 
         <!-- ===================== CATCH REQUESTS ===================== -->
-        <Style Selector="TabControl.wsmode > TabItem">
-            <Setter Property="Padding" Value="12,0"/>
-        </Style>
         <!-- page: one screen tall on desktop; on a phone at least 640px (the page scrolls, the list keeps its room) -->
         <Style Selector="ScrollViewer#CtPage.wide">
             <Setter Property="VerticalScrollBarVisibility" Value="Disabled"/>
@@ -336,12 +500,6 @@
         <!-- phone, reply editor open: the page grows (and scrolls) rather than squeezing the list to a row -->
         <Style Selector="ScrollViewer#CtPage.narrow > Grid#CtRoot.replyOpen">
             <Setter Property="MinHeight" Value="1000"/>
-        </Style>
-        <Style Selector="TextBlock.hint.error">
-            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
-        </Style>
-        <Style Selector="TextBlock.hint.warn">
-            <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
         </Style>
 
         <!-- [listen on][port][start] on one line; the address on its own line on a phone -->
@@ -407,28 +565,6 @@
         </Style>
         <Style Selector="Grid#CtSplit.narrow:not(.detail) > Border#CtDetailPane">
             <Setter Property="IsVisible" Value="False"/>
-        </Style>
-
-        <Style Selector="TextBlock.panelTitle">
-            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="LetterSpacing" Value="0.4"/>
-            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-        <Style Selector="TextBlock.counts">
-            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-        </Style>
-        <Style Selector="Button.icon.small">
-            <Setter Property="Width" Value="26"/>
-            <Setter Property="Height" Value="26"/>
-        </Style>
-        <Style Selector="Button.icon.small Path.glyph">
-            <Setter Property="Width" Value="13"/>
-            <Setter Property="Height" Value="13"/>
         </Style>
 
         <!-- request rows -->
@@ -529,45 +665,39 @@
     </UserControl.Styles>
 
     <Panel>
-    <!-- ===================== SHARE FILES =====================
-         The whole page scrolls: once the server is running it grows (stats + share URLs + QR + log),
-         which overflows a short window, so a single outer ScrollViewer keeps everything reachable.
-         Full width (no MaxWidth) so it still uses the available space. -->
-    <ScrollViewer x:Name="WsShareMode" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+    <!-- ===================== SHARE & CHAT =====================
+         One screen tall on desktop (the chat / files / log card takes what the server card leaves; lists scroll inside);
+         on a phone the page scrolls rather than squeezing the chat. -->
+    <ScrollViewer x:Name="ShPage" helpers:Responsive.BreakWidth="560" HorizontalScrollBarVisibility="Disabled"
                   IsVisible="{Binding IsShareMode}">
-        <!-- At least as tall as the visible area: the request log (the star row) takes the spare height instead
-             of leaving it empty under the cards; taller content still scrolls. -->
-        <Grid x:Name="WsPage" helpers:Responsive.BreakWidth="560" RowDefinitions="Auto, Auto, Auto, Auto, *"
-              MinHeight="{Binding $parent[ScrollViewer].Bounds.Height}">
+        <Grid x:Name="ShRoot" RowDefinitions="Auto, *" RowSpacing="12" Classes.running="{Binding IsRunning}">
 
-            <!-- ===== SERVER: listen settings + START ===== -->
+            <!-- ===== server: listen settings + start, then the link / PIN / certificate / QR while sharing ===== -->
             <Border Grid.Row="0" Classes="card section">
-                <StackPanel Spacing="12">
+                <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*, Auto">
                         <TabControl Grid.Column="0" Classes="seg wsmode" Padding="0" SelectedIndex="{Binding ModeIndex}" VerticalAlignment="Center"
-                                    ToolTip.Tip="Share files with devices on your network, or catch the requests a webhook / app sends">
-                            <TabItem Header="Share files"/>
+                                    ToolTip.Tip="Chat and swap files with browsers on your network, or catch the requests a webhook / app sends">
+                            <TabItem Header="Share &amp; chat"/>
                             <TabItem Header="Catch requests"/>
                         </TabControl>
                         <Border Grid.Column="1" Classes="badge" Classes.success="{Binding IsRunning}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <Ellipse Classes="dot" IsVisible="{Binding IsRunning}"/>
                                 <TextBlock Text="Running" IsVisible="{Binding IsRunning}"/>
-                                <TextBlock Text="Stopped" IsVisible="{Binding !IsRunning}"/>
+                                <TextBlock Text="Starting" IsVisible="{Binding IsStarting}"/>
+                                <TextBlock Text="Stopped" IsVisible="{Binding IsIdle}"/>
                             </StackPanel>
                         </Border>
                     </Grid>
 
-                    <!-- how to listen: bind interface (default 0.0.0.0 = LAN-visible).
-                         Listen settings are locked while running: the server captures them at START,
-                         so edits would be silently ignored while the UI claimed otherwise. -->
-                    <Grid x:Name="WsFields" helpers:Responsive.BreakWidth="600"
-                          ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="12">
-                        <StackPanel x:Name="WsBind">
+                    <!-- Listen settings are locked while running: the hub captures them at start. -->
+                    <Grid x:Name="ShFields" helpers:Responsive.BreakWidth="560" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                        <StackPanel x:Name="ShBind">
                             <TextBlock Classes="fieldLabel" Text="Listen on"/>
-                            <ComboBox Classes="field" ItemsSource="{Binding BindOptions}" SelectedItem="{Binding SelectedBind}"
-                                      HorizontalAlignment="Stretch" IsEnabled="{Binding !IsRunning}"
-                                      ToolTip.Tip="Which address the server binds to. 0.0.0.0 (default) = reachable from other devices on your network; 127.0.0.1 = this device only; or pick one specific interface IP.">
+                            <ComboBox x:Name="ShBindBox" Classes="field" ItemsSource="{Binding BindOptions}" SelectedItem="{Binding SelectedBind}"
+                                      HorizontalAlignment="Stretch" IsEnabled="{Binding IsIdle}"
+                                      ToolTip.Tip="All interfaces = this device and others on your network; this device only = 127.0.0.1; or one interface's address">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate x:DataType="vm:BindOption">
                                         <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis"/>
@@ -575,213 +705,321 @@
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
                         </StackPanel>
-                        <Grid x:Name="WsLimits" ColumnDefinitions="*, *" ColumnSpacing="12">
-                            <StackPanel Grid.Column="0">
+                        <Grid x:Name="ShRest" ColumnDefinitions="Auto, Auto, Auto, *" RowDefinitions="Auto, Auto">
+                            <StackPanel x:Name="ShPortBox" Grid.Column="0" Width="76">
                                 <TextBlock Classes="fieldLabel" Text="Port"/>
-                                <NumericUpDown Classes="field" Value="{Binding Port}" Minimum="1" Maximum="65535" ShowButtonSpinner="False" IsEnabled="{Binding !IsRunning}"/>
+                                <NumericUpDown Classes="field" Value="{Binding Port}" Minimum="1" Maximum="65535" ShowButtonSpinner="False"
+                                               FormatString="0" IsEnabled="{Binding IsIdle}"/>
                             </StackPanel>
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Classes="fieldLabel" Text="Max connections"
-                                           ToolTip.Tip="Maximum simultaneous connections the server accepts"/>
-                                <NumericUpDown Classes="field" Value="{Binding MaxConnections}" Minimum="1" Maximum="512" ShowButtonSpinner="False" IsEnabled="{Binding !IsRunning}"
-                                               ToolTip.Tip="Maximum simultaneous connections the server accepts"/>
-                            </StackPanel>
-                        </Grid>
-                    </Grid>
-
-                    <!-- optional HTTP Basic auth: [require password][username][password] on one line when wide -->
-                    <Grid x:Name="WsAuthRow" ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
-                        <CheckBox IsChecked="{Binding RequireAuth}" IsEnabled="{Binding !IsRunning}" Content="Require password"
-                                  ToolTip.Tip="Protect downloads with HTTP Basic auth (a username and password)"/>
-                        <Grid x:Name="WsAuth" ColumnSpacing="12" IsVisible="{Binding RequireAuth}" IsEnabled="{Binding !IsRunning}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" MaxWidth="200"/>
-                                <ColumnDefinition Width="*" MaxWidth="200"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Classes="fieldLabel" Text="Username"/>
-                                <TextBox Classes="field" Text="{Binding AuthUser}" PlaceholderText="Username"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Classes="fieldLabel" Text="Password"/>
-                                <TextBox Classes="field" Text="{Binding AuthPass}" IsUndoEnabled="False" PasswordChar="●" PlaceholderText="Password"/>
-                            </StackPanel>
-                        </Grid>
-                    </Grid>
-
-                    <Border Classes="divider"/>
-
-                    <!-- START / STOP + status -->
-                    <Grid x:Name="WsAction" helpers:Responsive.BreakWidth="480" ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
-                        <Button x:Name="WsToggle" Classes="toggle" MinWidth="148"
-                                Command="{Binding ToggleServerCommand}" Classes.active="{Binding IsRunning}">
-                            <Panel>
-                                <TextBlock Text="Start sharing" IsVisible="{Binding !IsRunning}" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Stop" IsVisible="{Binding IsRunning}" HorizontalAlignment="Center"/>
-                            </Panel>
-                        </Button>
-                        <TextBlock x:Name="WsStatus" Text="{Binding StatusMessage}"/>
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <!-- ===== LIVE STATS (while running) ===== -->
-            <Grid x:Name="WsStats" Grid.Row="1" helpers:Responsive.BreakWidth="640" IsVisible="{Binding IsRunning}"
-                  ColumnDefinitions="*,*,*,*,*,*,*,*,*,*" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="12">
-                <Border x:Name="WsStat1" Classes="card tile">
-                    <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
-                        <TextBlock Classes="tileLabel" Text="Active"/>
-                        <TextBlock Classes="tileValue" Text="{Binding ActiveConnections}"/>
-                    </Grid>
-                </Border>
-                <Border x:Name="WsStat2" Classes="card tile">
-                    <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
-                        <TextBlock Classes="tileLabel" Text="Downloads"/>
-                        <TextBlock Classes="tileValue" Text="{Binding TotalDownloads}"/>
-                    </Grid>
-                </Border>
-                <Border x:Name="WsStat3" Classes="card tile">
-                    <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
-                        <TextBlock Classes="tileLabel" Text="Sent"/>
-                        <TextBlock Classes="tileValue" Text="{Binding BytesSentText}"/>
-                    </Grid>
-                </Border>
-                <Border x:Name="WsStat4" Classes="card tile">
-                    <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
-                        <TextBlock Classes="tileLabel" Text="Clients"/>
-                        <TextBlock Classes="tileValue" Text="{Binding ClientCount}"/>
-                    </Grid>
-                </Border>
-                <Border x:Name="WsStat5" Classes="card tile">
-                    <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
-                        <TextBlock Classes="tileLabel" Text="Connections" ToolTip.Tip="Connections since the server started"/>
-                        <TextBlock Classes="tileValue" Text="{Binding TotalConnections}"/>
-                    </Grid>
-                </Border>
-            </Grid>
-
-            <!-- ===== SHARE URLs + QR (while running) ===== -->
-            <Border Grid.Row="2" Classes="card section" IsVisible="{Binding IsRunning}">
-                <StackPanel Spacing="14">
-                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12">
-                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                            <TextBlock Classes="sectionTitle" Text="Share links"/>
-                            <TextBlock Classes="hint" Text="Scan the QR or open a link."
-                                       ToolTip.Tip="Point a phone camera at the QR, or open a URL in any browser on the same Wi-Fi / LAN"/>
-                        </StackPanel>
-                        <Button Grid.Column="1" Classes="ghost" Command="{Binding RefreshAddressesCommand}" Content="Refresh" VerticalAlignment="Top"/>
-                    </Grid>
-                    <Grid x:Name="WsShare" helpers:Responsive.BreakWidth="560" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
-                        <!-- addresses — click one to show its QR -->
-                        <ListBox x:Name="WsLinks" Classes="links" ItemsSource="{Binding Addresses}" SelectedItem="{Binding SelectedShareUrl}"
-                                 Background="{DynamicResource Bg.Card}" BorderThickness="0" Padding="0" VerticalAlignment="Top"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="sys:String">
-                                    <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="4">
-                                        <TextBlock Grid.Column="0" Classes="url" Text="{Binding}" Margin="0,0,8,0"/>
-                                        <Button Grid.Column="1" Classes="icon" ToolTip.Tip="Copy link"
-                                                Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).CopyAddressCommand}"
-                                                CommandParameter="{Binding}">
-                                            <Path Classes="glyph" Data="{StaticResource WsIcoCopy}"/>
-                                        </Button>
-                                        <Button Grid.Column="2" Classes="icon" ToolTip.Tip="Open in browser"
-                                                IsVisible="{x:Static helpers:AppPlatform.IsDesktop}"
-                                                Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).OpenAddressCommand}"
-                                                CommandParameter="{Binding}">
-                                            <Path Classes="glyph" Data="{StaticResource WsIcoOpen}"/>
-                                        </Button>
-                                    </Grid>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-
-                        <!-- QR of the selected address (the bitmap carries its own white quiet zone) -->
-                        <Border x:Name="WsQr" CornerRadius="{StaticResource Radius.Md}" ClipToBounds="True" VerticalAlignment="Top"
-                                IsVisible="{Binding QrImage, Converter={x:Static ObjectConverters.IsNotNull}}">
-                            <Image Source="{Binding QrImage}" Width="164" Height="164"
-                                   RenderOptions.BitmapInterpolationMode="None"/>
-                        </Border>
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <!-- ===== SHARED FILES ===== -->
-            <Border Grid.Row="3" Classes="card section">
-                <StackPanel Spacing="14">
-                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12">
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <TextBlock Classes="sectionTitle" Text="Shared files" VerticalAlignment="Center"/>
-                            <Border Classes="badge" IsVisible="{Binding HasFiles}">
-                                <TextBlock Text="{Binding Files.Count}"/>
-                            </Border>
-                        </StackPanel>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                            <Button Classes="secondary" Click="AddFiles_Click">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Path Classes="glyph" Data="{StaticResource WsIcoPlus}"/>
-                                    <TextBlock Text="Add files" VerticalAlignment="Center"/>
-                                </StackPanel>
+                            <CheckBox x:Name="ShHttps" Grid.Column="1" Content="HTTPS" IsChecked="{Binding HttpsOn}" IsEnabled="{Binding IsIdle}"
+                                      ToolTip.Tip="Encrypt everything with this device's own certificate (browsers warn once). Off = plain HTTP."/>
+                            <CheckBox x:Name="ShPin" Grid.Column="2" Content="PIN" IsChecked="{Binding PinOn}" IsEnabled="{Binding IsIdle}"
+                                      ToolTip.Tip="Browsers need the 6-digit PIN (the link and QR carry it). Off = anyone who can reach the port joins."/>
+                            <Button x:Name="ShToggle" Classes="toggle" MinWidth="120" VerticalAlignment="Bottom"
+                                    Command="{Binding ToggleServerCommand}" Classes.active="{Binding IsRunning}" IsEnabled="{Binding !IsStarting}">
+                                <Panel>
+                                    <TextBlock Text="Start sharing" IsVisible="{Binding IsIdle}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Starting…" IsVisible="{Binding IsStarting}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Stop" IsVisible="{Binding IsRunning}" HorizontalAlignment="Center"/>
+                                </Panel>
                             </Button>
-                            <Button Classes="ghost" Command="{Binding ClearFilesCommand}" Content="Clear"/>
-                        </StackPanel>
+                        </Grid>
                     </Grid>
 
-                    <Panel>
-                        <Border Classes="empty" IsVisible="{Binding !HasFiles}">
-                            <StackPanel Spacing="4">
-                                <Path Classes="emptyIcon" Data="{StaticResource WsIcoInbox}"/>
-                                <TextBlock Text="No files yet" HorizontalAlignment="Center" FontWeight="SemiBold"
-                                           FontSize="{StaticResource Font.Body}" Foreground="{DynamicResource Text.Secondary}"/>
-                                <TextBlock Classes="hint" Text="Add files to share them on your network." HorizontalAlignment="Center" TextAlignment="Center"/>
-                            </StackPanel>
+                    <!-- while sharing: the link (with the PIN in it), the PIN, the certificate — and the QR -->
+                    <Grid x:Name="ShLive" helpers:Responsive.BreakWidth="500" ColumnDefinitions="*, Auto" ColumnSpacing="12" IsVisible="{Binding IsRunning}">
+                        <StackPanel Spacing="6" VerticalAlignment="Center">
+                            <Grid ColumnDefinitions="Auto, *, Auto, Auto, Auto" ColumnSpacing="6">
+                                <TextBlock Classes="liveLabel" Text="Link"/>
+                                <ComboBox x:Name="ShUrlBox" Grid.Column="1" Classes="field" ItemsSource="{Binding Addresses}" SelectedItem="{Binding SelectedShareUrl}"
+                                          HorizontalAlignment="Stretch"
+                                          ToolTip.Tip="Open it on the other device (same Wi-Fi / network). Copy, Open and the QR include the PIN, so they log in directly.">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="sys:String">
+                                            <TextBlock Classes="url" Text="{Binding}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <Button Grid.Column="2" Classes="icon" ToolTip.Tip="Copy the link (with the PIN)" Command="{Binding CopyLinkCommand}">
+                                    <Path Classes="glyph" Data="{StaticResource WsIcoCopy}"/>
+                                </Button>
+                                <Button Grid.Column="3" Classes="icon" ToolTip.Tip="Open in this device's browser" Command="{Binding OpenLinkCommand}"
+                                        IsVisible="{x:Static helpers:AppPlatform.IsDesktop}">
+                                    <Path Classes="glyph" Data="{StaticResource WsIcoOpen}"/>
+                                </Button>
+                                <Button x:Name="ShQrBtn" Grid.Column="4" Classes="icon" ToolTip.Tip="Show the QR code">
+                                    <Path Classes="glyph" Data="{StaticResource WsIcoQr}"/>
+                                    <Button.Flyout>
+                                        <Flyout Placement="BottomEdgeAlignedRight">
+                                            <StackPanel Spacing="8">
+                                                <Border CornerRadius="{StaticResource Radius.Md}" ClipToBounds="True" HorizontalAlignment="Center">
+                                                    <Image Source="{Binding QrImage}" Width="180" Height="180" RenderOptions.BitmapInterpolationMode="None"/>
+                                                </Border>
+                                                <TextBlock Text="Scan with the other device's camera" HorizontalAlignment="Center"
+                                                           FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Text.Secondary}"/>
+                                            </StackPanel>
+                                        </Flyout>
+                                    </Button.Flyout>
+                                </Button>
+                            </Grid>
+                            <Grid ColumnDefinitions="Auto, Auto, Auto, Auto, *" ColumnSpacing="6" IsVisible="{Binding ShowRunningPin}">
+                                <TextBlock Classes="liveLabel" Text="PIN"/>
+                                <SelectableTextBlock Grid.Column="1" Classes="pin" Text="{Binding PinText}" FontFamily="{StaticResource MonoFont}"
+                                                     FontSize="17" FontWeight="Bold" Foreground="{DynamicResource Accent.Text}" VerticalAlignment="Center"
+                                                     ToolTip.Tip="The page asks for it once (the link and QR carry it). Scripts: the PIN is the Basic-auth password, e.g. curl -k -u :PIN -OJ followed by a download link from the page."/>
+                                <Button Grid.Column="2" Classes="icon small" ToolTip.Tip="Copy the PIN" Command="{Binding CopyPinCommand}" Margin="4,0,0,0">
+                                    <Path Classes="glyph" Data="{StaticResource WsIcoCopy}"/>
+                                </Button>
+                                <Button Grid.Column="3" Classes="ghost" Content="New PIN" Command="{Binding NewPinCommand}" Padding="10,0"
+                                        ToolTip.Tip="A new random PIN: every browser has to enter it again"/>
+                            </Grid>
+                            <Grid x:Name="ShTls" ColumnDefinitions="Auto, Auto, Auto, *" RowDefinitions="Auto, Auto" ColumnSpacing="6">
+                                <TextBlock Classes="liveLabel" Text="TLS"/>
+                                <Path Grid.Column="1" Classes="lock" Classes.plain="{Binding !IsHttpsActive}" Data="{StaticResource WsIcoLock}"/>
+                                <TextBlock Grid.Column="2" Classes="cert" Text="{Binding CertText}" ToolTip.Tip="{Binding CertTip}" IsVisible="{Binding IsHttpsActive}"/>
+                                <TextBlock Grid.Column="2" Classes="cert" Text="Plain HTTP — not encrypted" IsVisible="{Binding !IsHttpsActive}"
+                                           ToolTip.Tip="Turn HTTPS on (when stopped) to encrypt the chat and the files"/>
+                                <TextBlock x:Name="ShTlsHint" Classes="hint" Text="· browsers warn once (own certificate)"
+                                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                           IsVisible="{Binding IsHttpsActive}" ToolTip.Tip="{Binding CertTip}"/>
+                            </Grid>
+                        </StackPanel>
+                        <!-- QR of the link (the bitmap carries its own white quiet zone); a phone shows it behind the QR button -->
+                        <Border x:Name="ShQr" Grid.Column="1" CornerRadius="{StaticResource Radius.Md}" ClipToBounds="True" VerticalAlignment="Center"
+                                BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="1"
+                                ToolTip.Tip="Scan with the other device's camera: it opens the page logged in">
+                            <Image Source="{Binding QrImage}" Width="104" Height="104" RenderOptions.BitmapInterpolationMode="None"
+                                   IsVisible="{Binding QrImage, Converter={x:Static ObjectConverters.IsNotNull}}"/>
                         </Border>
-                        <!-- files list (grows with the file count; a very long list caps here and scrolls internally) -->
-                        <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                            <ItemsControl ItemsSource="{Binding Files}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:SharedFileRow">
-                                        <Border Classes="fileRow">
-                                            <Grid ColumnDefinitions="Auto, *, Auto, Auto, Auto" ColumnSpacing="10">
-                                                <Path Grid.Column="0" Classes="fileIcon" Data="{StaticResource WsIcoFile}"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="{StaticResource Font.Body}"
-                                                           Foreground="{DynamicResource Text.Primary}"
-                                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                                <TextBlock Grid.Column="2" Text="{Binding Downloads, StringFormat='↓ {0}'}" IsVisible="{Binding HasDownloads}"
-                                                           FontSize="{StaticResource Font.Small}" FontWeight="SemiBold" Foreground="{DynamicResource Success}"
-                                                           VerticalAlignment="Center" ToolTip.Tip="Downloads of this file"/>
-                                                <TextBlock Grid.Column="3" Text="{Binding SizeText}" FontSize="{StaticResource Font.Small}"
-                                                           Foreground="{DynamicResource Text.Muted}"
-                                                           FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center"/>
-                                                <Button Grid.Column="4" Classes="rowAction" ToolTip.Tip="Remove"
-                                                        Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).RemoveFileCommand}"
-                                                        CommandParameter="{Binding}">
-                                                    <Path Classes="glyph" Data="{StaticResource WsIcoClose}"/>
-                                                </Button>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-                    </Panel>
+                    </Grid>
+
+                    <TextBlock x:Name="ShStatus" Classes="hint" Text="{Binding StatusMessage}" Classes.error="{Binding StatusIsError}"/>
+                    <TextBlock Classes="hint warn" Text="{Binding TlsNote}"
+                               IsVisible="{Binding HasTlsNote}"/>
                 </StackPanel>
             </Border>
 
-            <!-- ===== REQUEST LOG ===== -->
-            <Border Grid.Row="4" Classes="card output section">
-                <Grid RowDefinitions="Auto, *" RowSpacing="10">
-                    <TextBlock Grid.Row="0" Classes="sectionTitle" Text="Requests"/>
-                    <!-- Fills the card (at least 64px, so the page still fits the window's default 860x569).
-                         Capped at the visible height, so a long log scrolls inside the box instead of stretching the page. -->
-                    <TextBox Grid.Row="1" Classes="log" Text="{Binding Log}" IsReadOnly="True" AcceptsReturn="True"
-                             MinHeight="64" MaxHeight="{Binding $parent[ScrollViewer].Bounds.Height}"
-                             TextWrapping="NoWrap"
-                             ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
-                             PlaceholderText="Download requests show up here."/>
+            <!-- ===== chat | files | log ===== -->
+            <Border Grid.Row="1" Classes="card output">
+                <Grid x:Name="ShLower" helpers:Responsive.BreakWidth="520" RowDefinitions="Auto, *">
+                    <Grid Margin="10,8,10,6" ColumnDefinitions="*, Auto">
+                        <TabControl Classes="seg subtabs" Padding="0" SelectedIndex="{Binding SubTabIndex}" VerticalAlignment="Center">
+                            <TabItem>
+                                <TabItem.Header>
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="Chat" VerticalAlignment="Center"/>
+                                        <Border Classes="badge unread" IsVisible="{Binding HasUnread}">
+                                            <TextBlock Text="{Binding UnreadText}"/>
+                                        </Border>
+                                    </StackPanel>
+                                </TabItem.Header>
+                            </TabItem>
+                            <TabItem Header="Files"/>
+                            <TabItem Header="Log"/>
+                        </TabControl>
+                        <Button Grid.Column="1" Classes="icon small" Command="{Binding ClearChatCommand}" ToolTip.Tip="Clear the chat (here and on every page)"
+                                IsVisible="{Binding IsChatTab}" IsEnabled="{Binding HasChat}">
+                            <Path Classes="glyph" Data="{StaticResource WsIcoClear}"/>
+                        </Button>
+                        <Button Grid.Column="1" Classes="icon small" Command="{Binding ClearLogCommand}" ToolTip.Tip="Clear the log"
+                                IsVisible="{Binding IsLogTab}">
+                            <Path Classes="glyph" Data="{StaticResource WsIcoClear}"/>
+                        </Button>
+                    </Grid>
+
+                    <Panel Grid.Row="1">
+                        <!-- ===== chat ===== -->
+                        <Grid IsVisible="{Binding IsChatTab}" RowDefinitions="*, Auto">
+                            <Panel>
+                                <ItemsControl x:Name="ChatList" Classes="chat" ItemsSource="{Binding ChatItems}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ChatRow">
+                                            <StackPanel Classes="chatMsg" Classes.mine="{Binding IsMine}" Spacing="2">
+                                                <Grid ColumnDefinitions="Auto, Auto, *, Auto, Auto" ColumnSpacing="6" Margin="2,0,0,0">
+                                                    <TextBlock Classes="chatWho" Text="{Binding Header}" MaxWidth="220"/>
+                                                    <TextBlock Grid.Column="1" Classes="chatTime" Text="{Binding TimeText}"/>
+                                                    <Button Grid.Column="3" Classes="tiny" IsVisible="{Binding HasUrl}" ToolTip.Tip="Open the link"
+                                                            Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).OpenChatLinkCommand}"
+                                                            CommandParameter="{Binding}">
+                                                        <Path Classes="glyph" Data="{StaticResource WsIcoOpen}"/>
+                                                    </Button>
+                                                    <Button Grid.Column="4" Classes="tiny" IsVisible="{Binding CanCopy}" ToolTip.Tip="Copy the message"
+                                                            Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).CopyChatCommand}"
+                                                            CommandParameter="{Binding}">
+                                                        <Path Classes="glyph" Data="{StaticResource WsIcoCopy}"/>
+                                                    </Button>
+                                                </Grid>
+                                                <Border Classes="bubble">
+                                                    <Grid ColumnDefinitions="Auto, *" ColumnSpacing="8">
+                                                        <Path Classes="fileIcon" Data="{StaticResource WsIcoFile}" IsVisible="{Binding IsFile}" VerticalAlignment="Top" Margin="0,1,0,0"/>
+                                                        <SelectableTextBlock Grid.Column="1" Classes="chatText" Classes.file="{Binding IsFile}" Text="{Binding Body}" FlowDirection="{Binding TextFlow}"/>
+                                                    </Grid>
+                                                </Border>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <StackPanel Spacing="6" Margin="20" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                            IsHitTestVisible="False" IsVisible="{Binding !HasChat}">
+                                    <Path Classes="emptyIcon" Data="{StaticResource WsIcoChat}"/>
+                                    <TextBlock Text="No messages yet" HorizontalAlignment="Center" FontWeight="SemiBold"
+                                               FontSize="{StaticResource Font.Body}" Foreground="{DynamicResource Text.Secondary}"/>
+                                    <TextBlock Classes="hint" HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="260"
+                                               Text="Messages from every browser show up here."/>
+                                </StackPanel>
+                            </Panel>
+                            <Border Grid.Row="1" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0" Padding="10,8">
+                                <StackPanel Spacing="4">
+                                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="8">
+                                        <Button Classes="icon" Click="Attach_Click" IsEnabled="{Binding CanAttach}" VerticalAlignment="Bottom"
+                                                ToolTip.Tip="Share files: each shows as a download link on every page">
+                                            <Path Classes="glyph" Data="{StaticResource WsIcoPlus}"/>
+                                        </Button>
+                                        <TextBox x:Name="ChatBox" Grid.Column="1" Classes="field chatInput" Text="{Binding ChatDraft}"
+                                                 AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="Message" IsEnabled="{Binding IsRunning}"
+                                                 ToolTip.Tip="Enter sends · Shift+Enter adds a line"/>
+                                        <Button Grid.Column="2" Classes="primary" MinWidth="64" Content="Send" VerticalAlignment="Bottom"
+                                                Command="{Binding SendChatCommand}" IsEnabled="{Binding CanSendChat}"/>
+                                    </Grid>
+                                    <TextBlock Classes="hint error" Text="{Binding ChatError}" Margin="2,0,0,0"
+                                               IsVisible="{Binding ChatError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- ===== files: shared by this device / received from browsers ===== -->
+                        <Grid IsVisible="{Binding IsFilesTab}" RowDefinitions="Auto, Auto, Auto, *, Auto" Margin="10,0,10,8">
+                            <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="6" Margin="0,0,0,6">
+                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <TextBlock Classes="panelTitle" Text="SHARED"/>
+                                    <TextBlock Classes="counts" Text="{Binding Files.Count}" IsVisible="{Binding HasFiles}"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="rowBtn" Click="AddFiles_Click" ToolTip.Tip="Files every browser can download">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Path Classes="glyph" Data="{StaticResource WsIcoPlus}" Stroke="{DynamicResource Text.Primary}" Width="11" Height="11"/>
+                                        <TextBlock Text="Add files" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Grid.Column="2" Classes="icon small" Command="{Binding ClearFilesCommand}" IsEnabled="{Binding HasFiles}"
+                                        ToolTip.Tip="Stop sharing all of them">
+                                    <Path Classes="glyph" Data="{StaticResource WsIcoClear}"/>
+                                </Button>
+                            </Grid>
+                            <Panel Grid.Row="1">
+                                <Border Classes="emptyLine" IsVisible="{Binding !HasFiles}">
+                                    <TextBlock Classes="hint" Text="Nothing shared yet. Added files appear as downloads on the page."/>
+                                </Border>
+                                <ScrollViewer MaxHeight="104" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasFiles}">
+                                    <ItemsControl ItemsSource="{Binding Files}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:SharedFileRow">
+                                                <Border Classes="fileRow">
+                                                    <Grid ColumnDefinitions="Auto, *, Auto, Auto, Auto" ColumnSpacing="8">
+                                                        <Path Grid.Column="0" Classes="fileIcon" Data="{StaticResource WsIcoFile}"/>
+                                                        <TextBlock Grid.Column="1" Classes="fileName" Text="{Binding Name}" ToolTip.Tip="{Binding Name}"/>
+                                                        <TextBlock Grid.Column="2" Text="{Binding Downloads, StringFormat='↓ {0}'}" IsVisible="{Binding HasDownloads}"
+                                                                   FontSize="{StaticResource Font.Small}" FontWeight="SemiBold" Foreground="{DynamicResource Success}"
+                                                                   VerticalAlignment="Center" ToolTip.Tip="Complete downloads of this file"/>
+                                                        <TextBlock Grid.Column="3" Text="{Binding SizeText}" FontSize="{StaticResource Font.Small}"
+                                                                   Foreground="{DynamicResource Text.Muted}" FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center"/>
+                                                        <Button Grid.Column="4" Classes="rowAction" ToolTip.Tip="Stop sharing it"
+                                                                Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).RemoveFileCommand}"
+                                                                CommandParameter="{Binding}">
+                                                            <Path Classes="glyph" Data="{StaticResource WsIcoClose}"/>
+                                                        </Button>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Panel>
+
+                            <!-- RECEIVED · where they go · size cap · clear — one line on desktop, two on a phone -->
+                            <Grid x:Name="ShInboxRow" Grid.Row="2" helpers:Responsive.BreakWidth="540" ColumnDefinitions="Auto, *, Auto, Auto, Auto"
+                                  RowDefinitions="Auto, Auto" ColumnSpacing="6" Margin="0,8,0,6">
+                                <StackPanel x:Name="ShRecvTitle" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,4,0">
+                                    <TextBlock Classes="panelTitle" Text="RECEIVED"/>
+                                    <TextBlock Classes="counts" Text="{Binding ReceivedFiles.Count}" IsVisible="{Binding HasReceived}"/>
+                                </StackPanel>
+                                <Border x:Name="ShFolder" Classes="emptyLine" Padding="8,0" Margin="0" MinHeight="{DynamicResource Control.Height}"
+                                        ToolTip.Tip="{Binding InboxDisplay}">
+                                    <Grid ColumnDefinitions="Auto, *" ColumnSpacing="6">
+                                        <Path Classes="fileIcon" Data="{StaticResource WsIcoFolder}" Width="14" Height="14"/>
+                                        <TextBlock Grid.Column="1" Classes="folder" Text="{Binding InboxDisplay}"/>
+                                    </Grid>
+                                </Border>
+                                <StackPanel x:Name="ShFolderBtns" Orientation="Horizontal" Spacing="6">
+                                    <Button Classes="rowBtn" Content="Change" Click="ChangeInbox_Click" ToolTip.Tip="Pick the folder received files go to"/>
+                                    <Button Classes="rowBtn" Content="Open" Command="{Binding OpenInboxCommand}" IsVisible="{Binding CanOpenInbox}"
+                                            ToolTip.Tip="Open the folder"/>
+                                </StackPanel>
+                                <StackPanel x:Name="ShCap" Orientation="Horizontal" Spacing="6"
+                                            ToolTip.Tip="The largest file a browser may send (MB). Free space is checked too.">
+                                    <TextBlock Classes="inlineLabel" Text="Max MB"/>
+                                    <NumericUpDown Classes="field" Width="72" Value="{Binding MaxUploadMb}" Minimum="1" Maximum="1048576"
+                                                   ShowButtonSpinner="False" FormatString="0"/>
+                                </StackPanel>
+                                <Button x:Name="ShRecvClear" Grid.Column="4" Classes="icon small" Command="{Binding ClearReceivedCommand}" IsEnabled="{Binding HasReceived}"
+                                        VerticalAlignment="Center" ToolTip.Tip="Clear the list (the files stay where they are)">
+                                    <Path Classes="glyph" Data="{StaticResource WsIcoClear}"/>
+                                </Button>
+                            </Grid>
+                            <Panel Grid.Row="3">
+                                <Border Classes="emptyLine" VerticalAlignment="Top" IsVisible="{Binding !HasReceived}">
+                                    <TextBlock Classes="hint" Text="Files sent from a browser land in the folder above."/>
+                                </Border>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasReceived}">
+                                    <ItemsControl ItemsSource="{Binding ReceivedFiles}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ReceivedFileRow">
+                                                <Border Classes="fileRow">
+                                                    <Grid ColumnDefinitions="Auto, *, Auto, Auto, Auto" ColumnSpacing="8">
+                                                        <Path Grid.Column="0" Classes="fileIcon" Data="{StaticResource WsIcoFile}"/>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,2">
+                                                            <TextBlock Classes="fileName" Text="{Binding Name}" ToolTip.Tip="{Binding Name}"/>
+                                                            <TextBlock Classes="fileMeta" Classes.error="{Binding IsFailed}" Text="{Binding Detail}"/>
+                                                            <ProgressBar Classes="upload" Value="{Binding Percent}" IsVisible="{Binding IsPending}"/>
+                                                        </StackPanel>
+                                                        <Button Grid.Column="2" Classes="rowBtn" Content="Open" IsVisible="{Binding CanOpen}" Click="OpenReceived_Click"
+                                                                ToolTip.Tip="Open it with its app"/>
+                                                        <Button Grid.Column="3" Classes="rowBtn" Content="Show" IsVisible="{Binding CanShow}"
+                                                                Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).ShowReceivedCommand}"
+                                                                CommandParameter="{Binding}" ToolTip.Tip="Show it in its folder"/>
+                                                        <Button Grid.Column="4" Classes="rowBtn" Content="Save" IsVisible="{Binding CanSave}" Click="SaveReceived_Click"
+                                                                ToolTip.Tip="Save it somewhere on this device"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Panel>
+                            <TextBlock Grid.Row="4" Classes="hint error" Margin="2,4,0,0" Text="{Binding FilesError}"
+                                       IsVisible="{Binding FilesError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        </Grid>
+
+                        <!-- ===== log ===== -->
+                        <Grid IsVisible="{Binding IsLogTab}" RowDefinitions="Auto, *" Margin="10,0,10,8">
+                            <Grid x:Name="ShLogHead" helpers:Responsive.BreakWidth="460" ColumnDefinitions="*, Auto, Auto" RowDefinitions="Auto, Auto"
+                                  ColumnSpacing="6" Margin="0,0,0,6">
+                                <TextBlock x:Name="ShStats" Classes="counts" VerticalAlignment="Center">
+                                    <Run Text="{Binding ClientCount}"/><Run Text=" online · "/><Run Text="{Binding TotalConnections}"/><Run Text=" connections · ↑ "/><Run Text="{Binding BytesSentText}"/><Run Text=" · ↓ "/><Run Text="{Binding BytesReceivedText}"/>
+                                </TextBlock>
+                                <TextBlock Grid.Column="1" Classes="inlineLabel" Text="Max connections"
+                                           ToolTip.Tip="Most connections at once (a browser uses up to 6, plus its live connection)"/>
+                                <NumericUpDown Grid.Column="2" Classes="field" Width="64" Value="{Binding MaxConnections}"
+                                               Minimum="4" Maximum="512" ShowButtonSpinner="False" FormatString="0" IsEnabled="{Binding IsIdle}"
+                                               ToolTip.Tip="Most connections at once (a browser uses up to 6, plus its live connection)"/>
+                            </Grid>
+                            <TextBox Grid.Row="1" Classes="log" Text="{Binding Log}" IsReadOnly="True" AcceptsReturn="True"
+                                     TextWrapping="NoWrap" MinHeight="64"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     PlaceholderText="Logins, downloads and files received show up here."/>
+                        </Grid>
+                    </Panel>
                 </Grid>
             </Border>
-
         </Grid>
     </ScrollViewer>
 
@@ -797,7 +1035,7 @@
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*, Auto">
                         <TabControl Grid.Column="0" Classes="seg wsmode" Padding="0" SelectedIndex="{Binding ModeIndex}" VerticalAlignment="Center">
-                            <TabItem Header="Share files"/>
+                            <TabItem Header="Share &amp; chat"/>
                             <TabItem Header="Catch requests"/>
                         </TabControl>
                         <Border Grid.Column="1" Classes="badge" Classes.success="{Binding IsCatching}">

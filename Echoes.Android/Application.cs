@@ -34,7 +34,23 @@ public class MainApplication : AvaloniaAndroidApplication<global::Echoes.App>
         var os = global::Android.OS.Build.VERSION.Release;
         var api = (int)global::Android.OS.Build.VERSION.SdkInt;
         Echoes.Helpers.AppInfo.PlatformOverride = $"Android {os} (API {api})";
+        Echoes.Helpers.AppInfo.DeviceName = PhoneName();
         base.OnCreate();
+    }
+
+    // The name the user gave the phone (Settings › About phone › Device name, no permission needed), else maker + model.
+    private string PhoneName()
+    {
+        try
+        {
+            string? name = global::Android.Provider.Settings.Global.GetString(ContentResolver, "device_name");
+            if (!string.IsNullOrWhiteSpace(name)) return name.Trim();
+        }
+        catch { }
+        string maker = global::Android.OS.Build.Manufacturer ?? string.Empty;
+        string model = global::Android.OS.Build.Model ?? string.Empty;
+        string both = model.StartsWith(maker, StringComparison.OrdinalIgnoreCase) ? model : $"{maker} {model}";
+        return both.Trim();
     }
 
     protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)

@@ -1,9 +1,13 @@
 using System;
+using System.Collections.Specialized;
 using System.IO;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Echoes.Helpers;
 using Echoes.ViewModels;
 
@@ -11,19 +15,109 @@ namespace Echoes.Views;
 
 public partial class WebServerView : UserControl
 {
+    private WebServerViewModel? _vm;
+    private ScrollViewer? _chatScroll;
+    private bool _stick = true;        // follow new messages while the user is at the bottom
+    private bool _scrollQueued;
+
     public WebServerView()
     {
         InitializeComponent();
-        // interfaces come and go (VPN, Wi-Fi): the catcher lists the current ones whenever its picker opens
+        // interfaces come and go (VPN, Wi-Fi): the pickers list the current ones whenever they open
         CtBindBox.DropDownOpened += (_, _) =>
         {
             if (DataContext is WebServerViewModel { IsCatching: false } vm) vm.RebuildCatchBinds();
         };
+        ShBindBox.DropDownOpened += (_, _) => _vm?.RebuildShareBinds();
+
+        // Tunnel: see Enter before the multi-line box turns it into a newline. Desktop: Enter sends, Shift+Enter is a
+        // new line. Phone keyboards have no Shift+Enter, so there Enter stays a newline and the Send button sends.
+        ChatBox.AddHandler(KeyDownEvent, OnChatKeyDown, RoutingStrategies.Tunnel);
+
+        ChatList.TemplateApplied += (_, e) =>
+        {
+            if (_chatScroll != null) _chatScroll.ScrollChanged -= OnChatScrollChanged;
+            _chatScroll = e.NameScope.Find<ScrollViewer>("PART_Scroll");
+            if (_chatScroll != null) _chatScroll.ScrollChanged += OnChatScrollChanged;
+            if (_vm is { ChatItems.Count: > 0 }) Dispatcher.UIThread.Post(() => ScrollToBottom(3), DispatcherPriority.Background);
+        };
     }
 
-    private async void AddFiles_Click(object? sender, RoutedEventArgs e)
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+        if (_vm != null) _vm.ChatItems.CollectionChanged -= OnChatChanged;
+        _vm = DataContext as WebServerViewModel;
+        if (_vm != null) _vm.ChatItems.CollectionChanged += OnChatChanged;
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        if (_vm is null) return;
+        _vm.ViewShown = true;
+        // Android: reopen the folder picked last time (its permission was kept with the bookmark)
+        if (_vm.NeedsAndroidFolder && _vm.AndroidFolderBookmark is { Length: > 0 } bookmark)
+            _ = RestoreAndroidFolderAsync(bookmark);
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        if (_vm != null) _vm.ViewShown = false;
+    }
+
+    // ---------------- chat: follow the newest message ----------------
+
+    private void OnChatScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        // only a scroll by the user (offset moved) decides whether to keep following; growth alone doesn't
+        if (_chatScroll != null && Math.Abs(e.OffsetDelta.Y) > 0.01) _stick = AtBottom(_chatScroll);
+    }
+
+    private static bool AtBottom(ScrollViewer sv) => sv.Offset.Y >= sv.Extent.Height - sv.Viewport.Height - 24;
+
+    private void OnChatChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.Action == NotifyCollectionChangedAction.Reset) _stick = true;
+        if (!_stick || _scrollQueued) return;
+        _scrollQueued = true;
+        Dispatcher.UIThread.Post(() => { _scrollQueued = false; ScrollToBottom(3); }, DispatcherPriority.Background);
+    }
+
+    // the virtualizing panel estimates the extent: a second pass lands exactly on the end
+    private void ScrollToBottom(int attempts)
+    {
+        if (_chatScroll is null) return;
+        _chatScroll.ScrollToEnd();
+        _stick = true;
+        if (attempts > 1)
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (_chatScroll != null && _stick && !AtBottom(_chatScroll)) ScrollToBottom(attempts - 1);
+            }, DispatcherPriority.Background);
+    }
+
+    private void OnChatKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (_vm is null || e.Key != Key.Enter) return;
+        bool send = e.KeyModifiers == KeyModifiers.Control || (!AppPlatform.IsMobile && e.KeyModifiers == KeyModifiers.None);
+        if (!send) return;
+        e.Handled = true;
+        if (_vm.SendChatCommand.CanExecute(null)) _vm.SendChatCommand.Execute(null);
+    }
+
+    // ---------------- files this device shares ----------------
+
+    private async void AddFiles_Click(object? sender, RoutedEventArgs e) => await PickAndShareAsync(postToChat: false);
+
+    // The chat's "+": shared files are posted in the chat as download links.
+    private async void Attach_Click(object? sender, RoutedEventArgs e) => await PickAndShareAsync(postToChat: true);
+
+    private async Task PickAndShareAsync(bool postToChat)
     {
         if (DataContext is not WebServerViewModel vm) return;
+        if (!postToChat) vm.FilesError = null;
         var top = TopLevel.GetTopLevel(this);
         if (top is null) return;
 
@@ -31,7 +125,7 @@ public partial class WebServerView : UserControl
         {
             var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
-                Title = "Add files to share",
+                Title = postToChat ? "Send files in the chat" : "Add files to share",
                 AllowMultiple = true,
             });
 
@@ -88,9 +182,65 @@ public partial class WebServerView : UserControl
                     open = () => file.OpenReadAsync();
                 }
 
-                vm.AddSharedFile(name, size, open, mtime);
+                var item = vm.AddSharedFile(name, size, open, mtime);
+                if (postToChat) vm.ShareInChat(item);
             }
         }
-        catch (Exception ex) { vm.StatusMessage = "Add failed: " + ex.Message; }
+        catch (Exception ex)
+        {
+            string why = "Adding files failed: " + ex.Message;
+            if (postToChat) vm.ChatError = why; else vm.FilesError = why;
+        }
+    }
+
+    // ---------------- files received ----------------
+
+    private async void ChangeInbox_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_vm is null || TopLevel.GetTopLevel(this) is not { } top) return;
+        _vm.FilesError = null;
+        try
+        {
+            var picked = await top.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "Folder for received files",
+                AllowMultiple = false,
+            });
+            if (picked.Count == 0) return;
+            var folder = picked[0];
+            if (OperatingSystem.IsAndroid())
+            {
+                string? bookmark = null;
+                try { bookmark = await folder.SaveBookmarkAsync(); } catch { }
+                _vm.SetAndroidFolder(folder, bookmark);
+            }
+            else if (folder.TryGetLocalPath() is { Length: > 0 } path) _vm.SetInboxFolder(path);
+        }
+        catch (Exception ex) { _vm.FilesError = "Picking the folder failed: " + ex.Message; }
+    }
+
+    private async Task RestoreAndroidFolderAsync(string bookmark)
+    {
+        if (_vm is null || TopLevel.GetTopLevel(this) is not { } top) return;
+        try
+        {
+            if (await top.StorageProvider.OpenFolderBookmarkAsync(bookmark) is { } folder && _vm.NeedsAndroidFolder)
+                _vm.SetAndroidFolder(folder, null);
+        }
+        catch { /* the permission is gone: received files stay in the app (Save) until a folder is picked again */ }
+    }
+
+    private async void OpenReceived_Click(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is not ReceivedFileRow { CanOpen: true, Path: { } path }) return;
+        if (TopLevel.GetTopLevel(this)?.Launcher is not { } launcher || !File.Exists(path)) return;
+        try { await launcher.LaunchFileInfoAsync(new FileInfo(path)); } catch { }
+    }
+
+    private async void SaveReceived_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_vm is null || (sender as Control)?.DataContext is not ReceivedFileRow row) return;
+        if (TopLevel.GetTopLevel(this) is not { } top) return;
+        await _vm.SaveReceivedAsync(row, top.StorageProvider);
     }
 }

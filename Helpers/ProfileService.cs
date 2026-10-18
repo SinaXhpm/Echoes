@@ -212,14 +212,18 @@ public sealed class ProfileService
         { "ssh.inEnabled", "ssh.outEnabled", "curl.useProxy", "curl.skipSsl", "ip.useProxy", "checkhost.useProxy", "cf.useProxy",
           "tg.useProxy", "monitor.tg.useProxy", "monitor.tg.enabled",
           // a backup's monitors must not start polling (at every launch / phone boot) before the user has looked at them
-          "monitor.autoStart", "monitor.bootStart" };
+          "monitor.autoStart", "monitor.bootStart",
+          // the Web Server hub without its PIN / over plain HTTP: "on" means less safe
+          "webserver.noPin", "webserver.plainHttp" };
 
     // Switches whose ABSENCE means "on when an address is saved" (the Telegram tool, before its switch existed): a backup
     // that leaves the switch out but names a proxy gets the switch written as off.
     private static readonly (string Toggle, string Address)[] ImplicitToggles = { ("tg.useProxy", "tg.proxy") };
 
     // Routing with no switch at all (used whenever it is set): not taken over from a backup.
-    private static readonly string[] ClearedOnImport = { "socket.wsProxy" };
+    // (the Web Server hub's PIN and certificate key too: a backup must not bring ones someone else knows; this install
+    // makes new ones by itself)
+    private static readonly string[] ClearedOnImport = { "socket.wsProxy", "webserver.pin", "webserver.cert" };
 
     private static bool IsRiskyToggle(string key)
         => Array.IndexOf(RiskyToggles, key) >= 0

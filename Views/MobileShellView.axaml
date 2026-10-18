@@ -280,7 +280,7 @@
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="WEB SERVER" Title="Web Server"
-										 Subtitle="Share files or catch webhooks" AutomationProperties.Name="Web Server">
+										 Subtitle="Share files and chat, or catch webhooks" AutomationProperties.Name="Web Server">
 							<StackPanel Orientation="Horizontal" Spacing="14">
 								<Path Classes="ico" Data="{StaticResource IcoWebServer}"/>
 								<TextBlock Text="Web Server" VerticalAlignment="Center"/>

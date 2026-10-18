@@ -18,6 +18,13 @@ public static class AppInfo
     /// </summary>
     public static string? PlatformOverride { get; set; }
 
+    /// <summary>
+    /// What this device is called where others see it (the Web Server hub's page and chat): set by the Android head from
+    /// the phone's own name ("realme 12 Pro+"), since .NET only reports "localhost" there. Null elsewhere: the machine
+    /// name is used.
+    /// </summary>
+    public static string? DeviceName { get; set; }
+
     private static string? _platform, _runtime, _ui;
 
     public static string Platform => _platform ??= $"{PlatformOverride ?? DescribeOs()} · {DescribeArch()}";

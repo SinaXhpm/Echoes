@@ -82,7 +82,7 @@ Echoes shows a small notice in the sidebar when a new version is out. The **Abou
 | [Telegram Bot](#telegram-bot-api-tester) | Calls any Bot API method and shows the raw reply | curl, Postman |
 | [SSH](#ssh-client) | SSH terminal, SFTP files, port forwarding and server health | PuTTY, WinSCP, ssh |
 | [Socket](#tcp-udp-and-websocket-tool) | Raw TCP / UDP client and server, and a WebSocket client | netcat (nc), telnet, wscat |
-| [Web Server](#file-sharing-web-server-and-request-catcher) | Shares files on your network, or catches webhook requests | python -m http.server, webhook.site |
+| [Web Server](#file-sharing-web-server-and-request-catcher) | Chat and swap files with any browser on your network, or catch webhook requests | python -m http.server, Snapdrop, webhook.site |
 | [Proxy](#socks5-and-http-proxy-server-and-proxy-checker) | SOCKS5 + HTTP proxy server, and a checker for proxy lists | 3proxy, microsocks, proxy checkers |
 | [String Lab](#string-lab) | Encoding, hashes, JWT, JSON / YAML, regex, subnets, cron and more | CyberChef, jwt.io |
 | [Notes](#encrypted-notes) | Notes locked with a master password | encrypted notepad |
@@ -257,11 +257,12 @@ A netcat-style tool for raw TCP and UDP, plus a WebSocket client.
 
 ### File sharing web server and request catcher
 
-Share files with any phone or computer on your network. The other side only needs a web browser.
+Chat and swap files with any phone or computer on your network. The other side only needs a web browser, even when the two systems can't reach each other any other way (no remote desktop, no shared folder).
 
-- Start sharing in one click; share links with a QR code.
-- Choose the network interface and port, limit connections, and add a password if you want.
-- Live stats (active connections, downloads, bytes sent, unique clients), per-file counters and a request log.
+- **Share & chat:** one link or QR code opens a page that works in every browser, phones included: a live chat with copy buttons and clickable links, sending files to this device (drag & drop, paste, resumed after a dropped connection), and downloads of the files you share. Files you share also appear in the chat.
+- **HTTPS by default** with this device's own certificate (the browser warns once; compare the fingerprint shown in Echoes), on the same port that redirects plain HTTP. A 6-digit **PIN** protects the page, and the QR code carries it, so scanning logs straight in.
+- Received files land in Downloads\Echoes (or a folder you pick; on Android one you choose), are never overwritten, are marked as downloaded on Windows, and respect a size cap and the free disk space.
+- Choose the network interface and port, limit connections, and see live stats and a request log. Scripts can download with the PIN as the password (`curl -k -u :PIN -OJ <link>`).
 - **Catch requests (webhook tester):** a local endpoint that lists every request it receives (method, path, headers, query, body as pretty JSON, form fields or hex) with "Copy as curl", a reply you choose (status, body, delay), automatic CORS, and a WebSocket echo endpoint.
 - Built in, no extra software: works on desktop and Android.
 
@@ -366,7 +367,7 @@ In the Cloudflare tool, turn on "Keep updated with my IP" for an A or AAAA recor
 In DNS, type a resolver such as `https://1.1.1.1/dns-query` or `tls://1.1.1.1`, or use Compare to test many resolvers at once.
 
 **How do I share files between my phone and PC on the same Wi-Fi?**
-Add files in Web Server and press Start sharing, then scan the QR code with the other device. It only needs a browser.
+Press Start sharing in Web Server and scan the QR code with the other device. It opens a chat page in the browser where you can send text and files both ways; add files in Echoes to offer them for download.
 
 **Is Echoes a replacement for nmap, Postman, PuTTY or Wireshark?**
 It covers the everyday tasks of nmap, curl / Postman, PuTTY, WinSCP and netcat in one app. For deep, specialized work the dedicated tools still go further, and Echoes doesn't capture packets the way Wireshark does.

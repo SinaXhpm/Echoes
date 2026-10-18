@@ -345,7 +345,7 @@
 				</StackPanel>
 			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
 		<ctl:NavTabItem Classes="navtab" Tag="WEB SERVER" Title="Web Server"
-						Subtitle="Share files or catch webhooks"
+						Subtitle="Share files and chat, or catch webhooks"
 						AutomationProperties.Name="Web Server">
 			<ctl:NavTabItem.Header>
 				<StackPanel Orientation="Horizontal" Spacing="10">

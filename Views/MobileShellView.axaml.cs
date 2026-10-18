@@ -1,4 +1,5 @@
 using System;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Echoes.Helpers;
@@ -39,18 +40,46 @@ public partial class MobileShellView : UserControl
         ActualThemeVariantChanged += (_, _) => ApplySystemBars();
         AttachedToVisualTree += (_, _) =>
         {
-            if (_top is not null) _top.BackRequested -= OnBackRequested;
+            Unhook();
             _top = TopLevel.GetTopLevel(this);
-            if (_top is not null) _top.BackRequested += OnBackRequested;
+            if (_top is null) return;
+            _top.BackRequested += OnBackRequested;
+            _pane = _top.InputPane;
+            if (_pane is not null) _pane.StateChanged += OnInputPaneChanged;
         };
-        DetachedFromVisualTree += (_, _) =>
-        {
-            if (_top is not null) _top.BackRequested -= OnBackRequested;
-            _top = null;
-        };
+        DetachedFromVisualTree += (_, _) => Unhook();
     }
 
     private TopLevel? _top;
+    private Avalonia.Controls.Platform.IInputPane? _pane;
+    private Thickness? _pagesMargin;   // the page area's own margin, before any room was made for the keyboard
+
+    private void Unhook()
+    {
+        if (_top is not null) _top.BackRequested -= OnBackRequested;
+        if (_pane is not null) _pane.StateChanged -= OnInputPaneChanged;
+        _top = null;
+        _pane = null;
+    }
+
+    // The on-screen keyboard is drawn OVER the app: a box in the lower half (a chat's message box, a form's last field)
+    // ended up behind it, typed into blind. While it is open, the page area gives up the height the keyboard covers, so
+    // the page's scroller can bring the focused box into view above it; closed, the margin is the page's own again.
+    private void OnInputPaneChanged(object? sender, Avalonia.Controls.Platform.InputPaneStateEventArgs e)
+    {
+        if (Pages is null || _top is null) return;
+        _pagesMargin ??= Pages.Margin;
+        var m = _pagesMargin.Value;
+        double covered = 0;
+        if (e.NewState == Avalonia.Controls.Platform.InputPaneState.Open
+            && this.TranslatePoint(new Point(0, Bounds.Height), _top) is { } bottom)
+            covered = Math.Clamp(bottom.Y - e.EndRect.Top, 0, Bounds.Height * 0.8);   // the keyboard's part of this shell
+        Pages.Margin = new Thickness(m.Left, m.Top, m.Right, m.Bottom + covered);
+        if (covered > 0)
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => (_top?.FocusManager?.GetFocusedElement() as Control)?.BringIntoView(),
+                Avalonia.Threading.DispatcherPriority.Background);
+    }
 
     // Android back with the drawer open closes the drawer instead of leaving the app (the About box handles its own).
     private void OnBackRequested(object? sender, RoutedEventArgs e)
