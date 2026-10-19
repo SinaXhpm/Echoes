@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Echoes needs no capability: its network access is plain sockets and HTTP(S), which iOS allows an app by default.
+     Keep this empty: every entitlement listed here must also be enabled on the App ID (developer.apple.com > Identifiers)
+     or signing fails. -->
+<plist version="1.0">
+<dict/>
+</plist>

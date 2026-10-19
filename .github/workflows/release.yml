@@ -88,31 +88,34 @@ jobs:
         find . -name "*.rpm" -exec mv {} . \;
         rm -f /tmp/appimagetool
 
+    # macOS signing is automatic and optional. With the Apple secrets below set, the app and the .dmg are signed with the
+    # Developer ID certificate, notarized by Apple and stapled, so the download opens with no warning. Without them
+    # (a fork, or the secrets not added yet) the build is signed ad hoc as before. Secrets (Settings > Secrets > Actions):
+    #   APPLE_CERT_P12_BASE64   the Developer ID Application certificate + private key (.p12), base64
+    #   APPLE_CERT_PASSWORD     the .p12 password
+    #   APPLE_API_KEY_P8        content of the App Store Connect API key file (AuthKey_XXXX.p8)
+    #   APPLE_API_KEY_ID        its Key ID           APPLE_API_ISSUER   the Issuer ID shown above the keys list
+    # The certificate goes into a temporary keychain that is deleted at the end of the job.
+    - name: Import Apple signing certificate
+      if: matrix.os == 'macos-latest'
+      env:
+        APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+        APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+      run: bash packaging/macos/import-certificate.sh
+
     - name: Package macOS
       if: matrix.os == 'macos-latest'
+      env:
+        APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+        APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      run: bash packaging/macos/package.sh "${{ matrix.rid }}" "${{ steps.get_version.outputs.VERSION }}"
+
+    - name: Remove the signing keychain
+      if: always() && matrix.os == 'macos-latest'
       run: |
-        brew install create-dmg
-        mkdir -p "dist/Echoes.app/Contents/MacOS"
-        mkdir -p "dist/Echoes.app/Contents/Resources"
-        
-        cp ./publish/Echoes "dist/Echoes.app/Contents/MacOS/"
-        cp ./publish/*.dylib "dist/Echoes.app/Contents/MacOS/" 2>/dev/null || true
-        
-        chmod +x "dist/Echoes.app/Contents/MacOS/Echoes"
-        cp Assets/logo.icns "dist/Echoes.app/Contents/Resources/icon.icns"
-        
-        printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Echoes</string><key>CFBundleIconFile</key><string>icon.icns</string><key>CFBundleIdentifier</key><string>com.echoes.app</string><key>CFBundleName</key><string>Echoes</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>${{ steps.get_version.outputs.VERSION }}</string><key>CFBundleVersion</key><string>${{ steps.get_version.outputs.VERSION }}</string><key>LSMinimumSystemVersion</key><string>12.0</string><key>NSHighResolutionCapable</key><true/><key>NSLocalNetworkUsageDescription</key><string>Echoes reaches devices on your local network when you scan, ping or share files with them.</string></dict></plist>' > "dist/Echoes.app/Contents/Info.plist"
-        
-        printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>com.apple.security.network.client</key><true/><key>com.apple.security.network.server</key><true/><key>com.apple.security.cs.allow-jit</key><true/><key>com.apple.security.cs.disable-library-validation</key><true/></dict></plist>' > entitlements.plist
-        
-        codesign --force --options runtime --entitlements entitlements.plist --deep --sign - "dist/Echoes.app"
-
-        mkdir -p dmg_prepare
-        cp -R "dist/Echoes.app" dmg_prepare/
-        ln -s /Applications dmg_prepare/Applications
-
-        hdiutil create -volname "Echoes Installer" -srcfolder dmg_prepare -ov -format UDZO "Echoes-${{ matrix.rid }}.dmg"
-
+        if [ -n "${SIGN_KEYCHAIN:-}" ]; then security delete-keychain "$SIGN_KEYCHAIN" || true; fi
+        rm -f "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/DeveloperIDG2CA.cer"
     - name: Upload Artifacts
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:

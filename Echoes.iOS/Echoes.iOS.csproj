@@ -1,0 +1,83 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The iOS / iPadOS head: the same Avalonia UI and view-models as the Android head (single-view lifetime, the touch shell).
+       STATUS: scaffold. It is built only by .github/workflows/ios.yml (a macOS runner with the ios workload); it can't be
+       built on Windows, and it is not in Echoes.sln. See docs/apple/README.md for what a working iOS app still needs. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Avalonia.iOS 12.x ships only for net10.0-ios (like Android); the desktop head stays net8.0. -->
+    <TargetFramework>net10.0-ios</TargetFramework>
+    <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Keep the assembly name "Echoes" so existing avares://Echoes/... URIs resolve. -->
+    <AssemblyName>Echoes</AssemblyName>
+    <RootNamespace>Echoes.iOS</RootNamespace>
+
+    <!-- The bundle id is registered at developer.apple.com (Identifiers); it is the Android application id too. -->
+    <ApplicationId>com.sinaxhpm.echoes</ApplicationId>
+    <ApplicationTitle>Echoes</ApplicationTitle>
+    <!-- CFBundleShortVersionString / CFBundleVersion. CI sets both: the display version from the tag, the build number
+         from the run number (App Store Connect needs every uploaded build of a version to have a higher build number). -->
+    <ApplicationDisplayVersion>0.4.2</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <!-- the assembly version follows it (About box, User-Agent) -->
+    <Version>$(ApplicationDisplayVersion)</Version>
+
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <!-- Device builds are signed with a distribution certificate + provisioning profile that CI passes on the command line
+         (-p:CodesignKey / -p:CodesignProvision); the simulator needs no signing. -->
+    <ProvisioningType>manual</ProvisioningType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.iOS" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Controls.WebView" Version="12.1.1" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="DnsClient" Version="1.8.0" />
+    <PackageReference Include="SSH.NET" Version="2026.0.0" />
+  </ItemGroup>
+
+  <!-- SSH.NET and DnsClient register ciphers / record types by reflection: keep them whole when the linker trims. -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="Renci.SshNet" />
+    <TrimmerRootAssembly Include="DnsClient" />
+  </ItemGroup>
+
+  <!-- The iOS SDK's implicit global usings (Foundation, UIKit, CoreGraphics, ObjCRuntime) can collide with Avalonia names in
+       the shared sources, like the Android ones do. This head's own files import the Apple namespaces they use explicitly. -->
+  <ItemGroup>
+    <Using Remove="Foundation" />
+    <Using Remove="UIKit" />
+    <Using Remove="CoreGraphics" />
+    <Using Remove="ObjCRuntime" />
+  </ItemGroup>
+
+  <!-- App icon: a 1024 px opaque PNG in an asset catalog (Info.plist: XSAppIconAssets). -->
+  <ItemGroup>
+    <ImageAsset Remove="Assets.xcassets\**" />
+    <ImageAsset Include="Assets.xcassets\**\*" />
+  </ItemGroup>
+
+  <!-- Shared source from the desktop project (Program.cs / app.manifest / Desktop\ are desktop-only and excluded). -->
+  <ItemGroup>
+    <Compile Include="..\App.axaml.cs" Link="App.axaml.cs" />
+    <Compile Include="..\ViewLocator.cs" Link="ViewLocator.cs" />
+    <Compile Include="..\ViewModels\**\*.cs" Link="ViewModels\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Views\**\*.cs" Link="Views\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Helpers\**\*.cs" Link="Helpers\%(RecursiveDir)%(Filename)%(Extension)" />
+
+    <AvaloniaXaml Include="..\App.axaml" Link="App.axaml" />
+    <AvaloniaXaml Include="..\Views\**\*.axaml" Link="Views\%(RecursiveDir)%(Filename)%(Extension)" />
+    <AvaloniaXaml Include="..\Styles\**\*.axaml" Link="Styles\%(RecursiveDir)%(Filename)%(Extension)" />
+
+    <AvaloniaResource Include="..\Assets\**" Link="Assets\%(RecursiveDir)%(Filename)%(Extension)" />
+    <AvaloniaResource Remove="..\Assets\echoes.ico" />
+    <!-- Same as the other heads: build-time / unused assets are not embedded. -->
+    <AvaloniaResource Remove="..\Assets\logo.png;..\Assets\logo.icns;..\Assets\echoes.mp4;..\Assets\avalonia-logo.ico" />
+  </ItemGroup>
+</Project>

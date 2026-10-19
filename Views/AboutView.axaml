@@ -43,8 +43,8 @@
 
 				<Border Classes="divider"/>
 
-				<!-- updates -->
-				<StackPanel Spacing="8">
+				<!-- updates (left out of an app store's build: the store updates the app) -->
+				<StackPanel Spacing="8" IsVisible="{Binding ShowUpdates}">
 					<Grid ColumnDefinitions="Auto,Auto,*,Auto">
 						<TextBlock Text="Updates" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource Text.Primary}"/>
 						<Border Grid.Column="1" Classes="badge" Margin="8,0,0,0"
@@ -63,7 +63,7 @@
 							Content="{Binding LatestVersion, StringFormat='Download v{0}'}"/>
 				</StackPanel>
 
-				<Border Classes="divider"/>
+				<Border Classes="divider" IsVisible="{Binding ShowUpdates}"/>
 
 				<!-- details -->
 				<Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6">
@@ -87,7 +87,7 @@
 				<UniformGrid Columns="2" ColumnSpacing="8" RowSpacing="8">
 					<Button Classes="secondary" HorizontalAlignment="Stretch" Content="GitHub"
 							Command="{Binding OpenGitHubCommand}" ToolTip.Tip="Source code and README"/>
-					<Button Classes="secondary" HorizontalAlignment="Stretch" Content="Releases"
+					<Button Classes="secondary" HorizontalAlignment="Stretch" Content="Releases" IsVisible="{Binding ShowUpdates}"
 							Command="{Binding OpenReleasesCommand}" ToolTip.Tip="Downloads and changelog"/>
 					<Button Classes="secondary" HorizontalAlignment="Stretch" Content="Report a bug"
 							Command="{Binding OpenIssuesCommand}" ToolTip.Tip="Open a GitHub issue (Copy info first)"/>
@@ -98,6 +98,10 @@
 				<Button Classes="ghost" HorizontalAlignment="Center" BorderThickness="0" Command="{Binding OpenLicenseCommand}"
 						ToolTip.Tip="Free and open source (opens the license)">
 					<TextBlock Classes="muted" Text="MIT License · © 2026 Echoes contributors"/>
+				</Button>
+				<Button Classes="ghost" HorizontalAlignment="Center" BorderThickness="0" Margin="0,-6,0,0" Command="{Binding OpenPrivacyCommand}"
+						ToolTip.Tip="No account, no telemetry: what Echoes does with your data">
+					<TextBlock Classes="muted" Text="Privacy policy"/>
 				</Button>
 			</StackPanel>
 		</ScrollViewer>

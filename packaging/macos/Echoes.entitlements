@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Entitlements of the Developer ID build (the .dmg on GitHub), signed with the hardened runtime.
+     This is NOT the Mac App Store set: that one needs com.apple.security.app-sandbox, and the sandbox would cut features
+     (see docs/apple/README.md). -->
+<plist version="1.0">
+<dict>
+	<!-- outgoing and incoming connections (ping, scans, the web server, the proxy, the socket tool) -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<!-- kept from the first signed builds: the Avalonia / Skia native libraries are loaded at run time -->
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>

@@ -53,7 +53,9 @@ public sealed class AutoStartTarget
     /// <summary>macOS: the user's LaunchAgents folder.</summary>
     public string? MacLaunchAgentsDir { get; init; }
     public string MacLabel { get; init; } = "com.echoes.app.autostart";
-    public string MacBundleId { get; init; } = "com.echoes.app";
+    // The app bundle's CFBundleIdentifier (packaging/macos/Info.plist): macOS lists the login entry under this app's name.
+    // The Label stays as it was so an entry made by an earlier build is still the same entry.
+    public string MacBundleId { get; init; } = "com.sinaxhpm.echoes";
 
     internal string LinuxFile => Path.Combine(LinuxAutostartDir ?? string.Empty, LinuxFileName);
     internal string MacFile => Path.Combine(MacLaunchAgentsDir ?? string.Empty, MacLabel + ".plist");

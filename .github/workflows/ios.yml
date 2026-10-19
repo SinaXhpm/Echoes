@@ -1,0 +1,53 @@
+name: iOS (test build)
+
+# Experimental iOS head of the shared Avalonia UI (Echoes.iOS). It builds the app for the iOS SIMULATOR: no signing, no
+# Apple account, nothing published. It checks that the project compiles on the macOS runner and that the app bundle is
+# complete (icon catalog, Info.plist keys). A build for real devices and the upload to TestFlight / the App Store need the
+# Apple distribution secrets and are not part of this workflow yet (docs/apple/README.md).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master, main, apple-prep ]
+    paths:
+      - 'Echoes.iOS/**'
+      - '.github/workflows/ios.yml'
+
+# Least privilege: this job only reads the repo.
+permissions:
+  contents: read
+
+jobs:
+  ios-simulator:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+      with:
+        dotnet-version: 10.0.x
+
+    # The .NET for iOS workload wants a specific recent Xcode; the runner has several side by side.
+    - name: Use the newest installed Xcode
+      run: |
+        newest="$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)"
+        if [ -n "$newest" ]; then sudo xcode-select -s "$newest"; fi
+        xcodebuild -version
+
+    - name: Install the iOS workload
+      run: dotnet workload install ios
+
+    - name: Build for the iOS simulator
+      run: dotnet build Echoes.iOS/Echoes.iOS.csproj -c Debug -f net10.0-ios -r iossimulator-arm64
+
+    - name: Check the app bundle
+      run: |
+        app="$(find Echoes.iOS/bin -name '*.app' -type d | head -n 1)"
+        if [ -z "$app" ]; then echo "::error::No .app was produced"; exit 1; fi
+        echo "Bundle: $app"
+        ls "$app" | head -40
+        plutil -p "$app/Info.plist" | grep -E 'CFBundleIdentifier|CFBundleShortVersionString|CFBundleVersion|MinimumOSVersion|NSLocalNetworkUsageDescription|CFBundleIcons|CFBundlePrimaryIcon'
+        # the icon catalog must have been compiled (an App Store upload without an app icon is rejected)
+        if [ ! -f "$app/Assets.car" ]; then echo "::error::Assets.car is missing: the app icon catalog was not compiled"; exit 1; fi
+        echo "Assets.car present"

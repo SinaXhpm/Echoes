@@ -20,6 +20,12 @@ mono_crash.*
 *.mp4
 *.mov
 
+# Apple signing material (private key, CSR, certificates, .p12): local only, never committed
+.signing/
+*.p12
+*.p8
+*.certSigningRequest
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/

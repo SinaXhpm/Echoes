@@ -111,6 +111,8 @@ public partial class MainViewModel : ObservableObject
     // quiet) and is written to the crash log. Runs at startup and from the About box; a second call while one runs is a no-op.
     public async Task CheckForUpdatesAsync()
     {
+        // An app store updates the app: no check, and nothing in the UI that points to a release elsewhere.
+        if (AppInfo.IsStoreBuild) return;
         if (UpdateState == UpdateCheckState.Checking) return;
         UpdateState = UpdateCheckState.Checking;
         UpdateDetail = "Asking GitHub for the latest release…";

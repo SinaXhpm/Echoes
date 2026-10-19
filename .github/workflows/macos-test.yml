@@ -1,0 +1,71 @@
+name: macOS signing (test build)
+
+# A private dry run of the macOS release: it builds the arm64 app the way a release does, signs it with the Developer ID
+# certificate, has Apple notarize it, staples the ticket and keeps the .dmg as a workflow artifact for 3 days. No release,
+# tag or asset is created, so nothing reaches the Releases page or the in-app update check.
+# It runs only on the branch named below and by hand; delete the branch trigger when the release pipeline is proven.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ apple-prep ]
+
+# Least privilege: this job only reads the repo and uploads a workflow artifact.
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+      with:
+        dotnet-version: 10.0.x
+
+    # a test version: numeric (it goes into Info.plist) and different on every run
+    - name: Test version
+      id: ver
+      run: echo "VERSION=0.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+    # the same command as release.yml
+    - name: Publish
+      run: dotnet publish Echoes.csproj -c Release -r osx-arm64 -p:Version=${{ steps.ver.outputs.VERSION }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=copyused -p:OptimizationPreference=Size -p:StackTraceSupport=true -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
+
+    - name: Import Apple signing certificate
+      env:
+        APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+        APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+      run: bash packaging/macos/import-certificate.sh
+
+    - name: Package macOS
+      env:
+        APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+        APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      run: bash packaging/macos/package.sh osx-arm64 "${{ steps.ver.outputs.VERSION }}"
+
+    # What the downloaded file will say on a Mac, checked here too (informational: the runner may not assess)
+    - name: Show the signature
+      run: |
+        hdiutil attach Echoes-osx-arm64.dmg -nobrowse -mountpoint "$RUNNER_TEMP/mnt" > /dev/null
+        codesign -dv --verbose=2 "$RUNNER_TEMP/mnt/Echoes.app" 2>&1 | grep -E 'Identifier|Authority|TeamIdentifier|Timestamp|flags|Runtime' || true
+        xcrun stapler validate "$RUNNER_TEMP/mnt/Echoes.app" || true
+        spctl --assess --type exec --verbose=2 "$RUNNER_TEMP/mnt/Echoes.app" || true
+        hdiutil detach "$RUNNER_TEMP/mnt" > /dev/null || true
+
+    - name: Upload the .dmg (kept 3 days)
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: Echoes-osx-arm64-test
+        path: Echoes-osx-arm64.dmg
+        retention-days: 3
+        if-no-files-found: error
+
+    - name: Remove the signing keychain
+      if: always()
+      run: |
+        if [ -n "${SIGN_KEYCHAIN:-}" ]; then security delete-keychain "$SIGN_KEYCHAIN" || true; fi
+        rm -f "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/DeveloperIDG2CA.cer"

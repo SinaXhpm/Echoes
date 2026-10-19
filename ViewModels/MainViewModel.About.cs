@@ -43,6 +43,9 @@ public partial class MainViewModel
         _ => "Not checked",
     };
 
+    /// <summary>False in an app store's build (<see cref="AppInfo.IsStoreBuild"/>): the update section and the Releases link are hidden.</summary>
+    public bool ShowUpdates => !AppInfo.IsStoreBuild;
+
     public string PlatformText => AppInfo.Platform;
     public string RuntimeText => AppInfo.Runtime;
     public string UiText => AppInfo.Ui;
@@ -70,6 +73,9 @@ public partial class MainViewModel
 
     [RelayCommand]
     private void OpenLicense() => OpenUrl(RepoUrl + "/blob/master/LICENSE");
+
+    [RelayCommand]
+    private void OpenPrivacy() => OpenUrl(RepoUrl + "/blob/master/PRIVACY.md");
 
     [RelayCommand]
     private void OpenDataFolderInShell() => LinkHelper.OpenFolder(DataFolder);

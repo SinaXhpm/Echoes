@@ -61,3 +61,8 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# Shell scripts keep LF endings: a CRLF script fails on macOS / Linux ("bash: No such file").
+###############################################################################
+*.sh text eol=lf

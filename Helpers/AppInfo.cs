@@ -25,6 +25,18 @@ public static class AppInfo
     /// </summary>
     public static string? DeviceName { get; set; }
 
+    /// <summary>
+    /// True in a build that an app store distributes: the iOS head, and a Mac App Store build compiled with the STORE
+    /// constant. The store updates the app itself and its rules don't allow an app to look for or point to a copy
+    /// downloaded elsewhere, so the update check and the "Releases" link are left out there.
+    /// </summary>
+    public static bool IsStoreBuild =>
+#if STORE
+        true;
+#else
+        OperatingSystem.IsIOS();
+#endif
+
     private static string? _platform, _runtime, _ui;
 
     public static string Platform => _platform ??= $"{PlatformOverride ?? DescribeOs()} · {DescribeArch()}";
@@ -44,6 +56,7 @@ public static class AppInfo
         if (OperatingSystem.IsWindows()) return $"{(v.Build >= 22000 ? "Windows 11" : "Windows 10")} (build {v.Build})";
         if (OperatingSystem.IsMacOS()) return $"macOS {v.Major}.{v.Minor}";
         if (OperatingSystem.IsAndroid()) return "Android";
+        if (OperatingSystem.IsIOS()) return $"iOS {v.Major}.{v.Minor}";
         if (OperatingSystem.IsLinux()) return "Linux";
         return RuntimeInformation.OSDescription;
     }

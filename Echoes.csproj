@@ -6,8 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 
-    <!-- The Android head lives in a subfolder with its own project; keep it out of the desktop build. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);Echoes.Android\**</DefaultItemExcludes>
+    <!-- The Android and iOS heads live in subfolders with their own projects; keep them out of the desktop build. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);Echoes.Android\**;Echoes.iOS\**</DefaultItemExcludes>
 
     <Version>0.4.2</Version>
     <Description>Small utilities for network, API, and string tasks; throwing packets from a distant time, just to see what comes willowing back across the sand.</Description>
@@ -15,6 +15,11 @@
     <ApplicationIcon>Assets\echoes.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     
+  </PropertyGroup>
+
+  <!-- A Mac App Store build (docs/apple/README.md): -p:StoreBuild=true compiles with STORE, which AppInfo.IsStoreBuild reads. -->
+  <PropertyGroup Condition="'$(StoreBuild)' == 'true'">
+    <DefineConstants>$(DefineConstants);STORE</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup>
