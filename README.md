@@ -390,14 +390,14 @@ A netcat-style tool for raw TCP and UDP, plus a WebSocket client.
 Chat and swap files with any phone or computer on your network. The other side only needs a web browser, even when the two systems can't reach each other any other way (no remote desktop, no shared folder).
 
 <p align="center">
-  <img src="docs/screenshots/share-chat.png" width="640" alt="Echoes LAN file sharing and chat: HTTPS share link, 6-digit PIN and QR code, and a live chat with a phone and a laptop in their browsers">
+  <img src="docs/screenshots/share-chat.png" width="640" alt="Echoes LAN file sharing and chat: HTTPS share link, 8-digit PIN and QR code, and a live chat with a phone and a laptop in their browsers">
 </p>
 
 - **Share & chat:** one link or QR code opens a page that works in every browser, phones included: a live chat with copy buttons and clickable links, sending files to this device (drag & drop, paste, resumed after a dropped connection), and downloads of the files you share. Files you share also appear in the chat.
-- **HTTPS by default** with this device's own certificate (the browser warns once; compare the fingerprint shown in Echoes), on the same port that redirects plain HTTP. A 6-digit **PIN** protects the page, and the QR code carries it, so scanning logs straight in.
+- **HTTPS by default** with this device's own certificate (the browser warns once; compare the fingerprint shown in Echoes), on the same port that redirects plain HTTP. An 8-digit **PIN** protects the page, and the QR code carries it, so scanning logs straight in. Wrong PINs are slowed down for the device that tried them, and only TLS 1.2 and 1.3 are accepted.
 - Received files land in Downloads\Echoes (or a folder you pick; on Android one you choose), are never overwritten, are marked as downloaded on Windows, and respect a size cap and the free disk space. The Files tab shows that folder in full and how much Echoes has stored there; **Clean up** deletes the files Echoes received (nothing else in the folder) after asking.
 - Choose the network interface and port, limit connections, and see live stats and a request log. Scripts can download with the PIN as the password (`curl -k -u :PIN -OJ <link>`).
-- **Catch requests (webhook tester):** a local endpoint that lists every request it receives (method, path, headers, query, body as pretty JSON, form fields or hex) with "Copy as curl", a reply you choose (status, body, delay), automatic CORS, and a WebSocket echo endpoint.
+- **Catch requests (webhook tester):** a local endpoint that lists every request it receives (method, path, headers, query, body as pretty JSON, form fields or hex) with "Copy as curl", a reply you choose (status, body, delay), automatic CORS, and a WebSocket echo endpoint. It listens on this device only until you choose another interface.
 - Built in, no extra software: works on desktop and Android.
 
 ### SOCKS5 and HTTP proxy server and proxy checker
@@ -408,7 +408,7 @@ Chat and swap files with any phone or computer on your network. The other side o
 
 - A SOCKS5 and HTTP proxy on a single port; the protocol is detected for each connection.
 - Optional username and password, a live connection log and traffic stats.
-- **Safe by default:** other devices can't reach this device's own services through it, and while it has no password they reach only the internet and their own local network, not the private networks behind this device (WSL, Docker, virtual machines, VPN ranges).
+- **Safe by default:** other devices can't reach this device's own services through it, and while it has no password they reach only the internet and their own local network, not the private networks behind this device (WSL, Docker, virtual machines, VPN ranges), and never mail ports (25, 465, 587), so it can't be used to send spam.
 - **Check proxies:** paste a list in any common format; each proxy is tested (SOCKS5, SOCKS4 or HTTP detected automatically) for speed, exit IP and country. Copy the working ones or export them.
 - Built in, no extra software: works on desktop and Android.
 
