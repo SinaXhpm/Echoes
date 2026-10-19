@@ -20,6 +20,13 @@ jobs:
     steps:
     - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+    # first: a certificate problem fails in seconds instead of after the long AOT build
+    - name: Import Apple signing certificate
+      env:
+        APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+        APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+      run: bash packaging/macos/import-certificate.sh
+
     - name: Setup .NET
       uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
       with:
@@ -33,12 +40,6 @@ jobs:
     # the same command as release.yml
     - name: Publish
       run: dotnet publish Echoes.csproj -c Release -r osx-arm64 -p:Version=${{ steps.ver.outputs.VERSION }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=copyused -p:OptimizationPreference=Size -p:StackTraceSupport=true -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
-
-    - name: Import Apple signing certificate
-      env:
-        APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
-        APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
-      run: bash packaging/macos/import-certificate.sh
 
     - name: Package macOS
       env:

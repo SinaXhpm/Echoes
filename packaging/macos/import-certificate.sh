@@ -26,7 +26,14 @@ else
   echo "Could not download Apple's intermediate certificate; continuing with the runner's own."
 fi
 
-security import "$RUNNER_TEMP/signing.p12" -P "$APPLE_CERT_PASSWORD" -f pkcs12 -k "$KEYCHAIN" -T /usr/bin/codesign -T /usr/bin/security
+if ! security import "$RUNNER_TEMP/signing.p12" -P "$APPLE_CERT_PASSWORD" -f pkcs12 -k "$KEYCHAIN" -T /usr/bin/codesign -T /usr/bin/security; then
+  # sizes only, never the secrets: a wrong password, a cut-off secret or a .p12 this macOS can't read look the same to `security`
+  echo "::error::The certificate (.p12) could not be imported: wrong password, damaged secret, or an encoding macOS can't read."
+  echo "decoded .p12: $(wc -c < "$RUNNER_TEMP/signing.p12" | tr -d ' ') bytes; password: ${#APPLE_CERT_PASSWORD} characters (carriage returns: $(printf '%s' "$APPLE_CERT_PASSWORD" | tr -cd '\r' | wc -c | tr -d ' '))"
+  openssl pkcs12 -in "$RUNNER_TEMP/signing.p12" -passin env:APPLE_CERT_PASSWORD -noout 2>&1 | head -3 || true
+  rm -f "$RUNNER_TEMP/signing.p12"
+  exit 1
+fi
 security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
 security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
 rm -f "$RUNNER_TEMP/signing.p12"

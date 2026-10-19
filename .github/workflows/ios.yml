@@ -19,7 +19,9 @@ permissions:
 
 jobs:
   ios-simulator:
-    runs-on: macos-latest
+    # The .NET for iOS workload needs the Xcode of its own version (27.1 now); the default macOS image has Xcode 26 only.
+    # The xcode-27 image carries Xcode 27.x side by side. Back to macos-latest when that has it.
+    runs-on: xcode-27
     steps:
     - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -28,15 +30,19 @@ jobs:
       with:
         dotnet-version: 10.0.x
 
-    # The .NET for iOS workload wants a specific recent Xcode; the runner has several side by side.
-    - name: Use the newest installed Xcode
-      run: |
-        newest="$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)"
-        if [ -n "$newest" ]; then sudo xcode-select -s "$newest"; fi
-        xcodebuild -version
-
     - name: Install the iOS workload
       run: dotnet workload install ios
+
+    # The iOS pack's version is the Xcode it was built for (Microsoft.iOS.Sdk.net10.0_27.1 wants Xcode 27.1).
+    - name: Use the Xcode the workload wants
+      run: |
+        want="$(ls "$HOME/.dotnet/packs" | sed -n 's/^Microsoft\.iOS\.Sdk\.net10\.0_\([0-9][0-9.]*\)$/\1/p' | sort -V | tail -n 1)"
+        echo "The iOS workload targets Xcode $want"
+        ls -d /Applications/Xcode*.app
+        app="$(ls -d /Applications/Xcode_"$want".app /Applications/Xcode_"$want"*.app 2>/dev/null | head -n 1)"
+        if [ -z "$app" ]; then echo "::error::Xcode $want is not installed on this runner"; exit 1; fi
+        sudo xcode-select -s "$app"
+        xcodebuild -version
 
     - name: Build for the iOS simulator
       run: dotnet build Echoes.iOS/Echoes.iOS.csproj -c Debug -f net10.0-ios -r iossimulator-arm64
