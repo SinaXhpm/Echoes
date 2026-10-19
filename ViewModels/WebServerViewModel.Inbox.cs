@@ -56,7 +56,7 @@ public partial class WebServerViewModel
 {
     private const string KInbox = "webserver.inbox", KMaxUpload = "webserver.maxUploadMb";
     public const int DefaultMaxUploadMb = 4096;
-    private const int MaxReceivedRows = 200;
+    private const int MaxReceivedRows = 200, MaxPendingRows = 100;
 
     public ObservableCollection<ReceivedFileRow> ReceivedFiles { get; } = new();
     /// <summary>Desktop: the folder path. Android: the picked folder's name (empty = the app's own storage).</summary>
@@ -519,6 +519,15 @@ public partial class WebServerViewModel
             if (oldest is null) break;
             ReceivedFiles.Remove(oldest);
         }
+        // Files still arriving: the newest MaxPendingRows (many browsers starting files at once can't flood the list; a
+        // file whose row went gets a row again when it finishes)
+        int pending = ReceivedFiles.Count(r => r.IsPending);
+        for (int i = ReceivedFiles.Count - 1; i >= 0 && pending > MaxPendingRows; i--)
+        {
+            if (!ReceivedFiles[i].IsPending) continue;
+            ReceivedFiles.RemoveAt(i);
+            pending--;
+        }
         OnPropertyChanged(nameof(HasReceived));
     }
 
@@ -552,7 +561,7 @@ public partial class WebServerViewModel
 
     private static async Task<string> FreeNameAsync(IStorageFolder folder, string name)
     {
-        for (int n = 1; n <= 500; n++)
+        for (int n = 1; n <= 50; n++)
         {
             string candidate = n == 1 ? name : ShareInbox.WithCounter(name, n);
             IStorageFile? existing = null;

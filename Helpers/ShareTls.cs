@@ -26,6 +26,9 @@ public sealed class ShareCert : IDisposable
     public bool Regenerated { get; init; }
     /// <summary>Built once per run: the server sends the same (self-signed, chain-less) certificate on every handshake.</summary>
     public SslStreamCertificateContext? Context { get; init; }
+    /// <summary>TLS 1.2 + 1.3 (never 1.0 / 1.1, which the OS default still allowed); just 1.2 where the self-test found
+    /// this system can't serve the pair (<see cref="ShareTls.SelfTestAsync"/>).</summary>
+    public SslProtocols Protocols { get; internal set; } = SslProtocols.Tls12 | SslProtocols.Tls13;
 
     public SslServerAuthenticationOptions ServerOptions() => new()
     {
@@ -33,8 +36,8 @@ public sealed class ShareCert : IDisposable
         ServerCertificate = Context is null ? Certificate : null,
         ClientCertificateRequired = false,
         CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
-        // the OS default (TLS 1.2 / 1.3); no ALPN (HTTP/1.1 only — and .NET for Android's server mode refuses ALPN options)
-        EnabledSslProtocols = SslProtocols.None,
+        // no ALPN (HTTP/1.1 only — and .NET for Android's server mode refuses ALPN options)
+        EnabledSslProtocols = Protocols,
     };
 
     public void Dispose() => Certificate.Dispose();
@@ -46,8 +49,9 @@ public sealed class ShareCert : IDisposable
 /// fingerprint stays the same across restarts and browsers that accepted it once keep doing so (Firefox remembers the
 /// exception per certificate). It names localhost, this machine and its current LAN addresses; a new one is made when it
 /// expires (365 days, renewed 14 days early) or when this device has a LAN IPv4 address or name the certificate doesn't
-/// cover (moved to another network) — the new one keeps the old addresses too, so moving back doesn't renew again.
-/// IPv6 addresses are added but never force a renewal: privacy addresses change daily.
+/// cover (moved to another network). The new one names only the current addresses: anyone can read a certificate before
+/// the PIN, and carrying the old ones listed every network this device had been on. IPv6 addresses are added but never
+/// force a renewal: privacy addresses change daily.
 /// </summary>
 public static class ShareTls
 {
@@ -61,8 +65,10 @@ public static class ShareTls
     internal static Func<DateTimeOffset> Now { get; set; } = () => DateTimeOffset.UtcNow;
     internal static Func<(IReadOnlyList<string> Names, IReadOnlyList<IPAddress> V4, IReadOnlyList<IPAddress> V6)>? IdentityHook { get; set; }
 
-    // A certificate that passed the loopback handshake test in this process (by SHA-256): not tested again.
+    // A certificate that passed the loopback handshake test in this process (by SHA-256), and with which protocols: not
+    // tested again.
     private static string? s_tested;
+    private static SslProtocols s_testedProtocols;
     private static readonly object s_gate = new();
 
     /// <summary>
@@ -76,8 +82,6 @@ public static class ShareTls
             var (names, v4, v6) = Identity();
             var now = Now();
             var p = ProfileService.Instance;
-            List<string> keepNames = new();
-            List<IPAddress> keepIps = new();
             if (p.GetSetting(ProfileKey) is { Length: > 0 } stored)
             {
                 X509Certificate2? cert = null;
@@ -90,16 +94,13 @@ public static class ShareTls
                 if (cert is not null)
                 {
                     if (Fits(cert, names, v4, now)) return Wrap(cert, regenerated: false);
-                    var (oldNames, oldIps) = Sans(cert);
-                    keepNames.AddRange(oldNames);
-                    keepIps.AddRange(oldIps);
                     cert.Dispose();
                 }
             }
 
-            // Current names / addresses first, then the old certificate's (moving back to a network it knew: no renewal).
-            var dns = Distinct(new[] { "localhost" }.Concat(names).Concat(keepNames), StringComparer.OrdinalIgnoreCase).Take(MaxDnsSans).ToList();
-            var ips = Distinct(new[] { IPAddress.Loopback, IPAddress.IPv6Loopback }.Concat(v4).Concat(v6).Concat(keepIps), null).Take(MaxIpSans).ToList();
+            // Only what this device has now (never the networks it was on before).
+            var dns = Distinct(new[] { "localhost" }.Concat(names), StringComparer.OrdinalIgnoreCase).Take(MaxDnsSans).ToList();
+            var ips = Distinct(new[] { IPAddress.Loopback, IPAddress.IPv6Loopback }.Concat(v4).Concat(v6), null).Take(MaxIpSans).ToList();
             byte[] pfx = Generate(dns, ips, now, names.FirstOrDefault());
             // With no usable key file this run, a stored (sealed) certificate may only be unreadable for now: don't write
             // over it — this one serves the session, and the next run can open the stored one again.
@@ -111,11 +112,36 @@ public static class ShareTls
     /// <summary>
     /// A loopback handshake with the certificate: proves this platform can serve it (.NET for Android's server-side
     /// SslStream, Windows SChannel with the imported key) before any browser depends on it. Null = fine, else why not.
-    /// Remembered per certificate for the process.
+    /// Remembered per certificate for the process. A system that can't serve TLS 1.3 next to 1.2 gets 1.2 alone (still
+    /// never 1.0 / 1.1); when that fails too, the reason is returned as before.
     /// </summary>
     public static async Task<string?> SelfTestAsync(ShareCert cert, CancellationToken ct)
     {
-        lock (s_gate) if (s_tested == cert.Fingerprint) return null;
+        lock (s_gate)
+            if (s_tested == cert.Fingerprint)
+            {
+                cert.Protocols = s_testedProtocols;
+                return null;
+            }
+        var (why, timedOut) = await HandshakeTestAsync(cert, ct).ConfigureAwait(false);
+        if (why is not null && !timedOut && !ct.IsCancellationRequested && cert.Protocols != SslProtocols.Tls12)
+        {
+            var both = cert.Protocols;
+            cert.Protocols = SslProtocols.Tls12;
+            (why, _) = await HandshakeTestAsync(cert, ct).ConfigureAwait(false);
+            if (why is not null) cert.Protocols = both;
+        }
+        if (why is null)
+            lock (s_gate)
+            {
+                s_tested = cert.Fingerprint;
+                s_testedProtocols = cert.Protocols;
+            }
+        return why;
+    }
+
+    private static async Task<(string? Why, bool TimedOut)> HandshakeTestAsync(ShareCert cert, CancellationToken ct)
+    {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(8000);
         var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -142,20 +168,18 @@ public static class ShareTls
             await clientSsl.WriteAsync(new byte[] { 0x2A }, cts.Token).ConfigureAwait(false);
             var one = new byte[1];
             int n = await serverSsl.ReadAsync(one, cts.Token).ConfigureAwait(false);
-            if (n != 1 || one[0] != 0x2A) return "the test connection didn't carry data";
-            lock (s_gate) s_tested = cert.Fingerprint;
-            return null;
+            return (n != 1 || one[0] != 0x2A ? "the test connection didn't carry data" : null, false);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            return "the test handshake timed out";
+            return ("the test handshake timed out", true);
         }
         catch (Exception ex)
         {
             var e = SocketErrors.Unwrap(ex);
-            return e is PlatformNotSupportedException or NotImplementedException or NotSupportedException
+            return (e is PlatformNotSupportedException or NotImplementedException or NotSupportedException
                 ? "this system's TLS can't act as a server"
-                : WsProtocol.Short(e.Message.Trim(), 160);
+                : WsProtocol.Short(e.Message.Trim(), 160), false);
         }
         finally
         {

@@ -122,6 +122,8 @@ public sealed class RequestCatcher : IDisposable
     private readonly SemaphoreSlim _slots;
     private readonly int _perPeerCap;
     private readonly ConcurrentDictionary<string, int> _perPeer = new();
+    private readonly ConcurrentDictionary<string, int> _wsPerPeer = new();   // WebSocket slots reserved per address
+    private int _wsReserved;
     private readonly ConcurrentDictionary<long, Socket> _open = new();
     private readonly ConcurrentDictionary<long, WsConnection> _ws = new();
     private readonly WsSink _wsSink;
@@ -223,7 +225,7 @@ public sealed class RequestCatcher : IDisposable
             port = ep.Port;
         }
         catch { }
-        int held = Bump(ip, 1);
+        int held = Bump(_perPeer, ip, 1);
         Interlocked.Increment(ref _active);
         _open[id] = socket;
         try
@@ -242,17 +244,17 @@ public sealed class RequestCatcher : IDisposable
         finally
         {
             _open.TryRemove(id, out _);
-            Bump(ip, -1);
+            Bump(_perPeer, ip, -1);
             Interlocked.Decrement(ref _active);
             try { socket.Dispose(); } catch { }
             _slots.Release();
         }
     }
 
-    private int Bump(string peer, int delta)
+    private static int Bump(ConcurrentDictionary<string, int> map, string peer, int delta)
     {
-        int v = _perPeer.AddOrUpdate(peer, static (_, d) => d, static (_, old, d) => old + d, delta);
-        if (v <= 0) _perPeer.TryRemove(new KeyValuePair<string, int>(peer, v));
+        int v = map.AddOrUpdate(peer, static (_, d) => d, static (_, old, d) => old + d, delta);
+        if (v <= 0) map.TryRemove(new KeyValuePair<string, int>(peer, v));
         return v;
     }
 
@@ -514,9 +516,9 @@ public sealed class RequestCatcher : IDisposable
     {
         string? origin = req.Header("Origin");
         if (origin is null) return "Access-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: *\r\n";
-        // echo the origin (with credentials allowed), so fetch(..., { credentials: "include" }) works too
-        return "Access-Control-Allow-Origin: " + SafeHeaderValue(origin) + "\r\nAccess-Control-Allow-Credentials: true\r\n"
-               + "Access-Control-Expose-Headers: *\r\nVary: Origin\r\n";
+        // echo the origin, so browser code from any page can post here and read the reply — but no
+        // Allow-Credentials: the catcher sets no cookies, so a page never needs to send the user's along
+        return "Access-Control-Allow-Origin: " + SafeHeaderValue(origin) + "\r\nAccess-Control-Expose-Headers: *\r\nVary: Origin\r\n";
     }
 
     private static async Task<bool> TryWriteAsync(NetworkStream stream, CapturedRequest req, int status, string? contentType,
@@ -611,11 +613,15 @@ public sealed class RequestCatcher : IDisposable
             return;
         }
         // At most MaxWsPerClient from one address: a WebSocket is never closed for being idle, so one client opening
-        // the whole MaxWsClients would otherwise lock every other one out until Stop.
-        int fromClient = _ws.Values.Count(c => c.Tag is WsClient w && w.Upgrade.ClientIp == req.ClientIp);
-        if (_ws.Count >= MaxWsClients || fromClient >= MaxWsPerClient)
+        // the whole MaxWsClients would otherwise lock every other one out until Stop. Reserved here, before the
+        // handshake's await, and released when this connection ends: counting the registered ones instead let
+        // concurrent upgrades from one address all pass the check before any of them was registered.
+        bool overTotal = Interlocked.Increment(ref _wsReserved) > MaxWsClients;
+        bool overClient = Bump(_wsPerPeer, req.ClientIp, 1) > MaxWsPerClient;
+        if (overTotal || overClient)
         {
-            req.Note = fromClient >= MaxWsPerClient
+            ReleaseWs(req.ClientIp);
+            req.Note = overClient
                 ? $"This client has {MaxWsPerClient} WebSocket connections open already."
                 : $"{MaxWsClients} WebSocket clients are already connected.";
             _sink.OnRequest(req);
@@ -623,13 +629,25 @@ public sealed class RequestCatcher : IDisposable
             _sink.OnReplied(req);
             return;
         }
+        try { await AcceptWsAsync(stream, reader, req, key!, ct).ConfigureAwait(false); }
+        finally { ReleaseWs(req.ClientIp); }
+    }
 
+    private void ReleaseWs(string ip)
+    {
+        Interlocked.Decrement(ref _wsReserved);
+        Bump(_wsPerPeer, ip, -1);
+    }
+
+    // The 101 and the echo loop, within a reserved slot.
+    private async Task AcceptWsAsync(NetworkStream stream, ConnReader reader, CapturedRequest req, string key, CancellationToken ct)
+    {
         req.Kind = CaptureKind.WsUpgrade;
         // a client that asks for subprotocols gets the first one (so clients that insist on one still connect)
         string? proto = req.Header("Sec-WebSocket-Protocol")?.Split(',').Select(p => p.Trim()).FirstOrDefault(WsProtocol.IsToken);
         var sb = new StringBuilder();
         sb.Append("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n");
-        sb.Append("Sec-WebSocket-Accept: ").Append(WsProtocol.AcceptFor(key!)).Append("\r\n");
+        sb.Append("Sec-WebSocket-Accept: ").Append(WsProtocol.AcceptFor(key)).Append("\r\n");
         if (proto != null) sb.Append("Sec-WebSocket-Protocol: ").Append(proto).Append("\r\n");
         sb.Append("Server: Echoes request catcher\r\n\r\n");
         req.Note = "WebSocket — every message is echoed to all connected clients" + (proto != null ? $" (subprotocol {proto})." : ".");

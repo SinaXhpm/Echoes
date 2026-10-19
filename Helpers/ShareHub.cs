@@ -86,14 +86,14 @@ public interface IShareHubSink
 /// it shares; the first byte of each connection decides between TLS (0x16, the hub's own certificate) and plain HTTP
 /// (sent to https:// on the same port while HTTPS is on). Raw sockets, no HttpListener: works on Android and without
 /// admin rights.
-/// <para>Access: a 6-digit PIN (per-address lockout: 1 s, 2 s, 4 s … 5 min after 5 misses, and a pause for everyone
-/// after 100 misses in 10 minutes) buys a random session cookie (HttpOnly, SameSite=Strict, Secure on HTTPS). Every API
-/// call needs the X-Echoes header and a same-origin Origin / Sec-Fetch-Site; the WebSocket needs the same Origin.
-/// Scripts download with the PIN as the Basic-auth password (<c>curl -k -u :PIN -OJ https://…/d/ID</c>).</para>
-/// <para>Limits: connections (all / per address), messages (16 KB, 20 at once then 2 a second per browser, 500 kept in
-/// memory), uploads (chunks of at most 8 MB, 2 at once per browser and 8 in all, a size cap, free space), WebSockets
-/// (4 per browser, 8 per address, 64 in all), long polls (2 per browser). Stop closes everything and deletes partial
-/// uploads.</para>
+/// <para>Access: an 8-digit PIN (per-address lockout: 1 s, 2 s, 4 s … 5 min after 5 misses, and a pause for everyone
+/// after 300 misses in 10 minutes) buys a random session cookie (HttpOnly, SameSite=Strict, Secure on HTTPS; at most 16
+/// per address). Every API call needs the X-Echoes header and a same-origin Origin / Sec-Fetch-Site; the WebSocket needs
+/// the same Origin. Scripts download with the PIN as the Basic-auth password (<c>curl -k -u :PIN -OJ https://…/d/ID</c>).</para>
+/// <para>Limits: connections (all / a quarter per address), request bodies (an idle timeout and a total deadline of at
+/// least ~4 KB/s), messages (16 KB, 20 at once then 2 a second per browser, 500 kept in memory), uploads (chunks of at
+/// most 8 MB, 2 at once per browser and 8 in all, a size cap, free space), WebSockets (4 per browser, 8 per address, 64
+/// in all), long polls (2 per browser). Stop closes everything and deletes partial uploads.</para>
 /// </summary>
 public sealed partial class ShareHub : IDisposable
 {
@@ -106,9 +106,11 @@ public sealed partial class ShareHub : IDisposable
     private const int MaxJsonBody = 64 * 1024;
     private const int HeadTimeoutMs = 10_000, KeepAliveIdleMs = 15_000, BodyIdleMs = 30_000;
     private const int MaxRequestsPerConnection = 1000;
-    private const int MaxSessions = 256;
+    private const int MaxSessions = 256, MaxSessionsPerAddress = 16;
     private const int AuthFreeTries = 5, MaxLockoutSec = 300, MaxAuthEntries = 4096;
-    private const int GlobalFailWindowMs = 600_000, GlobalFailLimit = 100, GlobalPauseMs = 60_000;
+    // 8-digit PIN: even 300 guesses per pause cycle leave months to the whole space, and a stranger needs 300 misses
+    // (60 fresh addresses) to pause everyone's PIN entry
+    private const int GlobalFailWindowMs = 600_000, GlobalFailLimit = 300, GlobalPauseMs = 60_000;
 
     /// <summary>Test hook: sees the exception that ended a connection (never set in the app).</summary>
     internal static Action<Exception>? TestErrorHook { get; set; }
@@ -144,8 +146,9 @@ public sealed partial class ShareHub : IDisposable
         _sink = sink;
         int max = Math.Clamp(options.MaxConnections, 4, 512);
         _slots = new SemaphoreSlim(max);
-        // one address may hold at most half the slots (never fewer than a browser's 6 + its WebSocket), so others get in
-        _perPeerCap = Math.Max(Math.Min(8, max), max / 2);
+        // one address may hold at most a quarter of the slots (never fewer than a browser's 6 + its WebSocket + a poll):
+        // a device with an IPv4 and a couple of IPv6 addresses still can't take them all
+        _perPeerCap = Math.Max(8, max / 4);
         _cookieName = "echoes_" + options.Port.ToString(CultureInfo.InvariantCulture);
         _pin = Encoding.UTF8.GetBytes(options.Pin);
         _machineNames = ShareTls.MachineNames();
@@ -337,7 +340,7 @@ public sealed partial class ShareHub : IDisposable
 
             await using (stream.ConfigureAwait(false))
             {
-                var conn = new HubConn { Ip = ip, Socket = socket, Stream = stream, Reader = new HubReader(stream), Https = https };
+                var conn = new HubConn { Ip = ip, Socket = socket, Stream = stream, Reader = new HubReader(stream, BodyIdleMs), Https = https };
                 for (int served = 0; served < MaxRequestsPerConnection && !ct.IsCancellationRequested; served++)
                 {
                     bool keep = await ServeOneAsync(conn, served == 0, ct).ConfigureAwait(false);
@@ -625,7 +628,15 @@ public sealed partial class ShareHub : IDisposable
         public required string Token { get; init; }
         public required string Cid { get; init; }
         public required string Ip { get; init; }
-        public string Name = "Guest";
+        /// <summary>This device's own chat name: a browser can't take it (see <see cref="Name"/>).</summary>
+        public required string HostName { get; init; }
+        private string _name = "Guest";
+        /// <summary>The browser's chat name; one equal to this device's own gets " (guest)", so nobody posts as the host.</summary>
+        public string Name
+        {
+            get => Volatile.Read(ref _name);
+            set => Volatile.Write(ref _name, value.Equals(HostName, StringComparison.OrdinalIgnoreCase) ? value + " (guest)" : value);
+        }
         public long LastSeen = Environment.TickCount64;
         public int Ws, Polls, Chunks;
         public volatile bool Revoked;
@@ -650,16 +661,21 @@ public sealed partial class ShareHub : IDisposable
 
     private HubSession NewSession(string ip, string? name)
     {
-        // keep the table bounded: the least recently seen goes
-        if (_sessions.Count >= MaxSessions && _sessions.Values.OrderBy(s => Volatile.Read(ref s.LastSeen)).FirstOrDefault() is { } oldest)
+        // bounded per address: logging in again and again only replaces this address's own least recently seen session
+        // (a peer can't push the other devices out); then the whole table: the least recently seen goes
+        var own = _sessions.Values.Where(x => x.Ip == ip).ToList();
+        if (own.Count >= MaxSessionsPerAddress)
+            EndSession(own.OrderBy(x => Volatile.Read(ref x.LastSeen)).First());
+        else if (_sessions.Count >= MaxSessions && _sessions.Values.OrderBy(x => Volatile.Read(ref x.LastSeen)).FirstOrDefault() is { } oldest)
             EndSession(oldest);
         var s = new HubSession
         {
             Token = Base64Url(RandomNumberGenerator.GetBytes(32)),
             Cid = Convert.ToHexString(RandomNumberGenerator.GetBytes(6)).ToLowerInvariant(),
             Ip = ip,
-            Name = CleanName(name),
+            HostName = _o.HostName,
         };
+        s.Name = CleanName(name);
         _sessions[s.Token] = s;
         return s;
     }
@@ -738,13 +754,9 @@ public sealed partial class ShareHub : IDisposable
         return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(sb.ToString()), Volatile.Read(ref _pin));
     }
 
-    /// <summary>The lockout key: the address, or an IPv6 address's /64 (privacy addresses rotate within it).</summary>
-    internal static string LockKey(string ip)
-    {
-        if (!IPAddress.TryParse(ip, out var a) || a.AddressFamily != AddressFamily.InterNetworkV6 || IPAddress.IsLoopback(a)) return ip;
-        var b = a.GetAddressBytes();
-        return Convert.ToHexString(b, 0, 8) + "::/64";
-    }
+    /// <summary>The lockout key: the address itself (an IPv4-mapped one already as IPv4). Never an IPv6 /64: on a LAN every
+    /// device shares it, so a stranger's misses locked the others out; addresses that rotate meet the global limit.</summary>
+    internal static string LockKey(string ip) => ip;
 
     private bool IsLockedOut(string key, out long retrySec)
     {

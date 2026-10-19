@@ -22,7 +22,7 @@ public partial class WebServerViewModel : IShareHubSink
 {
     /// <summary>HTTPS with this device's own certificate (default). Off = plain HTTP.</summary>
     [ObservableProperty] private bool _httpsOn = true;
-    /// <summary>A 6-digit PIN guards the page (default). Off = anyone who can reach the port joins.</summary>
+    /// <summary>An 8-digit PIN guards the page (default). Off = anyone who can reach the port joins.</summary>
     [ObservableProperty] private bool _pinOn = true;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(PinText))] private string _pin = string.Empty;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsIdle))] private bool _isStarting;
@@ -36,7 +36,7 @@ public partial class WebServerViewModel : IShareHubSink
     [ObservableProperty] private string _shareLink = string.Empty;
     [ObservableProperty] private bool _showRunningPin;
 
-    public string PinText => Pin.Length == 6 ? Pin[..3] + " " + Pin[3..] : Pin;
+    public string PinText => Pin.Length == PinDigits ? Pin[..4] + " " + Pin[4..] : Pin;
     public bool HasTlsNote => !string.IsNullOrEmpty(TlsNote);
     /// <summary>Settings can be edited (they're captured when the hub starts).</summary>
     public bool IsIdle => !IsRunning && !IsStarting;
@@ -71,12 +71,15 @@ public partial class WebServerViewModel : IShareHubSink
 
     // ================================================================ PIN
 
-    private static string NewPinValue() => RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6", CultureInfo.InvariantCulture);
+    // 8 digits: with the hub's global miss limit a stranger needs months for the whole space (6 digits: days). The page (4-9
+    // digits), the link and Basic auth take it as is; a stored 6-digit PIN from an earlier version is replaced at launch.
+    private const int PinDigits = 8;
+    private static string NewPinValue() => RandomNumberGenerator.GetInt32(0, 100_000_000).ToString("D8", CultureInfo.InvariantCulture);
 
     private void RestorePin(ProfileService p)
     {
         string stored = SecretProtector.Unprotect(p.GetSetting(KPin));
-        if (stored.Length == 6 && stored.All(char.IsAsciiDigit))
+        if (stored.Length == PinDigits && stored.All(char.IsAsciiDigit))
         {
             Pin = stored;
             return;
@@ -147,7 +150,7 @@ public partial class WebServerViewModel : IShareHubSink
         var bind = SelectedBind ?? BindOptions.FirstOrDefault() ?? new BindOption("All", IPAddress.IPv6Any, "all");
         bool https = HttpsOn, pinOn = PinOn;
         int port = Port;
-        if (pinOn && Pin.Length != 6) { Pin = NewPinValue(); SavePin(); }
+        if (pinOn && Pin.Length != PinDigits) { Pin = NewPinValue(); SavePin(); }
         int gen = ++_startGen;
         IsStarting = true;
         TlsNote = null;

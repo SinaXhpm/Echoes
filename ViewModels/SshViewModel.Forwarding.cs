@@ -8,6 +8,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Echoes.ViewModels;
@@ -138,7 +139,7 @@ public partial class SshViewModel
                 if (s.Closed) throw new SshLoginException("Not connected.");
                 s.Client.AddForwardedPort(port);
                 if (spec.Remote) { lock (s.RemoteForwardGate) port.Start(); }
-                else port.Start();
+                else { EnsurePoolForForwards(); port.Start(); }
                 uint bound = port is ForwardedPortLocal l ? l.BoundPort : (uint)spec.BindPort;
                 bool exposed = !spec.Remote && !SshText.IsLoopbackOnly(spec.BindHost);
                 string status = spec.Remote
@@ -172,6 +173,17 @@ public partial class SshViewModel
                 });
             }
         });
+    }
+
+    private static int s_poolRaised;
+
+    // SSH.NET serves each forwarded connection on a pool thread for its whole life; past the pool's minimum, new ones got
+    // in at ~1/s (the pool's thread injection rate) and the rest were refused. Raised once, never lowered.
+    private static void EnsurePoolForForwards()
+    {
+        if (Interlocked.Exchange(ref s_poolRaised, 1) != 0) return;
+        ThreadPool.GetMinThreads(out int workers, out int io);
+        if (workers < 64) ThreadPool.SetMinThreads(64, io);
     }
 
     private static string ForwardStartError(Exception ex, SshForwardSpec spec)
@@ -212,6 +224,7 @@ public partial class SshViewModel
         try
         {
             s.Client.AddForwardedPort(fw);
+            EnsurePoolForForwards();
             fw.Start();
         }
         catch (Exception ex)

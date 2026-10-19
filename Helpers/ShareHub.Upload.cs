@@ -16,13 +16,56 @@ namespace Echoes.Helpers;
 /// chunk keeps what arrived — the page asks /api/up/status and resumes from there. A chunk that arrives while an older
 /// request for the same file still hangs takes over from it. Bytes go to a ".echoes-ID.part" file, renamed into the inbox
 /// under the sanitized name (never over an existing file) and marked as downloaded from the internet on Windows. Partial
-/// files are deleted on cancel, after 30 idle minutes and on Stop.
+/// files are deleted on cancel, after 30 idle minutes (2 when nothing arrived at all) and on Stop.
 /// </summary>
 public sealed partial class ShareHub
 {
     private const int MaxUploadsPerSession = 8, MaxChunksPerSession = 2, MaxChunksTotal = 8;
     private const long FreeSpaceMargin = 64L * 1024 * 1024;
     private const long UploadIdleMs = 30L * 60 * 1000;
+    // Nothing at all arrived for this long: dropped (a page sends its first chunk right after starting).
+    private const long NoDataDropMs = 2L * 60 * 1000;
+    // What one browser's declared-but-unsent sizes may hold back from the free-space check: a size is only a claim, so
+    // one browser can't make every other one hear "not enough free space" by announcing a huge file and sending nothing.
+    private const long SessionReserveBytes = 2L * 1024 * 1024 * 1024;
+    // Starts per browser: 120 at once (a big batch passes), then 2 a second. The "received" chat note of each file is
+    // limited like a message (20 at once, then 2 a second): a flood of tiny files can't become a flood of chat lines,
+    // chimes and badges. The files themselves still arrive and are listed.
+    private const int StartBurst = 120;
+    private const double StartsPerSec = 2.0;
+
+    private sealed class UploadQuota
+    {
+        public double Starts = StartBurst, Notes = MsgBurst;
+        public long StartsAt = Environment.TickCount64, NotesAt = Environment.TickCount64;
+    }
+
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<HubSession, UploadQuota> _quotas = new();
+
+    private static bool TakeToken(UploadQuota q, ref double tokens, ref long at, int burst, double perSec)
+    {
+        lock (q)
+        {
+            long now = Environment.TickCount64;
+            tokens = Math.Min(burst, tokens + (now - at) / 1000.0 * perSec);
+            at = now;
+            if (tokens < 1) return false;
+            tokens -= 1;
+            return true;
+        }
+    }
+
+    private bool TakeStartToken(HubSession s)
+    {
+        var q = _quotas.GetValue(s, static _ => new UploadQuota());
+        return TakeToken(q, ref q.Starts, ref q.StartsAt, StartBurst, StartsPerSec);
+    }
+
+    private bool TakeNoteToken(HubSession s)
+    {
+        var q = _quotas.GetValue(s, static _ => new UploadQuota());
+        return TakeToken(q, ref q.Notes, ref q.NotesAt, MsgBurst, MsgPerSec);
+    }
 
     private readonly ConcurrentDictionary<string, UploadEntry> _uploads = new(StringComparer.Ordinal);
     // Finished uploads for a while: a page whose last answer got lost asks again and hears "done" (instead of sending
@@ -62,6 +105,7 @@ public sealed partial class ShareHub
         public readonly object Gate = new();
         public long Offset;                       // bytes on disk (under Gate)
         public long LastActivity = Environment.TickCount64;
+        public long StartedAt = Environment.TickCount64;
         public UploadState State;                 // under Gate
         public CancellationTokenSource? Writer;   // the chunk request writing now (under Gate)
         public Task WriterDone = Task.CompletedTask;
@@ -97,10 +141,15 @@ public sealed partial class ShareHub
                 w => w.WriteNumber("max", cap)), ct).ConfigureAwait(false);
         if (_uploads.Values.Count(u => u.Session == s) >= MaxUploadsPerSession)
             return await JsonAsync(c, req, 429, HubHttp.Error("Too many files at once - wait for some to finish."), ct).ConfigureAwait(false);
+        if (!TakeStartToken(s))
+            return await JsonAsync(c, req, 429, HubHttp.Error("Too many files at once - wait a little.", w => w.WriteNumber("retry", 2)), ct, "Retry-After: 2\r\n").ConfigureAwait(false);
 
+        // Free space: what has arrived is on the disk already; what is still to come is held back, at most
+        // SessionReserveBytes per browser.
         string folder = PartFolder;
         long free = ShareInbox.FreeSpace(folder);
-        long pending = _uploads.Values.Sum(u => Math.Max(0, u.Info.Size - Interlocked.Read(ref u.Info.ReceivedBytes)));
+        long pending = _uploads.Values.GroupBy(u => u.Session)
+            .Sum(g => Math.Min(SessionReserveBytes, g.Sum(u => Math.Max(0, u.Info.Size - Interlocked.Read(ref u.Info.ReceivedBytes)))));
         if (free >= 0 && free - pending < size + FreeSpaceMargin)
         {
             Log($"{c.Ip}  {Clean(name)} ({FileHttpServer.HumanSize(size)}) refused: not enough free space");
@@ -224,9 +273,11 @@ public sealed partial class ShareHub
             var buf = ArrayPool<byte>.Shared.Rent(64 * 1024);
             try
             {
+                // Buffered: TLS hands over at most one 16 KB record per read, and a disk write per record cost more than
+                // half the upload speed. The buffer is written out when the file closes (dropped requests too).
                 await using var fs = new FileStream(entry.PartPath, new FileStreamOptions
                 {
-                    Mode = FileMode.Open, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 0, Options = FileOptions.Asynchronous,
+                    Mode = FileMode.Open, Access = FileAccess.Write, Share = FileShare.None, BufferSize = 64 * 1024, Options = FileOptions.Asynchronous,
                 });
                 fs.Seek(offset, SeekOrigin.Begin);
                 fs.SetLength(offset);   // a takeover may have left a few bytes past what's counted
@@ -383,11 +434,13 @@ public sealed partial class ShareHub
         _finished[entry.Info.Id] = (entry.Session, Path.GetFileName(final), entry.Info.Size, Environment.TickCount64);
         Log($"{entry.Ip}  received {Clean(Path.GetFileName(final))} ({FileHttpServer.HumanSize(entry.Info.Size)}) from {Clean(entry.Session.Name)}");
         try { _sink.OnUploadFinished(entry.Info, final, null); } catch { }
-        Post(seq => new ShareMessage
-        {
-            Seq = seq, Cid = entry.Session.Cid, From = entry.Session.Name, Time = DateTime.Now, Kind = ShareMessageKind.Received,
-            FileName = Path.GetFileName(final), FileSize = entry.Info.Size,
-        });
+        // the chat note is rate-limited (the file is saved and listed either way)
+        if (TakeNoteToken(entry.Session))
+            Post(seq => new ShareMessage
+            {
+                Seq = seq, Cid = entry.Session.Cid, From = entry.Session.Name, Time = DateTime.Now, Kind = ShareMessageKind.Received,
+                FileName = Path.GetFileName(final), FileSize = entry.Info.Size,
+            });
         return final;
     }
 
@@ -418,11 +471,15 @@ public sealed partial class ShareHub
         foreach (var kv in _finished) if (now - kv.Value.At > FinishedKeptMs) _finished.TryRemove(kv.Key, out _);
         foreach (var e in _uploads.Values.ToArray())
         {
-            bool idle;
-            lock (e.Gate) idle = e.Writer is null && now - e.LastActivity > UploadIdleMs;
-            if (!idle) continue;
-            Drop(e, "It stopped arriving (30 minutes without data).");
-            Log($"{e.Ip}  {Clean(e.Info.Name)}: stopped arriving - partial file deleted");
+            bool idle, nothing;
+            lock (e.Gate)
+            {
+                nothing = e.Writer is null && e.Offset == 0 && now - e.StartedAt > NoDataDropMs;
+                idle = e.Writer is null && now - e.LastActivity > UploadIdleMs;
+            }
+            if (!idle && !nothing) continue;
+            Drop(e, nothing ? "Nothing arrived (2 minutes)." : "It stopped arriving (30 minutes without data).");
+            Log($"{e.Ip}  {Clean(e.Info.Name)}: {(nothing ? "nothing arrived" : "stopped arriving")} - partial file deleted");
         }
     }
 

@@ -38,8 +38,9 @@ internal static class SingleInstance
     private static Action? s_showRequested;
 
     /// <summary>
-    /// Per-user and short: "echoes-" + 16 hex chars of SHA-256(the user's data dir). On Unix .NET makes the name a socket
-    /// path in the temp dir, and those are capped at ~104 chars (macOS' $TMPDIR alone is ~50).
+    /// Per-user and short: "echoes-" + 16 hex chars of SHA-256(the user's data dir). On Unix .NET makes a plain name a
+    /// socket path in the temp dir, and those are capped at ~104 chars (macOS' $TMPDIR alone is ~50). On Linux that temp
+    /// dir is usually the shared /tmp, so there it is a socket path in a private dir instead (see CreatePipeName).
     /// </summary>
     internal static string PipeName { get; } = CreatePipeName();
 
@@ -55,8 +56,36 @@ internal static class SingleInstance
 
     private static string CreatePipeName()
     {
-        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(AppStorage.UserDir()));
-        return "echoes-" + Convert.ToHexString(hash, 0, 8).ToLowerInvariant();
+        string data = AppStorage.UserDir();
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(data));
+        string name = "echoes-" + Convert.ToHexString(hash, 0, 8).ToLowerInvariant();
+        // Windows: a pipe name. macOS: .NET's socket in the per-user $TMPDIR is private already.
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()) return name;
+        // Linux: in the shared /tmp another user could take the name first (the listener then gave up) or, under a lax
+        // umask, reach the socket. A rooted name is used as the socket path as is: the per-user runtime dir, else the
+        // data dir (both owner-only). sun_path holds 108 bytes with the NUL: a longer path keeps the old name.
+        (string? Dir, string File)[] places = { (Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR"), name + ".sock"), (data, "instance.sock") };
+        foreach (var (dir, file) in places)
+        {
+            if (!IsPrivateDir(dir)) continue;
+            string path = Path.Combine(dir!, file);
+            if (Encoding.UTF8.GetByteCount(path) <= 107) return path;
+        }
+        return name;
+    }
+
+    // An existing, rooted directory without group / other access.
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    private static bool IsPrivateDir(string? dir)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(dir) || !Path.IsPathRooted(dir) || !Directory.Exists(dir)) return false;
+            const UnixFileMode GroupOther = UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute
+                                            | UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
+            return (File.GetUnixFileMode(dir) & GroupOther) == 0;
+        }
+        catch (Exception) { return false; }
     }
 
     // ---------- Second launch ----------
@@ -163,7 +192,13 @@ internal static class SingleInstance
                 while (true)
                 {
                     // Blocks (asynchronously) until a client connects: no polling.
-                    await server.WaitForConnectionAsync(stop).ConfigureAwait(false);
+                    try { await server.WaitForConnectionAsync(stop).ConfigureAwait(false); }
+                    catch (UnauthorizedAccessException) when (!stop.IsCancellationRequested)
+                    {
+                        // Unix: another user's process reached the socket and the peer check turned it away. Nothing is
+                        // wrong with the pipe, so it isn't counted as a failure (five such knocks used to stop the listener).
+                        continue;
+                    }
                     if (await ReadShowAsync(server, stop).ConfigureAwait(false)) RaiseShowRequested();
                     server.Disconnect();
                     failures = 0;

@@ -62,19 +62,21 @@ public static class SocketPayload
     /// Bytes as readable text: UTF-8 with line breaks kept (CRLF shown as one break) and tabs kept; every other
     /// control byte, and every byte that isn't valid UTF-8, escaped (\0, \r, \x1b …). Trailing line breaks are left
     /// off — each transcript entry is its own block, and the byte count and the hex view keep the exact bytes.
-    /// At most <paramref name="maxChars"/> characters; <paramref name="shownBytes"/> says how much was rendered.
+    /// At most <paramref name="maxChars"/> characters and <paramref name="maxLines"/> lines; <paramref name="shownBytes"/>
+    /// says how much was rendered.
     /// </summary>
-    public static string ToDisplayText(ReadOnlySpan<byte> data, int maxChars, out int shownBytes)
+    public static string ToDisplayText(ReadOnlySpan<byte> data, int maxChars, out int shownBytes, int maxLines = int.MaxValue)
     {
         int end = data.Length;
         while (end > 0 && (data[end - 1] == (byte)'\n' || data[end - 1] == (byte)'\r')) end--;
         var sb = new StringBuilder(Math.Min(end, maxChars) + 16);
-        int i = 0;
+        int i = 0, lines = 1;
         while (i < end && sb.Length < maxChars)
         {
             byte b = data[i];
             if (b < 0x80)
             {
+                if ((b == (byte)'\n' || b == (byte)'\r' && i + 1 < end && data[i + 1] == (byte)'\n') && ++lines > maxLines) break;
                 switch (b)
                 {
                     case (byte)'\n': sb.Append('\n'); break;
@@ -94,7 +96,7 @@ public static class SocketPayload
                 continue;
             }
             var status = Rune.DecodeFromUtf8(data[i..end], out var rune, out int used);
-            if (status == OperationStatus.Done && !Rune.IsControl(rune) && !IsBidiControl(rune.Value))
+            if (status == OperationStatus.Done && !Rune.IsControl(rune) && !IsHiddenControl(rune.Value))
             {
                 sb.Append(rune.ToString());
                 i += used;
@@ -166,8 +168,10 @@ public static class SocketPayload
 
     // Bidi embeddings, overrides and isolates (U+202A–U+202E, U+2066–U+2069) change the order the text around them is
     // drawn in, so a peer could make a transcript line read differently from the bytes it sent: they are escaped like
-    // other invisible controls. LRM / RLM / ZWNJ are kept — ordinary Persian and Arabic text uses them.
-    private static bool IsBidiControl(int cp) => cp is (>= 0x202A and <= 0x202E) or (>= 0x2066 and <= 0x2069);
+    // other invisible controls. LRM / RLM / ZWNJ are kept — ordinary Persian and Arabic text uses them. The line and
+    // paragraph separators (U+2028 / U+2029) break a line like LF without being one, and U+FEFF is invisible: escaped too.
+    private static bool IsHiddenControl(int cp)
+        => cp is (>= 0x202A and <= 0x202E) or (>= 0x2066 and <= 0x2069) or 0x2028 or 0x2029 or 0xFEFF;
 
     /// <summary>Writes a name a file system accepts (the transcript's suggested file name).</summary>
     public static string SafeFileName(string s)

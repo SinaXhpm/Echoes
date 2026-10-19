@@ -258,6 +258,21 @@
                 </ControlTemplate>
             </Setter>
         </Style>
+        <!-- received files: virtualized like the chat (up to 200 done + 100 arriving) -->
+        <Style Selector="ItemsControl.received">
+            <Setter Property="ItemsPanel">
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+            </Setter>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                        <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}"/>
+                    </ScrollViewer>
+                </ControlTemplate>
+            </Setter>
+        </Style>
         <Style Selector="StackPanel.chatMsg">
             <Setter Property="Margin" Value="0,0,44,8"/>
         </Style>
@@ -743,7 +758,7 @@
                             <CheckBox x:Name="ShHttps" Grid.Column="1" Content="HTTPS" IsChecked="{Binding HttpsOn}" IsEnabled="{Binding IsIdle}"
                                       ToolTip.Tip="Encrypt everything with this device's own certificate (browsers warn once). Off = plain HTTP."/>
                             <CheckBox x:Name="ShPin" Grid.Column="2" Content="PIN" IsChecked="{Binding PinOn}" IsEnabled="{Binding IsIdle}"
-                                      ToolTip.Tip="Browsers need the 6-digit PIN (the link and QR carry it). Off = anyone who can reach the port joins."/>
+                                      ToolTip.Tip="Browsers need the 8-digit PIN (the link and QR carry it). Off = anyone who can reach the port joins."/>
                             <Button x:Name="ShToggle" Classes="toggle" MinWidth="120" VerticalAlignment="Bottom"
                                     Command="{Binding ToggleServerCommand}" Classes.active="{Binding IsRunning}" IsEnabled="{Binding !IsStarting}">
                                 <Panel>
@@ -1013,8 +1028,7 @@
                                 <Border Classes="emptyLine" VerticalAlignment="Top" IsVisible="{Binding !HasReceived}">
                                     <TextBlock Classes="hint" Text="Files sent from a browser land in the folder above."/>
                                 </Border>
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasReceived}">
-                                    <ItemsControl ItemsSource="{Binding ReceivedFiles}">
+                                <ItemsControl Classes="received" ItemsSource="{Binding ReceivedFiles}" IsVisible="{Binding HasReceived}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:ReceivedFileRow">
                                                 <Border Classes="fileRow">
@@ -1036,8 +1050,7 @@
                                                 </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
+                                </ItemsControl>
                             </Panel>
                             <TextBlock Grid.Row="4" Classes="hint error" Margin="2,4,0,0" Text="{Binding FilesError}"
                                        IsVisible="{Binding FilesError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>

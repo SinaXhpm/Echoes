@@ -259,7 +259,7 @@ public partial class SocketViewModel
     // A server can send tiny frames (empty messages, pings) far faster than the transcript shows them, and the queue's
     // byte cap doesn't count them: a 1.5 s busy UI let 450,000 empty frames pile up (45 MB) and the next drain froze the
     // UI. Past this many queued events a frame is counted as skipped instead (the drain reports it, the ↓ counter has it).
-    private const int MaxQueuedWsEvents = 2000;
+    private const int MaxQueuedWsEvents = 300;
 
     private bool AdmitWs(int bytes)
     {

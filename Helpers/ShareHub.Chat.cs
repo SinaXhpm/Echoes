@@ -249,8 +249,10 @@ public sealed partial class ShareHub
         string name = CleanName(HubHttp.Str(doc, "name"));
         if (name != s.Name)
         {
-            Log($"{c.Ip}  {Clean(s.Name)} is now {Clean(name)}");
+            // the setter may add " (guest)" to a name equal to the host's, so log what the name became
+            string before = s.Name;
             s.Name = name;
+            if (s.Name != before) Log($"{c.Ip}  {Clean(before)} is now {Clean(s.Name)}");
         }
         return await JsonAsync(c, req, 200, HubHttp.Json(w => { w.WriteBoolean("ok", true); WriteMe(w, s); }), ct).ConfigureAwait(false);
     }

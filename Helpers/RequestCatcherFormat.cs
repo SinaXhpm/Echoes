@@ -84,14 +84,17 @@ public static class CatcherFormat
             // capped like headers / query: one 1 MB value in a wrapping text block would stall the UI thread
             var fields = Pairs(Encoding.UTF8.GetString(b), plusIsSpace: true)
                 .Select(kv => new CatcherField(WsProtocol.Short(kv.Key, MaxNameChars), WsProtocol.Short(kv.Value, MaxValueChars))).ToList();
-            return new CatcherBodyView { Kind = CatcherBodyKind.Form, Label = $"Form · {Plural(fields.Count, "field")} · {size}", Fields = fields, Note = cut };
+            string? note = cut;
+            var shown = CapFields(fields, "fields", ref note);
+            return new CatcherBodyView { Kind = CatcherBodyKind.Form, Label = $"Form · {Plural(fields.Count, "field")} · {size}", Fields = shown, Note = note };
         }
 
         if (ct.StartsWith("multipart/", StringComparison.Ordinal) && Boundary(r.Header("Content-Type")) is { } boundary)
         {
             var parts = Multipart(b, boundary);
+            string? note = cut;
             if (parts.Count > 0)
-                return new CatcherBodyView { Kind = CatcherBodyKind.Multipart, Label = $"Multipart · {Plural(parts.Count, "part")} · {size}", Fields = parts, Note = cut };
+                return new CatcherBodyView { Kind = CatcherBodyKind.Multipart, Label = $"Multipart · {Plural(parts.Count, "part")} · {size}", Fields = CapFields(parts, "parts", ref note), Note = note };
         }
 
         if (textish) return TextView(b, size, cut);
@@ -103,6 +106,22 @@ public static class CatcherFormat
         string t = SocketPayload.ToDisplayText(b, MaxTextChars, out int shown);
         if (shown < b.Length) note = (note == null ? "" : note + " ") + $"Showing the first {MaxTextChars:N0} characters.";
         return new CatcherBodyView { Kind = CatcherBodyKind.Text, Label = "Text · " + size, Text = t, Note = note };
+    }
+
+    // All the fields together are capped like a text body: the pane lists them unvirtualized, and 1000 form fields of
+    // 4000 characters each would lay out ~1M characters on the UI thread.
+    private static List<CatcherField> CapFields(List<CatcherField> all, string unit, ref string? note)
+    {
+        long chars = 0;
+        for (int i = 0; i < all.Count; i++)
+        {
+            chars += all[i].Name.Length + all[i].Value.Length + (all[i].Detail?.Length ?? 0);
+            if (chars <= MaxTextChars) continue;
+            int keep = Math.Max(1, i);
+            note = (note == null ? "" : note + " ") + $"Showing the first {keep:N0} of {all.Count:N0} {unit} — copy the body for all of it.";
+            return all.GetRange(0, keep);
+        }
+        return all;
     }
 
     private static string Cap(string s, out string? note)
@@ -332,8 +351,9 @@ public static class CatcherFormat
     /// <summary>
     /// One shell word for the copied command (all of it comes from the network). Plain text: POSIX single quotes, a
     /// quote inside written '"'"' — the usual '\'' would leave what follows it unquoted if the command were pasted into
-    /// PowerShell. Text holding control, C1 or bidi characters (a terminal acts on those when they are pasted): ANSI-C
-    /// quoting $'…' with each of them escaped, so the clipboard never carries them raw.
+    /// PowerShell. Text holding control, C1 or bidi characters (a terminal acts on those when they are pasted), or
+    /// typographic quotes (PowerShell ends a '…' string at ‘ ’ ‚ ‛ too): ANSI-C quoting $'…' with each of them
+    /// escaped, so the clipboard never carries them raw.
     /// </summary>
     public static string Quote(string s)
     {
@@ -341,7 +361,7 @@ public static class CatcherFormat
         foreach (char c in s)
             // a backslash too: fish reads \' inside '…' as an escaped quote, so a value ending in \ would leave the
             // string open there; $'…' escapes it (bash / zsh), and fish refuses $'…' outright instead of running it
-            if (c == '\\' || (c is not ('\n' or '\t') && RequestCatcher.IsUnsafeDisplay(c))) { special = true; break; }
+            if (c == '\\' || IsTypographicQuote(c) || (c is not ('\n' or '\t') && RequestCatcher.IsUnsafeDisplay(c))) { special = true; break; }
         if (!special) return "'" + s.Replace("'", "'\"'\"'") + "'";
         var sb = new StringBuilder(s.Length + 16).Append("$'");
         foreach (char c in s)
@@ -355,13 +375,16 @@ public static class CatcherFormat
                 case '\r': sb.Append("\\r"); break;
                 default:
                     if (c < 0x20 || c == 0x7F) sb.Append("\\x").Append(((int)c).ToString("x2", CultureInfo.InvariantCulture));
-                    else if (RequestCatcher.IsUnsafeDisplay(c)) sb.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
+                    else if (RequestCatcher.IsUnsafeDisplay(c) || IsTypographicQuote(c)) sb.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
                     else sb.Append(c);
                     break;
             }
         }
         return sb.Append('\'').ToString();
     }
+
+    // U+2018–U+201E: the single and double typographic quotes PowerShell treats as ' and ".
+    private static bool IsTypographicQuote(char c) => c is >= '\u2018' and <= '\u201E';
 
     private static string PrintfEscape(byte[] data)
     {

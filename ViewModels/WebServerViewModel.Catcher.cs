@@ -39,10 +39,16 @@ public sealed partial class CatcherRow : ObservableObject
             _ => RequestCatcher.Printable(WsProtocol.Short(r.Target, 300)),
         };
         ClientText = r.ClientIp;
+        // what the row keeps alive: the body plus the head's strings (UTF-16; a head may be 32 KB of Latin-1)
+        long head = r.Target.Length;
+        foreach (var h in r.Headers) head += h.Key.Length + h.Value.Length;
+        Weight = r.Body.Length + 2 * head;
         Refresh();
     }
 
     public CapturedRequest Request { get; }
+    /// <summary>Bytes the row holds (body + head), counted into <see cref="WebServerViewModel.MaxRetainedBodyBytes"/>.</summary>
+    public long Weight { get; }
     public string TimeText { get; }
     public string Method { get; }
     public string PathText { get; }
@@ -131,7 +137,7 @@ public partial class WebServerViewModel : ICatcherSink
     private const string KMode = "webserver.mode", KCatchPort = "catch.port", KCatchBind = "catch.bind",
         KReplyStatus = "catch.status", KReplyType = "catch.type", KReplyBody = "catch.body", KReplyDelay = "catch.delay";
     public const int MaxRows = 500;
-    /// <summary>Bodies the list keeps in all (each is at most 1 MB): past this the oldest rows go.</summary>
+    /// <summary>Bodies and heads the list keeps in all (a body is at most 1 MB): past this the oldest rows go.</summary>
     public const long MaxRetainedBodyBytes = 64L * 1024 * 1024;
     private const int MaxPending = 2000;
     private const long MaxPendingBodyBytes = 32L * 1024 * 1024;
@@ -301,9 +307,10 @@ public partial class WebServerViewModel : ICatcherSink
         {
             CatchBindOptions.Clear();
             foreach (var o in list) CatchBindOptions.Add(o);
-            // a picked interface that went away: this device only, never all interfaces behind the user's back
+            // nothing picked yet, or a picked interface that went away: this device only — all interfaces (anyone on the
+            // network can send, read the reply and join the WebSocket echo) only when the user picks it
             SelectedCatchBind = CatchBindOptions.FirstOrDefault(o => o.Kind != "iface" ? o.Kind == want : o.Address.ToString() == want)
-                                ?? (IPAddress.TryParse(want, out _) ? CatchBindOptions.First(o => o.Kind == "loopback") : CatchBindOptions[0]);
+                                ?? CatchBindOptions.First(o => o.Kind == "loopback");
         }
         finally { _rebuildingCatchBinds = false; }
         RefreshCatchUrls();
@@ -366,7 +373,7 @@ public partial class WebServerViewModel : ICatcherSink
         CatchError = false;
         if (CatchPort is < 1 or > 65535) { CatchStatus = "Port must be between 1 and 65535."; CatchError = true; return; }
         if (ReplyError != null) { CatchStatus = "Fix the reply first: " + ReplyError; CatchError = true; IsReplyOpen = true; return; }
-        var bind = SelectedCatchBind ?? CatchBindOptions.FirstOrDefault() ?? new BindOption("All", IPAddress.IPv6Any, "all");
+        var bind = SelectedCatchBind ?? CatchBindOptions.FirstOrDefault(o => o.Kind == "loopback") ?? new BindOption("This device only (127.0.0.1)", IPAddress.Loopback, "loopback");
         var c = new RequestCatcher(this, maxConnections: 64) { Reply = BuildReply() };
         try
         {
@@ -453,7 +460,7 @@ public partial class WebServerViewModel : ICatcherSink
                 if (_rowsById.ContainsKey(item.Req.Id)) continue;
                 var row = new CatcherRow(item.Req);
                 _rowsById[item.Req.Id] = row;
-                _retainedBodyBytes += item.Req.Body.Length;
+                _retainedBodyBytes += row.Weight;
                 fresh.Add(row);
                 _catchTotal++;
             }
@@ -467,11 +474,11 @@ public partial class WebServerViewModel : ICatcherSink
         {
             fresh.Reverse();   // newest first
             Requests.InsertRange(0, fresh);
-            // caps: rows, and the bodies they hold (oldest go first)
+            // caps: rows, and the bodies + heads they hold (oldest go first)
             int keep = Math.Min(Requests.Count, MaxRows);
             long bytes = _retainedBodyBytes;
-            for (int i = Requests.Count - 1; i >= keep; i--) bytes -= Requests[i].Request.Body.Length;
-            while (bytes > MaxRetainedBodyBytes && keep > 1) bytes -= Requests[--keep].Request.Body.Length;
+            for (int i = Requests.Count - 1; i >= keep; i--) bytes -= Requests[i].Weight;
+            while (bytes > MaxRetainedBodyBytes && keep > 1) bytes -= Requests[--keep].Weight;
             if (keep < Requests.Count)
             {
                 for (int i = keep; i < Requests.Count; i++)

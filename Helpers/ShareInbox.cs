@@ -34,10 +34,24 @@ public static class ShareInbox
             if (v is >= 0x202A and <= 0x202E || v is >= 0x2066 and <= 0x2069) continue;                                  // bidi embeddings / overrides / isolates
             if (v is 0x2028 or 0x2029) continue;                                  // line / paragraph separators
             if (v is >= 0xFFF0 and <= 0xFFFF || v is >= 0xE000 and <= 0xF8FF) continue;   // specials, private use
+            if (v is 0x00AD || v is >= 0xE0000 and <= 0xE007F) continue;           // soft hyphen, tag characters (invisible)
+            // a run of blanks (spaces, or fillers that only look blank) becomes one space: padding can't push the real
+            // extension out of sight ("photo.jpg        .exe")
+            if (Rune.IsWhiteSpace(rune) || v is 0x3164 or 0x115F or 0x1160 or 0xFFA0 or 0x2800)
+            {
+                if (sb.Length > 0 && sb[^1] != ' ') sb.Append(' ');
+                continue;
+            }
             if (v is '<' or '>' or ':' or '"' or '/' or '\\' or '|' or '?' or '*') { sb.Append('_'); continue; }
             sb.Append(rune.ToString());
         }
-        s = sb.ToString().Trim();
+        // Cut to length first: the checks below must see the name as it will be saved (cutting a long name can expose
+        // "CON" or an inner ".lnk", or leave nothing).
+        return Guard(Shorten(sb.ToString().Trim()));
+    }
+
+    private static string Guard(string s)
+    {
         // Windows drops trailing dots and spaces itself ("a.txt." opens "a.txt") — and "..": nothing left
         s = s.TrimEnd('.', ' ');
         if (s.Length == 0 || s.Trim('.').Length == 0) s = "file";
@@ -51,8 +65,7 @@ public static class ShareInbox
         string ext = Path.GetExtension(s).ToLowerInvariant();
         if (ext is ".lnk" or ".url" or ".scf" or ".library-ms" or ".searchconnector-ms" or ".desktop" or ".appref-ms" or ".settingcontent-ms")
             s += "_";
-
-        return Shorten(s);
+        return s;
     }
 
     private static bool IsReservedDevice(string stem)
@@ -81,22 +94,30 @@ public static class ShareInbox
     }
 
     /// <summary>"name (2).ext" for n = 2 (a leading-dot name like ".bashrc" has no extension).</summary>
-    public static string WithCounter(string name, int n)
+    public static string WithCounter(string name, int n) => WithTag(name, n.ToString(CultureInfo.InvariantCulture));
+
+    private static string WithTag(string name, string tag)
     {
         string ext = Path.GetExtension(name);
         if (ext.Length == name.Length || ext.Length > 16) ext = string.Empty;
         string stem = name[..^ext.Length];
-        return $"{stem} ({n.ToString(CultureInfo.InvariantCulture)}){ext}";
+        return $"{stem} ({tag}){ext}";
     }
 
+    private const int MaxNumbered = 50;
+
     /// <summary>Moves a finished upload into <paramref name="folder"/> under <paramref name="name"/> (sanitized
-    /// already), or "name (2)" … when that exists — never over an existing file. Returns the final path.</summary>
+    /// already), or "name (2)" … when that exists — never over an existing file. Past " (50)" a random tag is used
+    /// ("name (3fa9c1)"): probing every number up to thousands made each upload of a common name slower than the last.
+    /// Returns the final path.</summary>
     public static string FinalizeInto(string partPath, string folder, string name)
     {
         Directory.CreateDirectory(folder);
-        for (int n = 1; n <= 9999; n++)
+        for (int n = 1; n <= MaxNumbered + 20; n++)
         {
-            string candidate = n == 1 ? name : WithCounter(name, n);
+            string candidate = n == 1 ? name
+                : n <= MaxNumbered ? WithCounter(name, n)
+                : WithTag(name, Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(3)).ToLowerInvariant());
             string target = Path.Combine(folder, candidate);
             if (File.Exists(target) || Directory.Exists(target)) continue;
             try

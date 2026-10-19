@@ -29,8 +29,15 @@ public enum SocketState { Idle, Connecting, Connected, Listening }
 /// </summary>
 public sealed partial class SocketEntry : ObservableObject
 {
-    /// <summary>Longest text shown for one entry (the whole data still goes to copy / save).</summary>
-    public const int MaxTextChars = 16_384;
+    /// <summary>Longest text shown for one entry (the whole data still goes to copy / save). Laying out wrapped text
+    /// costs the UI thread up to ~1 s per 4,000 characters of Persian or mixed-direction text, so a peer's long
+    /// message must not decide how long the window freezes.</summary>
+    public const int MaxTextChars = 2_048;
+    /// <summary>Persian, Arabic and other text that is mostly non-ASCII costs the layout ~0.12 ms a character (several
+    /// times Latin text): such an entry shows fewer characters, so one message stays within ~50 ms.</summary>
+    public const int MaxComplexTextChars = 400;
+    /// <summary>Most lines shown for one entry (a message of short lines is just as costly).</summary>
+    public const int MaxTextLines = 200;
 
     private string? _text;
     private bool? _binary;
@@ -99,10 +106,18 @@ public sealed partial class SocketEntry : ObservableObject
     {
         if (Data == null) return Message ?? string.Empty;
         if (Data.Length == 0) return Tag is "ping" or "pong" ? "(no payload)" : "(empty)";
-        string t = SocketPayload.ToDisplayText(Data, MaxTextChars, out int shown);
+        string t = SocketPayload.ToDisplayText(Data, IsMostlyNonAscii(Data) ? MaxComplexTextChars : MaxTextChars, out int shown, MaxTextLines);
         if (t.Length == 0) return Data.Length <= 2 ? "(line break)" : "(line breaks)";
         if (shown < Data.Length) t += $"\n… {SocketPayload.FormatBytes(Data.Length - shown)} more — copy or save the transcript for all of it";
         return t;
+    }
+
+    // judged on the part an entry can show at most: over a quarter of the bytes are UTF-8 sequences
+    private static bool IsMostlyNonAscii(byte[] d)
+    {
+        int n = Math.Min(d.Length, MaxTextChars * 2), high = 0;
+        for (int i = 0; i < n; i++) if (d[i] >= 0x80) high++;
+        return high * 4 > n;
     }
 
     internal SocketEntry Merge(byte[] more, DateTime at)
@@ -151,7 +166,9 @@ public partial class SocketViewModel : ObservableObject
     private const int MaxEntries = 2000;
     private const long MaxRetainedBytes = 16L * 1024 * 1024;
     private const long MaxPendingBytes = 8L * 1024 * 1024;
-    private const int MaxQueuedEvents = 4000;
+    // Events one 100 ms tick takes: each becomes a transcript row, and adding / trimming thousands of rows a tick kept
+    // the UI thread busy longer than the tick itself under a flood (the rest is counted in the "Skipped" note).
+    private const int MaxQueuedEvents = 300;
     private const int MergeLimit = 64 * 1024;
     private const double MergeWindowMs = 150;
 
@@ -810,9 +827,10 @@ public partial class SocketViewModel : ObservableObject
     private enum EvKind { Received, Info, Error, PeerJoined, PeerLeft, Ended, WsData }
 
     /// <summary>A queued event. WebSocket frames (WsData) carry their kind in <see cref="Tag"/>, a round trip / frame
-    /// count in <see cref="Detail"/>, and <see cref="Flag"/> = binary.</summary>
+    /// count in <see cref="Detail"/>, and <see cref="Flag"/> = binary. <see cref="Until"/>: the last chunk's time when
+    /// the drain joined several reads into one.</summary>
     private sealed record Ev(EvKind Kind, int Gen, SocketPeer? Peer, byte[]? Data, string? Text, bool Flag, DateTime Time,
-                             string? Tag = null, string? Detail = null);
+                             string? Tag = null, string? Detail = null, DateTime? Until = null);
 
     /// <summary>Per-session sink: events of a session the user already closed carry an old generation and are dropped.</summary>
     private sealed class Sink : ISocketSink
@@ -858,6 +876,7 @@ public partial class SocketViewModel : ObservableObject
         bool peersChanged = false;
         List<Ev>? evs = null;
         while (_queue.TryDequeue(out var e)) (evs ??= new List<Ev>()).Add(e);
+        if (evs is { Count: > 1 } && _sessionMode is 0 or 1) JoinReads(evs);
         int count = evs?.Count ?? 0;
         // A client that connects AND leaves within one batch never gets a list row (its notes still go to the
         // transcript): a connect/close flood would otherwise add and remove a ListBox row per connection on the UI thread.
@@ -947,17 +966,54 @@ public partial class SocketViewModel : ObservableObject
                 && prev.DataLength + ev.Data!.Length <= MergeLimit
                 && (ev.Time - prev.LastChunk).TotalMilliseconds <= MergeWindowMs)
             {
-                var merged = prev.Merge(ev.Data, ev.Time);
+                var merged = prev.Merge(ev.Data, ev.Until ?? ev.Time);
                 if (inBatch) batch[^1] = merged;
                 else
                 {
-                    _retainedBytes += ev.Data.Length;
-                    Entries[Entries.Count - 1] = merged;
+                    // the shown entry moves into this batch: a trickle costs one remove + add (one re-layout) a tick,
+                    // not a replace per chunk
+                    Entries.RemoveAt(Entries.Count - 1);
+                    _retainedBytes -= prev.DataLength;
+                    batch.Add(merged);
                 }
                 return;
             }
         }
-        batch.Add(new SocketEntry(SocketEntryKind.Received, ev.Time, ev.Data, null, ev.Peer?.Label) { PeerRef = ev.Peer, LastChunk = ev.Time });
+        batch.Add(new SocketEntry(SocketEntryKind.Received, ev.Time, ev.Data, null, ev.Peer?.Label) { PeerRef = ev.Peer, LastChunk = ev.Until ?? ev.Time });
+    }
+
+    // Back-to-back reads of one peer (within MergeWindowMs, up to MergeLimit) become one array here, once per drain:
+    // merging them into the entry one by one copied the whole entry per read (4,000 small reads a tick allocated ~128 MB).
+    private static void JoinReads(List<Ev> evs)
+    {
+        int w = 0;
+        for (int r = 0; r < evs.Count;)
+        {
+            var first = evs[r];
+            int end = r + 1;
+            long total = first.Data?.Length ?? 0;
+            if (first.Kind == EvKind.Received)
+                while (end < evs.Count && evs[end] is { Kind: EvKind.Received } n && n.Gen == first.Gen && ReferenceEquals(n.Peer, first.Peer)
+                       && total + n.Data!.Length <= MergeLimit && (n.Time - evs[end - 1].Time).TotalMilliseconds <= MergeWindowMs)
+                {
+                    total += n.Data.Length;
+                    end++;
+                }
+            if (end - r > 1)
+            {
+                var all = new byte[total];
+                int at = 0;
+                for (int k = r; k < end; k++)
+                {
+                    evs[k].Data!.CopyTo(all, at);
+                    at += evs[k].Data!.Length;
+                }
+                first = first with { Data = all, Until = evs[end - 1].Time };
+            }
+            evs[w++] = first;
+            r = end;
+        }
+        evs.RemoveRange(w, evs.Count - w);
     }
 
     private void Commit(List<SocketEntry> batch)
@@ -1077,10 +1133,11 @@ public partial class SocketViewModel : ObservableObject
                 sb.Append('\n');
                 bool hex = view == 1 || view == 2 || e.LooksBinary;
                 bool text = view == 0 ? !e.LooksBinary : view == 2;
-                if (text) sb.Append(SocketPayload.ToDisplayText(e.Data, int.MaxValue, out _)).Append('\n');
+                // data lines are indented: a peer's own "\n[12:00:00.000] ← …" can't pass for an entry of the transcript
+                if (text) sb.Append("  ").Append(SocketPayload.ToDisplayText(e.Data, int.MaxValue, out _).Replace("\n", "\n  ")).Append('\n');
                 if (hex) sb.Append(SocketPayload.HexDump(e.Data)).Append('\n');
             }
-            else sb.Append(' ').Append(e.Message).Append('\n');
+            else sb.Append(' ').Append(e.Message?.Replace("\n", "\n  ")).Append('\n');
         }
         return sb.ToString();
     }

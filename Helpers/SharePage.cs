@@ -108,7 +108,7 @@ public static class SharePage
 """ + Logo + """
 <h1>Enter the PIN</h1>
 <p class="muted">Shown in Echoes on <b class="hostName">the other device</b>.</p>
-<input id="pin" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="9" placeholder="000000" aria-label="PIN">
+<input id="pin" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="9" placeholder="00000000" aria-label="PIN">
 <div class="err" id="loginErr"></div>
 <button type="submit" class="btn primary wide" id="loginBtn">Open</button>
 </form>
@@ -171,6 +171,7 @@ a{color:var(--accentText)}
 .meta{display:flex;align-items:center;font-size:12px;color:var(--muted);margin:0 3px 3px;min-height:22px}
 .who{font-weight:600;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .mine .who{color:var(--accentText)}
+.tag{flex:0 0 auto;margin-left:6px;padding:0 6px;border:1px solid var(--softLine);border-radius:6px;background:var(--soft);color:var(--accentText);font-size:11px;font-weight:600;line-height:16px;white-space:nowrap}
 .when{white-space:nowrap;margin-left:6px}
 .sp{flex:1 1 auto;min-width:8px}
 .mini{border:1px solid var(--bg);background:var(--bg);color:var(--muted);font-size:12px;padding:1px 7px;border-radius:6px;cursor:pointer;white-space:nowrap}
@@ -560,6 +561,7 @@ function addMessage(m, live) {
   var who = el('span', 'who', mine ? 'You' : (m.from || '?'));
   who.setAttribute('dir', 'auto');
   meta.appendChild(who);
+  if (m.host) { row.className += ' host'; meta.appendChild(el('span', 'tag', 'Host')); }   /* the server's flag, not the name */
   meta.appendChild(el('span', 'when', when(m.time)));
   meta.appendChild(el('span', 'sp'));
   var bubble = el('div', 'bubble');
@@ -832,7 +834,7 @@ function wire() {
   $('loginForm').onsubmit = function (e) {
     e.preventDefault();
     var v = $('pin').value.replace(/[^0-9]/g, '');
-    if (v.length < 4) { $('loginErr').textContent = 'Type the 6-digit PIN shown in Echoes.'; return; }
+    if (v.length < 4) { $('loginErr').textContent = 'Type the 8-digit PIN shown in Echoes.'; return; }
     login(v);
   };
   $('composer').onsubmit = function (e) { e.preventDefault(); sendText(); };

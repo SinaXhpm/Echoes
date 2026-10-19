@@ -66,8 +66,17 @@ internal sealed class HubReader
     private readonly Stream _s;
     private readonly byte[] _buf = new byte[MaxHead + 4];
     private int _start, _end;
+    private readonly int _bodyIdleMs;
+    // The current request's body must be in by then (Environment.TickCount64; 0 = no body): idle + 1 ms per 4 bytes, at
+    // least ~4 KB/s overall. The per-read idle timeout alone let a client trickle a byte every 29 s and hold a connection
+    // slot for days — on every route, before any PIN.
+    private long _bodyDeadline;
 
-    public HubReader(Stream s) => _s = s;
+    public HubReader(Stream s, int bodyIdleMs)
+    {
+        _s = s;
+        _bodyIdleMs = bodyIdleMs;
+    }
 
     /// <summary>Bytes read past the head (handed to a WebSocket).</summary>
     public byte[] TakeBuffered()
@@ -94,6 +103,7 @@ internal sealed class HubReader
     /// <summary>(null, 0) = closed before a new request; (null, status) = a bad request to answer with status.</summary>
     public async Task<(HubRequest? Request, int Error)> ReadHeadAsync(CancellationToken ct)
     {
+        _bodyDeadline = 0;   // the last request's: set again by Parse for this one's body
         int scanned = 0;
         while (true)
         {
@@ -135,8 +145,8 @@ internal sealed class HubReader
             if (l[0] is ' ' or '\t') return (null, 400);                 // obsolete folding: refused
             int c = l.IndexOf(':');
             if (c <= 0) return (null, 400);
-            string name = l[..c].Trim();
-            if (!WsProtocol.IsToken(name)) return (null, 400);
+            string name = l[..c];
+            if (!WsProtocol.IsToken(name)) return (null, 400);   // also "Content-Length : 5" (RFC 9112: whitespace before the colon)
             string value = l[(c + 1)..].Trim();
             foreach (char ch in value) if (ch < 0x20 && ch != '\t' || ch == 0x7F) return (null, 400);
             req.Headers.Add(new KeyValuePair<string, string>(name, value));
@@ -151,9 +161,12 @@ internal sealed class HubReader
             length = v;
         }
         req.ContentLength = length;
+        _bodyDeadline = length > 0 ? Environment.TickCount64 + _bodyIdleMs + length / 4 : 0;
         return (req, 0);
     }
 
+    /// <summary>Buffered bytes first, then the stream. Past the request body's deadline it throws
+    /// <see cref="OperationCanceledException"/> (as an idle timeout does): the caller drops the connection.</summary>
     public async ValueTask<int> ReadAsync(Memory<byte> dest, CancellationToken ct)
     {
         if (_end > _start)
@@ -163,7 +176,13 @@ internal sealed class HubReader
             _start += n;
             return n;
         }
-        return await _s.ReadAsync(dest, ct).ConfigureAwait(false);
+        long deadline = _bodyDeadline;
+        if (deadline == 0) return await _s.ReadAsync(dest, ct).ConfigureAwait(false);
+        long left = deadline - Environment.TickCount64;
+        if (left <= 0) throw new OperationCanceledException("The request body didn't arrive in time.");
+        using var total = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        total.CancelAfter((int)Math.Min(left, int.MaxValue));
+        return await _s.ReadAsync(dest, total.Token).ConfigureAwait(false);
     }
 
     /// <summary>Exactly <paramref name="length"/> body bytes (small JSON bodies), each read within <paramref name="idleMs"/>;

@@ -170,6 +170,11 @@ public static class SocketNet
 
     private static void Prepare(Socket s, SocketType type)
     {
+        // Without it, another program may bind 127.0.0.1:port or [::1]:port (a more specific address) next to an "all
+        // interfaces" socket and take its connections. Quick restarts on the same port with connections in TIME_WAIT
+        // still bind (tested).
+        if (OperatingSystem.IsWindows()) s.ExclusiveAddressUse = true;
+
         // Windows reports an ICMP "port unreachable" for an EARLIER datagram as a reset on the next receive of an
         // unconnected UDP socket, which would kill the server's receive loop for one gone client: switch that off.
         if (type == SocketType.Dgram && OperatingSystem.IsWindows())
@@ -351,8 +356,9 @@ public sealed class TcpClientSession : IDisposable
         catch (Exception ex)
         {
             ssl.Dispose();
+            // the summary quotes the certificate's own names (any characters, any length): cleaned like any server text
             if (problems != null)
-                throw new SocketFailure("Certificate not trusted: " + TlsCertificates.Summary(problems), ex) { CertSha256 = sha, CertProblems = problems };
+                throw new SocketFailure("Certificate not trusted: " + WsProtocol.Short(WebSocketClient.Clean(TlsCertificates.Summary(problems)), 300), ex) { CertSha256 = sha, CertProblems = problems };
             if (ex is OperationCanceledException && ct.IsCancellationRequested) throw;
             throw new SocketFailure(SocketErrors.Describe(ex, SocketAction.Tls, target, port), ex);
         }
@@ -439,6 +445,8 @@ public sealed class TcpClientSession : IDisposable
 public sealed class TcpServerSession : IDisposable
 {
     public const int MaxClients = 64;
+    /// <summary>One address (loopback excepted) may hold at most half the slots, so one host can't lock everyone out.</summary>
+    public const int MaxPerAddress = MaxClients / 2 < 8 ? 8 : MaxClients / 2;
 
     private readonly Socket _listener;
     private readonly ISocketSink _sink;
@@ -496,14 +504,34 @@ public sealed class TcpServerSession : IDisposable
             try { ep = SocketNet.Normalize((IPEndPoint)client.RemoteEndPoint!); }
             catch { try { client.Dispose(); } catch { } continue; }   // already gone
 
-            if (_peers.Count >= MaxClients)
+            bool full = _peers.Count >= MaxClients;
+            if (full || !IPAddress.IsLoopback(ep.Address) && CountFrom(ep.Address) >= MaxPerAddress)
             {
                 try { client.Dispose(); } catch { }
-                NoteTurnedAway(ep);
+                NoteTurnedAway(ep, full);
                 continue;
             }
-            client.NoDelay = true;
-            var peer = new SocketPeer(ep) { Socket = client, Stream = new NetworkStream(client, ownsSocket: true) };
+            SocketPeer peer;
+            try
+            {
+                client.NoDelay = true;
+                // a client that vanished without a FIN (powered off, left the Wi-Fi) is found and dropped instead of
+                // holding a slot forever; the system default waits 2 hours before the first probe
+                client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+                try
+                {
+                    client.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, 60);
+                    client.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, 10);
+                }
+                catch { /* not adjustable here: the system's timing */ }
+                peer = new SocketPeer(ep) { Socket = client, Stream = new NetworkStream(client, ownsSocket: true) };
+            }
+            catch
+            {
+                // reset between accept and here (macOS / Linux refuse socket options on it): drop it, keep accepting
+                try { client.Dispose(); } catch { }
+                continue;
+            }
             _peers[peer.Id] = peer;
             _sink.OnPeerJoined(peer);
             _ = Task.Run(() => PeerLoopAsync(peer));
@@ -517,14 +545,23 @@ public sealed class TcpServerSession : IDisposable
     private int _turnedAway;        // refused since the last line
     private int _turnedAwayArmed;   // 1 while the summary task runs
 
-    private void NoteTurnedAway(IPEndPoint ep)
+    private int CountFrom(IPAddress address)
+    {
+        int n = 0;
+        foreach (var p in _peers.Values) if (p.EndPoint.Address.Equals(address)) n++;
+        return n;
+    }
+
+    private void NoteTurnedAway(IPEndPoint ep, bool full)
     {
         if (Interlocked.CompareExchange(ref _turnedAwayArmed, 1, 0) != 0)
         {
             Interlocked.Increment(ref _turnedAway);
             return;
         }
-        _sink.OnInfo($"Turned away {SocketNet.Label(ep)} — {MaxClients} clients are already connected.");
+        _sink.OnInfo(full
+            ? $"Turned away {SocketNet.Label(ep)} — {MaxClients} clients are already connected."
+            : $"Turned away {SocketNet.Label(ep)} — {ep.Address} already has {MaxPerAddress} connections (the most one address may hold).");
         _ = Task.Run(async () =>
         {
             while (true)
@@ -533,7 +570,7 @@ public sealed class TcpServerSession : IDisposable
                 catch (OperationCanceledException) { return; }   // stopped: nothing more to report
                 int n = Interlocked.Exchange(ref _turnedAway, 0);
                 if (n == 0) { Volatile.Write(ref _turnedAwayArmed, 0); return; }
-                _sink.OnInfo($"Turned away {n} more connection{(n == 1 ? "" : "s")} — {MaxClients} clients are already connected.");
+                _sink.OnInfo($"Turned away {n} more connection{(n == 1 ? "" : "s")} — the server is full, or one address has too many.");
             }
         });
     }

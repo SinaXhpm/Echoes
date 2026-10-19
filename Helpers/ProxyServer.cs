@@ -8,6 +8,7 @@ using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -41,6 +42,8 @@ public sealed class ProxyServer : IDisposable
     // One deadline for everything before the relay starts (first byte, SOCKS/HTTP negotiation, auth,
     // request head) — same 15 s as FileHttpServer's header read.
     private const int HandshakeMs = 15_000;
+    // …but a socket that hasn't sent its first byte by this time is dropped sooner: every client speaks first.
+    private const int FirstByteMs = 5_000;
     // A tunnel with no traffic in EITHER direction for this long is torn down and frees its slot.
     private const int IdleMs = 5 * 60_000;
     private const int MaxHeadBytes = 32 * 1024;
@@ -62,7 +65,8 @@ public sealed class ProxyServer : IDisposable
     private readonly int _perPeerCap;
     private readonly ConcurrentDictionary<IPAddress, int> _perPeer = new();
     private readonly object _authGate = new();
-    private readonly Dictionary<IPAddress, (int fails, long until)> _authFails = new();   // under _authGate
+    private readonly Dictionary<IPAddress, (int fails, long until, long last)> _authFails = new();   // under _authGate; last = latest failure
+    private const int MaxAuthEntries = 4096;
     private readonly OwnAddresses _own = new();
 
     private TcpListener? _listener;
@@ -88,8 +92,9 @@ public sealed class ProxyServer : IDisposable
         _onConn = onConn;
         int max = Math.Clamp(maxConnections, 1, 512);
         _slots = new SemaphoreSlim(max);
-        // At most half the slots per LAN host, but never fewer than 16 — a browser's usual burst through a proxy.
-        _perPeerCap = Math.Max(Math.Min(16, max), max / 2);
+        // At most half of the slots per LAN host (never fewer than 8): one phone loading a heavy page opens dozens of
+        // tunnels at once, so a tighter cap would break normal browsing. Silent sockets are cut by FirstByteMs instead.
+        _perPeerCap = Math.Max(8, max / 2);
     }
 
     public void Start(IPAddress bind, int port)
@@ -180,9 +185,10 @@ public sealed class ProxyServer : IDisposable
                 // stall the accept loop until STOP. The relay itself runs on the server token plus its
                 // own idle timeout — never on this one, or every tunnel would die after 15 s.
                 using var hs = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                hs.CancelAfter(HandshakeMs);
+                hs.CancelAfter(FirstByteMs);
                 var one = new byte[1];
                 if (await stream.ReadAsync(one.AsMemory(0, 1), hs.Token).ConfigureAwait(false) == 0) return;
+                hs.CancelAfter(HandshakeMs);   // it spoke: the full negotiation deadline from here
 
                 if (one[0] == 0x05) await HandleSocks5(stream, peer, hs.Token, ct).ConfigureAwait(false);
                 else await HandleHttp(stream, peer, one[0], hs.Token, ct).ConfigureAwait(false);
@@ -326,11 +332,27 @@ public sealed class ProxyServer : IDisposable
             _authFails.TryGetValue(ip, out var f);
             if (f.until > now) { locked = true; return false; }
             if (ok) { _authFails.Remove(ip); return true; }
-            if (_authFails.Count > 4096) _authFails.Clear();   // bound memory against address churn
+            if (_authFails.Count > MaxAuthEntries) TrimAuthFails(now);
             int fails = f.until != 0 ? 1 : f.fails + 1;   // a lockout that ran out → count afresh
-            _authFails[ip] = fails >= MaxAuthFails ? (0, now + LockoutMs) : (fails, 0L);
+            _authFails[ip] = fails >= MaxAuthFails ? (0, now + LockoutMs, now) : (fails, 0L, now);
             return false;
         }
+    }
+
+    // Bounds the table against address churn without lifting lockouts early (a wholesale Clear() let 4097 throwaway
+    // addresses unlock everyone): run-out lockouts and counts idle for LockoutMs go first, then the oldest counts, and a
+    // live lockout only if the table is still full of them. Trims to 3/4 so it doesn't run on every failure.
+    private void TrimAuthFails(long now)
+    {
+        var drop = new List<IPAddress>();
+        foreach (var (ip, f) in _authFails)
+            if (f.until != 0 ? f.until <= now : now - f.last >= LockoutMs) drop.Add(ip);
+        foreach (var ip in drop) _authFails.Remove(ip);
+        int excess = _authFails.Count - MaxAuthEntries * 3 / 4;
+        if (excess <= 0) return;
+        var rest = new List<KeyValuePair<IPAddress, (int fails, long until, long last)>>(_authFails);
+        rest.Sort((x, y) => x.Value.until > now != y.Value.until > now ? (x.Value.until > now ? 1 : -1) : x.Value.last.CompareTo(y.Value.last));
+        for (int i = 0; i < excess; i++) _authFails.Remove(rest[i].Key);
     }
 
     // ------------------------------------------------------------------ HTTP
@@ -342,11 +364,11 @@ public sealed class ProxyServer : IDisposable
         // a pipelined TLS ClientHello) stay in the reader and are forwarded, not dropped.
         var reader = new HttpReader(s, first);
         var (head, tooLarge) = await reader.ReadHeadAsync(MaxHeadBytes, hs).ConfigureAwait(false);
-        if (tooLarge) { await WriteAscii(s, "HTTP/1.1 431 Request Header Fields Too Large\r\nConnection: close\r\n\r\n", hs); return; }
+        if (tooLarge) { await ReplyAndClose(s, "HTTP/1.1 431 Request Header Fields Too Large\r\nConnection: close\r\n\r\n", hs); return; }
         if (head is null) return;   // closed before the head was complete
         string requestLine = head[..head.IndexOf("\r\n", StringComparison.Ordinal)];
         var parts = requestLine.Split(' ');
-        if (parts.Length < 3) { await WriteAscii(s, "HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n", hs); return; }
+        if (parts.Length < 3) { await ReplyAndClose(s, "HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n", hs); return; }
         string method = parts[0], uri = parts[1], ver = parts[2];
 
         string user = "—";
@@ -359,8 +381,8 @@ public sealed class ProxyServer : IDisposable
             else locked = IsLockedOut(peer.Address);   // no credentials yet (the first 407) isn't a failure
             if (!ok)
             {
-                await WriteAscii(s, "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"Echoes\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", hs);
                 Log(peer.Name, "HTTP", uri, user, false, locked ? "locked out" : u is null ? "auth required" : "bad credentials");
+                await ReplyAndClose(s, "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"Echoes\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", hs);
                 return;
             }
         }
@@ -370,7 +392,7 @@ public sealed class ProxyServer : IDisposable
             var (h, p) = SplitHostPort(uri, 443);
             TcpClient remote;
             try { remote = await Dial(h, p, peer, ct); }
-            catch (Exception ex) { Log(peer.Name, "HTTPS", FormatTarget(h, p), user, false, DialFailText(ex)); await WriteAscii(s, HttpDialError(ex), ct); return; }
+            catch (Exception ex) { Log(peer.Name, "HTTPS", FormatTarget(h, p), user, false, DialFailText(ex)); await ReplyAndClose(s, HttpDialError(ex), ct); return; }
             using (remote)   // owned from here on, so a failing reply write can't leak the upstream socket
             {
                 var rstream = remote.GetStream();
@@ -387,14 +409,14 @@ public sealed class ProxyServer : IDisposable
             if (!Uri.TryCreate(uri, UriKind.Absolute, out var u) || u.Scheme != Uri.UriSchemeHttp
                 || !TryGetBodyFraming(head, out bool chunked, out long length))
             {
-                await WriteAscii(s, "HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n", ct);
+                await ReplyAndClose(s, "HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n", ct);
                 return;
             }
             string host = u.Host;
             int port = u.IsDefaultPort ? 80 : u.Port;
             TcpClient remote;
             try { remote = await Dial(host, port, peer, ct); }
-            catch (Exception ex) { Log(peer.Name, "HTTP", FormatTarget(host, port), user, false, DialFailText(ex)); await WriteAscii(s, HttpDialError(ex), ct); return; }
+            catch (Exception ex) { Log(peer.Name, "HTTP", FormatTarget(host, port), user, false, DialFailText(ex)); await ReplyAndClose(s, HttpDialError(ex), ct); return; }
 
             using (remote)   // owned from here on, so a failing write can't leak the upstream socket
             {
@@ -404,7 +426,7 @@ public sealed class ProxyServer : IDisposable
                 byte[] rebuilt = Encoding.Latin1.GetBytes(RebuildForOrigin(head, method, u, ver));
                 await rstream.WriteAsync(rebuilt, ct);
                 Interlocked.Add(ref _bytesUp, rebuilt.Length);
-                Log(peer.Name, "HTTP", $"{host}:{port}{u.PathAndQuery}", user, true, "forward");
+                Log(peer.Name, "HTTP", $"{host}:{port}{u.AbsolutePath}", user, true, "forward");   // no query: it may carry tokens
                 await ForwardAsync(reader, s, rstream, chunked, length, ct);
             }
         }
@@ -420,15 +442,16 @@ public sealed class ProxyServer : IDisposable
     {
         using var idle = CancellationTokenSource.CreateLinkedTokenSource(ct);
         idle.CancelAfter(IdleMs);
+        var answered = new StrongBox<bool>();   // the final response head is on its way to the client
         // Upload alongside the response, so a '100 Continue' or an early error reply reaches the client
         // while it is still sending.
-        _ = SendBodyAsync(client, rs, chunked, length, idle);
-        await RelayResponseAsync(rs, cs, idle).ConfigureAwait(false);
+        _ = SendBodyAsync(client, rs, chunked, length, idle, answered);
+        await RelayResponseAsync(rs, cs, idle, answered).ConfigureAwait(false);
     }
 
     // Client → origin: exactly this request's body (Content-Length bytes, or chunks through the last-chunk
     // and trailers) and nothing after it. A broken upload cancels the whole exchange. Never throws.
-    private async Task SendBodyAsync(HttpReader client, NetworkStream rs, bool chunked, long length, CancellationTokenSource idle)
+    private async Task SendBodyAsync(HttpReader client, NetworkStream rs, bool chunked, long length, CancellationTokenSource idle, StrongBox<bool> answered)
     {
         try
         {
@@ -436,7 +459,17 @@ public sealed class ProxyServer : IDisposable
             bool ok = chunked
                 ? await CopyChunkedAsync(client, rs, idle, tok).ConfigureAwait(false)
                 : await CopyBodyAsync(client, rs, length, idle, tok).ConfigureAwait(false);
-            if (!ok) idle.Cancel();
+            if (!ok) { idle.Cancel(); return; }
+            // Body sent; keep watching the client. Its EOF once the answer has started means it left (a browser closing
+            // after a Content-Length body): end the exchange instead of holding the slot for an origin that ignores
+            // 'Connection: close'. An EOF before the answer is a half-close: keep waiting for it. What it sends meanwhile
+            // is a pipelined request that is never served: read off and dropped, at most 64 KB.
+            for (int extra = 0; extra < 64 * 1024;)
+            {
+                var more = await client.ReadSomeAsync(64 * 1024, tok).ConfigureAwait(false);
+                if (more.IsEmpty) { if (Volatile.Read(ref answered.Value)) idle.Cancel(); return; }
+                extra += more.Length;
+            }
         }
         catch { try { idle.Cancel(); } catch { /* exchange already over */ } }
     }
@@ -485,7 +518,7 @@ public sealed class ProxyServer : IDisposable
 
     // Origin → client: the response head with 'Connection: close' (1xx interim heads pass as they are),
     // then the body until the origin closes. A head that isn't HTTP or won't parse is passed through raw.
-    private async Task RelayResponseAsync(NetworkStream rs, NetworkStream cs, CancellationTokenSource idle)
+    private async Task RelayResponseAsync(NetworkStream rs, NetworkStream cs, CancellationTokenSource idle, StrongBox<bool> answered)
     {
         var tok = idle.Token;
         var origin = new HttpReader(rs);
@@ -501,6 +534,7 @@ public sealed class ProxyServer : IDisposable
             Interlocked.Add(ref _bytesDown, b.Length);
             if (!interim) break;
         }
+        Volatile.Write(ref answered.Value, true);   // the final head is out (or a raw answer is about to be)
         var rest = origin.TakeBuffered();
         if (!rest.IsEmpty) { await cs.WriteAsync(rest, tok).ConfigureAwait(false); Interlocked.Add(ref _bytesDown, rest.Length); }
         await Pump(rs, cs, false, idle).ConfigureAwait(false);
@@ -625,7 +659,8 @@ public sealed class ProxyServer : IDisposable
                 ReadOnlySpan<byte> un = c >= 0 ? raw.AsSpan(0, c) : raw.AsSpan();
                 ReadOnlySpan<byte> pw = c >= 0 ? raw.AsSpan(c + 1) : ReadOnlySpan<byte>.Empty;
                 bool ok = CryptographicOperations.FixedTimeEquals(un, _userBytes) & CryptographicOperations.FixedTimeEquals(pw, _passBytes);
-                return (ok, Encoding.UTF8.GetString(un));
+                // Without a ':' the whole credential may be a password or token: never shown as the user name.
+                return (ok, c >= 0 ? Encoding.UTF8.GetString(un) : "—");
             }
             catch { return (false, null); }
             finally { if (raw is not null) CryptographicOperations.ZeroMemory(raw); }
@@ -659,7 +694,7 @@ public sealed class ProxyServer : IDisposable
     }
 
     private const string DeniedBody = "Echoes proxy: for clients on other devices, this device's own addresses (loopback, link-local, LAN, VPN) are blocked, " +
-                                      "and so are private networks other than the client's own while the proxy has no password.\n";
+                                      "and so are private networks other than the client's own and mail ports (25, 465, 587) while the proxy has no password.\n";
 
     private static string HttpDialError(Exception ex) => ex is ProxyDeniedException
         ? $"HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\nContent-Length: {DeniedBody.Length}\r\nConnection: close\r\n\r\n{DeniedBody}"
@@ -686,16 +721,25 @@ public sealed class ProxyServer : IDisposable
             : await Dns.GetHostAddressesAsync(host, timeout.Token).ConfigureAwait(false);
         if (addrs.Length == 0) throw new SocketException((int)SocketError.HostNotFound);
         if (!peer.IsLocal)
-            foreach (var a in addrs)
+        {
+            // Without a password anyone who reaches the port could send mail under this device's address (spam relay).
+            if (!_authRequired && port is 25 or 465 or 587) throw new ProxyDeniedException("blocked (mail port)");
+            // The client's own subnet = the entry interface's subnet, and only if the client is on it too: one coming
+            // through a port forward, a router or a VPN isn't, and gets no private target at all.
+            bool clientOnLink = peer.Address is { } client && _own.SameSubnet(client, peer.LocalAddress);
+            foreach (var raw in addrs)
             {
+                var a = EmbeddedIPv4(raw);   // ::a.b.c.d, NAT64, 6to4 … judged as the IPv4 inside
                 if (IsLocalTarget(a)) throw new ProxyDeniedException("blocked (local)");
-                if (_own.Contains(a, peer.LocalAddress)) throw new ProxyDeniedException("blocked (this host)");
+                if (_own.Contains(raw, peer.LocalAddress) || _own.Contains(a, peer.LocalAddress)) throw new ProxyDeniedException("blocked (this host)");
                 // Without a password the proxy serves anyone on the network it listens on: the internet and the client's
-                // own subnet, yes; the private networks only this device reaches (WSL / Docker / Hyper-V guests, a VPN's
-                // or another interface's private ranges), no. With a password the user chose who connects: unchanged.
-                if (!_authRequired && IsPrivateTarget(a) && !_own.SameSubnet(a, peer.LocalAddress))
+                // own subnet, yes; the networks only this device reaches (WSL / Docker / Hyper-V guests, a VPN's or another
+                // interface's ranges, the LAN's global IPv6 prefix), no. With a password the user chose who connects: unchanged.
+                if (!_authRequired && (IsPrivateTarget(a) || _own.OnOtherLink(a, peer.LocalAddress))
+                    && !(clientOnLink && _own.SameSubnet(a, peer.LocalAddress)))
                     throw new ProxyDeniedException("blocked (private network)");
             }
+        }
 
         Exception? last = null;
         foreach (var a in addrs)
@@ -729,6 +773,24 @@ public sealed class ProxyServer : IDisposable
         bool zeroPrefix = b.AsSpan(0, 15).IndexOfAnyExcept((byte)0) < 0;
         return (zeroPrefix && b[15] <= 1)                              // :: unspecified, ::1 loopback
                || (b[0] == 0xFE && (b[1] & 0xC0) == 0x80);             // fe80::/10 link-local
+    }
+
+    // The IPv4 address an IPv6 one carries, else the address itself: IPv4-mapped (::ffff:a.b.c.d), IPv4-compatible
+    // (::a.b.c.d), IPv4-translated (::ffff:0:a.b.c.d), NAT64 (64:ff9b::/96, 64:ff9b:1::/48 with the IPv4 in the last
+    // 32 bits) and 6to4 (2002:AABB:CCDD::/48). Judged as that IPv4, so 64:ff9b::7f00:1 counts as 127.0.0.1.
+    private static IPAddress EmbeddedIPv4(IPAddress a)
+    {
+        if (a.AddressFamily != AddressFamily.InterNetworkV6) return a;
+        if (a.IsIPv4MappedToIPv6) return a.MapToIPv4();
+        var b = a.GetAddressBytes();
+        bool zero8 = b.AsSpan(0, 8).IndexOfAnyExcept((byte)0) < 0;
+        if (zero8 && b[10] == 0 && b[11] == 0 && (b[8], b[9]) is (0, 0) or (0xFF, 0xFF))   // ::a.b.c.d, ::ffff:0:a.b.c.d
+            return new IPAddress(b.AsSpan(12, 4));
+        if (b[0] == 0x00 && b[1] == 0x64 && b[2] == 0xFF && b[3] == 0x9B
+            && (b.AsSpan(4, 8).IndexOfAnyExcept((byte)0) < 0 || (b[4] == 0 && b[5] == 1)))   // 64:ff9b::/96, 64:ff9b:1::/48
+            return new IPAddress(b.AsSpan(12, 4));
+        if (b[0] == 0x20 && b[1] == 0x02) return new IPAddress(b.AsSpan(2, 4));   // 2002::/16
+        return a;
     }
 
     // Private ranges: 10/8, 172.16/12, 192.168/16, 100.64/10 (carrier-grade NAT, Tailscale), fc00::/7 (unique local),
@@ -802,6 +864,27 @@ public sealed class ProxyServer : IDisposable
             int prefix = Current().Prefixes.TryGetValue(e, out int p) && p > 0 ? p : v4 ? 120 : 64;
             int shift = 128 - Math.Clamp(prefix, 1, 128);
             return (k >> shift) == (e >> shift);
+        }
+
+        // Is 'a' on the subnet of one of this device's interfaces OTHER than the entry one (another LAN, a corporate
+        // network on a second adapter, the LAN's global IPv6 /64)? Those are reached only through this device, whatever
+        // their address range. Not 198.18/15 (TUN-mode VPN fake-ip, see IsPrivateTarget), and prefixes shorter than
+        // /8 (IPv4) or /32 (IPv6) aren't taken as a subnet: a VPN adapter reporting one would swallow the internet.
+        public bool OnOtherLink(IPAddress a, IPAddress? entry)
+        {
+            if (!TryKey(a, out var k) || (k >> 17) == (new UInt128(0, 0xFFFF_C612_0000UL) >> 17)) return false;   // 198.18.0.0/15
+            UInt128 e = default;
+            bool hasEntry = entry is not null && TryKey(entry, out e);
+            foreach (var (own, prefix) in Current().Prefixes)
+            {
+                bool v4 = (own >> 32) == 0xFFFF;
+                if (prefix < (v4 ? 104 : 32) || prefix >= 128) continue;
+                int shift = 128 - prefix;
+                if ((k >> shift) != (own >> shift)) continue;
+                if (hasEntry && (e >> shift) == (own >> shift)) continue;   // the entry interface's subnet: SameSubnet's call
+                return true;
+            }
+            return false;
         }
 
         private bool IsStale([NotNullWhen(false)] Snapshot? s)
@@ -882,10 +965,10 @@ public sealed class ProxyServer : IDisposable
         var up = Pump(a, b, true, idle);
         var down = Pump(b, a, false, idle);
         var first = await Task.WhenAny(up, down).ConfigureAwait(false);
-        // Client half-closed after its request (nc -N, HTTP/1.0-style scripts, shutdown(SHUT_WR)): Pump has
-        // passed the FIN on, so keep relaying the answer until the target closes too (or the tunnel idles
-        // out) instead of dropping it.
-        if (first == up && await up.ConfigureAwait(false)) await down.ConfigureAwait(false);
+        // One side half-closed (a client after its request: nc -N, shutdown(SHUT_WR); a server after its banner or
+        // answer while it still reads): Pump has passed the FIN on, so let the other direction finish too, until that
+        // side closes or the tunnel idles out, instead of dropping what it still sends.
+        if (await first.ConfigureAwait(false)) await (first == up ? down : up).ConfigureAwait(false);
         // The disposing 'using' on both endpoints unblocks whichever pump is still reading.
     }
 
@@ -926,6 +1009,23 @@ public sealed class ProxyServer : IDisposable
     private static Task WriteAscii(NetworkStream s, string text, CancellationToken ct)
         => s.WriteAsync(Encoding.ASCII.GetBytes(text), ct).AsTask();
 
+    // An error reply, then close. A plain close with the client's request still unread (a POST body, the rest of an
+    // oversized head) makes the stack send RST, and the client drops the reply with it. So half-close and read off
+    // what is left first: at most 64 KB / 1 s, also on the caller's token, so it can't hold the slot for long.
+    private static async Task ReplyAndClose(NetworkStream s, string reply, CancellationToken ct)
+    {
+        await WriteAscii(s, reply, ct).ConfigureAwait(false);
+        try
+        {
+            s.Socket.Shutdown(SocketShutdown.Send);
+            using var drain = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            drain.CancelAfter(1000);
+            var buf = new byte[8192];
+            for (int total = 0, n; total < 64 * 1024 && (n = await s.ReadAsync(buf, drain.Token).ConfigureAwait(false)) > 0; total += n) { }
+        }
+        catch { /* drained, timed out, or the client is gone */ }
+    }
+
     private static string FormatTarget(string host, int port)
         => host.Contains(':') ? $"[{host}]:{port}" : $"{host}:{port}";
 
@@ -935,11 +1035,22 @@ public sealed class ProxyServer : IDisposable
             Time = DateTime.Now.ToString("HH:mm:ss"),
             Client = client,
             Proto = proto,
-            Target = Clean(target),
+            Target = Clean(UrlSecrets.Redact(WithoutUserInfo(target))),
             User = string.IsNullOrEmpty(user) ? "—" : Clean(user),
             Ok = ok,
             Status = status,
         });
+
+    // "http://user:pass@host/…" → "http://host/…": a URL's own credentials never reach the log (UrlSecrets.Redact
+    // then empties secret-looking query values).
+    private static string WithoutUserInfo(string s)
+    {
+        int start = s.IndexOf("://", StringComparison.Ordinal);
+        start = start < 0 ? 0 : start + 3;
+        int end = s.IndexOfAny(['/', '?', '#'], start);
+        int at = s.AsSpan(start, (end < 0 ? s.Length : end) - start).LastIndexOf('@');
+        return at < 0 ? s : string.Concat(s.AsSpan(0, start), s.AsSpan(start + at + 1));
+    }
 
     // Target and user name come straight from the client: control characters and line / paragraph separators
     // (a fake second row inside one log row), bidi overrides / isolates (text that reads differently from what was
