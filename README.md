@@ -1,6 +1,6 @@
 # Echoes — Free Network Toolkit for Windows, macOS, Linux and Android
 
-**Connection doctor, ping, traceroute and MTR, internet speed test, port scanner, SSH and SFTP client, cURL / HTTP client, DNS over HTTPS and WHOIS lookup, SSL/TLS checker, Cloudflare manager with dynamic DNS, uptime monitor with Telegram alerts and LAN file sharing: 20 network and developer tools in one free, open-source app.**
+**Connection doctor, ping, traceroute and MTR, internet speed test, port scanner, SSH and SFTP client, cURL / HTTP client, DNS over HTTPS and WHOIS lookup, SSL/TLS checker, Cloudflare manager with dynamic DNS, uptime monitor with Telegram alerts, Wi-Fi analyzer, proxy server, and HTTPS file sharing with chat for any browser: 20 network and developer tools in one free, open-source app.**
 
 [![License: MIT](https://img.shields.io/github/license/SinaXhpm/Echoes)](https://github.com/SinaXhpm/Echoes/blob/master/LICENSE)
 ![Platforms: Windows, macOS, Linux, Android](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android-blue)
@@ -19,10 +19,12 @@ Echoes is a free, open-source network toolkit with a simple graphical interface.
 
 - **One app, 20 tools.** Test a connection, find the problem, fix your DNS and share a file without switching windows.
 - **Finds the cause for you.** The Doctor tells you in one sentence why a site won't open: DNS tampering, SNI filtering, a blocked IP, a filter page, or a server that is down for everyone.
+- **Connects your devices.** Send files and chat between a PC and a phone, a laptop or any other device over HTTPS: scan a QR code, and the other side needs only a browser.
 - **Runs everywhere.** Windows, macOS (Intel and Apple Silicon), Linux and Android, from one codebase.
 - **Nothing extra to install.** Desktop builds are self-contained native apps: no .NET runtime, fast start-up, low memory use.
 - **No admin rights needed.** Where the system blocks normal (ICMP) ping, Echoes switches to UDP by itself.
 - **Private.** No account, no ads, no telemetry. Your data stays on your device and secrets are encrypted.
+- **Nothing runs by itself.** The web server, proxy, request catcher and socket listeners start only when you press Start, and stop when you stop them or quit.
 - **Easy on the eyes.** Dark and light themes, a compact window, and layouts that also fit phone screens.
 
 ## Contents
@@ -38,6 +40,7 @@ Echoes is a free, open-source network toolkit with a simple graphical interface.
 - [Android](#android)
 - [Privacy and security](#privacy-and-security)
 - [FAQ](#faq)
+- [Also by the developer: Submarine](#also-by-the-developer-submarine)
 - [Build from source](#build-from-source)
 - [License](#license)
 
@@ -375,6 +378,7 @@ Manage your Cloudflare domains without opening the dashboard.
 - **Server health:** CPU, load, memory, swap, disks and the busiest processes, with nothing installed on the server.
 - **Host-key pinning:** each server's key is remembered on first use (SHA-256 fingerprint), and you are warned if it changes.
 - Connect through a SOCKS5 proxy. Paste `ssh -p 2222 root@host` and the host, user and port fields fill themselves.
+- For daily work on servers, the same developer's dedicated client [Submarine](#also-by-the-developer-submarine) adds a tab set per server, a dual-pane SFTP browser, a two-way folder mirror and encrypted sync.
 
 ### TCP, UDP and WebSocket tool
 
@@ -470,6 +474,7 @@ Not available on Android: the system curl engine (the built-in engine is used in
 - **No account, no ads, no telemetry.** Echoes only contacts the hosts you test and the services a tool is built on (for example check-host.net, the speed test's servers (Cloudflare, or the server you pick), public DNS-over-HTTPS resolvers, the IP-info providers and rdap.org / rdap.verisign.com; the uptime monitor looks up its domains' expiry there; the Doctor checks internet access with connectivitycheck.gstatic.com; Dynamic DNS reads your public IP from Cloudflare, ipify, ident.me and icanhazip), plus GitHub to check for updates.
 - **Your data stays on your device:** `%APPDATA%\Echoes` on Windows, `~/.config/Echoes` on macOS and Linux.
 - **Secrets are encrypted:** notes and the Cloudflare vault use AES-256-GCM with a key made from your master password; saved requests, SSH passwords, the Telegram alert token and other secrets are encrypted on disk with a per-install key. Dynamic DNS keeps such a device-encrypted copy of its account's token so it can run while the vault is locked; removing the record or the account deletes it. In memory, keys and decrypted data are wiped after use, on lock and on exit.
+- **Servers are opt-in and guarded:** nothing listens until you press Start. File sharing runs over HTTPS (TLS 1.2 and 1.3) behind an 8-digit PIN, wrong PINs are slowed down per device, and uploads respect a size cap and the free disk space. The proxy refuses other networks' private ranges and mail ports while it has no password, and the request catcher listens on this device only until you choose another interface.
 - **Open source (MIT):** every line can be read, checked and built by anyone.
 
 ## FAQ
@@ -519,11 +524,34 @@ In DNS, type a resolver such as `https://1.1.1.1/dns-query` or `tls://1.1.1.1`, 
 **How do I share files between my phone and PC on the same Wi-Fi?**
 Press Start sharing in Web Server and scan the QR code with the other device. It opens a chat page in the browser where you can send text and files both ways; add files in Echoes to offer them for download.
 
+**Is Echoes an alternative to AirDrop, LocalSend, Snapdrop or PairDrop?**
+For a quick transfer between devices on the same network, yes. Run Echoes on one side and open the link on the other: an iPhone, iPad, Mac, Windows PC, Linux machine or Android phone needs only a browser. The page is served over HTTPS behind a PIN, and files and chat go both ways without any account or cloud.
+
+**Which ports does Echoes open?**
+None by itself. The web server, request catcher, proxy and socket servers listen only after you press Start, on the port and network interface you choose, and stop when you press Stop or quit Echoes. See [Privacy and security](#privacy-and-security).
+
+**Is there an SSH client from the same developer?**
+Yes. [Submarine](#also-by-the-developer-submarine) is a free, open-source SSH and SFTP client for Windows, macOS, Linux and Android.
+
 **Is Echoes a replacement for nmap, Postman, PuTTY or Wireshark?**
 It covers the everyday tasks of nmap, curl / Postman, PuTTY, WinSCP and netcat in one app. For deep, specialized work the dedicated tools still go further, and Echoes doesn't capture packets the way Wireshark does.
 
 **Does Echoes collect any data?**
 No. There is no telemetry and no account, and everything is stored locally. See [Privacy and security](#privacy-and-security).
+
+## Also by the developer: Submarine
+
+<p align="center">
+  <a href="https://github.com/SinaXhpm/Submarine"><img src="docs/logos/submarine.png" width="120" alt="Submarine logo: a submarine periscope above neon waves"></a>
+</p>
+
+**[Submarine](https://github.com/SinaXhpm/Submarine)** is a free, open-source **SSH and SFTP client** for Windows, macOS, Linux and Android, from the same developer. Echoes' SSH tool covers quick jobs; Submarine is made for working on servers every day.
+
+- **One window per server:** a terminal, a dual-pane SFTP browser, port forwarding (local, remote and SOCKS / HTTP), a two-way folder mirror, Docker containers and logs, live server info and a per-server command library, all as tabs.
+- **Many servers at once:** split view, a wall of terminals, and broadcast input to several sessions.
+- **Private by design:** saved servers are encrypted on your device, with optional zero-knowledge sync to your phone. It imports PuTTY, MobaXterm and OpenSSH config files.
+
+**[Get Submarine](https://github.com/SinaXhpm/Submarine/releases/latest)** · [Source code and README](https://github.com/SinaXhpm/Submarine)
 
 ## Build from source
 
@@ -562,14 +590,14 @@ Echoes is released under the **[MIT License](LICENSE)**. You are free to use, co
 
 ## Keywords
 
-**Diagnosis:** connection doctor, why won't a website open, website not loading, DNS tampering test, DNS hijacking check, SNI filtering test, internet censorship test, blocked website checker, OONI alternative, captive portal detection, path MTU test, MTU finder, is it down for everyone or just me.
+**Diagnosis:** connection doctor, why won't a website open, website not loading, internet troubleshooting, DNS tampering test, DNS hijacking check, DNS poisoning check, SNI filtering test, SNI blocking checker, DPI test, anti-DPI test, TLS fragment test, QUIC blocked test, HTTP/3 blocked test, internet censorship test, blocked website checker, filtered website test, OONI alternative, captive portal detection, path MTU test, MTU finder, packet too big, is it down for everyone or just me.
 
-**Network tools:** network toolkit, network tools, network utility, network diagnostic tool, network troubleshooting, Wi-Fi analyzer, WiFi channel scanner, Wi-Fi signal strength, ping tool, ping GUI, IPv6 ping, ping without admin, UDP ping, traceroute, tracert GUI, visual traceroute, MTR, WinMTR alternative, PingPlotter alternative, packet loss test, latency test, jitter test, internet speed test, bandwidth test, bufferbloat test, port scanner, TCP port scanner, UDP port scanner, open port checker, nmap GUI, nmap alternative, Zenmap alternative, Angry IP Scanner alternative, IP scanner, LAN scanner, network scanner, service version detection, host checker, check-host, website down checker, global ping, ping from multiple locations, DNS lookup, DNS checker, dig GUI, nslookup GUI, reverse DNS, WHOIS lookup, RDAP, DNS propagation, DNS over HTTPS client, DoH, DNS over TLS, DoT, DNS benchmark, fastest DNS server, DNS resolver comparison, SPF checker, DKIM checker, DMARC checker, email deliverability check, MX lookup, blacklist check, DNSBL, ARP table, netstat GUI, routing table, network interfaces, uptime monitor, server monitor, website monitor, ping monitor, latency monitor, SSL expiry monitor, domain expiry monitor, Telegram uptime alerts.
+**Network tools:** network toolkit, network tools, network utility, network diagnostic tool, network troubleshooting, Wi-Fi analyzer, WiFi channel scanner, Wi-Fi signal strength, ping tool, ping GUI, ping graph, IPv6 ping, ping without admin, UDP ping, TCP ping, tcping, ping with don't fragment, traceroute, tracert GUI, visual traceroute, MTR, WinMTR alternative, PingPlotter alternative, packet loss test, latency test, jitter test, internet speed test, speedtest alternative, bandwidth test, bufferbloat test, latency under load, port scanner, TCP port scanner, UDP port scanner, open port checker, nmap GUI, nmap alternative, Zenmap alternative, Angry IP Scanner alternative, IP scanner, LAN scanner, network scanner, ARP scan, MAC vendor lookup, service version detection, host checker, check-host, website down checker, global ping, ping from multiple locations, DNS lookup, DNS checker, dig GUI, nslookup GUI, reverse DNS, WHOIS lookup, RDAP, DNS propagation, DNS over HTTPS client, DoH, DNS over TLS, DoT, DNS benchmark, fastest DNS server, DNS resolver comparison, SPF checker, DKIM checker, DMARC checker, MTA-STS, email deliverability check, MX lookup, blacklist check, DNSBL, ARP table, netstat GUI, routing table, network interfaces, uptime monitor, Uptime Kuma alternative, UptimeRobot alternative, server monitor, website monitor, ping monitor, latency monitor, SSL expiry monitor, domain expiry monitor, Telegram uptime alerts.
 
-**Web and API:** cURL GUI, curl client, curl import, Copy as cURL, HTTP client, REST client, API tester, Postman alternative, Insomnia alternative, HTTP/3 client, HTTP request timing, SSL checker, TLS checker, SSL certificate checker, certificate expiry checker, TLS inspector, STARTTLS test, OCSP, HSTS, what is my IP, IP lookup, GeoIP lookup, IP geolocation, ASN lookup, proxy checker, Cloudflare manager, Cloudflare DNS manager, Cloudflare API client, Cloudflare DNS backup, Cloudflare zone export, BIND zone file, Cloudflare WAF rules, Cloudflare cache purge, Cloudflare SSL mode, Cloudflare ECH, DNSSEC, Cloudflare DDNS, dynamic DNS client, DDNS updater, ddclient alternative, Telegram Bot API tester, Telegram bot tool, WebSocket client, WebSocket tester, wscat alternative, webhook tester, webhook.site alternative, request bin, HTTP request inspector.
+**Web and API:** cURL GUI, curl client, curl import, Copy as cURL, HTTP client, REST client, API tester, Postman alternative, Insomnia alternative, HTTP/3 client, HTTP request timing, SSL checker, TLS checker, SSL certificate checker, certificate expiry checker, TLS inspector, STARTTLS test, OCSP, HSTS, what is my IP, IP lookup, GeoIP lookup, IP geolocation, ASN lookup, proxy checker, Cloudflare manager, Cloudflare DNS manager, Cloudflare API client, Cloudflare DNS backup, Cloudflare zone export, BIND zone file, Cloudflare WAF rules, Cloudflare cache purge, Cloudflare SSL mode, Cloudflare ECH, DNSSEC, Cloudflare DDNS, dynamic DNS client, DDNS updater, ddclient alternative, Telegram Bot API tester, Telegram bot tool, WebSocket client, WebSocket tester, wscat alternative, webhook tester, webhook.site alternative, request bin, request catcher, HTTP request inspector.
 
-**Servers and connections:** SSH client, SSH terminal, PuTTY alternative, SFTP client, WinSCP alternative, SSH key login, SSH port forwarding, SSH local and remote forwarding, server monitoring over SSH, SSH tunnel, SOCKS5 tunnel, SSH dynamic port forwarding, netcat GUI, TCP client, UDP client, TCP server, socket tester, hex sender, telnet alternative, web server, HTTP file server, LAN file sharing, share files over Wi-Fi, phone to PC file transfer, QR code file sharing, SOCKS5 proxy server, HTTP proxy server, local proxy server, proxy checker, proxy list tester, SOCKS5 checker, bulk proxy checker.
+**Servers and connections:** SSH client, SSH terminal, PuTTY alternative, SFTP client, WinSCP alternative, SSH key login, SSH port forwarding, SSH local and remote forwarding, server monitoring over SSH, SSH tunnel, SOCKS5 tunnel, SSH dynamic port forwarding, Submarine SSH client, netcat GUI, TCP client, UDP client, TCP server, socket tester, hex sender, telnet alternative, web server, HTTP file server, LAN file sharing, LAN chat, local network chat, HTTPS file sharing, share files over Wi-Fi, phone to PC file transfer, send files from phone to PC without a cable, browser-based file sharing, QR code file sharing, AirDrop alternative for Windows and Android, LocalSend alternative, Snapdrop alternative, PairDrop alternative, SOCKS5 proxy server, HTTP proxy server, local proxy server, proxy checker, proxy list tester, SOCKS5 checker, bulk proxy checker.
 
 **Developer tools:** developer toolbox, CyberChef alternative, Base64 encoder decoder, URL encoder decoder, hash generator, hash identifier, MD5, SHA-256, HMAC, file checksum, regex tester, JSON formatter, JSON validator, JSON to YAML, JSON to CSV, XML formatter, JWT decoder, JWT verifier, subnet calculator, CIDR calculator, IP converter, Unix timestamp converter, epoch converter, cron expression parser, base converter, text diff, case converter, UUID generator, ULID generator, NanoID generator, password generator, encrypted notes, encrypted backup, AES-256-GCM.
 
-**Platforms:** Windows network tools, macOS network tools, Linux network tools, Android network tools, Apple Silicon, cross-platform, portable app, no install, Native AOT, Avalonia UI, .NET 8, C#, free, open source, MIT license.
+**Platforms:** Windows network tools, macOS network tools, Linux network tools, Android network tools, Apple Silicon, Intel Mac, AppImage, deb, rpm, Android APK, portable app, no install, cross-platform, Native AOT, Avalonia UI, .NET 8, .NET 10, C#, free, open source, MIT license, no account, no ads, no telemetry.
