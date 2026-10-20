@@ -125,10 +125,16 @@ The Developer ID `.dmg` above keeps every feature. The Mac App Store needs more,
 
 `Echoes.iOS` holds the bundle metadata (`Info.plist`, an empty `Entitlements.plist`, a 1024 px opaque icon in
 `Assets.xcassets`), the Avalonia entry point and the shared sources, the same way the Android head does. It is built for
-the simulator in CI; **nobody has run it yet.** To make it a real app:
+the simulator in CI, and **CI now runs it** (`ios.yml`): it starts on an iPhone and an iPad simulator and stays up, the
+unsigned Release (ahead-of-time) compile for devices passes, and a self-test inside the app (`Echoes.iOS/SelfTest.cs`, started
+with `ECHOES_SELFTEST=1`) checks what the shared tools need from the platform. Last result on an iOS 27 simulator, all fine:
+storage, DNS, TCP, ICMP and UDP ping, HTTPS, a TLS server, loopback sockets, the network interfaces, and the whole share hub
+(HTTPS page, PIN login, a chat message); child processes are not available, as expected. Two real iOS bugs it found are fixed:
+the PKCS#12 `Exportable` flag throws on Apple's mobile platforms (`ShareTls.Load`), and an IPv4 ping socket hands over the IP
+header first (`IcmpPinger`). **Nothing has run on a real iPhone yet**, and the simulator shares the Mac's network. To make it a real app:
 
-1. **Build it once** (run `ios.yml` by hand) and fix what the first compile reports. Avalonia.iOS 12 and the .NET 10 iOS
-   workload need a recent Xcode on the runner.
+1. **Test on a device** (needs signing, below) and fix what only a phone shows: the Local Network prompt, background
+   behaviour, the keyboard, real ICMP and Wi-Fi.
 2. **Review every platform branch in the shared code.** Many places say `OperatingSystem.IsAndroid()` where they mean "a
    phone" and treat everything else as a desktop. On iOS those fall into the desktop path, which starts child processes
    (`Process.Start`: not allowed on iOS), opens folders, uses the tray or auto-start. Search for `IsAndroid()` (about 35
