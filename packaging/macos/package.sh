@@ -67,13 +67,19 @@ trap cleanup EXIT
 
 notarize_file() {   # $1 = a .zip or .dmg to submit
   local out id
-  out="$(run xcrun notarytool submit "$1" --key "$key_file" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" --wait --timeout 40m 2>&1)" || true
+  out="$(run xcrun notarytool submit "$1" --key "$key_file" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" --wait --timeout "${NOTARIZE_TIMEOUT:-40m}" 2>&1)" || true
   echo "$out"
   [ "${DRY_RUN:-}" = "1" ] && return 0
   id="$(echo "$out" | awk '/^ *id:/ { print $2; exit }')"
   if ! echo "$out" | grep -q 'status: Accepted'; then
-    echo "Apple did not accept $1" >&2
-    [ -n "$id" ] && xcrun notarytool log "$id" --key "$key_file" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" >&2 || true
+    if echo "$out" | grep -q -E 'status: (Invalid|Rejected)'; then
+      echo "Apple REJECTED $1 (submission $id); its log follows" >&2
+      [ -n "$id" ] && xcrun notarytool log "$id" --key "$key_file" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" >&2 || true
+    else
+      # no verdict yet: Apple's queue can take hours for a team's first submissions. Not a rejection.
+      echo "Apple has not finished with $1 (submission $id) after ${NOTARIZE_TIMEOUT:-40m}: not rejected, still in its queue." >&2
+      echo "Ask later:  xcrun notarytool info $id --key <AuthKey.p8> --key-id <KEY_ID> --issuer <ISSUER_ID>" >&2
+    fi
     exit 1
   fi
 }

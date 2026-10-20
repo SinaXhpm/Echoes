@@ -17,6 +17,8 @@ permissions:
 jobs:
   mac:
     runs-on: macos-latest
+    # Apple's queue can take hours for a team's first notarizations
+    timeout-minutes: 330
     steps:
     - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -46,6 +48,7 @@ jobs:
         APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
         APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        NOTARIZE_TIMEOUT: 2h30m
       run: bash packaging/macos/package.sh osx-arm64 "${{ steps.ver.outputs.VERSION }}"
 
     # What the downloaded file will say on a Mac, checked here too (informational: the runner may not assess)
