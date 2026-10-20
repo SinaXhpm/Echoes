@@ -13,8 +13,8 @@
     <RootNamespace>Echoes.Android</RootNamespace>
 
     <ApplicationId>com.sinaxhpm.echoes</ApplicationId>
-    <ApplicationVersion>15</ApplicationVersion>
-    <ApplicationDisplayVersion>0.4.2</ApplicationDisplayVersion>
+    <ApplicationVersion>16</ApplicationVersion>
+    <ApplicationDisplayVersion>0.4.3</ApplicationDisplayVersion>
     <!-- the assembly version follows it (About box, update check, User-Agent); CI sets it from the tag -->
     <Version>$(ApplicationDisplayVersion)</Version>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
