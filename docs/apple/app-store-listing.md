@@ -99,7 +99,7 @@ Every network action starts from the user's own button press and targets a host 
 
 - Local Network permission: the scanner, ping sweep and LAN file sharing talk to devices on the user's own Wi-Fi. The first use shows the system prompt with the purpose string.
 - Port scanner: a plain TCP connect scan of an address range the user enters, meant for their own network or servers they manage (like other network utilities on the App Store).
-- Web Server / Proxy / Request catcher / Socket servers: they start only when the user taps Start, listen only while the app is in the foreground, and stop on Stop. They do not touch other apps' traffic, and Echoes does not use VPN or Network Extension APIs. The file-sharing page is protected by a PIN shown in the app.
+- Web Server / Proxy / Request catcher / Socket servers: they start only when the user taps Start, listen only while the app is in the foreground, and stop on Stop. They do not touch other apps' traffic, and Echoes does not use VPN or Network Extension APIs. The file-sharing page is served over HTTPS with a self-signed certificate that the app creates on the device (a browser shows a one-time warning, which is expected) and is protected by an 8-digit PIN shown in the app.
 - Telegram alerts and Cloudflare management are optional: they work only after the user pastes their own bot token or API token, which is stored encrypted on the device.
 - Encryption: HTTPS and TLS through the system, SSH through the standard SSH protocol, and AES-GCM for the user's own notes and secrets. All are standard algorithms.
 
