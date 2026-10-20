@@ -16,6 +16,8 @@ public class AppDelegate : AvaloniaAppDelegate<global::Echoes.App>
         // grants the user-assigned-device-name entitlement, which is still better than the host name ("localhost").
         string name = UIKit.UIDevice.CurrentDevice.Name;
         if (!string.IsNullOrWhiteSpace(name)) Echoes.Helpers.AppInfo.DeviceName = name.Trim();
+        // CI starts the app with ECHOES_SELFTEST=1 on a simulator to check what the shared tools need (see SelfTest.cs).
+        if (SelfTest.Requested) _ = Task.Run(async () => { await Task.Delay(6000).ConfigureAwait(false); await SelfTest.RunAsync().ConfigureAwait(false); });
         return base.CustomizeAppBuilder(builder).WithInterFont();
     }
 }
