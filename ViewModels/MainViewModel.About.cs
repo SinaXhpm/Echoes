@@ -28,6 +28,7 @@ public partial class MainViewModel
     [ObservableProperty] private string _updateDetail = "Not checked yet";
     [ObservableProperty] private string? _updateDetailTip;
     [ObservableProperty] private string _copyInfoLabel = "Copy info";
+    [ObservableProperty] private string _copyLogLabel = "Copy log";
 
     public bool IsCheckingUpdate => UpdateState == UpdateCheckState.Checking;
     public bool IsUpToDate => UpdateState == UpdateCheckState.UpToDate;
@@ -50,6 +51,8 @@ public partial class MainViewModel
     public string RuntimeText => AppInfo.Runtime;
     public string UiText => AppInfo.Ui;
     public bool CanOpenDataFolder => LinkHelper.CanOpenFolder;
+    /// <summary>A phone can't open the data folder, so the errors Echoes recorded are copied from here instead.</summary>
+    public bool CanCopyLog => !LinkHelper.CanOpenFolder;
     public string DataFolder => AppStorage.UserDir();
 
     [RelayCommand]
@@ -87,5 +90,24 @@ public partial class MainViewModel
         CopyInfoLabel = "Copied";
         await Task.Delay(1500);
         CopyInfoLabel = "Copy info";
+    }
+
+    // The version and platform, then the end of the crash log (secrets are already left out of it): what a bug report needs
+    // from a phone, where the log file can't be opened.
+    [RelayCommand]
+    private async Task CopyLog()
+    {
+        string log = await Task.Run(() => CrashLog.ReadTail());
+        if (log.Length == 0)
+        {
+            CopyLogLabel = "No errors";
+        }
+        else
+        {
+            await ClipboardHelper.SetTextAsync(AppInfo.Summary(CurrentVersion) + Environment.NewLine + Environment.NewLine + log);
+            CopyLogLabel = "Copied";
+        }
+        await Task.Delay(1500);
+        CopyLogLabel = "Copy log";
     }
 }

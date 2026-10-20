@@ -93,6 +93,8 @@
 							Command="{Binding OpenIssuesCommand}" ToolTip.Tip="Open a GitHub issue (Copy info first)"/>
 					<Button Classes="secondary" HorizontalAlignment="Stretch" Content="{Binding CopyInfoLabel}"
 							Command="{Binding CopyInfoCommand}" ToolTip.Tip="Version, platform and runtime, for a bug report"/>
+					<Button Classes="secondary" HorizontalAlignment="Stretch" Content="{Binding CopyLogLabel}" IsVisible="{Binding CanCopyLog}"
+							Command="{Binding CopyLogCommand}" ToolTip.Tip="The errors Echoes recorded, for a bug report"/>
 				</UniformGrid>
 
 				<Button Classes="ghost" HorizontalAlignment="Center" BorderThickness="0" Command="{Binding OpenLicenseCommand}"

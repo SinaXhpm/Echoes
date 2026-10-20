@@ -8,7 +8,7 @@ to paste into App Store Connect is in [app-store-listing.md](app-store-listing.m
 
 | Piece | State |
 | :--- | :--- |
-| macOS `.dmg` on GitHub, signed with Developer ID, notarized and stapled | **Ready in CI.** Needs the secrets below; without them the build is signed ad hoc, as before. Not run on a real release yet. |
+| macOS `.dmg` on GitHub, signed with Developer ID, notarized and stapled | **Shipped** since v0.4.3 (Intel and Apple Silicon): Gatekeeper accepts both as "Notarized Developer ID", and both were opened on a real Mac. Without the secrets below the build is signed ad hoc, as before. |
 | macOS `.pkg` for the Mac App Store | Not built. Needs the App Sandbox, which cuts features; see "Mac App Store". |
 | iOS / iPadOS app | **Scaffold only** (`Echoes.iOS/`, built for the simulator by `.github/workflows/ios.yml`). It is not a working app yet; see "What iOS still needs". |
 | App Store build mode | `AppInfo.IsStoreBuild` (true on iOS, or on the desktop head with `-p:StoreBuild=true`): no update check, no Releases link. The About box has a Privacy policy link in every build. |

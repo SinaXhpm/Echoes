@@ -29,6 +29,34 @@ public static class CrashLog
         @"|[0-9]{3,20}:[A-Za-z0-9_-]{20,128}",
         RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
+    /// <summary>The end of the crash log: at most <paramref name="maxChars"/> characters, starting at a line. Empty when nothing was
+    /// logged. The About box's "Copy log" hands it to phones, where the file itself can't be opened.</summary>
+    public static string ReadTail(int maxChars = 12_000)
+    {
+        try
+        {
+            string path = AppStorage.UserPath(FileName);
+            lock (Gate)
+            {
+                if (!File.Exists(path)) return string.Empty;
+                using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                long take = Math.Min(fs.Length, maxChars * 4L);   // UTF-8: up to 4 bytes a character
+                var bytes = new byte[take];
+                fs.Seek(fs.Length - take, SeekOrigin.Begin);
+                fs.ReadExactly(bytes);
+                string text = Encoding.UTF8.GetString(bytes);
+                if (take < fs.Length || text.Length > maxChars)
+                {
+                    if (text.Length > maxChars) text = text[^maxChars..];
+                    int line = text.IndexOf('\n');                // the first line is cut: drop it
+                    if (line >= 0) text = text[(line + 1)..];
+                }
+                return text.Trim();
+            }
+        }
+        catch { return string.Empty; }
+    }
+
     public static void Write(string source, Exception? ex)
     {
         try

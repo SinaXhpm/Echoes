@@ -9,6 +9,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Echoes.Helpers;
+using Echoes.ViewModels;
 using Echoes.Views;
 
 namespace Echoes.iOS;
@@ -281,6 +282,16 @@ internal static class SelfTest
                 string file = Path.Combine(shots, $"{at + 1:00}-{tag.ToLowerInvariant().Replace(' ', '-')}.png");
                 await Dispatcher.UIThread.InvokeAsync(() => Shot(shell, file));
                 if (problem is null) opened.Add(tag); else problems.Add($"{tag}: {problem}");
+            }
+            // The About box: in a store build it has no update section, and a phone gets the Copy log button.
+            if (await Dispatcher.UIThread.InvokeAsync(() => shell.DataContext as MainViewModel) is { } main)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() => main.OpenAboutCommand.Execute(null));
+                await Task.Delay(1000, ct).ConfigureAwait(false);
+                await Dispatcher.UIThread.InvokeAsync(() => Shot(shell, Path.Combine(shots, $"{count + 1:00}-about.png")));
+                if (main.ShowUpdates) problems.Add("ABOUT: the update section is shown in an App Store build");
+                if (!main.CanCopyLog) problems.Add("ABOUT: no Copy log button on a phone");
+                await Dispatcher.UIThread.InvokeAsync(() => main.CloseAboutCommand.Execute(null));
             }
             foreach (string entry in NewCrashEntries(crashLog, logged)) problems.Add("crash log: " + entry);
             if (problems.Count > 0) throw new InvalidOperationException(string.Join(" | ", problems));
