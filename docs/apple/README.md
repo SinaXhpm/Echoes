@@ -13,6 +13,7 @@ to paste into App Store Connect is in [app-store-listing.md](app-store-listing.m
 | iOS / iPadOS app | **On TestFlight** (`Echoes.iOS/`, built and started on iPhone and iPad simulators by `.github/workflows/ios.yml`, signed builds by `ios-testflight.yml`). Not tried on a real iPhone yet; see "iOS: what works and what is left". |
 | App Store build mode | `AppInfo.IsStoreBuild` (true on iOS, or on the desktop head with `-p:StoreBuild=true`): no update check, no Releases link. The About box has a Privacy policy link in every build. |
 | Privacy policy, store text | Done. |
+| App Store Connect record (iOS 1.0.0) | **Filled in through the API** (an App Manager key): texts, URLs, copyright, categories (Utilities, Developer Tools), age rating (4+; the chat is declared as messaging), content rights, price Free, availability in 173 countries (China mainland and France off), the App Review notes, seven iPhone and seven iPad screenshots, and build 1.0.0 (4) attached. **Still for the account holder:** the App Privacy answers (the website only), the EU trader status (without it the 27 EU countries stay off), the review contact details, the export-compliance answers of the build, then Submit. |
 
 ## Identifiers
 

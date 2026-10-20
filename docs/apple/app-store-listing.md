@@ -29,7 +29,7 @@ Find out why a site won't open. Ping, trace routes, test speed, scan ports, look
 
 **Keywords (max 100, comma-separated, no spaces after commas):**
 ```
-ping,traceroute,dns,whois,port scanner,ssh,sftp,curl,tls,ssl,speedtest,mtr,proxy,uptime,cloudflare
+ping,traceroute,dns,whois,port scanner,ssh,sftp,curl,tls,ssl,bandwidth,mtr,proxy,uptime,diagnostics
 ```
 
 **Description (max 4000):**
@@ -139,15 +139,20 @@ for local data. Suggested answers, which are legal declarations you must confirm
 
 ## Screenshots
 
-At least one set per device class; up to 10 each. Take them from the real app (not from Windows or Android), no device
-frames needed. App Store Connect shows the exact current sizes next to the upload box; the usual ones:
+At least one set per device class; up to 10 each. They come from the real app, not from Windows or Android, and need no
+device frames. App Store Connect shows the exact current sizes next to the upload box; the usual ones:
 
-| Device | Size (px) |
-| :--- | :--- |
-| iPhone 6.9" | 1320 x 2868 (or 1290 x 2796) |
-| iPad 13" | 2064 x 2752 |
-| Mac | 1440 x 900, 2560 x 1600 or 2880 x 1800 (16:10) |
+| Device | Size (px) | API display type |
+| :--- | :--- | :--- |
+| iPhone 6.9" | 1320 x 2868 (or 1290 x 2796) | `APP_IPHONE_67` |
+| iPad 13" | 2064 x 2752 | `APP_IPAD_PRO_3GEN_129` |
+| Mac | 1440 x 900, 2560 x 1600 or 2880 x 1800 (16:10) | (not used) |
 
-Suggested order, matching the README gallery in `docs/screenshots/`: Doctor verdict, Ping graph, Speed test, Port scanner,
-Share and chat, DNS, SSH, Monitor. Use the documentation addresses only (`192.0.2.x`, `198.51.100.x`, `203.0.113.x`,
-`example.com`): no real IPs, names or paths in a public screenshot.
+**How they are made.** Run the workflow `.github/workflows/ios-screenshots.yml` by hand. It builds the app with
+`-p:StoreShots=true` (the scenes in `Echoes.iOS/StoreShots.cs`, compiled only in that build), starts it on an iPhone 17 Pro Max
+and an iPad Pro 13-inch simulator, and takes a native-size screenshot of seven scenes with the simulator's own status bar
+(9:41, full battery): Doctor on `example.com`, a TCP ping of `1.1.1.1`, the Web Server with a chat, a DNS lookup, the TLS
+Inspector, cURL, and the password generator with its "time to crack" card. Everything is real: the checks run against the real
+network, and the only addresses on screen are public ones (`example.com`, `1.1.1.1`) and the runner's own private one. The
+pictures are the artifact `Echoes-store-screenshots` (7 days); they go into App Store Connect through the API (a screenshot set
+per display type, one file per picture, in file-name order). A scene that fails is written to `errors.txt` and skipped.

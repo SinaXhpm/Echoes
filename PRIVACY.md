@@ -1,6 +1,6 @@
 # Echoes privacy policy
 
-Last updated: 19 October 2026
+Last updated: 21 October 2026
 
 Echoes is a free, open-source network toolkit (ping, traceroute, port scanner, DNS, SSH, speed test, file-sharing web server and more). This page says what it does with your data. The short version: **it collects none.**
 
@@ -14,6 +14,7 @@ Your settings, the hosts and URLs you typed (history), notes, saved requests, SS
 
 - Secrets (passwords, tokens) are encrypted on disk. Notes and the Cloudflare vault are encrypted with a key made from your master password.
 - You can export everything to one password-protected backup file and restore it on another device. The file goes only where you save it.
+- On an iPhone or iPad, the files that browsers send to the file-sharing page are kept in the Echoes folder of the Files app (On My iPhone), so you can open, move or delete them there.
 - Deleting the app, or its data folder, deletes the data.
 
 ## What leaves your device, and why
