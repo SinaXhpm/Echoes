@@ -1,0 +1,105 @@
+name: iOS TestFlight
+
+# Builds the signed iOS app (Apple Distribution certificate + App Store provisioning profile) and uploads it to App Store
+# Connect, where it shows up in TestFlight after Apple has processed it. By hand only (Actions > iOS TestFlight > Run
+# workflow); nothing is published. Needs the secrets listed in docs/apple/README.md:
+#   IOS_CERT_P12_BASE64, IOS_CERT_PASSWORD, IOS_PROFILE_BASE64, and the App Store Connect API key (APPLE_API_KEY_P8,
+#   APPLE_API_KEY_ID, APPLE_API_ISSUER) that the macOS release already uses.
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: Upload the build to App Store Connect (TestFlight)
+        type: boolean
+        default: true
+
+# Least privilege: this job only reads the repo.
+permissions:
+  contents: read
+
+jobs:
+  testflight:
+    # Same runner as ios.yml: the .NET for iOS workload needs the Xcode of its own version.
+    runs-on: xcode-27
+    timeout-minutes: 120
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Install the iOS workload
+      run: dotnet workload install ios
+
+    - name: Use the Xcode the workload wants
+      run: |
+        want="$(ls "$HOME/.dotnet/packs" | sed -n 's/^Microsoft\.iOS\.Sdk\.net10\.0_\([0-9][0-9.]*\)$/\1/p' | sort -V | tail -n 1)"
+        app="$(ls -d /Applications/Xcode_"$want".app /Applications/Xcode_"$want"*.app 2>/dev/null | head -n 1)"
+        if [ -z "$app" ]; then echo "::error::Xcode $want is not installed on this runner"; exit 1; fi
+        sudo xcode-select -s "$app"
+        xcodebuild -version
+
+    - name: Import the Apple Distribution certificate and the profile
+      env:
+        IOS_CERT_P12_BASE64: ${{ secrets.IOS_CERT_P12_BASE64 }}
+        IOS_CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
+        IOS_PROFILE_BASE64: ${{ secrets.IOS_PROFILE_BASE64 }}
+      run: bash packaging/ios/import-signing.sh
+
+    # CFBundleShortVersionString from the project's ApplicationDisplayVersion; CFBundleVersion must rise with every upload:
+    # the run number does.
+    - name: Versions
+      id: ver
+      run: |
+        short="$(sed -n 's|.*<ApplicationDisplayVersion>\(.*\)</ApplicationDisplayVersion>.*|\1|p' Echoes.iOS/Echoes.iOS.csproj | head -n 1)"
+        echo "SHORT=$short" >> "$GITHUB_OUTPUT"
+        echo "BUILD=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+        echo "Version $short, build ${{ github.run_number }}"
+        /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $short" Echoes.iOS/Info.plist
+        /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Echoes.iOS/Info.plist
+
+    - name: Build the signed .ipa
+      run: >
+        dotnet publish Echoes.iOS/Echoes.iOS.csproj -c Release -f net10.0-ios -r ios-arm64
+        -p:ArchiveOnBuild=true
+        -p:CodesignKey="$IOS_SIGN_IDENTITY" -p:CodesignProvision="$IOS_PROFILE_NAME"
+        -p:ApplicationDisplayVersion=${{ steps.ver.outputs.SHORT }} -p:ApplicationVersion=${{ steps.ver.outputs.BUILD }}
+
+    - name: Check the .ipa
+      run: |
+        ipa="$(find Echoes.iOS/bin -name '*.ipa' | head -n 1)"
+        if [ -z "$ipa" ]; then echo "::error::No .ipa was produced"; find Echoes.iOS/bin -maxdepth 6 | head -40; exit 1; fi
+        echo "IPA=$ipa" >> "$GITHUB_ENV"
+        ls -la "$ipa"
+        rm -rf "$RUNNER_TEMP/ipa" && mkdir -p "$RUNNER_TEMP/ipa" && unzip -q "$ipa" -d "$RUNNER_TEMP/ipa"
+        app="$(ls -d "$RUNNER_TEMP"/ipa/Payload/*.app | head -n 1)"
+        plutil -p "$app/Info.plist" | grep -E 'CFBundleIdentifier|CFBundleShortVersionString|CFBundleVersion|MinimumOSVersion|CFBundlePrimaryIcon|CFBundleIconName'
+        test -f "$app/PrivacyInfo.xcprivacy" && echo "PrivacyInfo.xcprivacy is in the bundle" || echo "::warning::PrivacyInfo.xcprivacy is not in the bundle"
+        test -f "$app/embedded.mobileprovision" && echo "the provisioning profile is embedded" || echo "::error::no embedded provisioning profile"
+        codesign --verify --strict --verbose=1 "$app" 2>&1 | tail -3
+        codesign -d --entitlements :- "$app" 2>/dev/null | grep -E "get-task-allow|beta-reports-active|application-identifier" | sed -E 's|[A-Z0-9]{10}\.|<team>.|' || true
+
+    - name: Upload to App Store Connect (TestFlight)
+      if: ${{ inputs.upload }}
+      env:
+        APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+        APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      run: |
+        mkdir -p "$HOME/.appstoreconnect/private_keys"
+        key="$HOME/.appstoreconnect/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8"
+        printf '%s\n' "$APPLE_API_KEY_P8" > "$key"; chmod 600 "$key"
+        xcrun altool --validate-app -f "$IPA" -t ios --apiKey "$APPLE_API_KEY_ID" --apiIssuer "$APPLE_API_ISSUER"
+        xcrun altool --upload-app -f "$IPA" -t ios --apiKey "$APPLE_API_KEY_ID" --apiIssuer "$APPLE_API_ISSUER"
+        rm -f "$key"
+        echo "Uploaded. Apple processes the build for a few minutes, then it appears in App Store Connect > TestFlight."
+
+    - name: Remove the signing keychain and the profile
+      if: always()
+      run: |
+        if [ -n "${IOS_SIGN_KEYCHAIN:-}" ]; then security delete-keychain "$IOS_SIGN_KEYCHAIN" || true; fi
+        rm -rf "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/"*.mobileprovision 2>/dev/null || true
+        rm -f "$RUNNER_TEMP/echoes.mobileprovision"

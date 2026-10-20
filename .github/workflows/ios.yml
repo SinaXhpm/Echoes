@@ -58,6 +58,9 @@ jobs:
         # the icon catalog must have been compiled (an App Store upload without an app icon is rejected)
         if [ ! -f "$app/Assets.car" ]; then echo "::error::Assets.car is missing: the app icon catalog was not compiled"; exit 1; fi
         echo "Assets.car present"
+        # Apple's privacy manifest must be in the bundle root (App Store Connect checks it on upload)
+        if [ ! -f "$app/PrivacyInfo.xcprivacy" ]; then echo "::error::PrivacyInfo.xcprivacy is missing from the bundle"; exit 1; fi
+        echo "PrivacyInfo.xcprivacy present"
         mkdir -p smoke
         ditto -c -k --keepParent "$app" smoke/Echoes-ios-simulator.zip
         echo "APP=$app" >> "$GITHUB_ENV"

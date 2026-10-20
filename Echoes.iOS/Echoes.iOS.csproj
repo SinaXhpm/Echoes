@@ -61,6 +61,8 @@
   <ItemGroup>
     <ImageAsset Remove="Assets.xcassets\**" />
     <ImageAsset Include="Assets.xcassets\**\*" />
+    <!-- Apple's privacy manifest, in the root of the app bundle (App Store Connect checks it on upload) -->
+    <BundleResource Include="PrivacyInfo.xcprivacy" />
   </ItemGroup>
 
   <!-- Shared source from the desktop project (Program.cs / app.manifest / Desktop\ are desktop-only and excluded). -->

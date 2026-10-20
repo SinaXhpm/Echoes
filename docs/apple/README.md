@@ -61,6 +61,17 @@ Other certificates you will need later (create them in Certificates, with the sa
 | `APPLE_API_KEY_ID` | that key's Key ID |
 | `APPLE_API_ISSUER` | the Issuer ID (shown above the keys list) |
 
+For iOS (TestFlight and later the App Store) three more, from the **Apple Distribution** certificate and the **App Store**
+provisioning profile for `com.sinaxhpm.echoes` (the API key above uploads the build):
+
+| Secret | Value |
+| :--- | :--- |
+| `IOS_CERT_P12_BASE64` | the Apple Distribution certificate + private key as a `.p12`, base64 |
+| `IOS_CERT_PASSWORD` | its password |
+| `IOS_PROFILE_BASE64` | the `.mobileprovision` file, base64 |
+
+`bash .signing/set-github-secrets.sh ios` uploads them from the files in `.signing/`.
+
 The API key: App Store Connect > Users and Access > Integrations > App Store Connect API > Team Keys > **+**, role
 **Developer**. The `.p8` downloads only once. Put it in `.signing/` too.
 
@@ -156,15 +167,12 @@ header first (`IcmpPinger`). **Nothing has run on a real iPhone yet**, and the s
 9. **Native AOT and trimming:** an iOS release is fully ahead-of-time compiled and trimmed. Run every tool once on a device
    in a Release build; reflection that works in Debug can fail there (the project already roots SSH.NET and DnsClient).
 
-Then ship it:
+Then ship it (`.github/workflows/ios-testflight.yml` does steps 2 and 3 when you run it by hand):
 
 1. Create the **Apple Distribution** certificate and an **App Store** provisioning profile for `com.sinaxhpm.echoes`.
-2. In CI, import both on the macOS runner and build with manual signing:
-   `dotnet publish Echoes.iOS/Echoes.iOS.csproj -c Release -f net10.0-ios -r ios-arm64 -p:ArchiveOnBuild=true
-   -p:CodesignKey="Apple Distribution: ..." -p:CodesignProvision="<profile name>" -p:ApplicationVersion=<run number>`.
-   Every upload needs a build number (`ApplicationVersion`) higher than the last one.
-3. Upload the `.ipa` with `xcrun altool --upload-app -f Echoes.ipa -t ios --apiKey <KEY_ID> --apiIssuer <ISSUER_ID>` (the
-   `.p8` goes in `~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8`), or with Transporter.
+2. The workflow imports both on the macOS runner and builds with manual signing (`dotnet publish ... -p:ArchiveOnBuild=true`, the
+   build number is the run number, because every upload needs a higher one).
+3. It uploads the `.ipa` with `xcrun altool` and the API key; Apple processes it for a few minutes.
 4. Test with **TestFlight** first (internal testers need no review), then submit the version for review.
 
 ## App Store Connect checklist
