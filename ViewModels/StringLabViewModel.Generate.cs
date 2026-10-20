@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Echoes.Helpers;
 
 namespace Echoes.ViewModels;
 
@@ -16,6 +18,13 @@ public partial class StringLabViewModel
     [ObservableProperty] private bool _genExcludeAmbiguous = true;  // drop 0/O, 1/l/I (read-aloud / handwriting safe)
     [ObservableProperty] private string _generateInfo = string.Empty;
 
+
+    // The card under the generated values: empty (hidden) for identifiers (UUID, ULID), which aren't secrets.
+    [ObservableProperty] private IReadOnlyList<CrackRow> _crackRows = Array.Empty<CrackRow>();
+    [ObservableProperty] private string _crackBitsText = string.Empty;
+    public bool HasCrackTime => CrackRows.Count > 0;
+    partial void OnCrackRowsChanged(IReadOnlyList<CrackRow> value) => OnPropertyChanged(nameof(HasCrackTime));
+
     private const string PwSymbol = "!@#$%^&*-_=+?";
     private const string NanoIdAlphabet = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
     private const string Crockford32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -26,6 +35,7 @@ public partial class StringLabViewModel
         int count = Math.Clamp(GenerateCount, 1, 1000);
         int len = Math.Clamp(GenerateLength, 1, 4096);
         bool symbols = GenSymbols, noAmbiguous = GenExcludeAmbiguous;
+        double? bits = SecretBits(type, len, symbols, noAmbiguous);
 
         return RunOffUi("gen", () =>
         {
@@ -38,7 +48,43 @@ public partial class StringLabViewModel
             GenerateOutput = r.Text;
             string clamped = count != GenerateCount || len != GenerateLength ? $"   (clamped to count {count}, length {len})" : "";
             GenerateInfo = r.Info + clamped;
+            SetCrackTime(bits);
         }, "Generate: ");
+    }
+
+    // The entropy of what is generated, for the types that are secrets (null for identifiers such as UUID and ULID).
+    private static double? SecretBits(string type, int len, bool symbols, bool noAmbiguous)
+    {
+        var (upper, lower, digit) = PwSets(noAmbiguous);
+        return type switch
+        {
+            "password" => CrackTime.PasswordBits(symbols ? new[] { upper.Length, lower.Length, digit.Length, PwSymbol.Length }
+                                                         : new[] { upper.Length, lower.Length, digit.Length }, len),
+            "alnum" => CrackTime.Bits(upper.Length + lower.Length + digit.Length, len),
+            "pin" => CrackTime.Bits(10, len),
+            "nanoid" => CrackTime.Bits(NanoIdAlphabet.Length, 21),
+            "hex" or "base64" or "b64url" => len * 8.0,
+            _ => null,
+        };
+    }
+
+    private void SetCrackTime(double? bits)
+    {
+        if (bits is not { } b)
+        {
+            CrackRows = Array.Empty<CrackRow>();
+            CrackBitsText = string.Empty;
+            return;
+        }
+        var rows = new List<CrackRow>();
+        foreach (var s in CrackTime.Scenarios)
+        {
+            var level = CrackTime.Judge(b, s.Rate);
+            rows.Add(new CrackRow(s.Name, s.Detail, CrackTime.Describe(b, s.Rate),
+                level == CrackTime.Level.Weak, level == CrackTime.Level.Fair, level == CrackTime.Level.Strong));
+        }
+        CrackRows = rows;
+        CrackBitsText = $"{Math.Floor(b):N0} bits";
     }
 
     private static (string Upper, string Lower, string Digit) PwSets(bool noAmbiguous) => noAmbiguous
@@ -167,3 +213,6 @@ public partial class StringLabViewModel
         return new string(c);
     }
 }
+
+/// <summary>One line of the String Lab "Time to crack" card: an attacker's situation, and how long this secret lasts against it.</summary>
+public sealed record CrackRow(string Name, string Detail, string Time, bool IsWeak, bool IsFair, bool IsStrong);

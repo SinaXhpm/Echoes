@@ -21,6 +21,11 @@
 			<Setter Property="Padding" Value="0,14,0,0"/>
 		</Style>
 
+		<!-- ===== the Generate tab's "Time to crack" card: red = minutes to weeks, amber = months to decades, green = longer ===== -->
+		<Style Selector="TextBlock.crackWeak"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+		<Style Selector="TextBlock.crackFair"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+		<Style Selector="TextBlock.crackStrong"><Setter Property="Foreground" Value="{DynamicResource Success}"/></Style>
+
 		<!-- ===== inputs (state colours come from the Fluent overrides in Tokens.axaml) ===== -->
 		<!-- text areas: Enter adds a line and long lines wrap; one-line fields are plain TextBox.field -->
 		<Style Selector="TextBox.multiline">
@@ -1044,7 +1049,29 @@
 								<TextBlock DockPanel.Dock="Top" Classes="status" Margin="0,0,0,10" Text="{Binding GenerateInfo}"
 										   IsVisible="{Binding GenerateInfo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Generated"/>
-								<TextBox Text="{Binding GenerateOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
+								<!-- how long a secret like this lasts, in everyday situations (passwords, PINs, tokens; not UUIDs) -->
+								<Border DockPanel.Dock="Bottom" Classes="card" Margin="0,12,0,0" Padding="12,10"
+										IsVisible="{Binding HasCrackTime}">
+									<StackPanel Spacing="4">
+										<DockPanel>
+											<TextBlock DockPanel.Dock="Right" Classes="muted" Text="{Binding CrackBitsText}"/>
+											<TextBlock Classes="fieldLabel" Text="Time to crack" Margin="0"
+													   ToolTip.Tip="On average (half of all possibilities), by guessing at random. Attackers try common passwords first, so a password you made up yourself falls much faster than these times."/>
+										</DockPanel>
+										<ItemsControl ItemsSource="{Binding CrackRows}">
+											<ItemsControl.ItemTemplate>
+												<DataTemplate x:DataType="vm:CrackRow">
+													<Grid ColumnDefinitions="*,Auto" Margin="0,2" ToolTip.Tip="{Binding Detail}">
+														<TextBlock Text="{Binding Name}" Foreground="{DynamicResource Text.Secondary}" TextTrimming="CharacterEllipsis"/>
+														<TextBlock Grid.Column="1" Text="{Binding Time}" FontWeight="SemiBold" Margin="12,0,0,0"
+																   Classes.crackWeak="{Binding IsWeak}" Classes.crackFair="{Binding IsFair}" Classes.crackStrong="{Binding IsStrong}"/>
+													</Grid>
+												</DataTemplate>
+											</ItemsControl.ItemTemplate>
+										</ItemsControl>
+									</StackPanel>
+								</Border>
+								<TextBox MinHeight="80" Text="{Binding GenerateOutput, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True"
 										 PlaceholderText="Generated values (crypto RNG)"/>
 							</DockPanel>
 						</Grid>

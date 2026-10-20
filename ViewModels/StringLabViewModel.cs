@@ -184,7 +184,7 @@ public partial class StringLabViewModel : ObservableObject
             case "xml": XmlInput = XmlOutput = string.Empty; break;
             case "subnet": SubnetInput = SubnetOutput = string.Empty; break;
             case "epoch": EpochInput = EpochOutput = string.Empty; break;
-            case "gen": GenerateOutput = GenerateInfo = string.Empty; break;
+            case "gen": GenerateOutput = GenerateInfo = string.Empty; SetCrackTime(null); break;
             case "baseconv": BaseInput = BaseOutput = BaseFrom = BaseTo = string.Empty; break;
             case "ipconv": IpConvInput = IpConvOutput = string.Empty; break;
             case "hashid": HashIdInput = HashIdOutput = string.Empty; break;

@@ -40,9 +40,9 @@ Echoes is a free, open-source network toolkit with a simple graphical interface.
 - [Android](#android)
 - [Privacy and security](#privacy-and-security)
 - [FAQ](#faq)
-- [Also by the developer: Submarine](#also-by-the-developer-submarine)
 - [Build from source](#build-from-source)
 - [License](#license)
+- [Also by the developer: Submarine](#also-by-the-developer-submarine)
 
 ## Download and install
 
@@ -92,7 +92,7 @@ Echoes shows a small notice in the sidebar when a new version is out. The **Abou
 | [Socket](#tcp-udp-and-websocket-tool) | Raw TCP / UDP client and server, and a WebSocket client | netcat (nc), telnet, wscat |
 | [Web Server](#file-sharing-web-server-and-request-catcher) | Chat and swap files with any browser on your network, or catch webhook requests | python -m http.server, Snapdrop, webhook.site |
 | [Proxy](#socks5-and-http-proxy-server-and-proxy-checker) | SOCKS5 + HTTP proxy server, and a checker for proxy lists | 3proxy, microsocks, proxy checkers |
-| [String Lab](#string-lab) | Encoding, hashes, JWT, JSON / YAML, regex, subnets, cron and more | CyberChef, jwt.io |
+| [String Lab](#string-lab) | Encoding, hashes, JWT, JSON / YAML, regex, subnets, cron, strong password generator with time to crack | CyberChef, jwt.io, password strength checkers |
 | [Notes](#encrypted-notes) | Notes locked with a master password | encrypted notepad |
 | [History & Backup](#history-and-encrypted-backup) | Recent inputs per tool, and one encrypted backup file | — |
 
@@ -130,7 +130,7 @@ Echoes shows a small notice in the sidebar when a new version is out. The **Abou
 </table>
 
 <details>
-<summary><b>More screenshots</b>: TCP ping, email check, DoH / DoT, port scanner, network and Wi-Fi, cURL, TLS, proxy, Cloudflare, SSH, String Lab, About, light theme</summary>
+<summary><b>More screenshots</b>: TCP ping, email check, DoH / DoT, port scanner, network and Wi-Fi, cURL, TLS, proxy, Cloudflare, SSH, String Lab, password time to crack, About, light theme</summary>
 
 <table>
   <tr>
@@ -160,6 +160,9 @@ Echoes shows a small notice in the sidebar when a new version is out. The **Abou
   <tr>
     <td><img src="docs/screenshots/ssh-server-health.png" width="380" alt="SSH client server health: CPU, load, memory, swap, disks and top processes"><br><b>SSH</b>: server health</td>
     <td><img src="docs/screenshots/string-lab-jwt.png" width="380" alt="String Lab JWT decoder verifying an HS256 signature"><br><b>String Lab</b>: JWT decode and verify</td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><img src="docs/screenshots/string-lab-password-time-to-crack.png" width="380" alt="String Lab password generator with the time to crack in six situations, from a login with lockout to a state-level attacker"><br><b>String Lab</b>: password generator with time to crack</td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/about-box.png" width="380" alt="About box with version, update check and platform details"><br><b>About</b>: version, update check, bug-report info</td>
@@ -435,6 +438,7 @@ Everyday developer text tools in one place.
 - **Converters:** Unix timestamp ↔ date, number bases 2 to 36, and a cron expression explainer that lists the next run times.
 - **Text:** compare two texts (diff), change case (camel, Pascal, snake, kebab, …), and line tools (sort, remove duplicates, trim, join, find and replace, …).
 - **Generators:** UUID v4 / v7, ULID, NanoID, strong passwords, tokens and PINs, from a cryptographically secure random source.
+- **Time to crack:** every generated password, PIN or token shows its strength in bits and how long it would take to guess, on average, in six everyday situations: a login with lockout, a login with no limit, a stolen database with a slow hash (bcrypt, Argon2) or a fast one (MD5, NTLM, SHA-1) on one GPU, a 1,000-GPU cluster and a state-level attacker. The times are colour-coded, and the numbers behind each situation are in its tooltip.
 
 ### Encrypted notes
 
@@ -539,20 +543,6 @@ It covers the everyday tasks of nmap, curl / Postman, PuTTY, WinSCP and netcat i
 **Does Echoes collect any data?**
 No. There is no telemetry and no account, and everything is stored locally. See [Privacy and security](#privacy-and-security).
 
-## Also by the developer: Submarine
-
-<p align="center">
-  <a href="https://github.com/SinaXhpm/Submarine"><img src="docs/logos/submarine.png" width="120" alt="Submarine logo: a submarine periscope above neon waves"></a>
-</p>
-
-**[Submarine](https://github.com/SinaXhpm/Submarine)** is a free, open-source **SSH and SFTP client** for Windows, macOS, Linux and Android, from the same developer. Echoes' SSH tool covers quick jobs; Submarine is made for working on servers every day.
-
-- **One window per server:** a terminal, a dual-pane SFTP browser, port forwarding (local, remote and SOCKS / HTTP), a two-way folder mirror, Docker containers and logs, live server info and a per-server command library, all as tabs.
-- **Many servers at once:** split view, a wall of terminals, and broadcast input to several sessions.
-- **Private by design:** saved servers are encrypted on your device, with optional zero-knowledge sync to your phone. It imports PuTTY, MobaXterm and OpenSSH config files.
-
-**[Get Submarine](https://github.com/SinaXhpm/Submarine/releases/latest)** · [Source code and README](https://github.com/SinaXhpm/Submarine)
-
 ## Build from source
 
 You need the **.NET 10 SDK** (or 9.0.300 and later; the desktop app still targets .NET 8), plus the Android workload for Android.
@@ -586,6 +576,64 @@ Primary development and testing happen on **Windows**; the macOS, Linux and Andr
 
 Echoes is released under the **[MIT License](LICENSE)**. You are free to use, copy, modify, share and even sell it, for personal or commercial use, as long as the copyright notice and license text stay included. The software is provided "as is", without warranty.
 
+## Also by the developer: Submarine
+
+<p align="center">
+  <a href="https://github.com/SinaXhpm/Submarine"><img src="docs/logos/submarine.png" width="140" alt="Submarine logo: a submarine periscope above neon waves"></a>
+</p>
+
+<p align="center"><b>Submarine: a modern SSH and SFTP client</b><br>Free and open source, for Windows, macOS, Linux and Android</p>
+
+**[Submarine](https://github.com/SinaXhpm/Submarine)** is a fast, free, open-source **SSH and SFTP client** from the same developer, built with Rust and Tauri. It replaces the usual PuTTY + WinSCP + tunnel-manager stack with **one tabbed window per server**. Echoes' SSH tool covers quick jobs; Submarine is made for working on servers every day.
+
+### Everything it does
+
+**Terminal**
+- Tabbed sessions per server and several shells per session, with a full xterm.js terminal (true colour, ANSI 256, mouse support).
+- Select to copy, right-click to paste, and wrapped lines copy as one line.
+- Scroll-back survives a reconnect, with a divider that marks where it dropped.
+- Container shells: one click opens a `docker exec` shell in a new tab (`bash`, then `sh`, then `ash`).
+
+**SFTP file browser**
+- Dual pane (local and remote) with drag and drop, as stacked tabs or a split view.
+- Live filter for each pane, multi-select with Ctrl / Shift-click and Select all, bulk download, move and delete.
+- Overwrite confirmation for uploads and downloads, with "apply to all" for batches.
+- Live edit: open a remote file in your editor and every save uploads back by itself.
+- Direct download to the folder you already have open, a permissions editor (chmod / chown), and drag files in from your file manager.
+
+**Port forwarding**
+- Local (`-L`), remote (`-R`) and dynamic (`-D`) tunnels. Dynamic tunnels speak SOCKS4, SOCKS4a, SOCKS5, SOCKS5h, HTTP CONNECT and plain HTTP proxy.
+- Each tunnel starts and stops on its own, is saved with the server, and shows its live connection count.
+
+**Folder mirror**
+- Two-way sync between a local and a remote folder, compared by size and content hash.
+- A live watcher pushes every save, create, rename and delete. Pick what wins on a conflict for each mirror (local, remote or newer), deleted files go to `.submarine-trash/`, and a dry-run preview warns about files that would be overwritten.
+
+**Server tools, with nothing to install on the server**
+- **Info panel:** overview (OS, kernel, uptime, load, RAM, swap, disks), network (interfaces, routes, iptables and nftables rules), listening ports with their processes, and systemd services with start, stop and restart.
+- **Docker manager:** containers (start, stop, restart, pause, kill), live logs, stats, inspect, env, mounts and ports, images, volumes and networks, the compose file of a container, and a safe prune that never touches volumes.
+- **Monitoring:** CPU, RAM, disk and network sparklines for each server over SSH.
+
+**Many servers at once**
+- Split view to tile two sessions, a global **Wall** that pins terminals from any hosts in a grid, and **broadcast input** that sends what you type to several sessions together.
+
+**Productivity**
+- A command library and a notes field (runbook, contacts) for each server, autostart for chosen servers, and quick connect without saving.
+- Servers in folders with tag colours, saved passwords and SSH keys with built-in key generation, and keys from a file or pasted (PEM or OpenSSH, with or without a passphrase).
+- Import from PuTTY (`.reg`), MobaXterm (`.mxtsessions`), OpenSSH config and Submarine JSON exports.
+
+**Private by design**
+- Your master password becomes a key on your device (Argon2id) and everything saved is sealed with AES-256-GCM before it touches the disk.
+- Optional cloud sync uploads only that ciphertext, byte for byte: no registration, no recovery e-mail, and nothing on the server can derive your key.
+- Host keys are pinned on first use, the master key is wiped from memory on lock, and there is no telemetry or analytics.
+
+**Android**
+- A native build of the same core, with the same encrypted vault and sync, so your servers appear on the phone.
+- A touch terminal with a soft-key bar (sticky Ctrl, Alt, Shift, Esc and Tab), SFTP with multi-select, tunnels while the app is open, and the info and Docker tabs. The folder mirror is desktop-only for now.
+
+**Downloads:** Windows (`.exe` installer or `.msi`), macOS (`.dmg`, Apple Silicon, and Intel through Rosetta), Linux (`.deb`, `.rpm`, Arch package and AppImage) and Android (`.apk`).
+
+**[Get Submarine](https://github.com/SinaXhpm/Submarine/releases/latest)** · [Source code and README](https://github.com/SinaXhpm/Submarine)
 ---
 
 ## Keywords
@@ -598,6 +646,6 @@ Echoes is released under the **[MIT License](LICENSE)**. You are free to use, co
 
 **Servers and connections:** SSH client, SSH terminal, PuTTY alternative, SFTP client, WinSCP alternative, SSH key login, SSH port forwarding, SSH local and remote forwarding, server monitoring over SSH, SSH tunnel, SOCKS5 tunnel, SSH dynamic port forwarding, Submarine SSH client, netcat GUI, TCP client, UDP client, TCP server, socket tester, hex sender, telnet alternative, web server, HTTP file server, LAN file sharing, LAN chat, local network chat, HTTPS file sharing, share files over Wi-Fi, phone to PC file transfer, send files from phone to PC without a cable, browser-based file sharing, QR code file sharing, AirDrop alternative for Windows and Android, LocalSend alternative, Snapdrop alternative, PairDrop alternative, SOCKS5 proxy server, HTTP proxy server, local proxy server, proxy checker, proxy list tester, SOCKS5 checker, bulk proxy checker.
 
-**Developer tools:** developer toolbox, CyberChef alternative, Base64 encoder decoder, URL encoder decoder, hash generator, hash identifier, MD5, SHA-256, HMAC, file checksum, regex tester, JSON formatter, JSON validator, JSON to YAML, JSON to CSV, XML formatter, JWT decoder, JWT verifier, subnet calculator, CIDR calculator, IP converter, Unix timestamp converter, epoch converter, cron expression parser, base converter, text diff, case converter, UUID generator, ULID generator, NanoID generator, password generator, encrypted notes, encrypted backup, AES-256-GCM.
+**Developer tools:** developer toolbox, CyberChef alternative, Base64 encoder decoder, URL encoder decoder, hash generator, hash identifier, MD5, SHA-256, HMAC, file checksum, regex tester, JSON formatter, JSON validator, JSON to YAML, JSON to CSV, XML formatter, JWT decoder, JWT verifier, subnet calculator, CIDR calculator, IP converter, Unix timestamp converter, epoch converter, cron expression parser, base converter, text diff, case converter, UUID generator, ULID generator, NanoID generator, password generator, password generator, strong password generator, password strength checker, password entropy calculator, how long to crack a password, time to crack password, brute force time calculator, random token generator, PIN generator, encrypted notes, encrypted backup, AES-256-GCM.
 
 **Platforms:** Windows network tools, macOS network tools, Linux network tools, Android network tools, Apple Silicon, Intel Mac, AppImage, deb, rpm, Android APK, portable app, no install, cross-platform, Native AOT, Avalonia UI, .NET 8, .NET 10, C#, free, open source, MIT license, no account, no ads, no telemetry.
