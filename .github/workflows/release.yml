@@ -18,9 +18,11 @@ jobs:
             rid: win-x64
           - os: ubuntu-22.04   # glibc 2.35: the AOT binary then also runs on Ubuntu 22.04+, Debian 12+, Fedora 36+ (24.04 would need 2.39)
             rid: linux-x64
-          - os: macos-latest
+          # macos-15 (Xcode 16), not macos-latest (Xcode 26): the AOT binary is linked for the macOS of the machine that builds it unless
+          # MACOSX_DEPLOYMENT_TARGET says otherwise, and Xcode 26's linker crashes when it does (see the Publish step). Cross-links osx-x64 too.
+          - os: macos-15
             rid: osx-x64
-          - os: macos-latest
+          - os: macos-15
             rid: osx-arm64
 
     steps:
@@ -48,7 +50,8 @@ jobs:
     - name: Publish
       env:
         # NativeAOT links with clang, which targets the build machine's own macOS (26) unless told otherwise: the app then
-        # refuses to open on older macOS (kLSIncompatibleSystemVersionErr). 12.0 is what the README promises.
+        # refuses to open on older macOS (kLSIncompatibleSystemVersionErr). 12.0 is what the README promises. Xcode 26's classic linker (the
+        # one .NET 8's NativeAOT uses) asserts when asked for 12.0, so the macOS jobs run on macos-15 (Xcode 16).
         MACOSX_DEPLOYMENT_TARGET: '12.0'
       run: dotnet publish Echoes.csproj -c Release -r ${{ matrix.rid }} -p:Version=${{ steps.get_version.outputs.VERSION }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=copyused -p:OptimizationPreference=Size -p:StackTraceSupport=true -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
 
@@ -101,14 +104,14 @@ jobs:
     #   APPLE_API_KEY_ID        its Key ID           APPLE_API_ISSUER   the Issuer ID shown above the keys list
     # The certificate goes into a temporary keychain that is deleted at the end of the job.
     - name: Import Apple signing certificate
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-15'
       env:
         APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
         APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
       run: bash packaging/macos/import-certificate.sh
 
     - name: Package macOS
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-15'
       env:
         APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
@@ -117,7 +120,7 @@ jobs:
       run: bash packaging/macos/package.sh "${{ matrix.rid }}" "${{ steps.get_version.outputs.VERSION }}"
 
     - name: Remove the signing keychain
-      if: always() && matrix.os == 'macos-latest'
+      if: always() && matrix.os == 'macos-15'
       run: |
         if [ -n "${SIGN_KEYCHAIN:-}" ]; then security delete-keychain "$SIGN_KEYCHAIN" || true; fi
         rm -f "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/DeveloperIDG2CA.cer"

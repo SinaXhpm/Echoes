@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         rid: [ osx-arm64, osx-x64 ]   # x64 is cross-built on the arm64 runner, like release.yml does
-    runs-on: macos-latest
+    runs-on: macos-15
     # Apple's queue can take hours for a team's first notarizations
     timeout-minutes: 330
     steps:
