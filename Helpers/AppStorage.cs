@@ -71,6 +71,7 @@ public static class AppStorage
     // hand out a relative path: fall back to ~/.config, then (no home at all) the temp dir.
     private static string AppDataRoot()
     {
+        if (OperatingSystem.IsIOS() && IosSupportRoot() is { } support) return support;
         string root = string.Empty;
         try { root = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.Create); }
         catch { }
@@ -78,6 +79,37 @@ public static class AppStorage
 
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         return !string.IsNullOrEmpty(home) && Path.IsPathRooted(home) ? Path.Combine(home, ".config") : Path.GetTempPath();
+    }
+
+    // iOS: the Files app shows the Documents folder (Info.plist: UIFileSharingEnabled), so only what the user is meant to
+    // see lives there (the received files, ShareInbox.IosReceivedFolder). The profile, the secret key, the share certificate
+    // and the logs go to Library/Application Support instead. Test builds up to 0.4.3 (build 2) kept them in
+    // Documents/.config/Echoes: that folder is moved over once.
+    private static readonly object IosGate = new();
+    private static bool _iosMigrated;
+
+    private static string? IosSupportRoot()
+    {
+        try
+        {
+            string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);   // <container>/Documents
+            string? container = string.IsNullOrEmpty(docs) ? null : Path.GetDirectoryName(docs.TrimEnd('/'));
+            if (string.IsNullOrEmpty(container) || !Path.IsPathRooted(container)) return null;
+            string root = Path.Combine(container, "Library", "Application Support");
+            lock (IosGate)
+            {
+                Directory.CreateDirectory(root);
+                if (!_iosMigrated)
+                {
+                    string oldDir = Path.Combine(docs, ".config", "Echoes"), newDir = Path.Combine(root, "Echoes");
+                    if (Directory.Exists(oldDir) && !Directory.Exists(newDir)) Directory.Move(oldDir, newDir);
+                    try { Directory.Delete(Path.Combine(docs, ".config")); } catch { }   // only when it is empty now
+                    _iosMigrated = true;
+                }
+            }
+            return root;
+        }
+        catch { return null; }
     }
 
     /// <summary>

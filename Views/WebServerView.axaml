@@ -1009,7 +1009,8 @@
                                     <StackPanel x:Name="ShStoreBtns" Orientation="Horizontal" Spacing="6">
                                         <Button Classes="rowBtn" Content="Open" Command="{Binding OpenInboxCommand}" IsVisible="{Binding CanOpenInbox}"
                                                 ToolTip.Tip="Open the folder"/>
-                                        <Button Classes="rowBtn" Content="Change" Click="ChangeInbox_Click" ToolTip.Tip="Pick the folder received files go to"/>
+                                        <Button Classes="rowBtn" Content="Change" Click="ChangeInbox_Click" IsVisible="{Binding CanChangeInbox}"
+                                                ToolTip.Tip="Pick the folder received files go to"/>
                                         <Button Classes="rowBtn cleanup" Content="Clean up" Command="{Binding AskCleanUpCommand}" IsEnabled="{Binding CanCleanUp}"
                                                 ToolTip.Tip="Delete the files Echoes received to free the space (only those: nothing else in the folder)"/>
                                     </StackPanel>

@@ -12,6 +12,12 @@ on:
     branches: [ master, main ]
     paths:
       - 'Echoes.iOS/**'
+      - 'App.axaml'
+      - 'App.axaml.cs'
+      - 'ViewModels/**'
+      - 'Views/**'
+      - 'Helpers/**'
+      - 'Styles/**'
       - '.github/workflows/ios.yml'
 
 # Least privilege: these jobs only read the repo and upload workflow artifacts.
@@ -94,34 +100,47 @@ jobs:
         if [ "${FAILED:-}" = "1" ]; then echo "::error::The app did not stay running on a simulator (see the logs artifact)"; exit 1; fi
 
     # The app checks what the shared tools need from iOS (storage, DNS, TCP, ICMP, HTTPS, a TLS server, sockets, child
-    # processes) when it is started with ECHOES_SELFTEST=1 (Echoes.iOS/SelfTest.cs) and leaves a report in its data folder.
-    - name: Self-test on a simulator
+    # processes, the sound and screen-on helpers) and opens every tool in the touch shell when it is started with
+    # ECHOES_SELFTEST=1 (Echoes.iOS/SelfTest.cs). It leaves a report and a picture of each tool in its data folder.
+    - name: Self-test on simulators
       run: |
-        udid="$(xcrun simctl list devices available | grep -E 'iPhone [0-9]+ Pro \(' | tail -n 1 | grep -Eo '[0-9A-F]{8}-([0-9A-F]{4}-){3}[0-9A-F]{12}')"
-        echo "simulator $udid"
-        xcrun simctl boot "$udid" || true
-        xcrun simctl bootstatus "$udid" -b > /dev/null
-        xcrun simctl install "$udid" "$APP"
-        xcrun simctl terminate "$udid" com.sinaxhpm.echoes 2> /dev/null || true
-        SIMCTL_CHILD_ECHOES_SELFTEST=1 xcrun simctl launch "$udid" com.sinaxhpm.echoes
-        data="$(xcrun simctl get_app_container "$udid" com.sinaxhpm.echoes data)"
-        report=""
-        for i in $(seq 1 40); do
-          report="$(find "$data" -name selftest.txt 2> /dev/null | head -n 1)"
-          if [ -n "$report" ] && grep -q "SELFTEST DONE" "$report"; then break; fi
-          sleep 5
-        done
-        xcrun simctl shutdown "$udid" || true
-        if [ -z "$report" ] || ! grep -q "SELFTEST DONE" "$report"; then
-          echo "::error::The self-test did not finish (the app stopped, or never ran it)"
-          [ -n "$report" ] && cat "$report"
-          exit 1
-        fi
         mkdir -p smoke
-        cp "$report" smoke/selftest.txt
-        echo "---- self-test report"; cat smoke/selftest.txt
-        grep "SELFTEST FAIL" smoke/selftest.txt | while read -r l; do echo "::warning::$l"; done
-        grep -q "SELFTEST DONE failures=0" smoke/selftest.txt || echo "::warning::some self-test checks failed (see the report above)"
+        FAILED=0
+        selftest() {   # $1 = device regex, $2 = label
+          udid="$(xcrun simctl list devices available | grep -E "$1" | tail -n 1 | grep -Eo '[0-9A-F]{8}-([0-9A-F]{4}-){3}[0-9A-F]{12}')"
+          if [ -z "$udid" ]; then echo "::warning::no $2 simulator on this runner"; return 0; fi
+          echo "=== $2: $udid"
+          xcrun simctl boot "$udid" || true
+          xcrun simctl bootstatus "$udid" -b > /dev/null
+          xcrun simctl install "$udid" "$APP"
+          xcrun simctl terminate "$udid" com.sinaxhpm.echoes 2> /dev/null || true
+          SIMCTL_CHILD_ECHOES_SELFTEST=1 xcrun simctl launch "$udid" com.sinaxhpm.echoes
+          data="$(xcrun simctl get_app_container "$udid" com.sinaxhpm.echoes data)"
+          report=""
+          for i in $(seq 1 72); do
+            report="$(find "$data" -name selftest.txt 2> /dev/null | head -n 1)"
+            if [ -n "$report" ] && grep -q "SELFTEST DONE" "$report"; then break; fi
+            sleep 5
+          done
+          if [ -z "$report" ] || ! grep -q "SELFTEST DONE" "$report"; then
+            echo "::error::The self-test on the $2 simulator did not finish (the app stopped, or never ran it)"
+            [ -n "$report" ] && cat "$report"
+            xcrun simctl shutdown "$udid" || true
+            FAILED=1
+            return 0
+          fi
+          cp "$report" "smoke/selftest-$2.txt"
+          tour="$(find "$data" -type d -name tour 2> /dev/null | head -n 1)"
+          if [ -n "$tour" ]; then mkdir -p "smoke/tour-$2"; cp "$tour"/*.png "smoke/tour-$2/" 2> /dev/null || true; fi
+          echo "---- self-test report ($2)"; cat "smoke/selftest-$2.txt"
+          grep "SELFTEST FAIL" "smoke/selftest-$2.txt" | while read -r l; do echo "::warning::$2: $l"; done
+          grep -q "SELFTEST DONE failures=0" "smoke/selftest-$2.txt" || echo "::warning::some self-test checks failed on the $2 simulator (see the report above)"
+          ls "smoke/tour-$2" 2> /dev/null | wc -l | xargs echo "pictures of the tools:"
+          xcrun simctl shutdown "$udid" || true
+        }
+        selftest 'iPhone [0-9]+ Pro \(' iphone
+        selftest 'iPad (Pro|Air)' ipad
+        if [ "$FAILED" = "1" ]; then exit 1; fi
     - name: Keep the screenshots, logs and the simulator app (3 days)
       if: always()
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

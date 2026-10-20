@@ -3,13 +3,20 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using Echoes.Helpers;
+using Echoes.Views;
 
 namespace Echoes.iOS;
 
 // A smoke test of what the shared tools need from the platform: storage, DNS, TCP, ICMP, HTTPS, a TLS server, loopback
-// sockets, child processes. It runs only when the app is started with ECHOES_SELFTEST=1 (CI starts it that way on a
-// simulator, .github/workflows/ios.yml) and writes one line per check, "ok" or "FAIL", to the console and to
+// sockets, child processes, the sound and screen-on helpers, and every tool opening in the touch shell (with a picture of
+// each, in the data folder's "tour"). It runs only when the app is started with ECHOES_SELFTEST=1 (CI starts it that way
+// on a simulator, .github/workflows/ios.yml) and writes one line per check, "ok" or "FAIL", to the console and to
 // selftest.txt in the app's data folder, ending with "SELFTEST DONE failures=N". Nothing in it runs in a normal start.
 internal static class SelfTest
 {
@@ -33,11 +40,11 @@ internal static class SelfTest
         int failures = 0;
         try { _file = Path.Combine(AppStorage.UserDir(), "selftest.txt"); } catch { }
 
-        async Task Check(string name, Func<CancellationToken, Task<string>> body)
+        async Task Check(string name, Func<CancellationToken, Task<string>> body, int seconds = 30)
         {
             try
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(seconds));
                 string detail = await body(cts.Token).ConfigureAwait(false);
                 Line($"SELFTEST ok   {name}: {detail}");
             }
@@ -203,8 +210,133 @@ internal static class SelfTest
         await Check("crack time (the String Lab card)", _ =>
             Task.FromResult($"128 bits vs one GPU: {CrackTime.Describe(128, 1e11)}"));
 
+        // The Files app shows Documents only: the received files go there, the app's own data stays out of it.
+        await Check("storage layout (app data, and the folder the Files app shows)", _ =>
+        {
+            string data = AppStorage.UserDir(), received = ShareInbox.DefaultFolder();
+            if (!data.Contains("/Library/Application Support/", StringComparison.Ordinal))
+                throw new InvalidOperationException("the app's data isn't in Library/Application Support: " + data);
+            if (!received.EndsWith("/Documents/Received", StringComparison.Ordinal))
+                throw new InvalidOperationException("received files aren't in Documents/Received: " + received);
+            Directory.CreateDirectory(received);
+            // a path an earlier run saved (the container folder changes with an update) is moved into this container;
+            // nothing outside the received folder can be reached that way
+            const string old = "/var/mobile/Containers/Data/Application/00000000-0000-0000-0000-000000000000/Documents";
+            if (ShareInbox.RebaseIos(old + "/Received/a.txt") != Path.Combine(received, "a.txt"))
+                throw new InvalidOperationException("a saved path wasn't moved into this container: " + ShareInbox.RebaseIos(old + "/Received/a.txt"));
+            if (ShareInbox.RebaseIos(old + "/.config/Echoes/profile.json") is not null) throw new InvalidOperationException("a path outside Received was accepted");
+            if (ShareInbox.RebaseIos(old + "/Received/../Echoes.txt") is not null) throw new InvalidOperationException("a path climbing out of Received was accepted");
+            return Task.FromResult($"app data in {data[data.IndexOf("/Library/", StringComparison.Ordinal)..]}, received files in {received[received.IndexOf("/Documents/", StringComparison.Ordinal)..]}");
+        });
+
+        // A CI runner has no sound output, so "couldn't start" is only reported; a crash or an exception would fail.
+        await Check("alert sound (info)", _ =>
+        {
+            bool started = new IosSoundPlayer().Play(SoundTones.CreatePcm(AlertTone.Up, 10), SoundTones.SampleRate);
+            return Task.FromResult(started ? "AVAudioPlayer started it" : "AVAudioPlayer couldn't start it (no sound output here?)");
+        });
+
+        await Check("the screen stays on while something runs", async ct =>
+        {
+            BackgroundGuard.Acquire("self-test");
+            await Task.Delay(700, ct).ConfigureAwait(false);
+            bool on = await Dispatcher.UIThread.InvokeAsync(() => UIKit.UIApplication.SharedApplication.IdleTimerDisabled);
+            BackgroundGuard.Release();
+            await Task.Delay(700, ct).ConfigureAwait(false);
+            bool off = !await Dispatcher.UIThread.InvokeAsync(() => UIKit.UIApplication.SharedApplication.IdleTimerDisabled);
+            if (!on || !off) throw new InvalidOperationException($"the screen stayed on: {on} while running, released after: {off}");
+            return "on while a job runs, back to normal after it";
+        });
+
+        // Opens every tool in the touch shell, one after another, like a person tapping through the drawer. A tool whose
+        // view or view-model can't be built here shows "failed to load" (ToolViews.Fill) and writes to the crash log.
+        // A picture of each page is saved to the data folder's "tour" (CI keeps them).
+        await Check("every tool opens in the touch shell", async ct =>
+        {
+            var shell = await Dispatcher.UIThread.InvokeAsync(() =>
+                (Application.Current?.ApplicationLifetime as ISingleViewApplicationLifetime)?.MainView as MobileShellView);
+            if (shell is null) throw new InvalidOperationException("the touch shell isn't there");
+            var (nav, pages) = await Dispatcher.UIThread.InvokeAsync(() => (shell.FindControl<ListBox>("Nav"), shell.FindControl<Carousel>("Pages")));
+            if (nav is null || pages is null) throw new InvalidOperationException("the drawer list or the pages are missing");
+
+            string shots = Path.Combine(AppStorage.UserDir(), "tour");
+            Directory.CreateDirectory(shots);
+            foreach (string stale in Directory.GetFiles(shots, "*.png")) File.Delete(stale);
+            string crashLog = AppStorage.UserPath("echoes-crash.log");
+            long logged = File.Exists(crashLog) ? new FileInfo(crashLog).Length : 0;
+
+            int count = await Dispatcher.UIThread.InvokeAsync(() => nav.ItemCount);
+            var opened = new List<string>();
+            var problems = new List<string>();
+            for (int i = 0; i < count; i++)
+            {
+                int at = i;
+                string tag = await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    nav.SelectedIndex = at;
+                    return (nav.SelectedItem as ListBoxItem)?.Tag as string ?? "?";
+                });
+                await Task.Delay(1200, ct).ConfigureAwait(false);   // layout, and the refresh that runs once the page is drawn
+                string? problem = await Dispatcher.UIThread.InvokeAsync(() => Inspect(shell, pages, at, tag));
+                string file = Path.Combine(shots, $"{at + 1:00}-{tag.ToLowerInvariant().Replace(' ', '-')}.png");
+                await Dispatcher.UIThread.InvokeAsync(() => Shot(shell, file));
+                if (problem is null) opened.Add(tag); else problems.Add($"{tag}: {problem}");
+            }
+            foreach (string entry in NewCrashEntries(crashLog, logged)) problems.Add("crash log: " + entry);
+            if (problems.Count > 0) throw new InvalidOperationException(string.Join(" | ", problems));
+            return $"{opened.Count} of {count} opened: {string.Join(", ", opened)}";
+        }, seconds: 300);
+
         Line($"SELFTEST DONE failures={failures}");
         return failures;
+    }
+
+    // UI thread: what the page of one drawer entry shows now, or what is wrong with it.
+    private static string? Inspect(MobileShellView shell, Carousel pages, int index, string tag)
+    {
+        static string? Page(Control? child, string name, bool needsSize)
+        {
+            if (child is null) return $"{name} is empty";
+            if (child is TextBlock { Text: { } text } && text.Contains("failed to load", StringComparison.Ordinal)) return text;
+            if (needsSize && (child.Bounds.Width < 1 || child.Bounds.Height < 1)) return $"{name} has no size ({child.Bounds.Width:0}x{child.Bounds.Height:0})";
+            return null;
+        }
+        if (tag == "DATA")   // History and Backup share one entry (two tabs: only the first one is on screen)
+            return Page(shell.FindControl<Decorator>("HistoryHost")?.Child as Control, "History", true)
+                ?? Page(shell.FindControl<Decorator>("BackupHost")?.Child as Control, "Backup", false);
+        return index < pages.ItemCount && pages.Items[index] is Decorator host ? Page(host.Child as Control, tag, true) : $"no page for {tag}";
+    }
+
+    // UI thread: a picture of the whole shell (the app bar and the page) at twice the size, for the CI artifacts.
+    private static void Shot(Control shell, string file)
+    {
+        try
+        {
+            int w = (int)shell.Bounds.Width, h = (int)shell.Bounds.Height;
+            if (w < 1 || h < 1) return;
+            using var bitmap = new RenderTargetBitmap(new PixelSize(w * 2, h * 2), new Vector(192, 192));
+            bitmap.Render(shell);
+            bitmap.Save(file, PngBitmapEncoderOptions.Default);
+        }
+        catch (Exception ex) { Line($"SELFTEST note: no picture of {Path.GetFileName(file)} ({ex.GetType().Name}: {ex.Message})"); }
+    }
+
+    // What the crash log gained after a position: the first line of each entry names the place and the exception.
+    private static List<string> NewCrashEntries(string file, long from)
+    {
+        var found = new List<string>();
+        try
+        {
+            if (!File.Exists(file)) return found;
+            using var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            if (fs.Length <= from) return found;
+            fs.Seek(from, SeekOrigin.Begin);
+            using var reader = new StreamReader(fs, Encoding.UTF8);
+            while (reader.ReadLine() is { } line)
+                if (line.StartsWith("[20", StringComparison.Ordinal) && found.Count < 8) found.Add(line.Length > 240 ? line[..240] : line);
+        }
+        catch { }
+        return found;
     }
 }
 

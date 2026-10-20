@@ -560,7 +560,7 @@ public static class IcmpPinger
                 s.SetRawSocketOption(SOL_IPV6, IPV6_DONTFRAG, BitConverter.GetBytes(1));
                 return true;
             }
-            if (OperatingSystem.IsMacOS())
+            if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
             {
                 s.SetRawSocketOption(IPPROTO_IPV6_BSD, IPV6_DONTFRAG, BitConverter.GetBytes(1));
                 return true;

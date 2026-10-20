@@ -94,10 +94,11 @@ public static class DoctorNet
             }
             catch { /* an interface that vanished meanwhile */ }
         }
-        // Android 10+ hides the routing table: an address without a visible gateway is "can't tell" there, not "none"
+        // Android 10+ hides the routing table, and an iPhone's may be hidden too (not tried on one yet): an address
+        // without a visible gateway is "can't tell" there, not "none"
         bool? has = !anyAddress ? false
                   : gateway != null || vpn != null ? true
-                  : OperatingSystem.IsAndroid() ? null : false;
+                  : OperatingSystem.IsAndroid() || OperatingSystem.IsIOS() ? null : false;
         return new DoctorLocal { HasNetwork = has, Interface = iface, Gateway = gateway, Vpn = vpn };
     }
 

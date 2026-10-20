@@ -42,14 +42,15 @@ public sealed partial class ReceivedFileRow : ObservableObject
     /// <summary>Desktop: open with its app — not for programs and scripts (those get "Show" only).</summary>
     public bool CanOpen => AppPlatform.IsDesktop && IsDone && Path is not null && !ShareInbox.IsRiskyToOpen(Name);
     public bool CanShow => AppPlatform.IsDesktop && IsDone && Path is not null;
-    /// <summary>Phone: the file is in the app's own storage until saved somewhere.</summary>
-    public bool CanSave => AppPlatform.IsMobile && IsDone && Path is not null && SavedTo is null;
+    /// <summary>Android: the file is in the app's own storage until saved somewhere. (iOS: it is already in the Files app.)</summary>
+    public bool CanSave => AppPlatform.IsMobile && !OperatingSystem.IsIOS() && IsDone && Path is not null && SavedTo is null;
 }
 
 /// <summary>
 /// "Share &amp; chat" — files from browsers. Desktop: they land in a folder (Downloads\Echoes unless changed), with
 /// Open (not for programs / scripts), Show in folder and Open folder. Android: they arrive in the app's own storage;
 /// once a folder is picked (the system folder picker) every new file is copied into it, until then each has Save.
+/// iOS: they arrive in Documents/Received, which the Files app shows (On My iPhone › Echoes).
 /// A per-file size cap (MB) is checked before anything is sent, together with the free space.
 /// </summary>
 public partial class WebServerViewModel
@@ -94,10 +95,13 @@ public partial class WebServerViewModel
 
     public bool HasReceived => ReceivedFiles.Count > 0;
     public long MaxUploadBytes => (long)Math.Clamp(MaxUploadMb, 1, 1_048_576) * 1024 * 1024;
-    public string InboxDisplay => OperatingSystem.IsAndroid() || AppPlatform.IsMobile && InboxPath.Length == 0
-        ? (InboxPath.Length > 0 ? InboxPath : "App storage (tap Save on each)")
-        : InboxPath;
+    public string InboxDisplay => OperatingSystem.IsIOS() ? "Files app › Echoes › Received"
+        : OperatingSystem.IsAndroid() || AppPlatform.IsMobile && InboxPath.Length == 0
+            ? (InboxPath.Length > 0 ? InboxPath : "App storage (tap Save on each)")
+            : InboxPath;
     public bool CanOpenInbox => LinkHelper.CanOpenFolder && AppPlatform.IsDesktop;
+    /// <summary>iOS can't write outside the app's own folders (the Files app shows this one), so there is nothing to pick.</summary>
+    public bool CanChangeInbox => !OperatingSystem.IsIOS();
 
     private void InitInbox()
     {
@@ -114,8 +118,10 @@ public partial class WebServerViewModel
             MaxUploadMb = Math.Clamp(p.GetInt(KMaxUpload, DefaultMaxUploadMb), 1, 1_048_576);
             if (!OperatingSystem.IsAndroid())
             {
-                string? saved = p.GetSetting(KInbox);
+                string? saved = OperatingSystem.IsIOS() ? null : p.GetSetting(KInbox);
                 InboxPath = saved is { Length: > 0 } && Path.IsPathFullyQualified(saved) ? saved : ShareInbox.DefaultFolder();
+                // iOS: the Files app lists the Echoes folder once it holds something
+                if (OperatingSystem.IsIOS()) { try { Directory.CreateDirectory(InboxPath); } catch { } }
             }
         }
         finally { _restoringInbox = false; }
@@ -420,6 +426,7 @@ public partial class WebServerViewModel
             {
                 if (e.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
                 string? p = e.TryGetProperty("p", out var pv) && pv.ValueKind == System.Text.Json.JsonValueKind.String ? pv.GetString() : null;
+                if (p is not null && OperatingSystem.IsIOS()) p = ShareInbox.RebaseIos(p);   // the container folder changes with an update
                 if (p is null || !Path.IsPathFullyQualified(p)) continue;
                 long s = e.TryGetProperty("s", out var sv) && sv.TryGetInt64(out long sl) && sl >= 0 ? sl : -1;
                 if (s < 0) continue;

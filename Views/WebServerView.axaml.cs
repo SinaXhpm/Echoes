@@ -197,7 +197,7 @@ public partial class WebServerView : UserControl
 
     private async void ChangeInbox_Click(object? sender, RoutedEventArgs e)
     {
-        if (_vm is null || TopLevel.GetTopLevel(this) is not { } top) return;
+        if (_vm is null || !_vm.CanChangeInbox || TopLevel.GetTopLevel(this) is not { } top) return;
         _vm.FilesError = null;
         try
         {

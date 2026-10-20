@@ -47,6 +47,12 @@
 	</array>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
+	<!-- The Files app (On My iPhone › Echoes) shows this app's Documents folder, where the Web Server keeps the files a
+	     browser sent. The app's own data (profile, keys, certificate) lives in Library/Application Support, not there. -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/AppIcon.appiconset</string>
 	<!-- iOS 14+: shown in the permission prompt the first time Echoes talks to a device on the local network

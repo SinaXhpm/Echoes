@@ -78,7 +78,10 @@ public static class SocketErrors
             case SocketError.TimedOut:
                 return $"Timed out — {target} didn't answer (the host may be down, or a firewall silently drops the connection).";
             case SocketError.HostUnreachable:
-                // macOS 15+ answers "no route to host" for every LAN address when Local Network access is off for the app
+                // macOS 15+ and iOS answer "no route to host" for every LAN address when Local Network access is off for the app
+                if (OperatingSystem.IsIOS() && IsLocalNetwork(HostOf(target)))
+                    return $"Host unreachable — no route to {HostOf(target)}. On an iPhone or iPad this is also what blocked Local Network access looks like: " +
+                           "turn on Echoes in Settings › Privacy & Security › Local Network.";
                 return OperatingSystem.IsMacOS() && IsLocalNetwork(HostOf(target))
                     ? $"Host unreachable — no route to {HostOf(target)}. On macOS this is also what blocked Local Network access looks like: " +
                       "allow Echoes in System Settings › Privacy & Security › Local Network."

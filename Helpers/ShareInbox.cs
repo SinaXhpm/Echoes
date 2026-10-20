@@ -173,11 +173,38 @@ public static class ShareInbox
     }
 
     /// <summary>Desktop: Downloads\Echoes. Android: a folder in the app's own storage (files are then saved out of it, or
-    /// copied into the folder the user picked).</summary>
+    /// copied into the folder the user picked). iOS: Documents/Received, which the Files app shows.</summary>
     public static string DefaultFolder()
-        => OperatingSystem.IsAndroid() || OperatingSystem.IsIOS()
-            ? Path.Combine(AppStorage.UserDir(), "Inbox")
+        => OperatingSystem.IsAndroid() ? Path.Combine(AppStorage.UserDir(), "Inbox")
+            : OperatingSystem.IsIOS() ? IosReceivedFolder()
             : Path.Combine(DownloadsFolder(), "Echoes");
+
+    /// <summary>iOS: Documents/Received. The Info.plist keys UIFileSharingEnabled and LSSupportsOpeningDocumentsInPlace make
+    /// the Documents folder show up in the Files app (On My iPhone › Echoes), so received files are reachable there.</summary>
+    public static string IosReceivedFolder()
+    {
+        string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        if (string.IsNullOrEmpty(docs) || !Path.IsPathRooted(docs)) docs = AppStorage.UserDir();
+        return Path.Combine(docs, "Received");
+    }
+
+    /// <summary>iOS: an app update or a reinstall gives the app a new container folder, so a path saved by an earlier run
+    /// points into the old one. What follows "/Documents/" is put under this container's Documents. Null when the result is
+    /// not inside the received folder: Clean up may only ever reach files in it.</summary>
+    public static string? RebaseIos(string path)
+    {
+        const string marker = "/Documents/";
+        int at = path.IndexOf(marker, StringComparison.Ordinal);
+        if (at < 0) return null;
+        string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        if (string.IsNullOrEmpty(docs) || !Path.IsPathRooted(docs)) return null;
+        try
+        {
+            string full = Path.GetFullPath(docs.TrimEnd('/') + path[(at + marker.Length - 1)..]);   // ".." can't climb out
+            return full.StartsWith(Path.GetFullPath(IosReceivedFolder()).TrimEnd('/') + "/", StringComparison.Ordinal) ? full : null;
+        }
+        catch { return null; }
+    }
 
     /// <summary>Where uploads are written while they arrive on Android (app storage).</summary>
     public static string AppInboxFolder() => Path.Combine(AppStorage.UserDir(), "Inbox");
