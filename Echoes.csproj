@@ -9,7 +9,7 @@
     <!-- The Android and iOS heads live in subfolders with their own projects; keep them out of the desktop build. -->
     <DefaultItemExcludes>$(DefaultItemExcludes);Echoes.Android\**;Echoes.iOS\**</DefaultItemExcludes>
 
-    <Version>0.4.3</Version>
+    <Version>1.0.0</Version>
     <Description>Small utilities for network, API, and string tasks; throwing packets from a distant time, just to see what comes willowing back across the sand.</Description>
     
     <ApplicationIcon>Assets\echoes.ico</ApplicationIcon>

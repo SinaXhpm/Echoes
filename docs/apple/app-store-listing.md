@@ -119,10 +119,11 @@ questions. Two need a deliberate answer:
 
 - **Unrestricted web access:** answer **No**. The cURL tool shows a page's HTML in a web view with scripts and outside
   resources blocked, and it is not a browser. (If App Review disagrees, the rating moves up; it is not a rejection.)
-- **User-generated content / messaging:** the chat is between devices the owner lets in with a PIN; there is no public
-  content. Answer **No**.
+- **Messaging and chat:** answer **Yes**: the Web Server's chat lets the people the owner lets in with a PIN write to
+  each other. **User-generated content:** **No**, there is nothing public. Declaring the chat does not change the
+  rating: App Store Connect still computes 4+.
 
-Expected rating: 4+.
+Expected rating: 4+. (The answers are already entered through the API; check them under App Information.)
 
 ## Export compliance (encryption)
 

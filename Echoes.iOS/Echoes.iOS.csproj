@@ -19,7 +19,7 @@
     <ApplicationTitle>Echoes</ApplicationTitle>
     <!-- CFBundleShortVersionString / CFBundleVersion. CI sets both: the display version from the tag, the build number
          from the run number (App Store Connect needs every uploaded build of a version to have a higher build number). -->
-    <ApplicationDisplayVersion>0.4.3</ApplicationDisplayVersion>
+    <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
     <!-- the assembly version follows it (About box, User-Agent) -->
     <Version>$(ApplicationDisplayVersion)</Version>
