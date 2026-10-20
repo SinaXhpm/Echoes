@@ -43,8 +43,10 @@ jobs:
       id: ver
       run: echo "VERSION=0.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
-    # the same command as release.yml
+    # the same command as release.yml (incl. the deployment target)
     - name: Publish
+      env:
+        MACOSX_DEPLOYMENT_TARGET: '12.0'
       run: dotnet publish Echoes.csproj -c Release -r ${{ matrix.rid }} -p:Version=${{ steps.ver.outputs.VERSION }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=copyused -p:OptimizationPreference=Size -p:StackTraceSupport=true -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
 
     - name: Package macOS

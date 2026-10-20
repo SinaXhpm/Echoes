@@ -47,6 +47,18 @@ cp "$root/Assets/logo.icns" "$app/Contents/Resources/icon.icns"
 sed "s/@VERSION@/$version/g" "$here/Info.plist" > "$app/Contents/Info.plist"
 if grep -q '@VERSION@' "$app/Contents/Info.plist"; then echo "Info.plist still has a placeholder" >&2; exit 1; fi
 
+# ---- the oldest macOS the app runs on: the binary's own deployment target must match Info.plist (LSMinimumSystemVersion) ----
+# A NativeAOT binary linked on a newer macOS than the one running it makes `open` fail (kLSIncompatibleSystemVersionErr)
+# even when Info.plist says 12.0, so check what the linker really wrote (the publish step sets MACOSX_DEPLOYMENT_TARGET).
+if command -v vtool >/dev/null 2>&1; then
+  minos="$(vtool -show-build "$app/Contents/MacOS/Echoes" 2>/dev/null | awk '/minos/ { for (i = 1; i <= NF; i++) if ($i == "minos") { print $(i + 1); exit } }')"
+  echo "Echoes binary: minimum macOS ${minos:-unknown}"
+  if [ -n "$minos" ] && [ "${minos%%.*}" -gt 12 ]; then
+    echo "::error::The binary needs macOS $minos, but Info.plist and the README promise 12.0: set MACOSX_DEPLOYMENT_TARGET=12.0 for dotnet publish." >&2
+    exit 1
+  fi
+fi
+
 # ---- signing: inner code first, the bundle last (no --deep, Apple advises against it) -----------------------------------
 if [ -n "$sign_identity" ]; then
   # --timestamp: a secure timestamp from Apple, which notarization requires; --options runtime: the hardened runtime

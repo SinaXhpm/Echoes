@@ -46,6 +46,10 @@ jobs:
         sudo apt-get install -y clang zlib1g-dev libfuse2 binutils rpm
 
     - name: Publish
+      env:
+        # NativeAOT links with clang, which targets the build machine's own macOS (26) unless told otherwise: the app then
+        # refuses to open on older macOS (kLSIncompatibleSystemVersionErr). 12.0 is what the README promises.
+        MACOSX_DEPLOYMENT_TARGET: '12.0'
       run: dotnet publish Echoes.csproj -c Release -r ${{ matrix.rid }} -p:Version=${{ steps.get_version.outputs.VERSION }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=copyused -p:OptimizationPreference=Size -p:StackTraceSupport=true -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
 
     - name: Package Windows
