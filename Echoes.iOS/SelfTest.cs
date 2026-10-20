@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using Echoes.Helpers;
@@ -146,10 +147,74 @@ internal static class SelfTest
             catch (Exception ex) { return $"not available ({ex.GetType().Name})"; }
         });
 
+        await Check("network interfaces", _ =>
+        {
+            var nics = NetworkInterface.GetAllNetworkInterfaces();
+            var up = nics.Where(n => n.OperationalStatus == OperationalStatus.Up).ToList();
+            var v4 = up.SelectMany(n => n.GetIPProperties().UnicastAddresses).Select(a => a.Address)
+                       .Where(a => a.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a)).Take(3).ToList();
+            string Safe(Func<string> f) { try { return f(); } catch (Exception ex) { return $"unavailable ({ex.GetType().Name})"; } }
+            string gw = Safe(() => string.Join(",", up.SelectMany(n => n.GetIPProperties().GatewayAddresses).Select(g => g.Address).Take(2)));
+            string dns = Safe(() => string.Join(",", up.SelectMany(n => n.GetIPProperties().DnsAddresses).Select(d => d.ToString()).Take(2)));
+            string conns = Safe(() => IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpConnections().Length + " TCP connections");
+            return Task.FromResult($"{nics.Length} interfaces, {up.Count} up; IPv4 {string.Join(", ", v4)}; gateway {gw}; dns {dns}; {conns}");
+        });
+
+        // The whole share hub on this platform: HTTPS with its own certificate, the page, a PIN login and a chat message.
+        await Check("share hub: HTTPS page, PIN login and chat", async ct =>
+        {
+            var cert = await Task.Run(ShareTls.LoadOrCreate, ct).ConfigureAwait(false);
+            string inbox = Path.Combine(AppStorage.UserDir(), "selftest-inbox");
+            Directory.CreateDirectory(inbox);
+            int port;
+            using (var probe = new TcpListener(IPAddress.Loopback, 0)) { probe.Start(); port = ((IPEndPoint)probe.LocalEndpoint).Port; }
+            var hub = new ShareHub(new ShareHubOptions
+            {
+                Bind = IPAddress.Loopback, Port = port, Cert = cert, RequirePin = true, Pin = "12345678", InboxFolder = inbox, PartFolder = "",
+                HostName = "iOS self-test", Items = () => Array.Empty<SharedItem>(),
+            }, new NullSink());
+            hub.Start();
+            try
+            {
+                using var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true };
+                using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
+                string origin = $"https://127.0.0.1:{port}";
+                HttpRequestMessage Req(HttpMethod m, string path, string? json = null)
+                {
+                    var r = new HttpRequestMessage(m, origin + path);
+                    r.Headers.Add("X-Echoes", "1");
+                    r.Headers.Add("Origin", origin);
+                    if (json is not null) r.Content = new StringContent(json, Encoding.UTF8, "application/json");
+                    return r;
+                }
+                string page = await http.GetStringAsync(origin + "/", ct).ConfigureAwait(false);
+                if (!page.Contains("<html", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("no page came back");
+                using var login = await http.SendAsync(Req(HttpMethod.Post, "/api/login", "{\"pin\":\"12345678\",\"name\":\"iOS test\"}"), ct).ConfigureAwait(false);
+                if (!login.IsSuccessStatusCode) throw new InvalidOperationException($"login answered {(int)login.StatusCode}");
+                using var send = await http.SendAsync(Req(HttpMethod.Post, "/api/send", "{\"text\":\"hello from the self-test\"}"), ct).ConfigureAwait(false);
+                if (!send.IsSuccessStatusCode) throw new InvalidOperationException($"send answered {(int)send.StatusCode}");
+                using var poll = await http.SendAsync(Req(HttpMethod.Get, "/api/poll?since=0"), ct).ConfigureAwait(false);
+                string body = await poll.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                if (!body.Contains("hello from the self-test", StringComparison.Ordinal)) throw new InvalidOperationException("the message didn't come back: " + body[..Math.Min(120, body.Length)]);
+                return $"https on port {port}: page {page.Length} chars, logged in, a message went through";
+            }
+            finally { hub.Stop(); }
+        });
         await Check("crack time (the String Lab card)", _ =>
             Task.FromResult($"128 bits vs one GPU: {CrackTime.Describe(128, 1e11)}"));
 
         Line($"SELFTEST DONE failures={failures}");
         return failures;
     }
+}
+
+// The hub reports here; the test only needs it to exist.
+file sealed class NullSink : IShareHubSink
+{
+    public void OnLog(string line) { }
+    public void OnMessage(ShareMessage message) { }
+    public void OnChatCleared() { }
+    public void OnUploadStarted(ShareUpload upload) { }
+    public void OnUploadFinished(ShareUpload upload, string? path, string? error) { }
+    public void OnDownload(string itemId, long bytes, bool complete) { }
 }

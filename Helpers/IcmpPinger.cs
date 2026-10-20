@@ -389,7 +389,11 @@ public static class IcmpPinger
                 long elapsed = sw.ElapsedMilliseconds;
                 if (r.ReceivedBytes < 1) continue;
 
-                byte type = buffer[0]; // datagram socket: payload starts at the ICMP header (no IP header)
+                // Linux / Android: the payload starts at the ICMP header. iOS (and macOS' own datagram sockets) hand an IPv4 ping
+                // socket the whole packet, IP header first: skip it, or every reply reads as type 0x45 and the probe times out.
+                int at = 0;
+                if (!v6 && (buffer[0] >> 4) == 4 && r.ReceivedBytes > (buffer[0] & 0xF) * 4) at = (buffer[0] & 0xF) * 4;
+                byte type = buffer[at];
                 var from = (r.RemoteEndPoint as IPEndPoint)?.Address ?? addr;
 
                 if (type == (v6 ? 129 : 0)) return Result(true, elapsed, from, null);   // echo reply
