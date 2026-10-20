@@ -55,7 +55,7 @@ jobs:
     - name: Show the signature
       run: |
         hdiutil attach Echoes-osx-arm64.dmg -nobrowse -mountpoint "$RUNNER_TEMP/mnt" > /dev/null
-        codesign -dv --verbose=2 "$RUNNER_TEMP/mnt/Echoes.app" 2>&1 | grep -E 'Identifier|Authority|TeamIdentifier|Timestamp|flags|Runtime' || true
+        codesign -dv --verbose=2 "$RUNNER_TEMP/mnt/Echoes.app" 2>&1 | grep -E 'Identifier=|Timestamp|flags|Runtime' || true
         xcrun stapler validate "$RUNNER_TEMP/mnt/Echoes.app" || true
         spctl --assess --type exec --verbose=2 "$RUNNER_TEMP/mnt/Echoes.app" || true
         hdiutil detach "$RUNNER_TEMP/mnt" > /dev/null || true
