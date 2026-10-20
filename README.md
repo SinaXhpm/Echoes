@@ -61,9 +61,8 @@ Get the latest version from the **[Releases page](https://github.com/SinaXhpm/Ec
 First launch:
 
 - **Windows:** the app isn't code-signed, so SmartScreen may show "Windows protected your PC". Click **More info → Run anyway**.
-- **macOS:** the app isn't notarized. If macOS blocks it, open **System Settings → Privacy & Security** and click **Open Anyway**, or run `xattr -dr com.apple.quarantine /Applications/Echoes.app`.
+- **macOS:** the app is signed with a Developer ID certificate and notarized by Apple, so it opens like any other app. It needs macOS 12 or newer. On macOS 15+, allow **Local Network** access when asked (or later in System Settings › Privacy & Security), or local devices look unreachable. Sites that accept only TLS 1.3 can't be opened by the macOS TLS stack of .NET 8; the TLS Inspector still analyses them.
 - **Linux:** needs glibc 2.35 or newer (Ubuntu 22.04+, Debian 12+, Fedora 36+). The tray icon needs a StatusNotifierItem host (KDE Plasma, or GNOME with the AppIndicator extension).
-- **macOS:** needs macOS 12 or newer. On macOS 15+, allow **Local Network** access when asked (or later in System Settings › Privacy & Security), or local devices look unreachable. Sites that accept only TLS 1.3 can't be opened by the macOS TLS stack of .NET 8; the TLS Inspector still analyses them.
 
 Echoes shows a small notice in the sidebar when a new version is out. The **About** box (the ⓘ button next to the name, or **About** in the Android menu) shows your version, checks for updates on demand, links to GitHub, the releases and the issue tracker, and copies your version and platform details for a bug report.
 
