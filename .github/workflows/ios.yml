@@ -1,9 +1,10 @@
 name: iOS (test build)
 
-# Experimental iOS head of the shared Avalonia UI (Echoes.iOS). It builds the app for the iOS SIMULATOR: no signing, no
-# Apple account, nothing published. It checks that the project compiles on the macOS runner and that the app bundle is
-# complete (icon catalog, Info.plist keys). A build for real devices and the upload to TestFlight / the App Store need the
-# Apple distribution secrets and are not part of this workflow yet (docs/apple/README.md).
+# Experimental iOS head of the shared Avalonia UI (Echoes.iOS). No signing, no Apple account, nothing published:
+#  - simulator: builds the app for the iOS simulator, starts it on an iPhone and an iPad simulator on the runner, checks that
+#    it is still running after a while, and keeps screenshots, the logs and the simulator app as artifacts (3 days);
+#  - device: compiles it for real devices (the full ahead-of-time compile and trim, unsigned) to catch what only a device
+#    build shows. A signed build for a phone and TestFlight need the Apple distribution secrets (docs/apple/README.md).
 
 on:
   workflow_dispatch:
@@ -13,7 +14,7 @@ on:
       - 'Echoes.iOS/**'
       - '.github/workflows/ios.yml'
 
-# Least privilege: this job only reads the repo.
+# Least privilege: these jobs only read the repo and upload workflow artifacts.
 permissions:
   contents: read
 
@@ -57,3 +58,78 @@ jobs:
         # the icon catalog must have been compiled (an App Store upload without an app icon is rejected)
         if [ ! -f "$app/Assets.car" ]; then echo "::error::Assets.car is missing: the app icon catalog was not compiled"; exit 1; fi
         echo "Assets.car present"
+        mkdir -p smoke
+        ditto -c -k --keepParent "$app" smoke/Echoes-ios-simulator.zip
+        echo "APP=$app" >> "$GITHUB_ENV"
+
+    # Start the app on a phone and on a tablet simulator, wait, and see whether it is still running and what it shows.
+    - name: Run it on simulators
+      run: |
+        xcrun simctl list runtimes | head -20
+        run_on() {   # $1 = device regex, $2 = label
+          udid="$(xcrun simctl list devices available | grep -E "$1" | tail -n 1 | grep -Eo '[0-9A-F]{8}-([0-9A-F]{4}-){3}[0-9A-F]{12}')"
+          if [ -z "$udid" ]; then echo "::warning::no $2 simulator on this runner"; return 0; fi
+          echo "=== $2: $udid"
+          xcrun simctl boot "$udid" || true
+          xcrun simctl bootstatus "$udid" -b > /dev/null
+          xcrun simctl install "$udid" "$APP"
+          xcrun simctl launch "$udid" com.sinaxhpm.echoes | tee "smoke/$2-launch.txt"
+          sleep 20
+          xcrun simctl io "$udid" screenshot "smoke/$2-1.png"
+          # still running? (the launchd label of an app carries its bundle id and a pid)
+          if xcrun simctl spawn "$udid" launchctl list | grep -q "com.sinaxhpm.echoes"; then echo "$2: the app is running after 20 s" | tee -a smoke/summary.txt
+          else echo "$2: the app is NOT running after 20 s" | tee -a smoke/summary.txt; echo "FAILED=1" >> "$GITHUB_ENV"; fi
+          xcrun simctl spawn "$udid" log show --last 2m --style compact --predicate 'process == "Echoes" OR eventMessage CONTAINS "Echoes"' > "smoke/$2-log.txt" 2>&1 || true
+          tail -40 "smoke/$2-log.txt" | cut -c1-220
+          xcrun simctl shutdown "$udid" || true
+        }
+        run_on 'iPhone [0-9]+ Pro \(' iphone
+        run_on 'iPad (Pro|Air)' ipad
+        ls ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i echoes | head -5 | tee -a smoke/summary.txt || true
+        cp ~/Library/Logs/DiagnosticReports/Echoes* smoke/ 2>/dev/null || true
+        cat smoke/summary.txt || true
+        if [ "${FAILED:-}" = "1" ]; then echo "::error::The app did not stay running on a simulator (see the logs artifact)"; exit 1; fi
+
+    - name: Keep the screenshots, logs and the simulator app (3 days)
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: Echoes-ios-simulator-test
+        path: smoke/
+        retention-days: 3
+        if-no-files-found: warn
+
+  ios-device:
+    # A full device compile (AOT + trimming), unsigned: shows what the simulator's Debug build can't. Informational for now.
+    runs-on: xcode-27
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Install the iOS workload
+      run: dotnet workload install ios
+
+    - name: Use the Xcode the workload wants
+      run: |
+        want="$(ls "$HOME/.dotnet/packs" | sed -n 's/^Microsoft\.iOS\.Sdk\.net10\.0_\([0-9][0-9.]*\)$/\1/p' | sort -V | tail -n 1)"
+        app="$(ls -d /Applications/Xcode_"$want".app /Applications/Xcode_"$want"*.app 2>/dev/null | head -n 1)"
+        if [ -z "$app" ]; then echo "::error::Xcode $want is not installed on this runner"; exit 1; fi
+        sudo xcode-select -s "$app"
+        xcodebuild -version
+
+    - name: Compile for devices (Release, unsigned)
+      run: dotnet build Echoes.iOS/Echoes.iOS.csproj -c Release -f net10.0-ios -r ios-arm64 -p:EnableCodeSigning=false -p:CodesignKey=- -p:BuildIpa=false
+
+    - name: What came out
+      run: |
+        app="$(find Echoes.iOS/bin -name '*.app' -type d | head -n 1)"
+        echo "Bundle: $app"
+        du -sh "$app"
+        ls -la "$app" | head -30
+        file "$app/Echoes"
+        vtool -show-build "$app/Echoes" | grep -E "platform|minos|sdk"
