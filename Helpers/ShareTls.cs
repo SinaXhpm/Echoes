@@ -211,10 +211,12 @@ public static class ShareTls
 
     // Exportable: .NET for Android's server mode hands the key to Java's SSLEngine as PKCS#8. The default key set on
     // Windows: SChannel can't serve a TLS server key that only lives in memory (EphemeralKeySet); the temporary key
-    // container is removed when the certificate is disposed (on Stop).
+    // container is removed when the certificate is disposed (on Stop). On iOS the key goes into the keychain, which can't
+    // hand out an exportable one (PlatformNotSupportedException): the default key set there.
     private static X509Certificate2 Load(byte[] pfx)
     {
-        const X509KeyStorageFlags flags = X509KeyStorageFlags.Exportable;
+        X509KeyStorageFlags flags = OperatingSystem.IsIOS() || OperatingSystem.IsTvOS() || OperatingSystem.IsMacCatalyst()
+            ? X509KeyStorageFlags.DefaultKeySet : X509KeyStorageFlags.Exportable;
 #if NET9_0_OR_GREATER
         return X509CertificateLoader.LoadPkcs12(pfx, null, flags);
 #else

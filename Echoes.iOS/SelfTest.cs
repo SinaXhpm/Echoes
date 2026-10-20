@@ -76,6 +76,21 @@ internal static class SelfTest
             return $"{r.Ms:0} ms";
         });
 
+        // Loopback answers by itself, so these show whether this platform can send ICMP echoes and the UDP fallback at all.
+        await Check("icmp echo to loopback", async ct =>
+        {
+            var r = await IcmpPinger.SendAsync(IPAddress.Loopback, 3000, ct, 0, PingMethod.Icmp).ConfigureAwait(false);
+            if (!r.Success) throw new InvalidOperationException($"{r.Error}{(r.PermissionDenied ? " (not permitted)" : "")}");
+            return $"{r.RoundtripMs} ms";
+        });
+
+        await Check("udp ping to loopback", async ct =>
+        {
+            var r = await IcmpPinger.SendAsync(IPAddress.Loopback, 3000, ct, 0, PingMethod.Udp).ConfigureAwait(false);
+            if (!r.Success) throw new InvalidOperationException($"{r.Error}");
+            return $"{r.RoundtripMs} ms";
+        });
+
         // The runner's network may drop ICMP, so a failed echo is reported, not counted: the point is which method works here.
         await Check("icmp ping 1.1.1.1 (info)", async ct =>
         {
