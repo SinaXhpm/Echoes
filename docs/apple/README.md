@@ -10,7 +10,7 @@ to paste into App Store Connect is in [app-store-listing.md](app-store-listing.m
 | :--- | :--- |
 | macOS `.dmg` on GitHub, signed with Developer ID, notarized and stapled | **Shipped** since v0.4.3 (Intel and Apple Silicon): Gatekeeper accepts both as "Notarized Developer ID", and both were opened on a real Mac. Without the secrets below the build is signed ad hoc, as before. |
 | macOS `.pkg` for the Mac App Store | Not built. Needs the App Sandbox, which cuts features; see "Mac App Store". |
-| iOS / iPadOS app | **Scaffold only** (`Echoes.iOS/`, built for the simulator by `.github/workflows/ios.yml`). It is not a working app yet; see "What iOS still needs". |
+| iOS / iPadOS app | **On TestFlight** (`Echoes.iOS/`, built and started on iPhone and iPad simulators by `.github/workflows/ios.yml`, signed builds by `ios-testflight.yml`). Not tried on a real iPhone yet; see "iOS: what works and what is left". |
 | App Store build mode | `AppInfo.IsStoreBuild` (true on iOS, or on the desktop head with `-p:StoreBuild=true`): no update check, no Releases link. The About box has a Privacy policy link in every build. |
 | Privacy policy, store text | Done. |
 
@@ -132,41 +132,53 @@ The Developer ID `.dmg` above keeps every feature. The Mac App Store needs more,
 - Build a signed `.app` (Apple Distribution), wrap it with `productbuild --component Echoes.app /Applications --sign
   "<Mac Installer Distribution identity>" Echoes.pkg`, and upload with Transporter or `xcrun altool --upload-package`.
 
-## What iOS still needs
+## iOS: what works and what is left
 
 `Echoes.iOS` holds the bundle metadata (`Info.plist`, an empty `Entitlements.plist`, a 1024 px opaque icon in
-`Assets.xcassets`), the Avalonia entry point and the shared sources, the same way the Android head does. It is built for
-the simulator in CI, and **CI now runs it** (`ios.yml`): it starts on an iPhone and an iPad simulator and stays up, the
-unsigned Release (ahead-of-time) compile for devices passes, and a self-test inside the app (`Echoes.iOS/SelfTest.cs`, started
-with `ECHOES_SELFTEST=1`) checks what the shared tools need from the platform. Last result on an iOS 27 simulator, all fine:
-storage, DNS, TCP, ICMP and UDP ping, HTTPS, a TLS server, loopback sockets, the network interfaces, and the whole share hub
-(HTTPS page, PIN login, a chat message); child processes are not available, as expected. Two real iOS bugs it found are fixed:
-the PKCS#12 `Exportable` flag throws on Apple's mobile platforms (`ShareTls.Load`), and an IPv4 ping socket hands over the IP
-header first (`IcmpPinger`). **Nothing has run on a real iPhone yet**, and the simulator shares the Mac's network. To make it a real app:
+`Assets.xcassets`, Apple's privacy manifest), the Avalonia entry point and the shared sources, the same way the Android head
+does. CI (`ios.yml`, on every change to the iOS head or the shared code) builds it for the simulator, starts it on an iPhone
+and an iPad simulator, compiles it for devices (the unsigned Release ahead-of-time build), and runs a self-test inside the app
+(`Echoes.iOS/SelfTest.cs`, started with `ECHOES_SELFTEST=1`). Last result on iOS 27 simulators, all fine: storage, DNS, TCP,
+ICMP and UDP ping, HTTPS, a TLS server, loopback sockets, the network interfaces, the whole share hub (HTTPS page, PIN login, a
+chat message), the storage layout, the alert sound, the screen staying on, and **all 20 tools opening in the touch shell**; the
+artifact `Echoes-ios-simulator-test` has a picture of each tool (`tour-iphone`, `tour-ipad`). Child processes are not available
+on iOS, as expected. Real iOS bugs found this way are fixed: the PKCS#12 `Exportable` flag throws on Apple's mobile platforms
+(`ShareTls.Load`), and an IPv4 ping socket hands over the IP header first (`IcmpPinger`). The TestFlight workflow has put signed
+builds on TestFlight. **Nothing has been tried on a real iPhone yet**, and the simulator shares the Mac's network.
 
-1. **Test on a device** (needs signing, below) and fix what only a phone shows: the Local Network prompt, background
-   behaviour, the keyboard, real ICMP and Wi-Fi.
-2. **Review every platform branch in the shared code.** Many places say `OperatingSystem.IsAndroid()` where they mean "a
-   phone" and treat everything else as a desktop. On iOS those fall into the desktop path, which starts child processes
-   (`Process.Start`: not allowed on iOS), opens folders, uses the tray or auto-start. Search for `IsAndroid()` (about 35
-   files) and `Process.Start` (CurlEngine, LinkHelper, SoundHelper, WifiLinux, the Web Server's Open folder) and give iOS its
-   own answer; `AppPlatform.IsMobile` already selects the touch shell.
-3. **Storage:** check `AppStorage` paths in the iOS sandbox, and put the received-files folder in Documents (with
-   `UIFileSharingEnabled` and `LSSupportsOpeningDocumentsInPlace` in Info.plist) so users can reach files in the Files app.
-4. **Background:** iOS suspends an app seconds after it leaves the screen. The monitor, the servers and scans pause with it.
-   `BackgroundGuard` and `BootStart` have no iOS implementation (they are no-ops); decide whether to ask for a short
-   background task and use local notifications for alerts, and keep the listing's "run while Echoes is open" wording.
-5. **Sound:** register a player like the Android head's `SoundHelper.RegisterPlayer`.
-6. **WebView:** `Avalonia.Controls.WebView` ships no iOS-specific asset; cURL's rendered preview may be unavailable
-   (the view already falls back with a message). Check it.
-7. **Network:** ICMP ping through unprivileged datagram sockets, traceroute with TTL, UDP and TCP, IPv6, and the Local
-   Network prompt (`NSLocalNetworkUsageDescription` is in Info.plist). Test on a real iPhone: the simulator shares the Mac's
-   network and hides the prompt.
-8. **Layouts:** safe areas and the notch, the on-screen keyboard (`InputPane`, already handled for Android), landscape and
-   iPad multitasking widths. Take the store screenshots from real devices.
-9. **Native AOT and trimming:** an iOS release is fully ahead-of-time compiled and trimmed. Run every tool once on a device
-   in a Release build; reflection that works in Debug can fail there (the project already roots SSH.NET and DnsClient).
+Done in the shared code for iOS:
 
+- **Platform branches.** Nothing reachable on iOS starts a child process: the system curl engine and "Open folder" are hidden,
+  the Wi-Fi analyzer says it isn't available, and the alert sound has its own player. Without a visible routing table the
+  Doctor says "can't tell" about the network (as on Android), not "no network".
+- **Storage.** The app's own data (profile, secret key, share certificate, logs) is in `Library/Application Support/Echoes`
+  (builds up to 0.4.3 build 2 had it in `Documents/.config`: moved once). The Web Server keeps what a browser sends in
+  `Documents/Received`, which the Files app shows under On My iPhone › Echoes (`UIFileSharingEnabled`,
+  `LSSupportsOpeningDocumentsInPlace`). Paths saved by an earlier run are rebased into the new container folder after an
+  update, and only inside `Received`. There is no folder picker and no Save button on iOS: iOS can't write elsewhere.
+- **Sound.** `IosSoundPlayer` (an `AVAudioPlayer`, ambient session: the ringer switch silences it, music keeps playing).
+- **Background.** iOS suspends an app soon after it leaves the screen or the phone locks, and a suspended app's sockets stop.
+  `IosBackgroundGuard` keeps the screen on (the idle timer is off) while a server, the monitor, a scan or a socket session
+  runs, and a background task covers a short switch to another app. `BootStart` has no iOS implementation (the option is
+  hidden). The listing's "run while Echoes is open" wording stays.
+- **Local Network.** `NSLocalNetworkUsageDescription` is in Info.plist; when the permission is off, "host unreachable" for a
+  LAN address names Settings › Privacy & Security › Local Network.
+- **Reporting.** About › Copy log copies the version line and the end of the crash log, for a tester who can't open the data
+  folder.
+
+Still to do, and only a phone can show it:
+
+1. **Test on a device** (TestFlight): the Local Network prompt, real ICMP ping and traceroute, the keyboard, the Files app
+   showing `Received`, the sound with the ringer switch on and off, landscape and iPad multitasking widths.
+2. **What happens after the phone locks.** If iOS closes the listening socket of a suspended app, the Web Server would still
+   say "running" and accept nothing. If a phone test shows that, rebind the listener in the accept loops (`ShareHub`,
+   `RequestCatcher`, `ProxyServer`, `SocketSessions`) after repeated accept failures.
+3. **WebView.** `Avalonia.Controls.WebView` ships no iOS-specific asset; cURL's rendered preview may be unavailable (the view
+   falls back with a message). Check the Response tab's preview.
+4. **Native AOT and trimming.** An iOS release is fully ahead-of-time compiled and trimmed (CI only compiles it, the simulator
+   run is a Debug build). Run every tool once on a device with the TestFlight build; reflection that works in Debug can fail
+   there (the project already roots SSH.NET and DnsClient).
+5. **Store screenshots** from real devices.
 Then ship it (`.github/workflows/ios-testflight.yml` does steps 2 and 3 when you run it by hand):
 
 1. Create the **Apple Distribution** certificate and an **App Store** provisioning profile for `com.sinaxhpm.echoes`.

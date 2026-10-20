@@ -2,7 +2,7 @@
 
 Everything App Store Connect asks for when you create the Echoes app record (iOS and macOS), ready to copy. Character
 limits are Apple's; every value below was counted against them. The iOS wording is a draft: adjust it to what the iOS
-build can really do when it ships (see [README.md](README.md), "What iOS still needs").
+build can really do when it ships (see [README.md](README.md), "iOS: what works and what is left").
 
 ## App record (New App)
 
