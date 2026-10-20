@@ -1,6 +1,6 @@
 name: macOS signing (test build)
 
-# A private dry run of the macOS release: it builds the arm64 app the way a release does, signs it with the Developer ID
+# A private dry run of the macOS release: it builds the arm64 and the Intel app the way a release does, signs it with the Developer ID
 # certificate, has Apple notarize it, staples the ticket and keeps the .dmg as a workflow artifact for 3 days. No release,
 # tag or asset is created, so nothing reaches the Releases page or the in-app update check.
 # It runs only on the branch named below and by hand; delete the branch trigger when the release pipeline is proven.
@@ -16,6 +16,10 @@ permissions:
 
 jobs:
   mac:
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [ osx-arm64, osx-x64 ]   # x64 is cross-built on the arm64 runner, like release.yml does
     runs-on: macos-latest
     # Apple's queue can take hours for a team's first notarizations
     timeout-minutes: 330
@@ -41,7 +45,7 @@ jobs:
 
     # the same command as release.yml
     - name: Publish
-      run: dotnet publish Echoes.csproj -c Release -r osx-arm64 -p:Version=${{ steps.ver.outputs.VERSION }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=copyused -p:OptimizationPreference=Size -p:StackTraceSupport=true -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
+      run: dotnet publish Echoes.csproj -c Release -r ${{ matrix.rid }} -p:Version=${{ steps.ver.outputs.VERSION }} -p:PublishAot=true -p:PublishTrimmed=true -p:TrimMode=copyused -p:OptimizationPreference=Size -p:StackTraceSupport=true -p:DebugType=none -p:DebugSymbols=false --self-contained true -o ./publish
 
     - name: Package macOS
       env:
@@ -49,12 +53,12 @@ jobs:
         APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
         APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         NOTARIZE_TIMEOUT: 150m
-      run: bash packaging/macos/package.sh osx-arm64 "${{ steps.ver.outputs.VERSION }}"
+      run: bash packaging/macos/package.sh "${{ matrix.rid }}" "${{ steps.ver.outputs.VERSION }}"
 
     # What the downloaded file will say on a Mac, checked here too (informational: the runner may not assess)
     - name: Show the signature
       run: |
-        hdiutil attach Echoes-osx-arm64.dmg -nobrowse -mountpoint "$RUNNER_TEMP/mnt" > /dev/null
+        hdiutil attach "Echoes-${{ matrix.rid }}.dmg" -nobrowse -mountpoint "$RUNNER_TEMP/mnt" > /dev/null
         codesign -dv --verbose=2 "$RUNNER_TEMP/mnt/Echoes.app" 2>&1 | grep -E 'Identifier=|Timestamp|flags|Runtime' || true
         xcrun stapler validate "$RUNNER_TEMP/mnt/Echoes.app" || true
         spctl --assess --type exec --verbose=2 "$RUNNER_TEMP/mnt/Echoes.app" || true
@@ -63,8 +67,8 @@ jobs:
     - name: Upload the .dmg (kept 3 days)
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
-        name: Echoes-osx-arm64-test
-        path: Echoes-osx-arm64.dmg
+        name: Echoes-${{ matrix.rid }}-test
+        path: Echoes-${{ matrix.rid }}.dmg
         retention-days: 3
         if-no-files-found: error
 
