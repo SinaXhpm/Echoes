@@ -77,6 +77,19 @@ key_file=""
 cleanup() { [ -n "$key_file" ] && rm -f "$key_file"; true; }
 trap cleanup EXIT
 
+# Apple's ticket server (CloudKit) is sometimes unreachable for a moment ("The network connection was lost", error 68),
+# although the submission was Accepted: try again a few times before giving up.
+staple() {   # $1 = the .app or the .dmg
+  local n
+  for n in 1 2 3 4 5 6; do
+    if run xcrun stapler staple "$1"; then return 0; fi
+    [ "${DRY_RUN:-}" = "1" ] && return 0
+    echo "stapling $1 failed (try $n of 6), waiting before the next one" >&2
+    sleep $((n * 20))
+  done
+  return 1
+}
+
 notarize_file() {   # $1 = a .zip or .dmg to submit
   local out id
   out="$(run xcrun notarytool submit "$1" --key "$key_file" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" --wait --timeout "${NOTARIZE_TIMEOUT:-40m}" 2>&1)" || true
@@ -108,7 +121,7 @@ if [ $notarize = 1 ]; then
   zip_file="$work/Echoes-notarize.zip"
   run ditto -c -k --keepParent "$app" "$zip_file"
   notarize_file "$zip_file"
-  run xcrun stapler staple "$app"
+  staple "$app"
   rm -f "$zip_file"
 fi
 
@@ -124,7 +137,7 @@ if [ -n "$sign_identity" ]; then
 fi
 if [ $notarize = 1 ]; then
   notarize_file "$dmg"
-  run xcrun stapler staple "$dmg"
+  staple "$dmg"
   run xcrun stapler validate "$dmg"
   # what Gatekeeper itself says about both; informational (a runner may have assessments switched off)
   run spctl --assess --type exec --verbose=2 "$app" || echo "spctl did not accept the app (see above)"
