@@ -1,0 +1,113 @@
+name: iOS (store screenshots)
+
+# App Store screenshots taken from the real app on simulators, at the exact sizes the store asks for (iPhone 6.9" =
+# 1320x2868, iPad 13" = 2064x2752). The app is built with -p:StoreShots=true (Echoes.iOS/StoreShots.cs) and started with
+# ECHOES_SHOTS=1: it puts real tools on screen one scene at a time against the real network (example.com, 1.1.1.1) and
+# waits for this workflow to take each screenshot with `xcrun simctl io screenshot`, so the pictures have a real status bar
+# (9:41, full battery). Manual only; the pictures are kept as an artifact (7 days).
+on:
+  workflow_dispatch:
+
+# Least privilege: this job only reads the repo and uploads a workflow artifact.
+permissions:
+  contents: read
+
+jobs:
+  screenshots:
+    runs-on: xcode-27
+    timeout-minutes: 90
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Install the iOS workload
+      run: dotnet workload install ios
+
+    - name: Use the Xcode the workload wants
+      run: |
+        want="$(ls "$HOME/.dotnet/packs" | sed -n 's/^Microsoft\.iOS\.Sdk\.net10\.0_\([0-9][0-9.]*\)$/\1/p' | sort -V | tail -n 1)"
+        app="$(ls -d /Applications/Xcode_"$want".app /Applications/Xcode_"$want"*.app 2>/dev/null | head -n 1)"
+        if [ -z "$app" ]; then echo "::error::Xcode $want is not installed on this runner"; exit 1; fi
+        sudo xcode-select -s "$app"
+        xcodebuild -version
+
+    - name: Build for the iOS simulator, with the screenshot scenes
+      run: dotnet build Echoes.iOS/Echoes.iOS.csproj -c Debug -f net10.0-ios -r iossimulator-arm64 -p:StoreShots=true
+
+    - name: Find the app and the simulators
+      run: |
+        app="$(find Echoes.iOS/bin -name '*.app' -type d | head -n 1)"
+        if [ -z "$app" ]; then echo "::error::No .app was produced"; exit 1; fi
+        echo "APP=$app" >> "$GITHUB_ENV"
+        xcrun simctl list devices available | grep -E 'iPhone|iPad' | sed -E 's/\([0-9A-F-]{36}\)//' | head -40
+
+    - name: Take the screenshots
+      run: |
+        mkdir -p shots
+        FAILED=0
+        take() {   # $1 = device regex, $2 = label, $3 = width, $4 = height the store wants
+          udid="$(xcrun simctl list devices available | grep -E "$1" | tail -n 1 | grep -Eo '[0-9A-F]{8}-([0-9A-F]{4}-){3}[0-9A-F]{12}')"
+          if [ -z "$udid" ]; then echo "::error::no simulator matches $1"; FAILED=1; return 0; fi
+          echo "=== $2: $udid"
+          xcrun simctl boot "$udid" || true
+          xcrun simctl bootstatus "$udid" -b > /dev/null
+          xcrun simctl ui "$udid" appearance dark || true
+          xcrun simctl status_bar "$udid" override --time 9:41 --dataNetwork wifi --wifiMode active --wifiBars 3 \
+            --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100 || true
+          xcrun simctl install "$udid" "$APP"
+          xcrun simctl terminate "$udid" com.sinaxhpm.echoes 2> /dev/null || true
+          SIMCTL_CHILD_ECHOES_SHOTS=1 xcrun simctl launch "$udid" com.sinaxhpm.echoes
+          data="$(xcrun simctl get_app_container "$udid" com.sinaxhpm.echoes data)"
+          dir=""
+          for i in $(seq 1 60); do
+            dir="$(find "$data" -type d -name shots 2> /dev/null | head -n 1)"
+            if [ -n "$dir" ]; then break; fi
+            sleep 2
+          done
+          if [ -z "$dir" ]; then echo "::error::the app did not start its screenshot scenes on $2"; FAILED=1; return 0; fi
+          out="shots/$2"
+          mkdir -p "$out"
+          n=1
+          while true; do
+            id="$(printf '%02d' "$n")"
+            f=""
+            for i in $(seq 1 300); do   # up to five minutes for one scene
+              f="$(ls "$dir"/ready-"$id"-*.txt 2> /dev/null | head -n 1)"
+              if [ -n "$f" ]; then break; fi
+              if [ -f "$dir/done.txt" ]; then break; fi
+              sleep 1
+            done
+            if [ -z "$f" ]; then break; fi
+            name="$(basename "$f" .txt | sed "s/^ready-$id-//")"
+            xcrun simctl io "$udid" screenshot --type=png "$out/$id-$name.png"
+            touch "$dir/taken-$id.txt"
+            n=$((n + 1))
+          done
+          if [ -f "$dir/error.txt" ]; then echo "---- scenes that failed"; cat "$dir/error.txt"; cp "$dir/error.txt" "$out/errors.txt"; fi
+          for p in "$out"/*.png; do
+            [ -f "$p" ] || continue
+            w="$(sips -g pixelWidth "$p" | awk '/pixelWidth/ {print $2}')"
+            h="$(sips -g pixelHeight "$p" | awk '/pixelHeight/ {print $2}')"
+            echo "$p ${w}x${h}"
+            if [ "$w" != "$3" ] || [ "$h" != "$4" ]; then echo "::warning::$p is ${w}x${h}, the store wants $3x$4"; FAILED=1; fi
+          done
+          xcrun simctl status_bar "$udid" clear || true
+          xcrun simctl shutdown "$udid" || true
+        }
+        take 'iPhone [0-9]+ Pro Max \(' iphone 1320 2868
+        take 'iPad Pro 13-inch' ipad 2064 2752
+        ls -R shots | head -60
+        if [ "$FAILED" = "1" ]; then echo "::warning::some screenshots are missing or have another size (see above)"; fi
+
+    - name: Keep the screenshots (7 days)
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: Echoes-store-screenshots
+        path: shots/
+        retention-days: 7
+        if-no-files-found: warn

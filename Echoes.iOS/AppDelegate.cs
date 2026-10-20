@@ -22,6 +22,10 @@ public class AppDelegate : AvaloniaAppDelegate<global::Echoes.App>
         Echoes.Helpers.BackgroundGuard.Register(new IosBackgroundGuard());
         // CI starts the app with ECHOES_SELFTEST=1 on a simulator to check what the shared tools need (see SelfTest.cs).
         if (SelfTest.Requested) _ = Task.Run(async () => { await Task.Delay(6000).ConfigureAwait(false); await SelfTest.RunAsync().ConfigureAwait(false); });
+#if STORESHOTS
+        // App Store screenshots (ios-screenshots.yml): only in a build made with -p:StoreShots=true.
+        if (StoreShots.Requested) _ = Task.Run(async () => { await Task.Delay(8000).ConfigureAwait(false); await StoreShots.RunAsync().ConfigureAwait(false); });
+#endif
         return base.CustomizeAppBuilder(builder).WithInterFont();
     }
 }

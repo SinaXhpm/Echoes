@@ -31,6 +31,12 @@
     <ProvisioningType>manual</ProvisioningType>
   </PropertyGroup>
 
+  <!-- App Store screenshots: ios-screenshots.yml builds with -p:StoreShots=true, which compiles StoreShots.cs (the scenes that
+       put real tools on screen for the screenshots). The shipped app is built without it. -->
+  <PropertyGroup Condition="'$(StoreShots)' == 'true'">
+    <DefineConstants>$(DefineConstants);STORESHOTS</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.4" />
     <PackageReference Include="Avalonia.iOS" Version="12.1.4" />
