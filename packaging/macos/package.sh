@@ -75,6 +75,9 @@ notarize_file() {   # $1 = a .zip or .dmg to submit
     if echo "$out" | grep -q -E 'status: (Invalid|Rejected)'; then
       echo "Apple REJECTED $1 (submission $id); its log follows" >&2
       [ -n "$id" ] && xcrun notarytool log "$id" --key "$key_file" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" >&2 || true
+    elif [ -z "$id" ]; then
+      # notarytool stopped before a submission existed (bad option, no network, rejected key): its output is above
+      echo "notarytool could not submit $1 (see its message above; --timeout takes one unit, e.g. 150m)." >&2
     else
       # no verdict yet: Apple's queue can take hours for a team's first submissions. Not a rejection.
       echo "Apple has not finished with $1 (submission $id) after ${NOTARIZE_TIMEOUT:-40m}: not rejected, still in its queue." >&2
