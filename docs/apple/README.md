@@ -80,7 +80,7 @@ Tag `v*` runs `.github/workflows/release.yml`; each macOS job (`osx-x64`, `osx-a
 
 Without the secrets it builds the same `.dmg` signed ad hoc (users do Open Anyway, as today).
 
-**Dry run without a release:** `.github/workflows/macos-test.yml` does the same for `osx-arm64` and `osx-x64` on the `apple-prep` branch (or by hand) and keeps the notarized `.dmg` as a workflow artifact for 3 days; it creates no tag, release or asset. Remove its branch trigger once the real release has been proven.
+**Dry run without a release:** `.github/workflows/macos-test.yml` does the same for `osx-arm64` and `osx-x64` when you start it by hand (Actions, Run workflow, any branch) and keeps the notarized `.dmg` as a workflow artifact for 3 days; it creates no tag, release or asset. 
 
 **Which macOS the app opens on:** the AOT binary is linked for the macOS of the machine that builds it unless
 `MACOSX_DEPLOYMENT_TARGET` says otherwise. Builds up to v0.4.2 were linked on macOS 26 and so opened only there

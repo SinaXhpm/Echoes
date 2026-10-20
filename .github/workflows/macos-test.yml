@@ -3,12 +3,10 @@ name: macOS signing (test build)
 # A private dry run of the macOS release: it builds the arm64 and the Intel app the way a release does, signs it with the Developer ID
 # certificate, has Apple notarize it, staples the ticket and keeps the .dmg as a workflow artifact for 3 days. No release,
 # tag or asset is created, so nothing reaches the Releases page or the in-app update check.
-# It runs only on the branch named below and by hand; delete the branch trigger when the release pipeline is proven.
+# It runs by hand only (Actions > macOS signing (test build) > Run workflow), on any branch.
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ apple-prep ]
 
 # Least privilege: this job only reads the repo and uploads a workflow artifact.
 permissions:
