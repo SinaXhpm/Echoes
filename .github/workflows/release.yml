@@ -4,12 +4,47 @@ on:
   push:
     tags:
       - 'v*'
+  # By hand (Actions > Build and Release > Run workflow): the same builds into a DRAFT release for the version given. Nothing is
+  # public and no tag exists until the draft is published on GitHub (the tag is then made on the commit it was built from).
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version (no "v"), e.g. 1.0.0
+        type: string
+        required: true
+
+# The release's tag: the pushed one, or v<version> for a draft run by hand.
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
 
 # Least privilege by default; only the release job is granted contents:write below.
 permissions: {}
 
 jobs:
+  # Publishing a draft on GitHub creates its tag, and that push would start this workflow again: it would rebuild everything
+  # and turn the release back into a pre-release. A tag whose release is already published is left alone.
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+    steps:
+    - id: check
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        state="$(gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" --json isDraft --jq '.isDraft' 2>/dev/null || true)"
+        if [ "${{ github.event_name }}" = "push" ] && [ "$state" = "false" ]; then
+          echo "The release $RELEASE_TAG is already published (from a draft): nothing to build."
+          echo "build=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "build=true" >> "$GITHUB_OUTPUT"
+        fi
+
   build:
+    needs: gate
+    if: needs.gate.outputs.build == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -39,7 +74,7 @@ jobs:
     - name: Get Version
       id: get_version
       shell: bash
-      run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+      run: echo "VERSION=${RELEASE_TAG#v}" >> $GITHUB_OUTPUT
 
     - name: Install Linux Dependencies
       if: runner.os == 'Linux'
@@ -136,6 +171,8 @@ jobs:
           *.dmg
 
   android:
+    needs: gate
+    if: needs.gate.outputs.build == 'true'
     runs-on: ubuntu-latest
     # Experimental head — never block the desktop release if the APK build fails.
     continue-on-error: true
@@ -171,7 +208,7 @@ jobs:
         dotnet build Echoes.Android/Echoes.Android.csproj -c Release -f net10.0-android
         -p:AndroidKeyStore=true
         -p:AndroidSigningKeyStore="$RUNNER_TEMP/echoes-release.keystore"
-        -p:ApplicationDisplayVersion=${GITHUB_REF_NAME#v}
+        -p:ApplicationDisplayVersion=${RELEASE_TAG#v}
 
     - name: Collect APK
       run: |
@@ -205,8 +242,11 @@ jobs:
       uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
       with:
         files: ./artifacts/**/*
-        tag_name: ${{ github.ref_name }}
-        prerelease: true
+        tag_name: ${{ env.RELEASE_TAG }}
+        target_commitish: ${{ github.sha }}
+        # a run by hand makes a draft; a pushed tag a pre-release, as before
+        draft: ${{ github.event_name == 'workflow_dispatch' }}
+        prerelease: ${{ github.event_name != 'workflow_dispatch' }}
         make_latest: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -97,6 +97,15 @@ jobs:
         rm -f "$key"
         echo "Uploaded. Apple processes the build for a few minutes, then it appears in App Store Connect > TestFlight."
 
+    # the .ipa as built (App Store signed: it installs only through TestFlight / the App Store), e.g. for a release's files
+    - name: Keep the .ipa (7 days)
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: Echoes-iOS-AppStore
+        path: ${{ env.IPA }}
+        retention-days: 7
+        if-no-files-found: error
+
     - name: Remove the signing keychain and the profile
       if: always()
       run: |

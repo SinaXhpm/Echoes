@@ -126,6 +126,16 @@ jobs:
         fi
         rm -f "$key"
 
+    # the signed package (it installs only through TestFlight / the Mac App Store), e.g. for a release's files
+    - name: Keep the package (7 days)
+      if: ${{ env.APPSTORE_INSTALLER_IDENTITY != '' }}
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: Echoes-macOS-AppStore
+        path: Echoes-AppStore.pkg
+        retention-days: 7
+        if-no-files-found: error
+
     - name: Keep the sandbox test log (7 days)
       if: always()
       run: cp "$RUNNER_TEMP/storetest.log" storetest.log 2>/dev/null || true
