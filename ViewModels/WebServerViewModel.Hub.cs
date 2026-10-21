@@ -231,11 +231,8 @@ public partial class WebServerViewModel : IShareHubSink
                   + (cert is not null ? "HTTPS" : "HTTP") + (pinOn ? ", PIN" : ", no PIN"));
         if (cert?.Regenerated == true) AppendLog("new certificate: browsers warn once for it (SHA-256 " + cert.ShortFingerprint + "…)");
         if (tlsNote is not null) AppendLog("HTTPS unavailable: " + tlsNote);
-        if (_uiTimer is null)
-        {
-            _uiTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
-            _uiTimer.Tick += (_, _) => FlushUi();
-        }
+        _uiTimer ??= new PacedTimer(250, 1000, FlushUi);   // 4 a second while something moves, then once a second
+        _lastActivity = -1;
         _uiTimer.Start();
         FlushUi();
     }

@@ -328,7 +328,13 @@ public partial class TgViewModel : ObservableObject
         IsConnecting = false;
         _connectCts = null;
         cts.Dispose();
-        if (generation != _apiGeneration) return;   // the token / proxy changed meanwhile: this verdict is about another bot
+        if (generation != _apiGeneration)
+        {
+            // the token / proxy changed meanwhile: this verdict is about another bot. A new token resets the badge itself, a
+            // new proxy doesn't: don't leave it on "Checking…" (a later send would then skip its own silent connect).
+            if (_conn == Conn.Checking) { _conn = Conn.None; ApplyConnBadge(); }
+            return;
+        }
         if (result.Outcome == TgOutcome.Cancelled) { _conn = Conn.None; ApplyConnBadge(); return; }
         UpdateConnection("getMe", state);
         if (state.IsOk) RememberProxy();

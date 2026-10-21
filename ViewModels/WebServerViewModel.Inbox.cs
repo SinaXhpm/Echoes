@@ -162,12 +162,21 @@ public partial class WebServerViewModel
 
     /// <summary>Mac App Store sandbox: the picked folder with its security-scoped bookmark (null = reopened from one). The folder
     /// object stays referenced: its access ends when it is released.</summary>
-    public void SetMacFolder(IStorageFolder folder, string path, string? bookmark)
+    public void SetMacFolder(IStorageFolder folder, string path, string? bookmark, bool restored = false)
     {
+        if (!ReferenceEquals(_macFolder, folder)) _macFolder?.Dispose();   // the folder this one replaces: its access ends
         _macFolder = folder;
         _macFolderPending = false;
         SetInboxFolder(path);
         if (bookmark is { Length: > 0 }) ProfileService.Instance.SetSetting(KInboxBookmark, bookmark);
+        // a new pick that got no bookmark: the old folder's must not bring that folder back at the next start
+        else if (!restored) ProfileService.Instance.Remove(KInboxBookmark);
+        if (restored)
+        {
+            // what arrived there in earlier runs could only be listed now that the folder is open again
+            _ = Task.Run(ListTrackedFiles);
+            RefreshStored();
+        }
     }
 
     /// <summary>Mac App Store sandbox: the bookmark of the folder picked earlier, while that folder is still closed.</summary>

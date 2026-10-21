@@ -138,8 +138,9 @@ public partial class TgViewModel
         var known = TelegramMethods.Find(name);
         MethodSearch = string.Empty;
         if (known is not null) { SelectKey(known.Name); IsBrowsing = false; return; }
-        CustomMethodName = name;
+        // the name after the switch: SelectKey puts back the custom method remembered from earlier, name included
         SelectKey(TgNavRow.CustomKey);
+        CustomMethodName = name;
         IsBrowsing = false;
     }
 
@@ -229,10 +230,11 @@ public partial class TgViewModel
     private bool _suppress;
 
     /// <summary>Open a method (a known name or <see cref="TgNavRow.CustomKey"/>), with <paramref name="apply"/>'s values
-    /// or the ones remembered for it.</summary>
-    private void SelectKey(string key, TgSnapshot? apply = null)
+    /// or the ones remembered for it. <paramref name="stash"/>: false when the caller has already kept the method being
+    /// left (LoadSnapshot changes the editor mode first, and a stash after that would read the form in the wrong mode).</summary>
+    private void SelectKey(string key, TgSnapshot? apply = null, bool stash = true)
     {
-        StashForm();
+        if (stash) StashForm();
         bool custom = key == TgNavRow.CustomKey;
         var def = custom ? null : TelegramMethods.Find(key);
         if (!custom && def is null) { def = TelegramMethods.Find("getMe")!; }
@@ -1015,6 +1017,8 @@ public partial class TgViewModel
     /// <summary>Open a request from the history: its method, values and editor mode.</summary>
     private void LoadSnapshot(TgSnapshot s)
     {
+        // keep what the method being left holds, read in ITS editor mode, before the mode or the custom name change
+        StashForm();
         if (s.JsonMode != (_editorModeIndex == 1))
         {
             // Switch the editor without converting the current method's form: the snapshot replaces it anyway.
@@ -1024,7 +1028,7 @@ public partial class TgViewModel
             OnPropertyChanged(nameof(IsJsonMode));
         }
         if (s.MethodKey == TgNavRow.CustomKey && s.CustomName.Length > 0) CustomMethodName = s.CustomName;
-        SelectKey(s.MethodKey, s);
+        SelectKey(s.MethodKey, s, stash: false);
         if (s.JsonMode) RawJson = s.RawJson;
         OnPropertyChanged(nameof(JsonModeUploadNote));
     }

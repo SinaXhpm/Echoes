@@ -182,7 +182,7 @@ public partial class WebServerViewModel : ICatcherSink
     private int _catchPortActive;
     private readonly ConcurrentQueue<(CapturedRequest Req, bool Replied)> _catchQueue = new();
     private int _catchPending, _catchDropped;
-    private DispatcherTimer? _catchTimer;
+    private PacedTimer? _catchTimer;
     private readonly Dictionary<long, CatcherRow> _rowsById = new();
     private long _catchTotal;
     private int _detailGen;
@@ -397,11 +397,7 @@ public partial class WebServerViewModel : ICatcherSink
         CatchStatus = lan
             ? "Anyone on your network can send here too."
             : "Only this device can send here.";
-        if (_catchTimer is null)
-        {
-            _catchTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
-            _catchTimer.Tick += (_, _) => DrainCatcher();
-        }
+        _catchTimer ??= new PacedTimer(200, 1000, DrainCatcher);   // 5 a second while requests arrive, then once a second
         _catchTimer.Start();
     }
 
@@ -445,10 +441,11 @@ public partial class WebServerViewModel : ICatcherSink
         _catchQueue.Enqueue((r, replied));
     }
 
-    /// <summary>UI thread: moves what arrived into the list in one batch (newest first, capped).</summary>
-    internal void DrainCatcher()
+    /// <summary>UI thread: moves what arrived into the list in one batch (newest first, capped). True when anything had
+    /// arrived (the paced timer then keeps its fast interval).</summary>
+    internal bool DrainCatcher()
     {
-        if (_catchQueue.IsEmpty && Volatile.Read(ref _catchDropped) == 0) return;
+        if (_catchQueue.IsEmpty && Volatile.Read(ref _catchDropped) == 0) return false;
         var fresh = new List<CatcherRow>();
         bool selectedChanged = false;
         while (_catchQueue.TryDequeue(out var item))
@@ -493,6 +490,7 @@ public partial class WebServerViewModel : ICatcherSink
         }
         if (selectedChanged) BuildDetail();
         UpdateCatchCounts();
+        return true;
     }
 
     private void UpdateCatchCounts()

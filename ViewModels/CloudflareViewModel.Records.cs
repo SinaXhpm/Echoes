@@ -118,8 +118,16 @@ public partial class CloudflareViewModel
             return;
         }
 
-        var list = r.Items.Select(CfRecord.FromApi).OfType<CfRecord>().ToList();
-        list.Sort(CompareRecords);
+        // Parsing (each record's data is deep-copied) and sorting off the UI thread: a zone can hold 100,000 records
+        // (GetAllAsync allows 200 pages of 500), and every load and zone switch froze the window while they ran.
+        var items = r.Items;
+        var list = await Task.Run(() =>
+        {
+            var parsed = items.Select(CfRecord.FromApi).OfType<CfRecord>().ToList();
+            parsed.Sort(CompareRecords);
+            return parsed;
+        });
+        if (gen != _recordsGen || session != _sessionGen || !ReferenceEquals(zone, SelectedZone)) return;   // switched meanwhile
         foreach (var rec in list) Records.Add(rec);
         RecordsZoneId = zone.Id;
         RebuildTypeFilters();

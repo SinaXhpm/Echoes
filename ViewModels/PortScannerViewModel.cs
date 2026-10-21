@@ -136,6 +136,9 @@ public partial class PortScannerViewModel : ObservableObject
         // Cancels and tears the sockets down; IsScanning flips in StartScan's finally, once the scan has drained.
         _stopRequested = true;
         try { _resolveCts?.Cancel(); } catch (ObjectDisposedException) { }
+        // the reverse-DNS lookups still waiting go too: Stop means stop (they ran on for hours after a big sweep, a few at a
+        // time with a timer polling them; the handful already with the OS end on their own)
+        _engine?.Names.Cancel();
         _engine?.Stop();
     }
 

@@ -597,7 +597,7 @@
                                                                 <TextBlock Grid.Row="2" Classes="key" Text="Valid"/>
                                                                 <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="val" Text="{Binding Validity}"/>
                                                                 <TextBlock Grid.Row="3" Classes="key" Text="{Binding SansLabel}" IsVisible="{Binding HasSans}"/>
-                                                                <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="val mono" Text="{Binding Sans}" IsVisible="{Binding HasSans}"/>
+                                                                <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="val mono" Text="{Binding SansShown}" IsVisible="{Binding HasSans}"/>
                                                                 <TextBlock Grid.Row="4" Classes="key" Text="Key"/>
                                                                 <SelectableTextBlock Grid.Row="4" Grid.Column="1" Classes="val" Text="{Binding KeyAndSignature}"/>
                                                                 <TextBlock Grid.Row="5" Classes="key" Text="Serial"/>

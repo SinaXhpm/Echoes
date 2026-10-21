@@ -587,9 +587,15 @@ function addMessage(m, live) {
   }
   row.appendChild(meta);
   row.appendChild(bubble);
+  row._seq = m.seq;
   var box = $('msgs'), stick = atBottom();
   box.appendChild(row);
-  while (box.childNodes.length > 601) box.removeChild(box.childNodes[1]);
+  /* the oldest rows go, and their seen-marks with them: a page left open on a busy share kept one per message ever */
+  while (box.childNodes.length > 601) {
+    var old = box.childNodes[1];
+    if (old._seq !== undefined) delete S.seen[old._seq];
+    box.removeChild(old);
+  }
   emptyChat();
   if (live) {
     if (stick || mine) toBottom(false);

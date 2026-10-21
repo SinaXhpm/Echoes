@@ -45,6 +45,11 @@ public partial class SocketView : UserControl
                 Dispatcher.UIThread.Post(() => ScrollToBottom(3), DispatcherPriority.Background);
         };
         TxList.AddHandler(ContextRequestedEvent, OnEntryContext, RoutingStrategies.Bubble);
+        // back on screen after another tool: what arrived meanwhile scrolled nothing, so catch up to the end
+        TxList.AttachedToVisualTree += (_, _) =>
+        {
+            if (_stick && _vm is { Entries.Count: > 0 }) QueueScroll();
+        };
 
         if (AppPlatform.IsMobile)
         {
@@ -66,8 +71,12 @@ public partial class SocketView : UserControl
 
     private void OnScrollChanged(object? sender, ScrollChangedEventArgs e)
     {
+        if (_scroll is null) return;
         // only a scroll by the user (offset moved) decides whether to keep following; growth alone doesn't
-        if (_scroll != null && Math.Abs(e.OffsetDelta.Y) > 0.01) _stick = AtBottom(_scroll);
+        if (Math.Abs(e.OffsetDelta.Y) > 0.01) _stick = AtBottom(_scroll);
+        // growth that wasn't followed (entries that came while the list was hidden behind another sub-tab or page) is
+        // caught up as soon as the list is laid out again
+        else if (_stick && Math.Abs(e.ExtentDelta.Y) > 0.01 && !AtBottom(_scroll)) QueueScroll();
     }
 
     private static bool AtBottom(ScrollViewer sv) => sv.Offset.Y >= sv.Extent.Height - sv.Viewport.Height - 24;
@@ -75,7 +84,12 @@ public partial class SocketView : UserControl
     private void OnEntriesChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         if (e.Action == NotifyCollectionChangedAction.Reset) _stick = true;
-        if (!_stick || _scrollQueued) return;
+        if (_stick) QueueScroll();
+    }
+
+    private void QueueScroll()
+    {
+        if (_scrollQueued) return;
         _scrollQueued = true;
         Dispatcher.UIThread.Post(() => { _scrollQueued = false; ScrollToBottom(3); }, DispatcherPriority.Background);
     }

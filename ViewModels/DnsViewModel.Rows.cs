@@ -104,6 +104,14 @@ public sealed partial class CompareRow : ObservableObject
     /// <summary>The phone layout's second line: transport · median · rounds · answers.</summary>
     [ObservableProperty] private string _summaryLine = "";
 
+    /// <summary>The run was stopped before this row's verdict: no "…" is left as if it were still running.</summary>
+    public void MarkStopped()
+    {
+        if (MedianText == "…") MedianText = "—";
+        if (VerdictText == "…") VerdictText = "stopped";
+        SummaryLine = string.Join(" · ", new[] { Transport, MedianText, RateText, AnswersText }.Where(x => x.Length > 0));
+    }
+
     /// <summary>Copies what <paramref name="s"/> has so far (call on the UI thread; reads under the stats' lock).</summary>
     public void Update(CompareStats s, bool final)
     {

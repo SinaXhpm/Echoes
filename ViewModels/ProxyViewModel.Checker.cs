@@ -227,7 +227,7 @@ public partial class ProxyViewModel
         _ => 8,
     };
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]   // the same button stops while it runs (a plain async command disables it until the run ends)
     private Task ToggleCheck()
     {
         if (IsChecking)

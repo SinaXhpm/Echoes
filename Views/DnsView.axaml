@@ -84,6 +84,8 @@
 
         <!-- ===== mode switch: one segmented control [Lookup | Compare | Email check] (as Ping's) ===== -->
         <Style Selector="ListBox.modeSwitch">
+            <!-- a segmented switch always has one segment on: Ctrl+click otherwise cleared it, and the mode went to -1 -->
+            <Setter Property="SelectionMode" Value="AlwaysSelected"/>
             <Setter Property="Padding" Value="2"/>
             <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>

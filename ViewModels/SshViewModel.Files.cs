@@ -87,6 +87,9 @@ public partial class SshViewModel
         FileRows = Array.Empty<SshFileRow>();
         FilesPath = string.Empty;
         FilesLoaded = false;
+        // a listing cancelled with the session no longer owns the flag (its finally clears it only while still current),
+        // and "Loading…" stayed over "Not connected"; the next connect then never listed the folder on its own
+        FilesBusy = false;
         FilesError = string.Empty;
         FilesInfo = string.Empty;
         FilesNameMode = 0;

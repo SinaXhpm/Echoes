@@ -112,14 +112,22 @@ public partial class NetworkInfoViewModel
             _wifiTimer = new DispatcherTimer { Interval = WifiInterval };
             _wifiTimer.Tick += (_, _) =>
             {
-                if (_wifiVisible?.Invoke() == true) _ = WifiReadAsync(scan: true, followUp: false);
+                if (_wifiVisible?.Invoke() == true) _ = WifiReadAsync(scan: ScanDue(WifiScanGap), followUp: false);
             };
         }
         _wifiTimer.Start();
         // a quick look back to the view: re-read unless the last read is very recent
         if (_wifiLast is null || DateTimeOffset.Now - _wifiLast.Time > TimeSpan.FromSeconds(5))
-            _ = WifiReadAsync(scan: true, followUp: true);
+            _ = WifiReadAsync(scan: ScanDue(TimeSpan.FromSeconds(30)), followUp: true);
     }
+
+    // An active scan takes the radio off its channel for a moment: with this tab open, Echoes' own pings and speed tests
+    // showed it as latency spikes every 10 s. The 10 s ticks read the system's list (the OS keeps it fresh with its own
+    // scans); Echoes asks for a scan of its own at most once a minute, and whenever Refresh is pressed.
+    internal static readonly TimeSpan WifiScanGap = TimeSpan.FromSeconds(60);
+    private long _wifiScanTick = long.MinValue / 2;   // Environment.TickCount64 of the last scan asked for (a clock step can't stall it)
+
+    private bool ScanDue(TimeSpan gap) => Environment.TickCount64 - _wifiScanTick >= (long)gap.TotalMilliseconds;
 
     /// <summary>The view left the screen (another tab or tool): stop polling.</summary>
     public void WifiHidden()
@@ -136,6 +144,7 @@ public partial class NetworkInfoViewModel
         if (_wifiReading) return;
         _wifiReading = true;
         WifiBusy = true;
+        if (scan) _wifiScanTick = Environment.TickCount64;
         try
         {
             var source = WifiSource;

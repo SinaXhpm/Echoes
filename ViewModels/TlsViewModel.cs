@@ -79,6 +79,10 @@ public sealed partial class TlsCertView : ObservableObject
         ExpirySeverity = TlsCertificates.ExpirySeverity(c, utcNow);
         var sans = TlsCertificates.Sans(c);
         Sans = sans.Count == 0 ? "—" : string.Join(", ", sans);
+        // On screen the first 100 (the report keeps them all): a shared CDN certificate names thousands, and the leaf opens
+        // by default, so 25-250K characters were laid out on the UI thread after every inspect and every resize.
+        SansShown = sans.Count <= MaxNamesShown ? Sans
+            : string.Join(", ", sans.Take(MaxNamesShown)) + $" … +{sans.Count - MaxNamesShown:N0} more (all of them are in the report)";
         HasSans = sans.Count > 0;
         SanCount = sans.Count;
         Key = TlsCertificates.KeyText(c);
@@ -109,6 +113,8 @@ public sealed partial class TlsCertView : ObservableObject
     public bool ExpiryWarn => ExpirySeverity == TlsSeverity.Warning;
     public bool ExpiryBad => ExpirySeverity == TlsSeverity.Error;
     public string Sans { get; }
+    public string SansShown { get; }
+    private const int MaxNamesShown = 100;
     public bool HasSans { get; }
     public int SanCount { get; }
     public string SansLabel => SanCount > 1 ? $"Names ({SanCount})" : "Names";

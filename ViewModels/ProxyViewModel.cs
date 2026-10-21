@@ -52,7 +52,7 @@ public partial class ProxyViewModel : ObservableObject
     // client could queue thousands), log entries wait here and a UI timer drains them in one batch and
     // polls the traffic counters — which also keeps ↑/↓ moving during a long transfer.
     private readonly ConcurrentQueue<ProxyLogEntry> _pendingLog = new();
-    private DispatcherTimer? _statsTimer;
+    private PacedTimer? _statsTimer;
 
     private ProxyServer? _server;
     // What the running server is actually bound to: the address card shows these, not the (locked)
@@ -180,8 +180,7 @@ public partial class ProxyViewModel : ObservableObject
             _runningPort = Port;
             IsRunning = true;
             BackgroundGuard.Acquire("Proxy server");
-            _statsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-            _statsTimer.Tick += (_, _) => PollStats();
+            _statsTimer = new PacedTimer(500, 2000, PollStats);   // twice a second while traffic moves, every 2 s when idle
             _statsTimer.Start();
             RefreshAddresses();
             // No auth on a LAN-reachable bind = anyone on the network can use it. That's the feature,
@@ -238,23 +237,30 @@ public partial class ProxyViewModel : ObservableObject
     }
 
     // UI timer tick (while running): refresh the live counters and flush queued log entries.
-    private void PollStats()
+    // True while anything moves (the paced timer then keeps its fast interval).
+    private bool PollStats()
     {
         var s = _server;
-        if (s is null) return;
+        if (s is null) return false;
+        long activity = s.BytesUp + s.BytesDown + s.TotalConnections + s.ActiveConnections;
+        bool moved = activity != _lastActivity;
+        _lastActivity = activity;
         ActiveConnections = s.ActiveConnections;
         TotalConnections = s.TotalConnections;
-        TrafficText = $"↑ {FileHttpServer.HumanSize(s.BytesUp)}   ↓ {FileHttpServer.HumanSize(s.BytesDown)}";
-        DrainLog();
+        if (moved) TrafficText = $"↑ {FileHttpServer.HumanSize(s.BytesUp)}   ↓ {FileHttpServer.HumanSize(s.BytesDown)}";
+        return DrainLog() || moved;
     }
 
-    private void DrainLog()
+    private long _lastActivity = -1;
+
+    private bool DrainLog()
     {
         bool any = false;
         while (_pendingLog.TryDequeue(out var e)) { Connections.Insert(0, e); any = true; }
-        if (!any) return;
+        if (!any) return false;
         while (Connections.Count > MaxLogRows) Connections.RemoveAt(Connections.Count - 1);
         OnPropertyChanged(nameof(HasConnections));
+        return true;
     }
 
     private void ResetStats()
@@ -262,6 +268,7 @@ public partial class ProxyViewModel : ObservableObject
         ActiveConnections = 0;
         TotalConnections = 0;
         TrafficText = "↑ 0 B   ↓ 0 B";
+        _lastActivity = -1;
         _pendingLog.Clear();
         Connections.Clear();
         OnPropertyChanged(nameof(HasConnections));

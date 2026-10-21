@@ -270,7 +270,9 @@ public sealed class MonitorNotifier : IDisposable
     private TelegramApi? _api;
     private MonitorTelegramConfig? _apiFor;
     private int _dropped;
-    private DateTime _lastSentUtc = DateTime.MinValue;
+    // Environment.TickCount64 of the last message sent: a monotonic clock. With the wall clock, a step backwards (NTP after
+    // a resume, a VM restore, the user fixing the time) made the gap as long as the step and held the next DOWN alert back.
+    private long _lastSentTick = long.MinValue / 2;
     private Task? _worker;
 
     /// <param name="report">(text, isFailure) for the events log — called on the worker's thread.</param>
@@ -325,8 +327,8 @@ public sealed class MonitorNotifier : IDisposable
                 await _signal.WaitAsync(token).ConfigureAwait(false);
                 // Let the burst finish (one round flips many monitors), and keep messages apart.
                 await Task.Delay(CoalesceWindow, token).ConfigureAwait(false);
-                var gap = _lastSentUtc + MinGap - DateTime.UtcNow;
-                if (gap > TimeSpan.Zero) await Task.Delay(gap, token).ConfigureAwait(false);
+                long gapMs = _lastSentTick + (long)MinGap.TotalMilliseconds - Environment.TickCount64;
+                if (gapMs > 0) await Task.Delay(TimeSpan.FromMilliseconds(gapMs), token).ConfigureAwait(false);
 
                 // Signals first, then the queue: an alert queued in between keeps its own signal for the next pass.
                 while (_signal.CurrentCount > 0) _signal.Wait(0);
@@ -381,7 +383,7 @@ public sealed class MonitorNotifier : IDisposable
             if (r.Outcome == TgOutcome.Cancelled) return;
             if (r.Ok)
             {
-                _lastSentUtc = DateTime.UtcNow;
+                _lastSentTick = Environment.TickCount64;
                 SentCount++;
                 if (attempt > 0) _report($"Telegram alert sent after {attempt + 1} tries.", false);
                 return;

@@ -99,7 +99,7 @@ public partial class WebServerViewModel : ObservableObject
     // counters, so the UI cost is flat whatever the load (one UI post per event could swamp it).
     private readonly ConcurrentQueue<string> _pendingLog = new();
     private readonly ConcurrentQueue<(string Id, long Bytes, bool Complete)> _pendingDownloads = new();
-    private Avalonia.Threading.DispatcherTimer? _uiTimer;
+    private PacedTimer? _uiTimer;
     private const int MaxPendingLog = 200;   // the TextBox keeps only ~8000 chars anyway
 
     private IReadOnlyList<SharedItem> SnapshotItems()
@@ -375,8 +375,10 @@ public partial class WebServerViewModel : ObservableObject
     private void ClearLog() => Log = string.Empty;
 
     // UI thread: drain queued log lines / downloads / chat / uploads into bound state and poll the live counters.
-    private void FlushUi()
+    // True while anything moves: something queued, or the hub's counters changed (the paced timer keeps its fast interval).
+    private bool FlushUi()
     {
+        bool queued = !_pendingLog.IsEmpty || !_pendingDownloads.IsEmpty || !_pendingChat.IsEmpty || !_pendingUploads.IsEmpty;
         if (!_pendingLog.IsEmpty)
         {
             var batch = new List<string>();
@@ -395,7 +397,10 @@ public partial class WebServerViewModel : ObservableObject
         DrainUploads();
 
         var s = _hub;
-        if (s is null) return;
+        if (s is null) return queued;
+        long activity = s.BytesSent + s.BytesReceived + s.TotalConnections + s.ActiveConnections + s.ClientCount;
+        bool moved = activity != _lastActivity;
+        _lastActivity = activity;
         ActiveConnections = s.ActiveConnections;
         TotalConnections = s.TotalConnections;
         TotalDownloads = s.Downloads;
@@ -403,5 +408,8 @@ public partial class WebServerViewModel : ObservableObject
         BytesReceivedText = FileHttpServer.HumanSize(s.BytesReceived);
         ClientCount = s.ClientCount;
         UpdateLiveStatus();
+        return queued || moved;
     }
+
+    private long _lastActivity = -1;
 }

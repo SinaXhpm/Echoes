@@ -15,8 +15,10 @@ public partial class NetworkInfoView : UserControl
         // stop the polling, and every tick checks it is still effectively visible.
         WifiRoot.AttachedToVisualTree += (_, _) =>
         {
+            // a minimized window counts as hidden too (its controls stay "visible", and a laptop scanned on regardless)
             if (DataContext is NetworkInfoViewModel vm)
-                vm.WifiShown(() => WifiRoot.IsEffectivelyVisible && TopLevel.GetTopLevel(WifiRoot) is not null);
+                vm.WifiShown(() => WifiRoot.IsEffectivelyVisible && TopLevel.GetTopLevel(WifiRoot) is { } top
+                                   && (top is not Window w || w.WindowState != WindowState.Minimized));
         };
         WifiRoot.DetachedFromVisualTree += (_, _) =>
         {

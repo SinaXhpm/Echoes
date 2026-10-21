@@ -123,12 +123,31 @@ public partial class CurlViewModel
     [ObservableProperty] private bool _isSaveOpen;
     [ObservableProperty] private string _saveName = string.Empty;
 
+    // Saved lives in the profile file, which is rewritten after every settings change: a multi-MB body there made each of
+    // those writes (several a second while typing elsewhere) re-serialize and seal it again under the profile's lock, which
+    // the UI thread waits on. Bodies and text parts over this size aren't kept in Saved; a file body (Body → File) is.
+    private const int MaxSavedTextChars = 256 * 1024;
+
+    private CurlRequest ForLibrary(CurlRequest m)
+    {
+        bool cut = false;
+        if (m.RawBody.Length > MaxSavedTextChars) { m.RawBody = string.Empty; cut = true; }
+        foreach (var f in m.Form)
+            if (f.Value.Length > MaxSavedTextChars) { f.Value = string.Empty; cut = true; }
+        foreach (var p in m.Parts)
+            if (!p.IsFile && p.Value.Length > MaxSavedTextChars) { p.Value = string.Empty; cut = true; }
+        if (cut)
+            ShowNote($"Saved without its body: Saved keeps bodies up to {MaxSavedTextChars / 1024} KB. "
+                     + "For a bigger one, put it in a file and use Body → File.", isError: false);
+        return m;
+    }
+
     [RelayCommand]
     private void SaveRequest()
     {
         var item = SavedRequests.FirstOrDefault(s => s.Id == CurrentSavedId);
         if (item is null) { OpenSave(); return; }
-        item.Request = BuildModel();
+        item.Request = ForLibrary(BuildModel());
         item.SavedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         PersistSaved();
         Flash($"Saved \"{item.Name}\"");
@@ -150,7 +169,7 @@ public partial class CurlViewModel
     private void ConfirmSave()
     {
         string name = SaveName.Trim();
-        var m = BuildModel();
+        var m = ForLibrary(BuildModel());
         if (name.Length == 0) name = $"{m.Method} {m.ShortLabel()}";
         var item = new CurlSavedItem { Name = name, Request = m, SavedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() };
         SavedRequests.Insert(0, item);

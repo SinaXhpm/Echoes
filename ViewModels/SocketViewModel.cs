@@ -216,7 +216,8 @@ public partial class SocketViewModel : ObservableObject
     private readonly ConcurrentQueue<Ev> _queue = new();
     private long _pendingBytes, _droppedBytes;
     private int _droppedChunks;
-    private DispatcherTimer? _timer;
+    // 100 ms while data flows, once a second when quiet (the peers' idle times and the traffic line still move)
+    private PacedTimer? _timer;
     private long _sentBytes, _recvBytes, _retainedBytes;
     private int _trimmedEntries;
     private string? _lastTraffic;
@@ -584,11 +585,7 @@ public partial class SocketViewModel : ObservableObject
     private void SessionStarted()
     {
         if (!_guardHeld) { BackgroundGuard.Acquire("Socket session"); _guardHeld = true; }
-        if (_timer == null)
-        {
-            _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
-            _timer.Tick += (_, _) => Drain();
-        }
+        _timer ??= new PacedTimer(100, 1000, Drain);
         _timer.Start();
     }
 
@@ -727,6 +724,8 @@ public partial class SocketViewModel : ObservableObject
     private async Task SendTo(SocketPeer? target, string? label, byte[] data)
     {
         Drain();
+        _timer?.Wake();   // the reply should show at the fast pace
+
         Commit(new List<SocketEntry> { new(SocketEntryKind.Sent, DateTime.Now, data, null, label) });
         _sentBytes += data.Length;
 
@@ -869,8 +868,8 @@ public partial class SocketViewModel : ObservableObject
         _queue.Enqueue(ev);
     }
 
-    /// <summary>UI thread: moves everything queued into the transcript in one batch.</summary>
-    internal void Drain()
+    /// <summary>UI thread: moves everything queued into the transcript in one batch. True when anything was queued.</summary>
+    internal bool Drain()
     {
         List<SocketEntry>? batch = null;
         bool peersChanged = false;
@@ -952,6 +951,7 @@ public partial class SocketViewModel : ObservableObject
         if (IsServerMode && Peers.Count > 0) UpdatePeerRows();
         UpdateServerStatus();
         UpdateTraffic();
+        return count > 0 || dropped > 0;
     }
 
     // TCP is a byte stream: chunks of the same peer arriving within MergeWindowMs read as one message

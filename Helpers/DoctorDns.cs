@@ -261,7 +261,12 @@ public static class DoctorDns
                     int n = await s.ReceiveAsync(buf, SocketFlags.None, late.Token).ConfigureAwait(false);
                     var addrs = new List<IPAddress>();
                     if (!TryParse(buf.AsSpan(0, n), id, type, out int rc2, addrs)) continue;
-                    if (rc2 != r.Rcode || !addrs.OrderBy(x => x.ToString()).SequenceEqual(r.Addrs.OrderBy(x => x.ToString())))
+                    bool differs = rc2 != r.Rcode || !addrs.OrderBy(x => x.ToString()).SequenceEqual(r.Addrs.OrderBy(x => x.ToString()));
+                    // After the resend two genuine replies are expected, and they can differ (another frontend of the
+                    // resolver, another CDN answer): that alone said "forged" on a slow path. Then only an answer that
+                    // points somewhere no real one would (a filter page, a private or reserved address) counts.
+                    bool forgedLooking = !resent || addrs.Concat(r.Addrs).Any(a => DoctorIp.IsKnownFilter(a) || !DoctorIp.IsPublic(a));
+                    if (differs && forgedLooking)
                     {
                         r.Injected = true;
                         r.Later.AddRange(addrs);

@@ -317,6 +317,9 @@ public partial class CurlViewModel
         string text = RequestBody;
         bool json = RawTypeIndex == 0;
         string? pretty = await Task.Run(() => json ? CurlBody.PrettyJson(text) : CurlBody.PrettyXml(text));
+        // a big body takes a moment: if it was edited, replaced (a saved request, an imported command) or its type changed
+        // meanwhile, the result is for a body that's gone and must not overwrite the new one
+        if (!ReferenceEquals(RequestBody, text) || RawTypeIndex != (json ? 0 : 1)) return;
         if (pretty is null) { ValidateBody(); return; }
         RequestBody = pretty;
     }
@@ -506,9 +509,13 @@ public partial class CurlViewModel
                     ProxyUser = r.ProxyUser ?? string.Empty;
                     ProxyPass = r.ProxyPass ?? string.Empty;
                     UseProxy = true;
+                    _keepProxy = _keepProxyPass = null;
                 }
                 OverrideIp = r.OverrideIp ?? string.Empty;
             }
+            // _loaded is off here, so OnPropertyChanged doesn't drop the stored values kept as they were (an unreadable
+            // key this run): the applied URL / proxy are what the save below must write, not the old sealed ones
+            _keepUrl = null;
         }
         finally
         {

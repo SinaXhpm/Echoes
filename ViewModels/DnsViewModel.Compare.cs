@@ -121,6 +121,11 @@ public partial class DnsViewModel
         }
         catch (OperationCanceledException)
         {
+            // stopped halfway: the rows still waiting said "…" as if the run went on, and Copy had nothing to copy
+            finished = true;   // progress posts still queued add nothing now
+            foreach (var row in rows) row.MarkStopped();
+            CompareSummary = "Stopped before every resolver was asked: the times above are from the queries that finished.";
+            CompareSummaryGood = CompareSummaryBad = false;
             CompareProgress = "stopped";
         }
         finally { IsWorking = false; }

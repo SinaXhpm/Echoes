@@ -76,9 +76,19 @@ public partial class CurlViewModel : ObservableObject
     [ObservableProperty] private NicOption? _selectedInterface;
     private string? SelectedNicIp => SelectedInterface?.Ip;
 
+    // The adapter the user picked (curl.nicIp). Kept while it is down: a VPN that was off when the tab opened fell back to
+    // Auto, and that fallback was saved over the choice for good. It is selected again once it comes back; only the user's
+    // own pick changes it.
+    private string? _preferredNicIp;
+    private bool _applyingNics;
+
     partial void OnSelectedInterfaceChanged(NicOption? value)
     {
-        if (_loaded) ProfileService.Instance.SetSetting("curl.nicIp", value?.Ip ?? string.Empty);
+        if (_loaded && !_applyingNics)
+        {
+            _preferredNicIp = value?.Ip;
+            ProfileService.Instance.SetSetting("curl.nicIp", value?.Ip ?? string.Empty);
+        }
         RequestChanged();
     }
 
@@ -106,9 +116,15 @@ public partial class CurlViewModel : ObservableObject
         }
         catch { }
 
-        string? keep = _loaded ? SelectedInterface?.Ip : ProfileService.Instance.GetSetting("curl.nicIp");
-        Interfaces = list;
-        SelectedInterface = (!string.IsNullOrEmpty(keep) ? list.FirstOrDefault(n => n.Ip == keep) : null) ?? list[0];
+        if (!_loaded) _preferredNicIp = ProfileService.Instance.GetSetting("curl.nicIp");
+        string? keep = _preferredNicIp;
+        _applyingNics = true;   // a fallback to Auto (the adapter is down) is shown, not saved
+        try
+        {
+            Interfaces = list;
+            SelectedInterface = (!string.IsNullOrEmpty(keep) ? list.FirstOrDefault(n => n.Ip == keep) : null) ?? list[0];
+        }
+        finally { _applyingNics = false; }
     }
 
     // ================================================================== persistence (debounced)
@@ -375,13 +391,23 @@ public partial class CurlViewModel : ObservableObject
         RequestTimeText = "0 ms";
         _reqSw.Restart();
         _reqTimer ??= CreateReqTimer();
+        _reqTimer.Interval = FastTick;
         _reqTimer.Start();
     }
 
+    // Smooth while a request is young; a long wait (a stream, "no timeout", a server that never answers) needn't wake the
+    // UI 15 times a second for as long as it lasts, in the background on a phone too.
+    private static readonly TimeSpan FastTick = TimeSpan.FromMilliseconds(66), SlowTick = TimeSpan.FromMilliseconds(500);
+
     private Avalonia.Threading.DispatcherTimer CreateReqTimer()
     {
-        var t = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(66) };
-        t.Tick += (_, _) => RequestTimeText = FormatMs(_reqSw.Elapsed.TotalMilliseconds);
+        var t = new Avalonia.Threading.DispatcherTimer { Interval = FastTick };
+        t.Tick += (_, _) =>
+        {
+            double ms = _reqSw.Elapsed.TotalMilliseconds;
+            RequestTimeText = FormatMs(ms);
+            if (ms > 2000 && t.Interval != SlowTick) t.Interval = SlowTick;
+        };
         return t;
     }
 

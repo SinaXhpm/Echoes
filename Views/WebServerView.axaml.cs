@@ -19,6 +19,7 @@ public partial class WebServerView : UserControl
     private ScrollViewer? _chatScroll;
     private bool _stick = true;        // follow new messages while the user is at the bottom
     private bool _scrollQueued;
+    private bool _macRestoreTried;
 
     public WebServerView()
     {
@@ -41,6 +42,11 @@ public partial class WebServerView : UserControl
             if (_chatScroll != null) _chatScroll.ScrollChanged += OnChatScrollChanged;
             if (_vm is { ChatItems.Count: > 0 }) Dispatcher.UIThread.Post(() => ScrollToBottom(3), DispatcherPriority.Background);
         };
+        // back on screen after another tool: messages that came meanwhile scrolled nothing, so catch up to the end
+        ChatList.AttachedToVisualTree += (_, _) =>
+        {
+            if (_stick && _vm is { ChatItems.Count: > 0 }) QueueScroll();
+        };
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -59,9 +65,13 @@ public partial class WebServerView : UserControl
         // Android: reopen the folder picked last time (its permission was kept with the bookmark)
         if (_vm.NeedsAndroidFolder && _vm.AndroidFolderBookmark is { Length: > 0 } bookmark)
             _ = RestoreAndroidFolderAsync(bookmark);
-        // Mac App Store sandbox: the same for the folder picked in an earlier run
-        else if (_vm.MacFolderBookmark is { Length: > 0 } macBookmark)
+        // Mac App Store sandbox: the same for the folder picked in an earlier run (once: a bookmark that doesn't open the
+        // folder for writing won't do so on the next visit either)
+        else if (!_macRestoreTried && _vm.MacFolderBookmark is { Length: > 0 } macBookmark)
+        {
+            _macRestoreTried = true;
             _ = RestoreMacFolderAsync(macBookmark);
+        }
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -74,8 +84,12 @@ public partial class WebServerView : UserControl
 
     private void OnChatScrollChanged(object? sender, ScrollChangedEventArgs e)
     {
+        if (_chatScroll is null) return;
         // only a scroll by the user (offset moved) decides whether to keep following; growth alone doesn't
-        if (_chatScroll != null && Math.Abs(e.OffsetDelta.Y) > 0.01) _stick = AtBottom(_chatScroll);
+        if (Math.Abs(e.OffsetDelta.Y) > 0.01) _stick = AtBottom(_chatScroll);
+        // growth that wasn't followed (messages that came while the chat was behind the Files / Log sub-tab or another
+        // page) is caught up as soon as the list is laid out again
+        else if (_stick && Math.Abs(e.ExtentDelta.Y) > 0.01 && !AtBottom(_chatScroll)) QueueScroll();
     }
 
     private static bool AtBottom(ScrollViewer sv) => sv.Offset.Y >= sv.Extent.Height - sv.Viewport.Height - 24;
@@ -83,7 +97,12 @@ public partial class WebServerView : UserControl
     private void OnChatChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         if (e.Action == NotifyCollectionChangedAction.Reset) _stick = true;
-        if (!_stick || _scrollQueued) return;
+        if (_stick) QueueScroll();
+    }
+
+    private void QueueScroll()
+    {
+        if (_scrollQueued) return;
         _scrollQueued = true;
         Dispatcher.UIThread.Post(() => { _scrollQueued = false; ScrollToBottom(3); }, DispatcherPriority.Background);
     }
@@ -237,13 +256,18 @@ public partial class WebServerView : UserControl
     private async Task RestoreMacFolderAsync(string bookmark)
     {
         if (_vm is null || TopLevel.GetTopLevel(this) is not { } top) return;
+        IStorageFolder? folder = null;
         try
         {
-            if (await top.StorageProvider.OpenFolderBookmarkAsync(bookmark) is { } folder
-                && folder.TryGetLocalPath() is { Length: > 0 } path && ShareInbox.IsWritableFolder(path))
-                _vm.SetMacFolder(folder, path, null);
+            folder = await top.StorageProvider.OpenFolderBookmarkAsync(bookmark);
+            if (folder is not null && folder.TryGetLocalPath() is { Length: > 0 } path && ShareInbox.IsWritableFolder(path))
+            {
+                _vm.SetMacFolder(folder, path, null, restored: true);
+                folder = null;   // the view-model keeps it (and with it the folder's access)
+            }
         }
         catch { /* the permission is gone: received files keep going to the default folder */ }
+        finally { folder?.Dispose(); }   // opened but not used: give its access back
     }
 
     private async Task RestoreAndroidFolderAsync(string bookmark)

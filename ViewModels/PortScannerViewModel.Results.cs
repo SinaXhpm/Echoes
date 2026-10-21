@@ -157,9 +157,16 @@ public partial class PortScannerViewModel
         bool rebuild = false;
         while (budget-- > 0 && sink.Hosts.TryDequeue(out var h)) rebuild |= UpsertHost(h);
         while (budget-- > 0 && sink.Ports.TryDequeue(out var f)) rebuild |= UpsertPort(f);
-        if (rebuild) RebuildView();
+        if (rebuild) _viewStale = true;
+        // With a filter or the Open / Changes view on, new rows mean rebuilding the filtered list (up to 20,000 rows, and a
+        // reset that re-creates the visible rows and drops the selection): at most once a second while results stream in
+        // (it was every 200 ms tick), and at once at the end.
+        if (_viewStale && (final || Environment.TickCount64 - _viewBuiltAt >= 1000)) RebuildView();
         HasResults = _listed.Count > 0;
     }
+
+    private bool _viewStale;
+    private long _viewBuiltAt;
 
     // The pass is over and its final listing replaces the live one: what's still queued would only be redrawn twice.
     private void DiscardQueued()
@@ -332,7 +339,10 @@ public partial class PortScannerViewModel
             timer.Stop();
             var diff = _lastDiff;
             string portsText = _lastPortsText;
-            ReportText = await Task.Run(() => ScanReport.BuildText(pass, portsText, diff));
+            string text = await Task.Run(() => ScanReport.BuildText(pass, portsText, diff));
+            // a big report takes seconds: a scan started meanwhile has cleared the report, and this one isn't about it
+            if (IsScanning || !ReferenceEquals(sink, _sink)) return;
+            ReportText = text;
         };
         timer.Start();
     }
@@ -389,6 +399,8 @@ public partial class PortScannerViewModel
 
     private void RebuildView()
     {
+        _viewStale = false;
+        _viewBuiltAt = Environment.TickCount64;
         string f = FilterText.Trim();
         if (f.Length == 0 && ViewMode == "all")
         {

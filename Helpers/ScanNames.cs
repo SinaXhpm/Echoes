@@ -16,6 +16,9 @@ namespace Echoes.Helpers;
 public sealed class ScanNames
 {
     private const int DeadlineMs = 3000;
+    // A sweep behind a transparent proxy marks every address up (a /16: 65,536): names for more hosts than a list can
+    // usefully show only cost DNS traffic and time. The hosts past this are listed without a name.
+    private const int MaxLookups = 4096;
 
     private readonly SemaphoreSlim _slots;
     private readonly Action<ScanHost> _resolved;
@@ -36,7 +39,7 @@ public sealed class ScanNames
     /// <summary>Start a lookup for this host unless one ran already. Never throws.</summary>
     public void Queue(ScanHost host)
     {
-        if (host.ReverseName is not null) return;
+        if (host.ReverseName is not null || _lookups.Count >= MaxLookups) return;
         _lookups.GetOrAdd(host.Ip, _ =>
         {
             Interlocked.Increment(ref _pending);

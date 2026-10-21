@@ -225,6 +225,11 @@ public partial class DoctorViewModel : ObservableObject
         CardTitle = "Stopped";
         CardText = "Stopped early: the checks below show what was found.";
         CardAdvice = "";
+        if (UseProxy != _withProxy)
+        {
+            _withProxy = UseProxy;   // the box changed during the run (as in Finish): show what the next run will do
+            RebuildItems();
+        }
     }
 
     private async Task RunAsync(DoctorTarget t, DoctorEnvironment env, DoctorProxy? proxy, int run, CancellationToken ct)

@@ -239,6 +239,8 @@
 
         <!-- ===== two- or three-way switch (Form | Raw JSON, Methods | History, Updates | JSON): pills in an inset track ===== -->
         <Style Selector="ListBox.switch">
+            <!-- a segmented switch always has one segment on: Ctrl+click otherwise cleared it, and the pane went empty -->
+            <Setter Property="SelectionMode" Value="AlwaysSelected"/>
             <Setter Property="Padding" Value="2"/>
             <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>

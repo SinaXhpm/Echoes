@@ -153,11 +153,12 @@ public sealed class ScanEngine : IDisposable
             MaxDegreeOfParallelism = Math.Clamp(_o.Concurrency, 1, AppPlatform.IsMobile ? 100 : 256),
             CancellationToken = ct,
         };
+        bool smallSweep = targets.Count <= ScanDiscovery.LanFloorMaxHosts;   // LAN hosts then get the longer floor
         try
         {
             await Parallel.ForEachAsync(targets, options, async (h, c) =>
             {
-                var st = await ScanDiscovery.DiscoverAsync(h.Address, h.Rtt, _sweepRtt, ceiling, c).ConfigureAwait(false);
+                var st = await ScanDiscovery.DiscoverAsync(h.Address, h.Rtt, _sweepRtt, ceiling, c, smallSweep).ConfigureAwait(false);
                 Interlocked.Add(ref _sent, ScanDiscovery.ProbesPerHost);
                 if (!st.Up && c.IsCancellationRequested) return;   // an aborted check isn't evidence of anything
                 if (st.Up) MarkUp(h, st.Reason, st.LatencyMs);

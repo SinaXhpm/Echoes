@@ -16,16 +16,25 @@ namespace Echoes.Views;
 public partial class SshView : UserControl
 {
     private SshViewModel? _vm;
+    private bool _termFollow = true;
 
     public SshView()
     {
         InitializeComponent();
 
-        // The terminal follows its output.
+        // The terminal follows its output while the user is at the bottom: scrolled up to read or select earlier output
+        // (tail -f, top), it stays there instead of being pulled down every second. Back at the end, it follows again.
         TerminalOutputBlock.PropertyChanged += (_, e) =>
         {
-            if (e.Property == SelectableTextBlock.TextProperty)
+            if (e.Property != SelectableTextBlock.TextProperty) return;
+            if (string.IsNullOrEmpty(TerminalOutputBlock.Text)) _termFollow = true;   // cleared / a new session
+            if (_termFollow)
                 Dispatcher.UIThread.Post(() => TermScroll.Offset = new Vector(TermScroll.Offset.X, double.MaxValue), DispatcherPriority.Background);
+        };
+        TermScroll.ScrollChanged += (_, e) =>
+        {
+            if (Math.Abs(e.OffsetDelta.Y) > 0.01)
+                _termFollow = TermScroll.Offset.Y >= TermScroll.Extent.Height - TermScroll.Viewport.Height - 24;
         };
 
         // A sub-tab's content is in the visual tree only while it is shown: the Files listing loads on first view, and the

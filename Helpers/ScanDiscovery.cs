@@ -23,9 +23,14 @@ public static class ScanDiscovery
     /// <summary>Probes one host check sends (an ICMP echo + the TCP ports).</summary>
     public static int ProbesPerHost => Ports.Length + 1;
 
-    // Sweep timeout = clamp(SRTT + 4·RTTVAR, 150 ms, ceiling) once this many replies are in.
+    // Sweep timeout = clamp(SRTT + 4·RTTVAR, floor, ceiling) once this many replies are in.
     private const int WarmSamples = 5;
     private const double FloorMs = 150;
+    // On a home or office LAN most hosts answer in 1-5 ms, so the estimate sank to the floor, while phones and IoT devices
+    // in Wi-Fi power save answer 100-400 ms late: they were reported down. A LAN sweep of up to a few thousand hosts keeps
+    // a floor they fit under; a bigger one keeps the short floor (a private /16 would take minutes longer).
+    private const double LanFloorMs = 600;
+    public const int LanFloorMaxHosts = 4096;
 
     /// <summary><paramref name="LocalError"/>: nothing proved the host up AND a probe could not be sent (out of
     /// sockets / ephemeral ports) — the host is undetermined, never "down".</summary>
@@ -35,9 +40,12 @@ public static class ScanDiscovery
     /// <param name="sweepRtt">One estimator for the whole sweep; once warm it replaces the fixed per-probe timeout
     /// (a /16 at 1.5 s per dead host took ~16 min).</param>
     /// <param name="timeoutMs">The ceiling — the user's timeout.</param>
-    public static async Task<HostState> DiscoverAsync(IPAddress addr, HostRtt hostRtt, HostRtt sweepRtt, int timeoutMs, CancellationToken ct)
+    /// <param name="smallSweep">At most <see cref="LanFloorMaxHosts"/> targets: a host on the local network then gets the
+    /// longer floor (power-save devices).</param>
+    public static async Task<HostState> DiscoverAsync(IPAddress addr, HostRtt hostRtt, HostRtt sweepRtt, int timeoutMs, CancellationToken ct,
+                                                      bool smallSweep = false)
     {
-        int timeout = sweepRtt.AdaptiveTimeout(timeoutMs, WarmSamples, FloorMs);
+        int timeout = sweepRtt.AdaptiveTimeout(timeoutMs, WarmSamples, smallSweep && IsLocalNetwork(addr) ? LanFloorMs : FloorMs);
 
         // A private linked source so the first positive can cancel the probes still running.
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -148,6 +156,16 @@ public static class ScanDiscovery
         a.TryWriteBytes(x, out int lx);
         b.TryWriteBytes(y, out int ly);
         return x[..lx].SequenceEqual(y[..ly]);
+    }
+
+    // A LAN address: 10/8, 172.16/12, 192.168/16, link-local 169.254/16; IPv6 unique local fc00::/7 and link-local fe80::/10.
+    private static bool IsLocalNetwork(IPAddress a)
+    {
+        if (a.IsIPv4MappedToIPv6) a = a.MapToIPv4();
+        var b = a.GetAddressBytes();
+        if (a.AddressFamily == AddressFamily.InterNetwork)
+            return b[0] == 10 || (b[0] == 172 && (b[1] & 0xF0) == 16) || (b[0] == 192 && b[1] == 168) || (b[0] == 169 && b[1] == 254);
+        return b.Length == 16 && ((b[0] & 0xFE) == 0xFC || (b[0] == 0xFE && (b[1] & 0xC0) == 0x80));
     }
 }
 

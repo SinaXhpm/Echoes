@@ -1405,7 +1405,10 @@
                         </Button>
                     </Grid>
                     <Border Grid.Row="1" Classes="card output" ClipToBounds="True">
-                        <TextBox Classes="out" Text="{Binding SnippetCode}" IsReadOnly="True" AcceptsReturn="True"/>
+                        <!-- capped for display like the other output boxes (a multi-MB body is in every language's snippet);
+                             Copy takes the full SnippetCode -->
+                        <TextBox Classes="out" Text="{Binding SnippetCode, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}"
+                                 IsReadOnly="True" AcceptsReturn="True"/>
                     </Border>
                 </Grid>
             </TabItem>
