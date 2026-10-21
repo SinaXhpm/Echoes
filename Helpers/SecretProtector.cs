@@ -139,7 +139,11 @@ public static class SecretProtector
                             // Kept for the whole run in a pinned buffer (no stale copies after a GC compaction); the
                             // GC-movable array File.ReadAllBytes returned is zeroed. Not wiped at exit: it's on disk
                             // anyway, and a late background save must never seal a value with a zeroed key.
-                            if (read.Length == KeyLength) return SecureMemory.Copy(read);
+                            if (read.Length == KeyLength)
+                            {
+                                KeepOutOfBackups(path);   // also a key made by a build that didn't do this yet
+                                return SecureMemory.Copy(read);
+                            }
                         }
                         finally { SecureMemory.Zero(read); }
                         // It is only ever created atomically, so a wrong size is outside damage, not a torn write: set it
@@ -150,6 +154,7 @@ public static class SecretProtector
                     RandomNumberGenerator.Fill(fresh);
                     try { AppStorage.CreateNewFileAtomic(path, fresh); }   // IOException if another process created it first
                     catch { SecureMemory.Zero(fresh); throw; }
+                    KeepOutOfBackups(path);
                     return fresh;
                 }
                 catch (Exception e) when (attempt < 5 && e is IOException or UnauthorizedAccessException)
@@ -166,6 +171,14 @@ public static class SecretProtector
         {
             return null;
         }
+    }
+
+    // iOS: the key must not go into a backup next to the profile it opens (a restored phone asks for the secrets again,
+    // as Android does). Best effort: a failure only leaves it as it was.
+    private static void KeepOutOfBackups(string path)
+    {
+        try { AppStorage.ExcludeFromBackup?.Invoke(path); }
+        catch (Exception ex) { CrashLog.Write("SecretProtector.ExcludeFromBackup", ex); }
     }
 
     // The pre-"enc2" key, kept only to read "enc1:" values (and as the fallback when there's no key file). Byte-for-byte

@@ -25,6 +25,11 @@ public static class BackgroundGuard
 {
     private static IBackgroundGuard? _impl;
     private static int _count;
+    private static string _reason = string.Empty;
+    // The platform refused the start: Android 12+ won't start a foreground service once the app is in the background (the
+    // user tapped Start and switched away while a scan was still resolving names, or a web server made its certificate).
+    // The job then showed "running" while Android froze the process; Reacquire makes the start once the app is back.
+    private static bool _failed;
     private static readonly object _lock = new();
 
     /// <summary>Called once at startup by a platform head that supports background execution.</summary>
@@ -37,8 +42,33 @@ public static class BackgroundGuard
             _count++;
             if (_count == 1)
             {
-                try { _impl?.Acquire(reason); } catch { }
+                _reason = reason;
+                StartLocked();
             }
+        }
+    }
+
+    /// <summary>The app is in the foreground again (Android: MainActivity.OnStart): a start the OS refused while it was in
+    /// the background is made now, where it is allowed.</summary>
+    public static void Reacquire()
+    {
+        lock (_lock)
+        {
+            if (_count > 0 && _failed) StartLocked();
+        }
+    }
+
+    private static void StartLocked()
+    {
+        try
+        {
+            _impl?.Acquire(_reason);
+            _failed = false;
+        }
+        catch (Exception ex)
+        {
+            _failed = true;
+            CrashLog.Write("BackgroundGuard.Acquire", ex);
         }
     }
 
@@ -50,7 +80,9 @@ public static class BackgroundGuard
             _count--;
             if (_count == 0)
             {
-                try { _impl?.Release(); } catch { }
+                _failed = false;
+                try { _impl?.Release(); }
+                catch (Exception ex) { CrashLog.Write("BackgroundGuard.Release", ex); }
             }
         }
     }

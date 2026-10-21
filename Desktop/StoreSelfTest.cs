@@ -137,10 +137,31 @@ internal static class StoreSelfTest
         try
         {
             var r = IcmpPinger.SendAsync(IPAddress.Loopback, 3000, CancellationToken.None).GetAwaiter().GetResult();
-            if (r.Success) Ok("ping 127.0.0.1", $"{r.Method}, {r.RoundtripMs} ms");
+            if (r.Success) Ok("ping 127.0.0.1", $"{r.Method}, {r.RoundtripMs} ms, TTL {r.Ttl}");
             else Note("ping 127.0.0.1", $"no reply ({r.Error})");
         }
         catch (Exception ex) { Note("ping 127.0.0.1", ex.GetType().Name + ": " + ex.Message); }
+
+        // macOS hands every ICMP reply to every ICMP socket: a probe to an address nothing answers (TEST-NET-1), sent
+        // together with one to loopback, must not end on loopback's reply (the replies are matched by identifier and
+        // sequence). Sent through the ICMP datagram socket, not /sbin/ping: Method must say Icmp.
+        Check("ICMP replies matched to their probe", () =>
+        {
+            var silent = IcmpPinger.SendAsync(IPAddress.Parse("192.0.2.1"), 1500, CancellationToken.None, 0, PingMethod.Icmp);
+            var loop = IcmpPinger.SendAsync(IPAddress.Loopback, 1500, CancellationToken.None, 0, PingMethod.Icmp);
+            var s = silent.GetAwaiter().GetResult();
+            var l = loop.GetAwaiter().GetResult();
+            if (s.Success) throw new InvalidOperationException("192.0.2.1 'answered': another probe's reply was taken");
+            if (!l.Success) throw new InvalidOperationException("loopback didn't answer: " + l.Error);
+            return $"192.0.2.1 silent ({s.Error}), loopback {l.RoundtripMs} ms, TTL {l.Ttl}";
+        });
+        try
+        {
+            var r = IcmpPinger.SendAsync(IPAddress.Parse("1.1.1.1"), 4000, CancellationToken.None).GetAwaiter().GetResult();
+            if (r.Success) Ok("ping 1.1.1.1", $"{r.Method}, {r.RoundtripMs} ms, TTL {r.Ttl}");
+            else Note("ping 1.1.1.1", $"no reply ({r.Method}): {r.Error}");
+        }
+        catch (Exception ex) { Note("ping 1.1.1.1", ex.GetType().Name + ": " + ex.Message); }
 
         // system tools the app starts (the cURL engine, sounds)
         Check("child process: /usr/bin/curl", () =>

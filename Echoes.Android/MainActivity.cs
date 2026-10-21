@@ -33,8 +33,20 @@ public class MainActivity : AvaloniaMainActivity
             // keeping the process), and must not keep a dead one alive or recolour its window.
             _themeChanged = (_, _) => PostSystemBars();
             app.ActualThemeVariantChanged += _themeChanged;
+            // Now, before the first frame (MainApplication has loaded the profile and set the theme): styles.xml only
+            // knows the dark theme, and with the light one saved every cold start showed dark bars that then flipped. The
+            // post below stays the final word after Avalonia's own theme handling.
+            ApplySystemBars();
             PostSystemBars();
         }
+    }
+
+    // Back in the foreground: a keep-alive service that Android refused to start while Echoes was in the background (a job
+    // started just before switching away) is started now.
+    protected override void OnStart()
+    {
+        base.OnStart();
+        Echoes.Helpers.BackgroundGuard.Reacquire();
     }
 
     private EventHandler? _themeChanged;

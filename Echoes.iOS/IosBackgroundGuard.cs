@@ -15,19 +15,41 @@ namespace Echoes.iOS;
 internal sealed class IosBackgroundGuard : IBackgroundGuard
 {
     private nint _task = UIApplication.BackgroundTaskInvalid;   // main thread only
+    private bool _held;                                          // main thread only
+    private NSObject? _toBackground, _toForeground;
 
     public void Acquire(string reason) => OnMain(() =>
     {
+        _held = true;
         UIApplication.SharedApplication.IdleTimerDisabled = true;
-        if (_task != UIApplication.BackgroundTaskInvalid) return;
-        _task = UIApplication.SharedApplication.BeginBackgroundTask("Echoes", () => OnMain(EndTask));   // the system's time is up
+        Observe();
+        if (UIApplication.SharedApplication.ApplicationState == UIApplicationState.Background) BeginTask();
     });
 
     public void Release() => OnMain(() =>
     {
+        _held = false;
         UIApplication.SharedApplication.IdleTimerDisabled = false;
         EndTask();
     });
+
+    // The extra time lasts one trip to the background (about 30 s), so a task is begun each time Echoes leaves the screen
+    // while a job runs and ended when it comes back. One begun only with the first job ran out on the first trip, and every
+    // later one got no time at all: the app was suspended at once and its connections dropped.
+    private void Observe()
+    {
+        if (_toBackground is not null) return;
+        _toBackground = UIApplication.Notifications.ObserveDidEnterBackground((_, _) => { if (_held) BeginTask(); });
+        _toForeground = UIApplication.Notifications.ObserveWillEnterForeground((_, _) => EndTask());
+    }
+
+    private void BeginTask()
+    {
+        if (_task != UIApplication.BackgroundTaskInvalid) return;
+        // The expiration handler runs on the main thread, and UIKit requires the task to be ended before it returns (a
+        // posted end could run after the suspension, and iOS kills an app that leaves a task open).
+        _task = UIApplication.SharedApplication.BeginBackgroundTask("Echoes", EndTask);
+    }
 
     private void EndTask()
     {

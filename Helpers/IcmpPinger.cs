@@ -28,12 +28,13 @@ public enum IcmpApplied { None = 0, Size = 1, Ttl = 2, DontFragment = 4 }
 /// <summary>
 /// Cross-platform ICMP echo ("ping") that works without root.
 ///
-/// On Windows/macOS it uses the managed <see cref="Ping"/> class (reliable, no
-/// privileges needed). On Linux/Android it opens an unprivileged ICMP *datagram*
+/// On Windows it uses the managed <see cref="Ping"/> class (reliable, no
+/// privileges needed). Everywhere else it opens an unprivileged ICMP *datagram*
 /// socket (SOCK_DGRAM, IPPROTO_ICMP / IPPROTO_ICMPV6) and builds the echo packet by hand — Android
 /// keeps net.ipv4.ping_group_range open for all apps, so this works in the sandbox
-/// with only the INTERNET permission, and on desktop Linux it avoids needing sudo
-/// wherever ping_group_range allows the caller's gid.
+/// with only the INTERNET permission, on desktop Linux it avoids needing sudo
+/// wherever ping_group_range allows the caller's gid, and macOS / iOS allow it to any app (their
+/// sockets see every ICMP message, so the replies are matched to the probe by identifier and sequence).
 ///
 /// Where no form of ICMP is allowed (ping sockets off, no raw-socket rights, no usable ping utility: containers,
 /// locked-down or sandboxed systems), <see cref="PingMethod.Udp"/> needs no permission anywhere: a datagram to a port
@@ -181,8 +182,11 @@ public static class IcmpPinger
 
     private static async Task<PingResult> SendIcmpAsync(IPAddress addr, int timeoutMs, IcmpProbeOptions o, bool custom, CancellationToken token)
     {
-        // Windows/macOS: managed Ping is privilege-free and gives us the reply TTL.
-        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+        // Windows: managed Ping is privilege-free (IcmpSendEcho) and gives us the reply TTL. macOS goes the datagram way
+        // below, like iOS and Linux: there managed Ping runs /sbin/ping, a process per probe (an MTR started ~20 a second, a
+        // sweep hundreds), and the Mac App Store sandbox would have to allow the child process. Managed Ping stays the
+        // fallback where the socket is refused.
+        if (OperatingSystem.IsWindows())
             return await SendManagedAsync(addr, timeoutMs, o, custom, token);
 
         if (addr.AddressFamily != AddressFamily.InterNetwork)
@@ -344,7 +348,11 @@ public static class IcmpPinger
             }
 
             var ep = new IPEndPoint(addr, 0);
-            ushort id = (ushort)(Environment.ProcessId & 0xFFFF); // kernel overrides this for datagram sockets
+            // Linux / Android: the kernel replaces the identifier with the socket's own and delivers only that socket's
+            // replies. iOS / macOS send it as it is and deliver every ICMP message to every ICMP socket: the replies are
+            // matched here (identifier, sequence, source).
+            bool matchIds = !OperatingSystem.IsLinux() && !OperatingSystem.IsAndroid();
+            ushort id = (ushort)(Environment.ProcessId & 0xFFFF);
             ushort seq = (ushort)(Interlocked.Increment(ref _seq) & 0xFFFF);
             byte[] payload = custom ? Payload(o.PayloadSize) : DefaultPayload;
             // Echo request: ICMP type 8, ICMPv6 type 128 (whose checksum covers a pseudo-header: the kernel fills it in).
@@ -387,17 +395,34 @@ public static class IcmpPinger
                         q.Type == 11 ? "TTL expired" : q.Type == 3 ? "Destination unreachable" : ex.Message);
                 }
                 long elapsed = sw.ElapsedMilliseconds;
-                if (r.ReceivedBytes < 1) continue;
+                int len = r.ReceivedBytes;
+                if (len < 1) continue;
 
-                // Linux / Android: the payload starts at the ICMP header. iOS (and macOS' own datagram sockets) hand an IPv4 ping
-                // socket the whole packet, IP header first: skip it, or every reply reads as type 0x45 and the probe times out.
+                // Linux / Android: the payload starts at the ICMP header. iOS and macOS hand an IPv4 ping socket the whole
+                // packet, IP header first: skip it, or every reply reads as type 0x45 and the probe times out.
                 int at = 0;
-                if (!v6 && (buffer[0] >> 4) == 4 && r.ReceivedBytes > (buffer[0] & 0xF) * 4) at = (buffer[0] & 0xF) * 4;
+                if (!v6 && (buffer[0] >> 4) == 4 && len > (buffer[0] & 0xF) * 4) at = (buffer[0] & 0xF) * 4;
                 byte type = buffer[at];
                 var from = (r.RemoteEndPoint as IPEndPoint)?.Address ?? addr;
 
-                if (type == (v6 ? 129 : 0)) return Result(true, elapsed, from, null);   // echo reply
-                if (!v6 && type == 11) return Result(false, elapsed, from, "TTL expired"); // time exceeded
+                if (type == (v6 ? 129 : 0))   // echo reply
+                {
+                    // iOS / macOS: the socket gets EVERY echo reply that reaches this device, not only its own probe's
+                    // (Linux and Android match replies to the socket by identifier). Taking the first one ended a probe on
+                    // another probe's reply: a powered-off host read as up while a monitored neighbour answered, MTR cut
+                    // the path at a silent hop. Darwin keeps the identifier as sent: identifier, sequence and source.
+                    if (matchIds && !(QuotesProbe(buffer, at + 4, len, id, seq) && SameAddress(from, addr))) continue;
+                    return Result(true, elapsed, from, null, ttl: at > 0 ? buffer[8] : -1);   // Darwin: the TTL is in the IPv4 header
+                }
+                // An ICMP error quotes the start of the probe it is about: the probe's IP header (IPv6: 40 bytes), then its
+                // echo header with the identifier and sequence. On iOS / macOS it arrives as an ordinary datagram, and
+                // other probes' errors too.
+                int inner = at + 8 + (v6 ? 40 : len > at + 8 ? (buffer[at + 8] & 0xF) * 4 : 0);
+                if (matchIds && !QuotesProbe(buffer, inner + 4, len, id, seq)) continue;
+                if (v6 ? type == 3 : type == 11) return Result(false, elapsed, from, "TTL expired");   // time exceeded
+                if (v6 ? type == 2 : type == 3 && len > at + 1 && buffer[at + 1] == 4)                 // packet too big / fragmentation needed
+                    return Result(false, elapsed, from, PacketTooBig, v6 ? ReadMtu(buffer, at + 4, len, 4) : ReadMtu(buffer, at + 6, len, 2));
+                if (v6 ? type == 1 : type == 3) return Result(false, elapsed, from, "Destination unreachable");
                 // anything else: ignore and keep waiting until the deadline fires the token
             }
         }
@@ -419,8 +444,23 @@ public static class IcmpPinger
             sock?.Dispose();
         }
 
-        PingResult Result(bool ok, long ms, IPAddress? from, string? error, int mtu = 0)
-            => new(ok, ms, from, -1, error, false, PingMethod.Icmp, applied, mtu, note);
+        PingResult Result(bool ok, long ms, IPAddress? from, string? error, int mtu = 0, int ttl = -1)
+            => new(ok, ms, from, ttl, error, false, PingMethod.Icmp, applied, mtu, note);
+    }
+
+    // True when the 4 bytes at off are this probe's identifier and sequence (big-endian, as BuildEchoRequest writes them).
+    private static bool QuotesProbe(byte[] b, int off, int length, ushort id, ushort seq)
+        => off >= 0 && off + 4 <= length
+           && b[off] == (byte)(id >> 8) && b[off + 1] == (byte)id
+           && b[off + 2] == (byte)(seq >> 8) && b[off + 3] == (byte)seq;
+
+    // The MTU an ICMP "fragmentation needed" (16 bits at off) or ICMPv6 "packet too big" (32 bits) reports; 0 if cut off.
+    private static int ReadMtu(byte[] b, int off, int length, int size)
+    {
+        if (off < 0 || off + size > length) return 0;
+        long v = 0;
+        for (int i = 0; i < size; i++) v = (v << 8) | b[off + i];
+        return v is > 0 and <= int.MaxValue ? (int)v : 0;
     }
 
     // ---------- UDP datagram probe: no permission needed on any OS ----------

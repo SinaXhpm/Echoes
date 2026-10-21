@@ -100,6 +100,19 @@ internal static class SelfTest
             return $"{r.RoundtripMs} ms";
         });
 
+        // Darwin hands every ICMP reply to every ICMP socket: a probe to an address nothing answers (TEST-NET-1), sent
+        // together with one to loopback, must not end on loopback's reply. It did before the replies were matched by
+        // identifier and sequence: a powered-off host read as up while another one answered.
+        await Check("icmp replies matched to their probe", async ct =>
+        {
+            var silent = IcmpPinger.SendAsync(IPAddress.Parse("192.0.2.1"), 1500, ct, 0, PingMethod.Icmp);
+            var loop = IcmpPinger.SendAsync(IPAddress.Loopback, 1500, ct, 0, PingMethod.Icmp);
+            var (s, l) = (await silent.ConfigureAwait(false), await loop.ConfigureAwait(false));
+            if (s.Success) throw new InvalidOperationException("192.0.2.1 'answered': another probe's reply was taken");
+            if (!l.Success) throw new InvalidOperationException("loopback didn't answer: " + l.Error);
+            return $"192.0.2.1 silent ({s.Error}), loopback {l.RoundtripMs} ms, TTL {l.Ttl}";
+        });
+
         // The runner's network may drop ICMP, so a failed echo is reported, not counted: the point is which method works here.
         await Check("icmp ping 1.1.1.1 (info)", async ct =>
         {

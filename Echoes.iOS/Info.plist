@@ -27,8 +27,12 @@
 	<array>
 		<string>arm64</string>
 	</array>
+	<!-- the launch screen in the app's dark background (Bg.App) instead of a white flash before the first frame -->
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UISupportedInterfaceOrientations</key>
@@ -59,5 +63,12 @@
 	     (scanner, ping sweep, LAN file sharing). Without this key iOS blocks local-network access silently. -->
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Echoes reaches devices on your local network when you scan, ping or share files with them.</string>
+	<!-- cURL's WEB tab shows the page the user fetched in a web view: App Transport Security would block its http://
+	     images and styles. Web content only: the app's own requests use SocketsHttpHandler, which ATS doesn't cover. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

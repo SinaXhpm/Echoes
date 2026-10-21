@@ -170,6 +170,11 @@ public static class AppStorage
         return o;
     }
 
+    /// <summary>Set by the iOS head: keeps a file out of the device's backups (iCloud, Finder). Used for the key that opens
+    /// the sealed secrets: an unencrypted computer backup held it next to the profile it opens. Android keeps all app
+    /// data out of backups already; elsewhere nothing to do.</summary>
+    public static Action<string>? ExcludeFromBackup { get; set; }
+
     /// <summary>Owner-only (0600) for a file copied / moved into the data dir (both keep the source's mode).
     /// No-op on Windows and Android; never throws.</summary>
     public static void MakePrivate(string path)
