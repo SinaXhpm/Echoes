@@ -23,10 +23,17 @@ public static class SharePage
 
     static SharePage()
     {
-        ScriptHash = Hash(Js);
-        StyleHash = Hash(Css);
-        Bytes = Encoding.UTF8.GetBytes(Head + "<style>" + Css + "</style></head>" + Body + "<script>" + Js + "</script></body></html>");
+        // A browser turns every CR LF / lone CR in the page into LF before it hashes an inline block, so the hashes must be
+        // over LF-only text, and the page sent the same way. The raw strings below hold CR LF when the source file was
+        // checked out with Windows line endings (git core.autocrlf): unnormalized, a build made on Windows sent hashes no
+        // browser matched, and the page came up with no style and no script.
+        string css = Lf(Css), js = Lf(Js);
+        ScriptHash = Hash(js);
+        StyleHash = Hash(css);
+        Bytes = Encoding.UTF8.GetBytes(Lf(Head) + "<style>" + css + "</style></head>" + Lf(Body) + "<script>" + js + "</script></body></html>");
     }
+
+    private static string Lf(string s) => s.Replace("\r\n", "\n").Replace('\r', '\n');
 
     private static string Hash(string s) => "'sha256-" + Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(s))) + "'";
 
