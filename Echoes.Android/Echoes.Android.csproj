@@ -54,6 +54,8 @@
 
     <AvaloniaResource Include="..\Assets\**" Link="Assets\%(RecursiveDir)%(Filename)%(Extension)" />
     <AvaloniaResource Remove="..\Assets\echoes.ico" />
+    <!-- the multi-size icon of the Windows tray and window (Desktop/TrayService.cs): not used here -->
+    <AvaloniaResource Remove="..\Assets\echoes-windows.ico" />
     <!-- Same as the desktop head: build-time / unused assets are not embedded (~7 MB off the APK). -->
     <AvaloniaResource Remove="..\Assets\logo.png;..\Assets\logo.icns;..\Assets\echoes.mp4;..\Assets\avalonia-logo.ico" />
   </ItemGroup>

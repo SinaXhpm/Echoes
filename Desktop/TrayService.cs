@@ -43,6 +43,12 @@ internal sealed class TrayService
     private void Start(bool startHidden)
     {
         _closeToTray = ProfileService.Instance.GetBool(CloseToTrayKey, true);
+        // the title bar, Alt+Tab and the taskbar button get the same sharp frames as the tray (see AppIcon)
+        if (OperatingSystem.IsWindows())
+        {
+            try { _window.Icon = AppIcon(); }
+            catch (Exception ex) { CrashLog.Write("Window.Icon", ex); }   // the PNG from MainWindow.axaml stays
+        }
         try
         {
             _icon = CreateIcon();
@@ -122,17 +128,25 @@ internal sealed class TrayService
         menu.Add(new NativeMenuItemSeparator());
         menu.Add(quit);
 
-        WindowIcon image;
-        using (var png = AssetLoader.Open(new Uri("avares://Echoes/Assets/logo-256.png")))
-            image = new WindowIcon(png);   // decoded right away; the stream isn't kept
-
-        var icon = new TrayIcon { Icon = image, ToolTipText = "Echoes", Menu = menu };
+        var icon = new TrayIcon { Icon = AppIcon(), ToolTipText = "Echoes", Menu = menu };
         // Windows: left click (right click opens the menu); Linux: the host's "activate". macOS shows the menu instead.
         icon.Clicked += (_, _) => Post(_window.BringToFront);
 
         // Avalonia 12 creates the platform icon only once it is in the application's TrayIcon.Icons.
         TrayIcon.SetIcons(Application.Current!, new TrayIcons { icon });
         return icon;
+    }
+
+    // Windows wants the tray icon at 16 px times the taskbar's scale (16, 20, 24 … 48) and the window's at 16 / 24 / 32 times
+    // the window's. Given one picture (the 256 px PNG), Avalonia hands Windows that picture whole and Windows shrinks it
+    // without smoothing: the spiral's fine lines came out as grain. From a multi-size .ico Avalonia takes the frame of the
+    // exact size instead; Assets/echoes-windows.ico has one for every scale up to 300 %, each the average of the full-size
+    // logo's pixels. macOS and Linux scale the PNG smoothly themselves.
+    private static WindowIcon AppIcon()
+    {
+        string asset = OperatingSystem.IsWindows() ? "avares://Echoes/Assets/echoes-windows.ico" : "avares://Echoes/Assets/logo-256.png";
+        using var stream = AssetLoader.Open(new Uri(asset));
+        return new WindowIcon(stream);   // read right away; the stream isn't kept
     }
 
     // Tray events can arrive on a platform thread (Linux: D-Bus) or in the middle of the Windows tray menu's own click
