@@ -9,7 +9,7 @@ to paste into App Store Connect is in [app-store-listing.md](app-store-listing.m
 | Piece | State |
 | :--- | :--- |
 | macOS `.dmg` on GitHub, signed with Developer ID, notarized and stapled | **Shipped** since v0.4.3 (Intel and Apple Silicon): Gatekeeper accepts both as "Notarized Developer ID", and both were opened on a real Mac. Without the secrets below the build is signed ad hoc, as before. |
-| macOS `.pkg` for the Mac App Store | Not built. Needs the App Sandbox, which cuts features; see "Mac App Store". |
+| macOS `.pkg` for the Mac App Store | **Built and uploaded** (1.0.0, build 2, universal) by `macos-appstore.yml`: sandboxed, tested under the sandbox in CI, validated by Apple; see "Mac App Store". |
 | iOS / iPadOS app | **On TestFlight** (`Echoes.iOS/`, built and started on iPhone and iPad simulators by `.github/workflows/ios.yml`, signed builds by `ios-testflight.yml`). Not tried on a real iPhone yet; see "iOS: what works and what is left". |
 | App Store build mode | `AppInfo.IsStoreBuild` (true on iOS, or on the desktop head with `-p:StoreBuild=true`): no update check, no Releases link. The About box has a Privacy policy link in every build. |
 | Privacy policy, store text | Done. |
@@ -118,21 +118,43 @@ If notarization is rejected, the job log has the reasons. The usual ones: a bina
 When the first notarized release is verified, update the README's "First launch" note for macOS (it still says the app is
 not notarized) and drop the `xattr` advice.
 
-## Mac App Store (not built)
+## Mac App Store
 
-The Developer ID `.dmg` above keeps every feature. The Mac App Store needs more, so decide before starting:
+The Developer ID `.dmg` above keeps every feature. The Mac App Store build is the same app compiled with
+`-p:StoreBuild=true` (the `STORE` constant) and run in the App Sandbox; `.github/workflows/macos-appstore.yml` builds it by
+hand (Actions > macOS App Store > Run workflow).
 
-- **App Sandbox is mandatory** (`com.apple.security.app-sandbox`) with the entitlements `network.client`, `network.server`
-  and `files.user-selected.read-write`, plus the profile's `application-identifier` and `team-identifier`.
-- What the sandbox changes for Echoes: "Open at sign-in" (a LaunchAgent in `~/Library/LaunchAgents`) is not allowed, so hide
-  it; the data folder moves into the app's container; folders chosen for received files and downloads must be kept as
-  security-scoped bookmarks or they are forgotten at restart; helper programs started by the app (the system curl engine,
-  anything run with `Process.Start`) must be tested; and `disable-library-validation` / `allow-jit` are not accepted.
-- Mac App Store apps may not update themselves or point to downloads elsewhere: publish with `-p:StoreBuild=true` (it
-  compiles with the `STORE` constant, and the About box then drops the update check and the Releases link).
-- Build a signed `.app` (Apple Distribution), wrap it with `productbuild --component Echoes.app /Applications --sign
-  "<Mac Installer Distribution identity>" Echoes.pkg`, and upload with Transporter or `xcrun altool --upload-package`.
+**What the store build changes** (`AppInfo.IsMacSandbox`):
 
+- **Entitlements** (`packaging/macos/Echoes.AppStore.entitlements`): the App Sandbox, `network.client`, `network.server`,
+  `files.user-selected.read-write`, `files.downloads.read-write`, and the profile's application and team identifiers (filled
+  in from the provisioning profile at build time).
+- **No "Open Echoes when I sign in"**: the sandbox doesn't allow a LaunchAgent, so `AutoStart` offers none and the Monitor
+  settings hide the switch. **No update check and no Releases link** (the store updates the app).
+- **Data** lives in the app's container (`~/Library/Containers/com.sinaxhpm.echoes/Data/Library/Application Support/Echoes`),
+  apart from a Developer ID copy's.
+- **Received files** go to `~/Downloads/Echoes` (the Downloads entitlement; the real home folder is read from the user
+  database, since `$HOME` is the container). A folder picked instead is kept as a security-scoped bookmark and reopened at
+  the next start; if it can't be, the Downloads folder is used.
+- **A saved SSH key path** can't be read in a later run without a new pick: the error says to pick the key again.
+
+**The workflow:**
+
+1. publishes arm64 and x64 and joins them into one universal app (`packaging/macos/package-appstore.sh`);
+2. signs a copy ad hoc with the store's entitlements and runs it with `ECHOES_STORE_SELFTEST=1` (`Desktop/StoreSelfTest.cs`):
+   the process must be sandboxed, its real home folder closed, and the data folder, the Downloads folder, DNS, TCP out and
+   in, UDP, ping, `/usr/bin/curl`, `/sbin/ping`, the single-instance socket and the window must all work. It fails on any
+   failed check;
+3. runs the same copy with `ECHOES_STORE_SHOTS=1` (`Desktop/StoreShots.cs`) for the store screenshots (2880 x 1800,
+   artifact `Echoes-mac-store-screenshots`);
+4. with the signing secrets, signs the app with Apple Distribution and the Mac App Store profile, wraps it with
+   `productbuild` signed with Mac Installer Distribution, has Apple validate it, and uploads it when "upload" is ticked
+   (artifact `Echoes-macOS-AppStore`).
+
+Secrets: `IOS_CERT_P12_BASE64` / `IOS_CERT_PASSWORD` (the Apple Distribution certificate, shared with iOS),
+`MACINSTALLER_CERT_P12_BASE64` / `MACINSTALLER_CERT_PASSWORD` (Mac Installer Distribution, made 2026-10-21, expires
+2027-10-21), `MAC_PROFILE_BASE64` (profile "Echoes Mac App Store", expires 2027-10-20), and the API key secrets. The files
+are in the git-ignored `.signing/`.
 ## iOS: what works and what is left
 
 `Echoes.iOS` holds the bundle metadata (`Info.plist`, an empty `Entitlements.plist`, a 1024 px opaque icon in
