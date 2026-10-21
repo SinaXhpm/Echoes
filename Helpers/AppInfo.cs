@@ -37,6 +37,17 @@ public static class AppInfo
         OperatingSystem.IsIOS();
 #endif
 
+    /// <summary>
+    /// True in the Mac App Store build, which the store runs in the App Sandbox: no login item of its own, a data folder
+    /// inside the app's container, and file access only where the entitlements or the user's own pick allow it.
+    /// </summary>
+    public static bool IsMacSandbox =>
+#if STORE
+        OperatingSystem.IsMacOS();
+#else
+        false;
+#endif
+
     private static string? _platform, _runtime, _ui;
 
     public static string Platform => _platform ??= $"{PlatformOverride ?? DescribeOs()} · {DescribeArch()}";

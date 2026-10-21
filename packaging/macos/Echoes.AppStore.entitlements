@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Entitlements of the Mac App Store build (packaging/macos/package-appstore.sh). The App Sandbox is mandatory there, and
+     what the sandbox doesn't list stays closed. The two identifiers at the end come from the provisioning profile: the script
+     fills them in (without them, for the ad-hoc copy that the workflow's sandbox test runs, the keys are removed). -->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- outgoing and incoming connections (ping, scans, the web server, the proxy, the socket tool) -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<!-- files and folders the user picks in an open / save panel (a folder is kept across runs as a security-scoped bookmark) -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<!-- the default folder of received files: Downloads/Echoes -->
+	<key>com.apple.security.files.downloads.read-write</key>
+	<true/>
+	<key>com.apple.application-identifier</key>
+	<string>@APP_IDENTIFIER@</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>@TEAM_ID@</string>
+</dict>
+</plist>

@@ -59,6 +59,9 @@ public partial class WebServerView : UserControl
         // Android: reopen the folder picked last time (its permission was kept with the bookmark)
         if (_vm.NeedsAndroidFolder && _vm.AndroidFolderBookmark is { Length: > 0 } bookmark)
             _ = RestoreAndroidFolderAsync(bookmark);
+        // Mac App Store sandbox: the same for the folder picked in an earlier run
+        else if (_vm.MacFolderBookmark is { Length: > 0 } macBookmark)
+            _ = RestoreMacFolderAsync(macBookmark);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -214,9 +217,33 @@ public partial class WebServerView : UserControl
                 try { bookmark = await folder.SaveBookmarkAsync(); } catch { }
                 _vm.SetAndroidFolder(folder, bookmark);
             }
-            else if (folder.TryGetLocalPath() is { Length: > 0 } path) _vm.SetInboxFolder(path);
+            else if (folder.TryGetLocalPath() is { Length: > 0 } path)
+            {
+                if (AppInfo.IsMacSandbox)
+                {
+                    // the sandbox opens the folder for this run; its bookmark opens it again next time
+                    string? bookmark = null;
+                    try { bookmark = await folder.SaveBookmarkAsync(); } catch { }
+                    _vm.SetMacFolder(folder, path, bookmark);
+                }
+                else _vm.SetInboxFolder(path);
+            }
         }
         catch (Exception ex) { _vm.FilesError = "Picking the folder failed: " + ex.Message; }
+    }
+
+    // Mac App Store sandbox: reopens the folder picked in an earlier run. If the bookmark doesn't open it for writing, the
+    // default folder (Downloads/Echoes) stays.
+    private async Task RestoreMacFolderAsync(string bookmark)
+    {
+        if (_vm is null || TopLevel.GetTopLevel(this) is not { } top) return;
+        try
+        {
+            if (await top.StorageProvider.OpenFolderBookmarkAsync(bookmark) is { } folder
+                && folder.TryGetLocalPath() is { Length: > 0 } path && ShareInbox.IsWritableFolder(path))
+                _vm.SetMacFolder(folder, path, null);
+        }
+        catch { /* the permission is gone: received files keep going to the default folder */ }
     }
 
     private async Task RestoreAndroidFolderAsync(string bookmark)

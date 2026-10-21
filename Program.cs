@@ -14,6 +14,13 @@ class Program
     {
         RaiseFileDescriptorLimit();
 
+#if STORE
+        // The Mac App Store build under the App Sandbox: the checks of .github/workflows/macos-appstore.yml (see
+        // Desktop/StoreSelfTest.cs). Nothing happens unless ECHOES_STORE_SELFTEST=1.
+        bool storeSelfTest = Desktop.StoreSelfTest.Requested;
+        if (storeSelfTest) Desktop.StoreSelfTest.RunHeadless();
+#endif
+
         // Started by the "Open Echoes when I sign in" entry (Monitor settings, Helpers/AutoStart): hidden in the tray,
         // monitoring on.
         bool background = Helpers.AutoStart.IsBackgroundLaunch(args);
@@ -65,7 +72,13 @@ class Program
         // Tray icon, close-to-tray, bringing the window back: desktop-only code that App (shared with the Android head)
         // can't reference, so it reaches App through this hook and runs once the main window exists. A login launch
         // starts with the window hidden in the tray.
-        App.DesktopStarted = (desktop, window, _) => Desktop.TrayService.Attach(desktop, window, startHidden: background);
+        App.DesktopStarted = (desktop, window, _) =>
+        {
+            Desktop.TrayService.Attach(desktop, window, startHidden: background);
+#if STORE
+            if (storeSelfTest) Desktop.StoreSelfTest.Finish();
+#endif
+        };
 
         try
         {

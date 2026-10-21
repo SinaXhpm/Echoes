@@ -115,6 +115,9 @@ public static class AutoStart
     /// </summary>
     public static AutoStartTarget? ForThisProcess()
     {
+        // The Mac App Store's sandbox doesn't allow a LaunchAgent in ~/Library/LaunchAgents: no entry to make there (the
+        // Monitor settings then don't show "Open Echoes when I sign in").
+        if (AppInfo.IsMacSandbox) return null;
         string? exe = Environment.ProcessPath;
         // An AppImage runs from a fresh temporary mount each time; the file to start is the .AppImage itself.
         if (OperatingSystem.IsLinux()

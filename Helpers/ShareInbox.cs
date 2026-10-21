@@ -206,6 +206,20 @@ public static class ShareInbox
         catch { return null; }
     }
 
+    /// <summary>Whether a file can be created in <paramref name="path"/> (made if missing) right now. Never throws.</summary>
+    public static bool IsWritableFolder(string path)
+    {
+        try
+        {
+            Directory.CreateDirectory(path);
+            string probe = Path.Combine(path, ".echoes-" + Guid.NewGuid().ToString("N")[..8]);
+            using (File.Create(probe)) { }
+            File.Delete(probe);
+            return true;
+        }
+        catch { return false; }
+    }
+
     /// <summary>Where uploads are written while they arrive on Android (app storage).</summary>
     public static string AppInboxFolder() => Path.Combine(AppStorage.UserDir(), "Inbox");
 
@@ -231,6 +245,8 @@ public static class ShareInbox
             catch { /* fall through to the profile folder */ }
         }
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        // App Sandbox: $HOME is the container; the entitlement for Downloads is for the user's real folder
+        if (AppInfo.IsMacSandbox && MacSandbox.RealHome() is { } realHome) home = realHome;
         if (OperatingSystem.IsLinux() && XdgDownloads(home) is { } xdg) return xdg;
         return Path.Combine(string.IsNullOrEmpty(home) ? Path.GetTempPath() : home, "Downloads");
     }

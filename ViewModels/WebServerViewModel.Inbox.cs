@@ -55,7 +55,7 @@ public sealed partial class ReceivedFileRow : ObservableObject
 /// </summary>
 public partial class WebServerViewModel
 {
-    private const string KInbox = "webserver.inbox", KMaxUpload = "webserver.maxUploadMb";
+    private const string KInbox = "webserver.inbox", KInboxBookmark = "webserver.inboxBookmark", KMaxUpload = "webserver.maxUploadMb";
     public const int DefaultMaxUploadMb = 4096;
     private const int MaxReceivedRows = 200, MaxPendingRows = 100;
 
@@ -67,6 +67,8 @@ public partial class WebServerViewModel
     [ObservableProperty] private string? _filesError;
 
     private IStorageFolder? _androidFolder;
+    private IStorageFolder? _macFolder;   // Mac App Store sandbox: the picked folder, kept so its access stays open
+    private bool _macFolderPending;       // ... and a folder picked in an earlier run, to be reopened from its bookmark
     private bool _restoringInbox;
 
     // ---- what is stored, and Clean up. Desktop: a list of the files THIS app received (path, size, sender, time) is kept
@@ -119,6 +121,13 @@ public partial class WebServerViewModel
             if (!OperatingSystem.IsAndroid())
             {
                 string? saved = OperatingSystem.IsIOS() ? null : p.GetSetting(KInbox);
+                // Mac App Store sandbox: a folder picked in an earlier run is closed to the app now. Received files go to the
+                // default folder until the view reopens the picked one from its bookmark (the saved path stays as it is).
+                if (AppInfo.IsMacSandbox && saved is { Length: > 0 } && !ShareInbox.IsWritableFolder(saved))
+                {
+                    _macFolderPending = p.GetSetting(KInboxBookmark) is { Length: > 0 };
+                    saved = null;
+                }
                 InboxPath = saved is { Length: > 0 } && Path.IsPathFullyQualified(saved) ? saved : ShareInbox.DefaultFolder();
                 // iOS: the Files app lists the Echoes folder once it holds something
                 if (OperatingSystem.IsIOS()) { try { Directory.CreateDirectory(InboxPath); } catch { } }
@@ -150,6 +159,19 @@ public partial class WebServerViewModel
         ProfileService.Instance.SetSetting(KInbox, path);
         if (_hub is { } hub) hub.InboxFolder = path;
     }
+
+    /// <summary>Mac App Store sandbox: the picked folder with its security-scoped bookmark (null = reopened from one). The folder
+    /// object stays referenced: its access ends when it is released.</summary>
+    public void SetMacFolder(IStorageFolder folder, string path, string? bookmark)
+    {
+        _macFolder = folder;
+        _macFolderPending = false;
+        SetInboxFolder(path);
+        if (bookmark is { Length: > 0 }) ProfileService.Instance.SetSetting(KInboxBookmark, bookmark);
+    }
+
+    /// <summary>Mac App Store sandbox: the bookmark of the folder picked earlier, while that folder is still closed.</summary>
+    public string? MacFolderBookmark => AppInfo.IsMacSandbox && _macFolderPending ? ProfileService.Instance.GetSetting(KInboxBookmark) : null;
 
     /// <summary>Android: the picked folder (and its bookmark to reopen it next time; null = restored from one).</summary>
     public void SetAndroidFolder(IStorageFolder folder, string? bookmark)
