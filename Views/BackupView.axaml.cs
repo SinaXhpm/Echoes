@@ -119,7 +119,7 @@ public partial class BackupView : UserControl
             await using (var stream = await files[0].OpenReadAsync())
                 data = await BackupVault.ReadFileAsync(stream);   // magic checked first, size capped
             string note = await vm.ApplyImportAsync(data);   // throws on wrong password / bad file
-            vm.Status = "Imported ✓  Restart Echoes to load the restored data."
+            vm.Status = "Imported ✓  Restart Echoes now to load it: until then, changes aren't saved."
                         + (note.Length > 0 ? "\n" + note : string.Empty);
             vm.ClearPassword();
         }

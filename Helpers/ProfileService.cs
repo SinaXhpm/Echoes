@@ -430,6 +430,7 @@ public sealed class ProfileService
             foreach (var kv in hosts) _knownHosts[kv.Key] = kv.Value;
             ReplaceHistoryLocked(history);
             _savedVersion = ++_version;   // the file now matches memory
+            _restorePending = true;       // and stays as restored until the restart (see Save)
             return new ImportReport(disabled, kept);
         }
     }
@@ -527,9 +528,11 @@ public sealed class ProfileService
             Parse(ReadProfileText());
             return;
         }
-        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) { }   // first run
+        catch (FileNotFoundException) { }   // first run
         catch (Exception ex)
         {
+            // (A DirectoryNotFoundException lands here too: UserDir() has just made the folder, so a missing one means the
+            // data folder wasn't reachable, e.g. a network home not mounted yet at sign-in. Not a first run.)
             // Corrupt or unreadable: start fresh so the app still runs, but nothing is written over the file until it has
             // been kept as .corrupt.bak (SetAsideUnreadable, before the first write). The copy that used to be made right
             // here needed the very read access that had just failed, so a profile that was merely unreadable (locked by
@@ -554,16 +557,37 @@ public sealed class ProfileService
         }
     }
 
-    // The profile that failed to load is MOVED to .corrupt.bak, not copied: a rename needs no read access, so it also keeps a
-    // file that can't be read. False while even that fails (e.g. still locked): nothing may be written over it yet.
-    // Caller holds _writeGate.
+    // The profile that failed to load, before anything is written over it: looked at again first. Gone → nothing to keep;
+    // still unreadable → wait (false); it reads now → it was only locked or offline at startup, and this session started
+    // from defaults: it is left alone (_keepDiskProfile) and the next launch loads it; corrupt → MOVED aside under a name of
+    // its own (a rename needs no read access, and an earlier .corrupt.bak stays). Caller holds _writeGate.
     private bool SetAsideUnreadable()
     {
-        try { File.Move(_path, _path + ".corrupt.bak", overwrite: true); }
+        try
+        {
+            string text = File.ReadAllText(_path);
+            bool valid;
+            try { valid = JsonNode.Parse(text) is JsonObject; }
+            catch { valid = false; }
+            if (valid)
+            {
+                _keepDiskProfile = true;
+                CrashLog.Write("Profile.Load", new IOException("The profile couldn't be read at startup but can now: it is kept as it is, and this session's changes aren't saved."));
+                return false;
+            }
+        }
+        catch (FileNotFoundException) { return true; }   // nothing there (any more) to keep
+        catch (IOException) { return false; }             // still locked / unreachable (incl. a missing folder)
+        catch (UnauthorizedAccessException) { }           // can't be read, but maybe renamed: set it aside below
+        catch { return false; }
+        try { File.Move(_path, $"{_path}.corrupt-{DateTime.UtcNow:yyyyMMdd-HHmmss}.bak", overwrite: false); }
         catch (FileNotFoundException) { }   // nothing there (any more) to keep
         catch { return false; }
         return true;
     }
+
+    // Set when the profile that couldn't be read at startup reads fine later: nothing is written over it this session.
+    private volatile bool _keepDiskProfile;
 
     private void Parse(string text)
     {
@@ -581,9 +605,16 @@ public sealed class ProfileService
         if (changed) lock (_gate) Save();
     }
 
+    // Set by a backup import: the file on disk IS the restore from then on. Every live view-model (Monitor, cURL, Port
+    // Scanner, SSH, String Lab …) still holds its pre-import values and would write them back on its next change or at the
+    // exit flush, e.g. turning the backup's monitors back on at the next launch. Until the restart the import asks for,
+    // changes stay in memory only.
+    private volatile bool _restorePending;
+
     // Caller holds _gate: mark the profile dirty and schedule one coalesced background write.
     private void Save()
     {
+        if (_restorePending) return;
         _version++;
         if (_writeScheduled) return;
         _writeScheduled = true;
@@ -603,7 +634,7 @@ public sealed class ProfileService
             lock (_gate)
             {
                 _writeScheduled = false;
-                if (_savedVersion == _version) return true;
+                if (_savedVersion == _version || _restorePending || _keepDiskProfile) return true;
                 data = Serialize(_history.Select(kv => (kv.Key, (IEnumerable<string>)kv.Value)), _settings, _knownHosts);
                 version = _version;
             }
