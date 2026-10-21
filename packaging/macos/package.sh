@@ -138,7 +138,14 @@ fi
 if [ $notarize = 1 ]; then
   notarize_file "$dmg"
   staple "$dmg"
-  run xcrun stapler validate "$dmg"
+  # the check asks the same ticket server, which drops connections now and then (error 68): retried like stapling
+  validated=0
+  for n in 1 2 3 4 5 6; do
+    if run xcrun stapler validate "$dmg"; then validated=1; break; fi
+    echo "validating the ticket of $dmg failed (try $n of 6), waiting before the next one" >&2
+    sleep $((n * 20))
+  done
+  if [ $validated = 0 ]; then echo "::error::The stapled ticket of $dmg could not be validated." >&2; exit 1; fi
   # what Gatekeeper itself says about both; informational (a runner may have assessments switched off)
   run spctl --assess --type exec --verbose=2 "$app" || echo "spctl did not accept the app (see above)"
   run spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg" || echo "spctl did not accept the dmg (see above)"

@@ -72,11 +72,13 @@ class Program
         // Tray icon, close-to-tray, bringing the window back: desktop-only code that App (shared with the Android head)
         // can't reference, so it reaches App through this hook and runs once the main window exists. A login launch
         // starts with the window hidden in the tray.
-        App.DesktopStarted = (desktop, window, _) =>
+        App.DesktopStarted = (desktop, window, vm) =>
         {
             Desktop.TrayService.Attach(desktop, window, startHidden: background);
 #if STORE
             if (storeSelfTest) Desktop.StoreSelfTest.Finish();
+            // the Mac App Store screenshots of the same workflow (Desktop/StoreShots.cs), only with ECHOES_STORE_SHOTS=1
+            else if (Desktop.StoreShots.Requested) Desktop.StoreShots.Start(window, vm);
 #endif
         };
 

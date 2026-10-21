@@ -101,6 +101,38 @@ jobs:
         fi
         echo "The sandbox test passed."
 
+    # Mac App Store screenshots (2880 x 1800) from the same sandboxed copy: with ECHOES_STORE_SHOTS=1 the app puts seven tools on
+    # screen against the real network and renders its own window into the pictures (Desktop/StoreShots.cs).
+    - name: Store screenshots
+      run: |
+        app="dist-appstore/test/Echoes.app"
+        shots="$HOME/Library/Containers/com.sinaxhpm.echoes/Data/Library/Application Support/Echoes/store-shots"
+        rm -rf "$shots"
+        ECHOES_STORE_SHOTS=1 "$app/Contents/MacOS/Echoes" > "$RUNNER_TEMP/shots.log" 2>&1 &
+        pid=$!
+        for i in $(seq 1 300); do
+          if [ -f "$shots/done.txt" ]; then break; fi
+          if ! kill -0 "$pid" 2>/dev/null; then break; fi
+          sleep 2
+        done
+        kill "$pid" 2>/dev/null || true
+        mkdir -p store-shots
+        cp "$shots"/*.png store-shots/ 2>/dev/null || true
+        if [ -f "$shots/error.txt" ]; then echo "---- scenes that failed"; cat "$shots/error.txt"; cp "$shots/error.txt" store-shots/; fi
+        for p in store-shots/*.png; do [ -f "$p" ] && echo "$p $(sips -g pixelWidth "$p" | awk '/pixelWidth/ {print $2}')x$(sips -g pixelHeight "$p" | awk '/pixelHeight/ {print $2}')"; done
+        n="$(ls store-shots/*.png 2>/dev/null | wc -l | tr -d ' ')"
+        echo "$n screenshots"
+        if [ "$n" = "0" ]; then echo "::warning::no screenshots were made"; tail -30 "$RUNNER_TEMP/shots.log"; fi
+
+    - name: Keep the screenshots (7 days)
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: Echoes-mac-store-screenshots
+        path: store-shots/
+        retention-days: 7
+        if-no-files-found: ignore
+
     - name: Check the signed package
       if: ${{ env.APPSTORE_INSTALLER_IDENTITY != '' }}
       run: |
