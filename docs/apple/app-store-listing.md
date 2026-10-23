@@ -120,6 +120,22 @@ Every network action starts from the user's own button press, or from a setting 
 To try it quickly: open Ping and enter apple.com, open Doctor and enter apple.com, or open DNS and look up apple.com.
 ```
 
+Notes for the macOS version (the iOS ones speak of the lock screen and the Files app), paste as is:
+
+```
+Echoes is a network diagnostic and developer toolkit (ping, traceroute, DNS, port scanner, SSH client, speed test, HTTP client, file sharing). There is no account, login or in-app purchase, so no demo account is needed. It is open source (MIT): https://github.com/SinaXhpm/Echoes
+
+Every network action starts from the user's own click, or from a setting the user turned on (such as starting the monitor when the app opens), and targets a host the user entered. Nothing is sent to the developer: there is no analytics, advertising or tracking SDK, and the App Store build never checks for updates itself.
+
+- Sandbox: network client and server, the user's Downloads folder (files received through the Web Server go to Downloads/Echoes) and files or folders the user picks. Nothing else on the Mac is read.
+- Port scanner: a plain TCP connect scan of an address range the user enters, meant for their own network or servers they manage (like other network utilities on the App Store).
+- Web Server / Proxy / Request catcher / Socket servers: they start only when the user clicks Start and stop on Stop or when the app quits. They do not touch other apps' traffic, and Echoes does not use VPN or Network Extension APIs. The file-sharing page is served over HTTPS with a self-signed certificate that the app creates on the Mac (a browser shows a one-time warning, which is expected) and is protected by an 8-digit PIN shown in the app.
+- Telegram alerts and Cloudflare management are optional: they work only after the user pastes their own bot token or API token, which is stored encrypted on the Mac.
+- Encryption: HTTPS and TLS through the system, SSH through the standard SSH protocol, and AES-GCM for the user's own notes and secrets. All are standard algorithms.
+
+To try it quickly: open Ping and enter apple.com, open Doctor and enter apple.com, or open DNS and look up apple.com.
+```
+
 ## App Privacy ("nutrition label")
 
 Recommended answer: **Data Not Collected.** Echoes has no developer-side server, no account, no analytics and no
@@ -164,9 +180,29 @@ device frames. App Store Connect shows the exact current sizes next to the uploa
 
 **How they are made.** Run the workflow `.github/workflows/ios-screenshots.yml` by hand. It builds the app with
 `-p:StoreShots=true` (the scenes in `Echoes.iOS/StoreShots.cs`, compiled only in that build), starts it on an iPhone 17 Pro Max
-and an iPad Pro 13-inch simulator, and takes a native-size screenshot of seven scenes with the simulator's own status bar
-(9:41, full battery): Doctor on `example.com`, a TCP ping of `1.1.1.1`, the Web Server with a chat, a DNS lookup, the TLS
-Inspector, cURL, and the password generator with its "time to crack" card. Everything is real: the checks run against the real
-network, and the only addresses on screen are public ones (`example.com`, `1.1.1.1`) and the runner's own private one. The
-pictures are the artifact `Echoes-store-screenshots` (7 days); they go into App Store Connect through the API (a screenshot set
-per display type, one file per picture, in file-name order). A scene that fails is written to `errors.txt` and skipped.
+and an iPad Pro 13-inch simulator, and takes a native-size screenshot of ten scenes with the simulator's own status bar
+(9:41, full battery): Doctor on `example.com`, the tool menu, a TCP ping of `1.1.1.1`, the speed test (caught mid-download on
+Leaseweb Washington: Cloudflare refuses tests from CI's data-centre addresses), the monitor with five public targets, the Web
+Server with a chat, a DNS lookup, the TLS Inspector, cURL's timing and the password generator. The Mac pictures (nine, no menu:
+the sidebar shows the tools) come from `macos-appstore.yml` (artifact `Echoes-mac-store-screenshots`, the `window-*.png`
+renders). Everything is real: the checks run against the real network, and the only addresses on screen are public ones and
+the runner's own. A scene that fails is written to `errors.txt` and skipped.
+
+**Captions.** Each picture goes on the app's teal under a headline and a short line, in a simple device frame, at the exact
+store size (opaque PNG). App Store search reads these headlines, so they use the words people search for:
+
+| # | Scene | Headline | Line under it |
+| :--- | :--- | :--- | :--- |
+| 1 | Menu (iPhone, iPad) | 20 network tools in one free app | Ping, speed test, DNS, port scan, SSH and more |
+| 2 | Doctor | Website not opening? Find out why | One tap checks your connection, DNS and security (Mac: Plus 19 more network tools, all in one free app) |
+| 3 | Ping | Ping any website or server | Live delay, packet loss, traceroute and MTR |
+| 4 | Speed test | Test your internet speed | Download speed, ping and jitter in seconds |
+| 5 | Monitor | Know when a site goes down | Uptime alerts with sound or Telegram |
+| 6 | Web Server | Send files to any device | Share files and chat with any browser on your Wi-Fi |
+| 7 | DNS | Look up any domain | DNS records over normal DNS, HTTPS or TLS |
+| 8 | TLS | Check any website's certificate | See who issued it and when it expires |
+| 9 | cURL | Test websites and APIs | Send HTTP requests and see exactly where time goes |
+| 10 | Password | Make strong passwords | Plus hash, encode, JSON and JWT tools |
+
+They go into App Store Connect through the API: one screenshot set per display type (`APP_IPHONE_67`,
+`APP_IPAD_PRO_3GEN_129`, `APP_DESKTOP`), one file per picture, in file-name order.
