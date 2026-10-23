@@ -282,15 +282,26 @@ internal static class SelfTest
             int count = await Dispatcher.UIThread.InvokeAsync(() => nav.ItemCount);
             var opened = new List<string>();
             var problems = new List<string>();
+            long heapBefore = GC.GetTotalMemory(forceFullCollection: true);
             for (int i = 0; i < count; i++)
             {
                 int at = i;
+                // What opening a tool costs (info, compared run to run): the UI thread's time from the tap until the page
+                // has been laid out and drawn (a Background job runs after layout and render), the managed memory it kept,
+                // and how many visuals its page built.
+                long heap0 = GC.GetTotalMemory(forceFullCollection: true);
+                var sw = Stopwatch.StartNew();
                 string tag = await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     nav.SelectedIndex = at;
                     return (nav.SelectedItem as ListBoxItem)?.Tag as string ?? "?";
                 });
+                await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+                long openMs = sw.ElapsedMilliseconds;
                 await Task.Delay(1200, ct).ConfigureAwait(false);   // layout, and the refresh that runs once the page is drawn
+                long heap1 = GC.GetTotalMemory(forceFullCollection: true);
+                int visuals = await Dispatcher.UIThread.InvokeAsync(() => CountVisuals(pages, at));
+                Line($"SELFTEST info open {tag}: {openMs} ms, {(heap1 - heap0) / 1048576.0:+0.0;-0.0} MB managed, {visuals} visuals");
                 string? problem = await Dispatcher.UIThread.InvokeAsync(() => Inspect(shell, pages, at, tag));
                 string file = Path.Combine(shots, $"{at + 1:00}-{tag.ToLowerInvariant().Replace(' ', '-')}.png");
                 await Dispatcher.UIThread.InvokeAsync(() => Shot(shell, file));
@@ -306,6 +317,11 @@ internal static class SelfTest
                 if (!main.CanCopyLog) problems.Add("ABOUT: no Copy log button on a phone");
                 await Dispatcher.UIThread.InvokeAsync(() => main.CloseAboutCommand.Execute(null));
             }
+            long heapAfter = GC.GetTotalMemory(forceFullCollection: true);
+            long resident = 0;
+            try { resident = Environment.WorkingSet; } catch { }
+            Line($"SELFTEST info all tools open: {(heapAfter - heapBefore) / 1048576.0:0.0} MB managed added, {heapAfter / 1048576.0:0.0} MB managed in all"
+                 + (resident > 0 ? $", {resident / 1048576.0:0} MB resident" : ""));
             foreach (string entry in NewCrashEntries(crashLog, logged)) problems.Add("crash log: " + entry);
             if (problems.Count > 0) throw new InvalidOperationException(string.Join(" | ", problems));
             return $"{opened.Count} of {count} opened: {string.Join(", ", opened)}";
@@ -313,6 +329,22 @@ internal static class SelfTest
 
         Line($"SELFTEST DONE failures={failures}");
         return failures;
+    }
+
+    // UI thread: the visuals under one drawer entry's page.
+    private static int CountVisuals(Carousel pages, int index)
+    {
+        if (index >= pages.ItemCount || pages.Items[index] is not Visual host) return 0;
+        int n = 0;
+        var stack = new Stack<Visual>();
+        stack.Push(host);
+        while (stack.Count > 0)
+        {
+            var v = stack.Pop();
+            n++;
+            foreach (var child in Avalonia.VisualTree.VisualExtensions.GetVisualChildren(v)) stack.Push(child);
+        }
+        return n;
     }
 
     // UI thread: what the page of one drawer entry shows now, or what is wrong with it.

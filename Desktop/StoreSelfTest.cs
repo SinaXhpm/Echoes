@@ -227,6 +227,9 @@ internal static class StoreSelfTest
         {
             await Task.Delay(5000).ConfigureAwait(false);
             Console.WriteLine("STORETEST ok   the window opened (Avalonia and Skia run under the sandbox)");
+            // what Echoes holds once its window is up (info, compared run to run)
+            long managed = GC.GetTotalMemory(forceFullCollection: true);
+            Note("memory with the window open", $"{Environment.WorkingSet / 1048576.0:0} MB resident, {managed / 1048576.0:0.0} MB managed");
             Console.WriteLine($"STORETEST DONE failures={_failures}");
             Console.Out.Flush();
             Environment.Exit(_failures == 0 ? 0 : 1);
