@@ -432,7 +432,8 @@
 		<!-- ============================ WI-FI ============================ -->
 		<!-- Reads only while this tab is on screen (code-behind tells the view-model): on show, every 10 s, on Refresh. -->
 		<TabItem Header="Wi-Fi">
-			<Grid x:Name="WifiRoot" h:Responsive.BreakWidth="560" RowDefinitions="Auto, Auto, Auto, *" Margin="0,12,0,0">
+			<ctl:Deferred><DataTemplate x:DataType="vm:NetworkInfoViewModel">
+			<Grid x:Name="WifiRoot" AttachedToVisualTree="WifiRoot_Attached" DetachedFromVisualTree="WifiRoot_Detached" h:Responsive.BreakWidth="560" RowDefinitions="Auto, Auto, Auto, *" Margin="0,12,0,0">
 				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,10">
 					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
 						<StackPanel Orientation="Horizontal" Spacing="8">
@@ -608,6 +609,7 @@
 					</StackPanel>
 				</Border>
 			</Grid>
+			</DataTemplate></ctl:Deferred>
 		</TabItem>
 
 		<!-- ============================ NEIGHBORS ============================ -->

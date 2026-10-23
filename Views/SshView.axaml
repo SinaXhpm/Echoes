@@ -708,7 +708,8 @@
 
                 <!-- ============ files (SFTP) ============ -->
                 <TabItem Header="Files">
-                    <Grid x:Name="SshFilesPane" helpers:Responsive.BreakWidth="560" RowDefinitions="Auto, Auto, *, Auto" Margin="0,10,0,0">
+                    <ctl:Deferred><DataTemplate x:DataType="vm:SshViewModel">
+                    <Grid x:Name="SshFilesPane" AttachedToVisualTree="FilesPane_Attached" DetachedFromVisualTree="FilesPane_Detached" helpers:Responsive.BreakWidth="560" RowDefinitions="Auto, Auto, *, Auto" Margin="0,10,0,0">
                         <Grid x:Name="SshFilesBar" helpers:Responsive.BreakWidth="560" ColumnDefinitions="Auto, *, Auto, Auto" RowDefinitions="Auto, Auto">
                             <Button Classes="icon" Command="{Binding FilesUpCommand}" IsEnabled="{Binding IsConnected}"
                                     ToolTip.Tip="Up one folder" AutomationProperties.Name="Up one folder">
@@ -794,7 +795,7 @@
                                         <TextBlock Grid.Column="4" Classes="colHead fCell fPerm" Text="Permissions" FontFamily="{x:Static FontFamily.Default}"/>
                                     </Grid>
                                 </Border>
-                                <ListBox x:Name="SshFileList" Grid.Row="1" ItemsSource="{Binding FileRows}" SelectedItem="{Binding SelectedFile}"
+                                <ListBox x:Name="SshFileList" KeyDown="OnFileListKeyDown" Grid.Row="1" ItemsSource="{Binding FileRows}" SelectedItem="{Binding SelectedFile}"
                                          SelectionMode="Single" ScrollViewer.HorizontalScrollBarVisibility="Disabled" DoubleTapped="OnFileDoubleTapped">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate x:DataType="helpers:SshFileRow">
@@ -849,6 +850,7 @@
                             <TextBlock Classes="status" Text="{Binding FilesInfo}" IsVisible="{Binding !TransferActive}"/>
                         </Panel>
                     </Grid>
+                    </DataTemplate></ctl:Deferred>
                 </TabItem>
 
                 <!-- ============ forwarding ============ -->
@@ -974,7 +976,8 @@
 
                 <!-- ============ server health ============ -->
                 <TabItem Header="Server">
-                    <Grid x:Name="SshServerPane" helpers:Responsive.BreakWidth="560" Margin="0,10,0,0">
+                    <ctl:Deferred><DataTemplate x:DataType="vm:SshViewModel">
+                    <Grid x:Name="SshServerPane" AttachedToVisualTree="ServerPane_Attached" DetachedFromVisualTree="ServerPane_Detached" helpers:Responsive.BreakWidth="560" Margin="0,10,0,0">
                         <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasHealth}">
                             <StackPanel Spacing="8">
                                 <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10">
@@ -1097,6 +1100,7 @@
                             </StackPanel>
                         </Border>
                     </Grid>
+                    </DataTemplate></ctl:Deferred>
                 </TabItem>
             </TabControl>
         </Grid>
