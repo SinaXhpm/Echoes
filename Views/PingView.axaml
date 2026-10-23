@@ -489,6 +489,7 @@
 
                 <!-- ping statistics (ping's own summary, live) + the recent round trips; not for a traceroute -->
                 <Border Grid.Row="3" Classes="foot" IsVisible="{Binding IsLoopMode}">
+                    <ctl:Deferred><DataTemplate x:DataType="vm:PingViewModel">
                     <Grid x:Name="PingStats" helpers:Responsive.BreakWidth="600" ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
                         <!-- two groups (packets · round trips) that wrap as wholes on a phone -->
                         <WrapPanel ItemSpacing="18" LineSpacing="8" VerticalAlignment="Center">
@@ -530,12 +531,14 @@
                                               Series="{Binding PingSeries}" Version="{Binding PingSeriesVersion}"
                                               ToolTip.Tip="Round trips of the last 60 probes; red marks one that got no reply"/>
                     </Grid>
+                    </DataTemplate></ctl:Deferred>
                 </Border>
             </Grid>
         </Border>
 
         <!-- ===== MTR: header / hop table / progress ===== -->
         <Border Grid.Row="1" Classes="card output" IsVisible="{Binding IsMtrMode}">
+            <ctl:Deferred><DataTemplate x:DataType="vm:PingViewModel">
             <Grid x:Name="MtrRoot" helpers:Responsive.BreakWidth="640" RowDefinitions="Auto, Auto, Auto, Auto, *, Auto">
                 <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="16,8,8,8">
                     <TextBlock Classes="cardHeader" Text="Hops" Margin="0" VerticalAlignment="Center"/>
@@ -613,6 +616,7 @@
                     <TextBlock Classes="footText" Classes.error="{Binding Mtr.StatusIsError}" Text="{Binding Mtr.Status}"/>
                 </Border>
             </Grid>
+            </DataTemplate></ctl:Deferred>
         </Border>
     </Grid>
 </UserControl>

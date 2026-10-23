@@ -21,14 +21,16 @@ public partial class WebServerView : UserControl
     private bool _scrollQueued;
     private bool _macRestoreTried;
 
+    private void CtBindBox_DropDownOpened(object? sender, EventArgs e)
+    {
+        if (DataContext is WebServerViewModel { IsCatching: false } vm) vm.RebuildCatchBinds();
+    }
+
     public WebServerView()
     {
         InitializeComponent();
-        // interfaces come and go (VPN, Wi-Fi): the pickers list the current ones whenever they open
-        CtBindBox.DropDownOpened += (_, _) =>
-        {
-            if (DataContext is WebServerViewModel { IsCatching: false } vm) vm.RebuildCatchBinds();
-        };
+        // interfaces come and go (VPN, Wi-Fi): the pickers list the current ones whenever they open (the Catch page's
+        // handler is in the XAML: that page is built when first shown)
         ShBindBox.DropDownOpened += (_, _) => _vm?.RebuildShareBinds();
 
         // Tunnel: see Enter before the multi-line box turns it into a newline. Desktop: Enter sends, Shift+Enter is a

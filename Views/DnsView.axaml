@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
+             xmlns:ctl="using:Echoes.Views.Controls"
              xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.DnsView"
              x:DataType="vm:DnsViewModel">
@@ -635,6 +636,7 @@
 
         <!-- ===== Lookup results: header (what + how many, result actions) over the output ===== -->
         <Border Grid.Row="1" Classes="card output" IsVisible="{Binding IsLookupMode}">
+            <ctl:Deferred><DataTemplate x:DataType="vm:DnsViewModel">
             <Grid RowDefinitions="Auto, Auto, *">
                 <Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="16,8,8,8" MinHeight="{DynamicResource Control.Height}">
                     <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
@@ -721,10 +723,12 @@
                     </Panel>
                 </Panel>
             </Grid>
+            </DataTemplate></ctl:Deferred>
         </Border>
 
         <!-- ===== Compare results: header / recommendation / table ===== -->
         <Border Grid.Row="1" Classes="card output" IsVisible="{Binding IsCompareMode}">
+            <ctl:Deferred><DataTemplate x:DataType="vm:DnsViewModel">
             <Grid RowDefinitions="Auto, Auto, Auto, Auto, *">
                 <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10" Margin="16,8,8,8" MinHeight="{DynamicResource Control.Height}">
                     <TextBlock Classes="cardHeader" Margin="0" VerticalAlignment="Center" Text="Resolvers"/>
@@ -790,10 +794,12 @@
                                Text="Ranks the resolvers in the list by speed and flags plain ones whose answers differ from the encrypted ones."/>
                 </Panel>
             </Grid>
+            </DataTemplate></ctl:Deferred>
         </Border>
 
         <!-- ===== Email check results: header (domain, counts) / findings ===== -->
         <Border Grid.Row="1" Classes="card output" IsVisible="{Binding IsEmailMode}">
+            <ctl:Deferred><DataTemplate x:DataType="vm:DnsViewModel">
             <Grid RowDefinitions="Auto, Auto, *">
                 <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10" Margin="16,8,8,8" MinHeight="{DynamicResource Control.Height}">
                     <TextBlock Classes="cardHeader" Margin="0" VerticalAlignment="Center" Text="Email check"/>
@@ -862,6 +868,7 @@
                                IsVisible="{Binding ShowMailEmpty}"/>
                 </Panel>
             </Grid>
+            </DataTemplate></ctl:Deferred>
         </Border>
     </Grid>
 </UserControl>

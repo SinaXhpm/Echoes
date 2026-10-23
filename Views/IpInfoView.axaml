@@ -188,6 +188,7 @@
                     <!-- cards (shown once a source answers) -->
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                                   IsVisible="{Binding Result, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <ctl:Deferred><DataTemplate x:DataType="vm:IpInfoViewModel">
                         <StackPanel x:Name="IpResults" helpers:Responsive.BreakWidth="560" Spacing="12">
 
                             <!-- hero: flag + IP + location, with map / copy -->
@@ -286,6 +287,7 @@
                                        TextWrapping="Wrap" Margin="2,0,0,4"
                                        IsVisible="{Binding StatusLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                         </StackPanel>
+                        </DataTemplate></ctl:Deferred>
                     </ScrollViewer>
 
                     <!-- empty / working / error state -->

@@ -537,12 +537,12 @@
         <Style Selector="ScrollViewer#CtPage.narrow">
             <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
         </Style>
-        <Style Selector="ScrollViewer#CtPage.narrow > Grid#CtRoot">
+        <Style Selector="ScrollViewer#CtPage.narrow Grid#CtRoot">
             <Setter Property="Height" Value="{Binding $parent[ScrollViewer].Bounds.Height}"/>
             <Setter Property="MinHeight" Value="640"/>
         </Style>
         <!-- phone, reply editor open: the page grows (and scrolls) rather than squeezing the list to a row -->
-        <Style Selector="ScrollViewer#CtPage.narrow > Grid#CtRoot.replyOpen">
+        <Style Selector="ScrollViewer#CtPage.narrow Grid#CtRoot.replyOpen">
             <Setter Property="MinHeight" Value="1000"/>
         </Style>
 
@@ -1085,6 +1085,7 @@
          on a phone never shorter than 640px, so the page scrolls instead of squeezing the list. -->
     <ScrollViewer x:Name="CtPage" helpers:Responsive.BreakWidth="560" HorizontalScrollBarVisibility="Disabled"
                   IsVisible="{Binding IsCatchMode}">
+        <ctl:Deferred><DataTemplate x:DataType="vm:WebServerViewModel">
         <Grid x:Name="CtRoot" RowDefinitions="Auto, *" RowSpacing="12" Classes.running="{Binding IsCatching}" Classes.replyOpen="{Binding IsReplyOpen}">
 
             <!-- ===== server + reply ===== -->
@@ -1108,7 +1109,7 @@
                     <Grid x:Name="CtFields" helpers:Responsive.BreakWidth="520" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
                         <StackPanel x:Name="CtBind">
                             <TextBlock Classes="fieldLabel" Text="Listen on"/>
-                            <ComboBox x:Name="CtBindBox" Classes="field" ItemsSource="{Binding CatchBindOptions}" SelectedItem="{Binding SelectedCatchBind}"
+                            <ComboBox x:Name="CtBindBox" DropDownOpened="CtBindBox_DropDownOpened" Classes="field" ItemsSource="{Binding CatchBindOptions}" SelectedItem="{Binding SelectedCatchBind}"
                                       IsEnabled="{Binding !IsCatching}"
                                       ToolTip.Tip="All interfaces = this device and other devices on your network; this device only = 127.0.0.1">
                                 <ComboBox.ItemTemplate>
@@ -1324,6 +1325,7 @@
                 </Grid>
             </Border>
         </Grid>
+        </DataTemplate></ctl:Deferred>
     </ScrollViewer>
     </Panel>
 </UserControl>

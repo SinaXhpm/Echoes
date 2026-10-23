@@ -1251,6 +1251,7 @@
 
                     <!-- ===== detail panel (beside the list; instead of it on a phone) ===== -->
                     <Border x:Name="DetailCard" Classes="card" IsVisible="{Binding HasSelection}">
+                        <ctl:Deferred><DataTemplate x:DataType="vm:MonitorViewModel">
                         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="14,10,14,14" Spacing="12">
                                 <Button x:Name="BackBtn" Classes="ghost" HorizontalAlignment="Left" Command="{Binding CloseDetailCommand}">
@@ -1334,7 +1335,7 @@
                                             <TextBlock Classes="fieldLabel" Margin="0" Text="Keyword"/>
                                             <!-- the text and its rule side by side -->
                                             <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
-                                                <TextBox x:Name="KeywordBox" Classes="field" Text="{Binding EditKeyword}" MaxLength="200"
+                                                <TextBox x:Name="KeywordBox" KeyDown="KeywordBox_KeyDown" Classes="field" Text="{Binding EditKeyword}" MaxLength="200"
                                                          PlaceholderText="Text on the page" IsEnabled="{Binding CanEditKeyword}"
                                                          ToolTip.Tip="Text the page must (not) contain; not case-sensitive"
                                                          AutomationProperties.Name="Keyword"/>
@@ -1466,6 +1467,7 @@
                                 </StackPanel>
                             </StackPanel>
                         </ScrollViewer>
+                        </DataTemplate></ctl:Deferred>
                     </Border>
                 </Grid>
             </TabItem>

@@ -456,6 +456,7 @@
                     </StackPanel>
 
                     <ScrollViewer x:Name="InScroll" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding IsIdle}">
+                        <ctl:Deferred><DataTemplate x:DataType="vm:TlsViewModel">
                         <StackPanel Spacing="12">
                             <!-- the one clear error -->
                             <Border Classes="callout" IsVisible="{Binding HasError}" ToolTip.Tip="{Binding ErrorDetail}">
@@ -471,6 +472,7 @@
 
                             <!-- summary -->
                             <Border Classes="card" Padding="12" IsVisible="{Binding HasResult}">
+                                <ctl:Deferred><DataTemplate x:DataType="vm:TlsViewModel">
                                 <StackPanel Spacing="10">
                                     <Grid x:Name="ResHead" helpers:Responsive.BreakWidth="560" ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto, Auto">
                                         <Border Grid.Column="0" Classes="badge verdict" Classes.success="{Binding VerdictOk}"
@@ -552,6 +554,7 @@
                                         </ItemsControl>
                                     </StackPanel>
                                 </StackPanel>
+                                </DataTemplate></ctl:Deferred>
                             </Border>
 
                             <!-- chain -->
@@ -633,6 +636,7 @@
                                 </ItemsControl>
                             </StackPanel>
                         </StackPanel>
+                        </DataTemplate></ctl:Deferred>
                     </ScrollViewer>
                 </Panel>
             </Grid>

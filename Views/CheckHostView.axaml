@@ -715,6 +715,7 @@
 
             <!-- ===================== summary over all nodes ===================== -->
             <Border Grid.Row="2" Classes="card" Margin="0,12,0,0" IsVisible="{Binding HasRun}">
+                <ctl:Deferred><DataTemplate x:DataType="vm:CheckHostViewModel">
                 <Grid x:Name="ChTiles" helpers:Responsive.BreakWidth="560"
                       ColumnDefinitions="*, *, *, *, *, *, *, *, *, *" RowDefinitions="Auto, Auto, Auto">
                     <Border Classes="tile t1" ToolTip.Tip="{Binding ReachCounts}">
@@ -766,6 +767,7 @@
                         </StackPanel>
                     </Border>
                 </Grid>
+                </DataTemplate></ctl:Deferred>
             </Border>
 
             <!-- ===================== filter, views, sort, copy ===================== -->

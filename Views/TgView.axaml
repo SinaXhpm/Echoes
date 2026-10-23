@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
+             xmlns:ctl="using:Echoes.Views.Controls"
              xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.TgView"
              x:DataType="vm:TgViewModel">
@@ -1015,6 +1016,7 @@
                     <!-- the form -->
                     <ScrollViewer Grid.Row="1" IsVisible="{Binding IsFormMode}" HorizontalScrollBarVisibility="Disabled"
                                   VerticalScrollBarVisibility="Auto" Background="{DynamicResource Bg.Card}">
+                        <ctl:Deferred><DataTemplate x:DataType="vm:TgViewModel">
                         <StackPanel Margin="12,0,12,12" Spacing="10">
                             <Border Classes="divider"/>
 
@@ -1096,6 +1098,7 @@
                                 </StackPanel>
                             </Button>
                         </StackPanel>
+                        </DataTemplate></ctl:Deferred>
                     </ScrollViewer>
 
                     <!-- raw JSON -->
