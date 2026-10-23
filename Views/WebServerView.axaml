@@ -958,7 +958,7 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:SharedFileRow">
                                             <Border Classes="fileRow">
-                                                <Grid ColumnDefinitions="Auto, *, Auto, Auto, Auto" ColumnSpacing="8">
+                                                <Grid ColumnDefinitions="Auto, *, Auto, Auto, Auto, Auto" ColumnSpacing="8">
                                                     <Path Grid.Column="0" Classes="fileIcon" Data="{StaticResource WsIcoFile}"/>
                                                     <TextBlock Grid.Column="1" Classes="fileName" Text="{Binding Name}" ToolTip.Tip="{Binding Name}"/>
                                                     <TextBlock Grid.Column="2" Text="{Binding Downloads, StringFormat='↓ {0}'}" IsVisible="{Binding HasDownloads}"
@@ -966,7 +966,34 @@
                                                                VerticalAlignment="Center" ToolTip.Tip="Complete downloads of this file"/>
                                                     <TextBlock Grid.Column="3" Text="{Binding SizeText}" FontSize="{StaticResource Font.Small}"
                                                                Foreground="{DynamicResource Text.Muted}" FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center"/>
-                                                    <Button Grid.Column="4" Classes="rowAction" ToolTip.Tip="Stop sharing it"
+                                                    <!-- while sharing: the file's own direct link (no PIN needed) and its QR code -->
+                                                    <Button Grid.Column="4" Classes="rowAction" IsVisible="{Binding HasLink}"
+                                                            ToolTip.Tip="Direct link and QR code: downloads this file, no PIN needed">
+                                                        <Path Classes="glyph" Data="{StaticResource WsIcoQr}"/>
+                                                        <Button.Flyout>
+                                                            <Flyout Placement="BottomEdgeAlignedRight">
+                                                                <StackPanel Spacing="8" Width="236">
+                                                                    <Border CornerRadius="{StaticResource Radius.Md}" ClipToBounds="True" HorizontalAlignment="Center">
+                                                                        <Image Source="{Binding Qr}" Width="200" Height="200" RenderOptions.BitmapInterpolationMode="None"/>
+                                                                    </Border>
+                                                                    <TextBlock Text="Scan to download this file" HorizontalAlignment="Center"
+                                                                               FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Text.Secondary}"/>
+                                                                    <SelectableTextBlock Text="{Binding LinkUrl}" TextWrapping="Wrap" FontFamily="{StaticResource MonoFont}"
+                                                                                         FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Text.Muted}"/>
+                                                                    <Button Classes="secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                                                            Command="{Binding CopyLinkCommand}">
+                                                                        <Panel>
+                                                                            <TextBlock Text="Copy link" IsVisible="{Binding !LinkCopied}"/>
+                                                                            <TextBlock Text="Copied" IsVisible="{Binding LinkCopied}"/>
+                                                                        </Panel>
+                                                                    </Button>
+                                                                    <TextBlock Classes="hint" TextWrapping="Wrap"
+                                                                               Text="Anyone with this link can download the file, without the PIN."/>
+                                                                </StackPanel>
+                                                            </Flyout>
+                                                        </Button.Flyout>
+                                                    </Button>
+                                                    <Button Grid.Column="5" Classes="rowAction" ToolTip.Tip="Stop sharing it"
                                                             Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).RemoveFileCommand}"
                                                             CommandParameter="{Binding}">
                                                         <Path Classes="glyph" Data="{StaticResource WsIcoClose}"/>

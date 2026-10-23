@@ -125,7 +125,7 @@ public static class HttpHelper
     /// </summary>
     public static string CurlProxyArg(string proxy)
     {
-        proxy = proxy.Trim();
+        proxy = FoldDigits(proxy.Trim());
         if (proxy.Contains("://")) return proxy;
         string norm = NormalizeProxy(proxy);
         return norm.StartsWith("socks5://", StringComparison.Ordinal) ? "socks5h://" + norm["socks5://".Length..] : norm;
@@ -133,7 +133,7 @@ public static class HttpHelper
 
     public static string NormalizeProxy(string proxy)
     {
-        proxy = proxy.Trim();
+        proxy = FoldDigits(proxy.Trim());
         if (proxy.Contains("://")) return proxy;
 
         // Infer SOCKS5 from the ACTUAL numeric port, not a substring: a Contains(":1080") test wrongly
@@ -144,5 +144,14 @@ public static class HttpHelper
             return "socks5://" + proxy;
 
         return "http://" + proxy;
+    }
+
+    // Digits typed in the phone's language read in ASCII in the address; user info before "@" is a credential and stays
+    // as typed, and so does a name in another script (an internationalised host).
+    private static string FoldDigits(string proxy)
+    {
+        int at = proxy.LastIndexOf('@');
+        string address = proxy[(at + 1)..];
+        return !LocalDigits.Any(address) || LocalDigits.HasNonAsciiLetter(address) ? proxy : proxy[..(at + 1)] + LocalDigits.Fold(address);
     }
 }

@@ -32,14 +32,15 @@ public static class ScanTargets
         if (string.IsNullOrWhiteSpace(input)) return r;
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        // Accept comma, whitespace, newline and semicolon as separators.
-        var tokens = input.Split(new[] { ',', ';', ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        // Accept comma, whitespace, newline and semicolon as separators (the Arabic comma and semicolon too).
+        var tokens = input.Split(new[] { ',', ';', ' ', '\t', '\r', '\n', '\u060C', '\u061B' }, StringSplitOptions.RemoveEmptyEntries);
 
         foreach (var raw in tokens)
         {
             // (No early break at the host cap: AddIp/Expand enforce it per address, and hostnames
             // after the cap must still be collected so BuildTargets can report them.)
             string tok = raw.Trim().Trim('"', '\'', '`');
+            if (!LocalDigits.HasNonAsciiLetter(tok)) tok = LocalDigits.Fold(tok);   // Persian / Arabic digits: an IP, not a name
             if (tok.Length == 0) continue;
 
             try

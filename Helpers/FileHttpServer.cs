@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,6 +22,18 @@ public sealed class SharedItem
     // Mtime of the version that was picked (desktop only; Android content streams have none). When set,
     // a seekable source gets Last-Modified + a strong ETag, so browsers can resume and If-Range works.
     public DateTime? LastModifiedUtc { get; init; }
+
+    /// <summary>The secret of the file's direct link (<c>/f/{LinkToken}/{name}</c>, the share hub): 128 random bits, so the
+    /// link downloads this one file without the PIN (whoever was given it may) and can't be guessed. It ends with the item
+    /// (removed, cleared).</summary>
+    public string LinkToken { get; } = NewLinkToken();
+
+    private static string NewLinkToken()
+    {
+        Span<byte> bytes = stackalloc byte[16];
+        RandomNumberGenerator.Fill(bytes);
+        return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');   // URL-safe, 22 chars
+    }
 }
 
 /// <summary>Thrown by a <see cref="SharedItem.Open"/> whose file no longer matches what was picked

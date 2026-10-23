@@ -701,7 +701,7 @@ public sealed partial class MonitorViewModel : ObservableObject
                 UpdateSummary();
             }
             cts.Dispose();
-            BackgroundGuard.Release();
+            BackgroundGuard.Release(BackgroundReason);
         }
     }
 

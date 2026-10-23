@@ -18,7 +18,7 @@ public partial class StringLabViewModel
         {
             ResetError();
             if (string.IsNullOrWhiteSpace(SubnetInput)) return;
-            SubnetOutput = SubnetCalc.Describe(SubnetInput);
+            SubnetOutput = SubnetCalc.Describe(LocalDigits.Fold(SubnetInput));
         }
         catch (Exception ex) { ErrorMessage = ex.Message; }
     }

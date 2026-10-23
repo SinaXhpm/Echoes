@@ -96,15 +96,43 @@ public partial class SshView : UserControl
             if (files is not { Count: > 0 }) return;
             var file = files[0];
             // desktop: the real path (kept with a saved server); Android: the content URI, opened through the provider
+            // (iOS too, though it has a path: see SshViewModel.KeyOpenerFor)
             _vm.SetPickedKey(file.TryGetLocalPath() ?? file.Path.ToString(), file);
         }
         catch (Exception ex) { CrashLog.Write("Ssh.BrowseKey", ex); }
     }
 
+    // ---------------------------------------------------------------- terminal keys (phone)
+    // The recalled command is ready to edit: the caret goes to its end (it stayed where it was, often at the start).
+    private void OnHistoryPrevious(object? sender, RoutedEventArgs e) => Recall(_vm?.HistoryUpCommand);
+    private void OnHistoryNext(object? sender, RoutedEventArgs e) => Recall(_vm?.HistoryDownCommand);
+
+    private void Recall(System.Windows.Input.ICommand? command)
+    {
+        if (command is null) return;
+        command.Execute(null);
+        SshCommandBox.CaretIndex = SshCommandBox.Text?.Length ?? 0;
+    }
+
     // ---------------------------------------------------------------- files
+    // Phone: one tap opens a folder (or a link to one), as a phone's file manager does; a file only gets selected
+    // (a double tap or Download saves it, as before).
+    private SshFileRow? _tappedRow;
+
+    private async void OnFileTapped(object? sender, TappedEventArgs e)
+    {
+        if (!AppPlatform.IsMobile || _vm is null || (e.Source as Control)?.DataContext is not SshFileRow row) return;
+        _tappedRow = row;
+        if (row.IsFile) return;
+        try { await _vm.OpenRowAsync(row); }   // a link that turns out to point to a file just stays selected
+        catch (Exception ex) { CrashLog.Write("Ssh.OpenRow", ex); }
+    }
+
     private async void OnFileDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (_vm is null || (e.Source as Control)?.DataContext is not SshFileRow row) return;
+        // Phone: the first tap already opened a folder, and the second may land on a row of the folder it opened.
+        if (AppPlatform.IsMobile && (row.IsDirectory || !ReferenceEquals(row, _tappedRow))) return;
         await OpenRow(row);
     }
 

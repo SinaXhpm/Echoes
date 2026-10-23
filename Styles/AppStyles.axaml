@@ -1,5 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:glob="clr-namespace:System.Globalization;assembly=System.Runtime">
 
     <!-- ============================================================
          Echoes design system — v3. Colors / radii / type scale live in
@@ -63,6 +64,8 @@
     </Style>
     <Style Selector="TextBox.mono">
         <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+        <!-- code, keys, ports, expressions: no autocorrect or word suggestions on a phone keyboard -->
+        <Setter Property="TextInputOptions.ShowSuggestions" Value="False"/>
     </Style>
     <Style Selector="SelectableTextBlock">
         <Setter Property="SelectionBrush" Value="{DynamicResource Selection}"/>
@@ -70,6 +73,9 @@
 
     <!-- ===== inputs (colors + states come from the TextControl* tokens) ===== -->
     <Style Selector="TextBox">
+        <!-- Enter types the same line break everywhere (Windows typed CR LF): a hash or Base64 of a typed text, a body,
+             a message are the same bytes on every system -->
+        <Setter Property="NewLine" Value="&#10;"/>
         <Setter Property="CaretBrush" Value="{DynamicResource Accent}"/>
         <Setter Property="SelectionBrush" Value="{DynamicResource Selection}"/>
         <Setter Property="SelectionForegroundBrush" Value="{DynamicResource Text.Primary}"/>
@@ -89,6 +95,10 @@
         <Setter Property="Height" Value="NaN"/>
         <Setter Property="VerticalContentAlignment" Value="Top"/>
         <Setter Property="Padding" Value="12,9"/>
+    </Style>
+    <!-- history boxes hold hosts, URLs, headers and user names: no autocorrect or word suggestions on a phone keyboard -->
+    <Style Selector="AutoCompleteBox">
+        <Setter Property="TextInputOptions.ShowSuggestions" Value="False"/>
     </Style>
     <Style Selector="AutoCompleteBox.field">
         <Setter Property="MinHeight" Value="0"/>
@@ -113,6 +123,14 @@
     </Style>
     <Style Selector="NumericUpDown">
         <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+        <!-- numbers read and shown the same in every language: with the phone's culture "0.5" was 5 where "." groups
+             thousands (German, Turkish ...) and refused where the decimal mark is "," or Arabic (Persian digits are
+             folded to ASCII as they are typed, InputAssist) -->
+        <Setter Property="NumberFormat" Value="{x:Static glob:NumberFormatInfo.InvariantInfo}"/>
+        <Setter Property="ParsingNumberStyle" Value="Float"/>
+        <!-- the phone's number keypad, without word suggestions (both reach the inner box) -->
+        <Setter Property="TextInputOptions.ContentType" Value="Number"/>
+        <Setter Property="TextInputOptions.ShowSuggestions" Value="False"/>
     </Style>
     <Style Selector="NumericUpDown.field">
         <Setter Property="Height" Value="{DynamicResource Control.Height}"/>

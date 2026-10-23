@@ -417,7 +417,7 @@
                         </StackPanel>
                         <StackPanel x:Name="InSni">
                             <TextBlock Classes="fieldLabel" Text="SNI"/>
-                            <TextBox Classes="field mono" Text="{Binding Sni}" PlaceholderText="Automatic"
+                            <TextBox Classes="field mono" Text="{Binding Sni}" TextInputOptions.ContentType="Url" PlaceholderText="Automatic"
                                      helpers:InputAssist.SelectAllOnFocus="True" AutomationProperties.Name="Server name (SNI)"
                                      ToolTip.Tip="Server name (SNI). Leave empty to send the host name. Set it to test another name on the same address.">
                                 <TextBox.KeyBindings>

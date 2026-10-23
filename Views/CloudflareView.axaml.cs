@@ -28,7 +28,14 @@ public partial class CloudflareView : UserControl
     public CloudflareView()
     {
         InitializeComponent();
+        // phones: a narrow record row drops its Edit / Delete buttons (styles: CfMain.narrow.touch) and opens on a tap
+        if (AppPlatform.IsMobile) CfMain.Classes.Add("touch");
     }
+
+    // Avalonia.Android turns the filters into MIME types and drops "All" once another type is listed, so a .zone file (no
+    // MIME type of its own) couldn't be picked: Android offers every file. The contents are checked either way.
+    private static FilePickerFileType[] OpenTypes(FilePickerFileType type)
+        => OperatingSystem.IsAndroid() ? new[] { FilePickerFileTypes.All } : new[] { type, FilePickerFileTypes.All };
 
     // ---------- backup: the zone's records → a JSON file ----------
     private async void OnBackup(object? sender, RoutedEventArgs e)
@@ -72,7 +79,7 @@ public partial class CloudflareView : UserControl
             {
                 Title = "Restore DNS records",
                 AllowMultiple = false,
-                FileTypeFilter = new[] { JsonBackup, FilePickerFileTypes.All },
+                FileTypeFilter = OpenTypes(JsonBackup),
             });
             if (files is not { Count: > 0 }) return;
 
@@ -97,7 +104,7 @@ public partial class CloudflareView : UserControl
             {
                 Title = "Import a BIND zone file",
                 AllowMultiple = false,
-                FileTypeFilter = new[] { ZoneFile, FilePickerFileTypes.All },
+                FileTypeFilter = OpenTypes(ZoneFile),
             });
             if (files is not { Count: > 0 }) return;
 
@@ -130,6 +137,12 @@ public partial class CloudflareView : UserControl
     }
 
     // ---------- double-click / double-tap a record to edit it (not on its pill or buttons) ----------
+    // A phone opens it on one tap: its narrow rows have no Edit / Delete buttons, and the editor has Delete.
+    private void OnRecordTapped(object? sender, TappedEventArgs e)
+    {
+        if (AppPlatform.IsMobile) OnRecordDoubleTapped(sender, e);
+    }
+
     private void OnRecordDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (DataContext is not CloudflareViewModel vm) return;

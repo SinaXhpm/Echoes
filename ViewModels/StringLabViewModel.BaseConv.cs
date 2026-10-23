@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Echoes.Helpers;
 
 namespace Echoes.ViewModels;
 
@@ -26,7 +27,7 @@ public partial class StringLabViewModel
         try
         {
             ResetError();
-            var s = BaseInput.Trim();
+            var s = LocalDigits.Fold(BaseInput.Trim());
             if (string.IsNullOrEmpty(s)) return;
 
             if (!TryReadBase(BaseFrom, out int fromBase, allowBlank: true) || !TryReadBase(BaseTo, out int toBase, allowBlank: true))
@@ -99,7 +100,7 @@ public partial class StringLabViewModel
     {
         b = 0;
         if (string.IsNullOrWhiteSpace(text) || text.Trim().Equals("auto", StringComparison.OrdinalIgnoreCase)) return allowBlank;
-        return int.TryParse(text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out b) && b is >= 2 and <= 36;
+        return int.TryParse(LocalDigits.Fold(text.Trim()), NumberStyles.None, CultureInfo.InvariantCulture, out b) && b is >= 2 and <= 36;
     }
 
     // Digits for any base 2-36 (case-insensitive); '_', ' ' and ',' are accepted as digit-group

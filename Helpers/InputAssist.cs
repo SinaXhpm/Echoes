@@ -4,8 +4,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
+using Avalonia.Input.TextInput;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -56,6 +59,10 @@ public enum PasteMode
 ///
 /// <c>UserTarget</c> / <c>PortTarget</c> — names of sibling fields that receive the user / port found in a
 /// pasted "user@host:port" or "ssh -p 2222 user@host" (SSH), instead of those parts being dropped.
+///
+/// Phone keyboards (<see cref="Install"/>): a host / URL / list field gets no autocorrect or word suggestions, a URL
+/// keyboard for one address and English where Android has it; a masked box is kept out of the keyboard's memory; and
+/// digits typed in the phone's language (Persian, Arabic, Hindi ...) become ASCII in the fields that hold numbers and addresses.
 /// </summary>
 public static class InputAssist
 {
@@ -130,6 +137,7 @@ public static class InputAssist
             {
                 c.AddHandler(TextBox.PastingFromClipboardEvent, OnPasting, RoutingStrategies.Bubble);
                 c.AddHandler(InputElement.KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
+                TechnicalKeyboard(c, m);
             }
         });
 
@@ -138,9 +146,77 @@ public static class InputAssist
             if (e.NewValue is true) AttachPasteButton(c);
             else DetachPasteButton(c);
         });
+
+        // Tunnel: runs before the TextBox inserts the text, which can still be rewritten.
+        InputElement.TextInputEvent.AddClassHandler<TextBox>(OnTextInput, RoutingStrategies.Tunnel);
+
+        // A masked box (password, passphrase, API token): the keyboard neither suggests nor learns what is typed (Gboard
+        // otherwise keeps typed passwords in its dictionary), iOS treats it as secure entry.
+        TextBox.PasswordCharProperty.Changed.AddClassHandler<TextBox>((tb, _) =>
+        {
+            if (tb.PasswordChar != default) tb.SetValue(TextInputOptions.IsSensitiveProperty, true, BindingPriority.Style);
+        });
+    }
+
+    /// <summary>Registers the app-wide handlers (typed digits, masked boxes) before the first view exists; the attached
+    /// properties register theirs as they are set.</summary>
+    public static void Install()   // the static constructor does the rest
+    {
+        // Phone: a flyout opens without moving focus into its first field (the standard mode does, for keyboard users),
+        // which put the keyboard up over the options before anything was tapped. A tap on a field focuses it as usual.
+        if (!AppPlatform.IsMobile || _flyoutsHooked) return;
+        _flyoutsHooked = true;
+        Button.FlyoutProperty.Changed.AddClassHandler<Button>((_, e) => NoFocusOnOpen(e.NewValue));
+        FlyoutBase.AttachedFlyoutProperty.Changed.AddClassHandler<Control>((_, e) => NoFocusOnOpen(e.NewValue));
+    }
+
+    private static bool _flyoutsHooked;
+
+    private static void NoFocusOnOpen(object? flyout)
+    {
+        if (flyout is PopupFlyoutBase { ShowMode: FlyoutShowMode.Standard } f) f.ShowMode = FlyoutShowMode.Transient;
     }
 
     private static bool IsSmart(PasteMode m) => m is not (PasteMode.None or PasteMode.Text);
+
+    // ---------------------------------------------------------------- phone keyboards
+
+    private static readonly IReadOnlyList<string> EnglishHint = ["en-US"];
+
+    // Hosts, URLs and lists of them: autocorrect "fixed" github.com to GitHub.com and a word still being composed was
+    // left out of the value when a button was tapped; one address gets the URL keyboard (".", "/" at hand); Android
+    // switches to English where the user has it (iOS has no such hint); a bot token stays out of the keyboard's memory.
+    // Style priority: what a view sets on the field itself wins.
+    private static void TechnicalKeyboard(Control c, PasteMode m)
+    {
+        c.SetValue(TextInputOptions.ShowSuggestionsProperty, false, BindingPriority.Style);
+        c.SetValue(TextInputOptions.LocaleHintsProperty, EnglishHint, BindingPriority.Style);
+        if (m is PasteMode.Host or PasteMode.Domain or PasteMode.Ip or PasteMode.Endpoint or PasteMode.Url)
+            c.SetValue(TextInputOptions.ContentTypeProperty, TextInputContentType.Url, BindingPriority.Style);
+        else if (m is PasteMode.Token)
+            c.SetValue(TextInputOptions.IsSensitiveProperty, true, BindingPriority.Style);
+    }
+
+    // Digits typed in the phone's language become ASCII where the value is a number, a port, an address or a URL: a
+    // NumericUpDown or a number keyboard always, a host / URL field unless it already holds non-ASCII letters (someone
+    // typing an internationalised domain, whose digits are part of the name). Elsewhere (messages, String Lab) the text
+    // is the user's and stays as typed.
+    private static void OnTextInput(object? sender, TextInputEventArgs e)
+    {
+        if (sender is not TextBox tb || e.Text is not { Length: > 0 } text) return;
+        var host = tb.TemplatedParent as Control ?? tb;   // the NumericUpDown / AutoCompleteBox around an inner box
+        var type = TextInputOptions.GetContentType(tb);
+        bool number = host is NumericUpDown || type is TextInputContentType.Digits or TextInputContentType.Number or TextInputContentType.Pin;
+        if (!number && !((IsSmart(GetPasteMode(host)) || type is TextInputContentType.Url or TextInputContentType.Email)
+                         && !LocalDigits.HasNonAsciiLetter(tb.Text)))
+            return;
+
+        string folded = LocalDigits.Fold(text);
+        // a box that takes fractions (Ping's interval) reads only "."; there "0,5" is a decimal comma, never thousands
+        if (host is NumericUpDown nud && (nud.FormatString.Contains('.') || nud.Increment % 1 != 0))
+            folded = folded.Replace(',', '.');
+        if (folded != text) e.Text = folded;
+    }
 
     // ---------------------------------------------------------------- select-all on the first focusing click
 
@@ -244,6 +320,10 @@ public static class InputAssist
             catch (Exception ex) { CrashLog.Write("InputAssist.PasteButton", ex); }
         };
 
+        // A long press on the icon is about the icon (a phone shows its tooltip), not the field's text selection and menu.
+        btn.AddHandler(InputElement.HoldingEvent, (_, e) => e.Handled = true);
+        btn.AddHandler(InputElement.ContextRequestedEvent, (_, e) => e.Handled = true);
+
         // A tall multi-line box gets the icon in its top-right corner instead of the vertical middle.
         btn.AttachedToVisualTree += (_, _) => btn.Classes.Set("top", InnerTextBox(host)?.AcceptsReturn == true);
 
@@ -346,6 +426,10 @@ public static class InputAssist
         if (!IsSmart(mode)) return new Outcome(raw, null, false, null);   // plain-text field: paste as-is
         if (raw.Length > MaxCleanLength)
             return new Outcome(raw, null, false, "Clipboard too large to clean — pasted as-is");
+
+        // An address and port from a chat, typed on a Persian keyboard, read in ASCII digits. A URL or list keeps its
+        // digits when it holds other letters too (a path or domain in that script, where they are part of the name).
+        if (mode is not (PasteMode.Url or PasteMode.Lines) || !LocalDigits.HasNonAsciiLetter(raw)) raw = LocalDigits.Fold(raw);
 
         string trimmed = raw.Trim();
         string? defangNote = HostExtractor.WasDefanged(raw) ? "defanged text restored" : null;

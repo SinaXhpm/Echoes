@@ -17,6 +17,7 @@
         <StreamGeometry x:Key="SshIcoFile">M7 3.5 H13.5 L18 8 V20.5 H7 Z M13.5 3.5 V8 H18</StreamGeometry>
         <StreamGeometry x:Key="SshIcoLink">M10 14 L14 10 M9 7.5 L11 5.5 A3.5 3.5 0 0 1 18.5 13 L16.5 15 M15 16.5 L13 18.5 A3.5 3.5 0 0 1 5.5 11 L7.5 9</StreamGeometry>
         <StreamGeometry x:Key="SshIcoUp">M12 19 V5 M6 11 L12 5 L18 11</StreamGeometry>
+        <StreamGeometry x:Key="SshIcoDown">M12 5 V19 M6 13 L12 19 L18 13</StreamGeometry>
         <StreamGeometry x:Key="SshIcoRefresh">M19 12 A7 7 0 1 1 16.9 7 M19 4.5 V8.5 H15</StreamGeometry>
         <StreamGeometry x:Key="SshIcoUpload">M12 15 V4 M7.5 8.5 L12 4 L16.5 8.5 M5 19.5 H19</StreamGeometry>
         <StreamGeometry x:Key="SshIcoDownload">M12 4 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 19.5 H19</StreamGeometry>
@@ -228,6 +229,22 @@
         </Style>
         <Style Selector="TextBlock.prompt.live">
             <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <!-- phone: the keys its keyboard lacks (Ctrl+C, Up / Down) beside the command box, which takes the prompt's room -->
+        <Style Selector="StackPanel#SshTermKeys">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#SshRoot.touch StackPanel#SshTermKeys">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="ScrollViewer#SshPage.narrow Grid#SshRoot.touch TextBlock.prompt">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Button.icon TextBlock.keyCap">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
         </Style>
         <Style Selector="Path.emptyIcon">
             <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
@@ -589,7 +606,7 @@
                             </StackPanel>
                             <StackPanel Grid.Column="1">
                                 <TextBlock Classes="fieldLabel" Text="Port"/>
-                                <TextBox x:Name="SshPortBox" Classes="field" Text="{Binding Port}" PlaceholderText="22">
+                                <TextBox x:Name="SshPortBox" Classes="field" Text="{Binding Port}" TextInputOptions.ContentType="Digits" PlaceholderText="22">
                                     <TextBox.KeyBindings>
                                         <KeyBinding Gesture="Enter" Command="{Binding ToggleConnectCommand}"/>
                                     </TextBox.KeyBindings>
@@ -652,8 +669,8 @@
                             <CheckBox VerticalAlignment="Center" IsChecked="{Binding ConnectViaProxy}" Content="Via SOCKS5 proxy"
                                       ToolTip.Tip="Reach the server through a SOCKS5 proxy"/>
                             <Grid x:Name="SshFProxyFields" ColumnDefinitions="*, 72" ColumnSpacing="10" IsVisible="{Binding ConnectViaProxy}">
-                                <TextBox Classes="field mono" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding ProxyInHost}" PlaceholderText="Proxy host"/>
-                                <TextBox Grid.Column="1" Classes="field mono" Text="{Binding ProxyInPort}" PlaceholderText="Port"/>
+                                <TextBox Classes="field mono" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding ProxyInHost}" TextInputOptions.ContentType="Url" PlaceholderText="Proxy host"/>
+                                <TextBox Grid.Column="1" Classes="field mono" Text="{Binding ProxyInPort}" TextInputOptions.ContentType="Digits" PlaceholderText="Port"/>
                             </Grid>
                         </Grid>
                     </Grid>
@@ -688,10 +705,10 @@
                                 </Panel>
                             </Panel>
                             <Border Grid.Row="1" BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0" Padding="12,10">
-                                <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10">
-                                    <TextBlock Grid.Column="0" Classes="prompt" Classes.live="{Binding IsConnected}" Text="&gt;_" Margin="2,0,0,0"/>
+                                <Grid ColumnDefinitions="Auto, *, Auto">
+                                    <TextBlock Grid.Column="0" Classes="prompt" Classes.live="{Binding IsConnected}" Text="&gt;_" Margin="2,0,10,0"/>
                                     <!-- Only usable while a shell is open. -->
-                                    <TextBox Grid.Column="1" Classes="field mono" Text="{Binding CommandInput}" PlaceholderText="Type a command"
+                                    <TextBox x:Name="SshCommandBox" Grid.Column="1" Classes="field mono" Text="{Binding CommandInput}" PlaceholderText="Type a command"
                                              IsEnabled="{Binding IsConnected}" ToolTip.Tip="Enter sends it; Up / Down recall earlier commands">
                                         <TextBox.KeyBindings>
                                             <KeyBinding Gesture="Enter" Command="{Binding SendCommandCommand}"/>
@@ -700,6 +717,22 @@
                                             <KeyBinding Gesture="Down" Command="{Binding HistoryDownCommand}"/>
                                         </TextBox.KeyBindings>
                                     </TextBox>
+                                    <!-- phone only (styles above). Not focusable: a tap leaves the keyboard up for the command box. -->
+                                    <StackPanel x:Name="SshTermKeys" Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="8,0,0,0"
+                                                IsEnabled="{Binding IsConnected}">
+                                        <Button Classes="icon" Focusable="False" Command="{Binding SendInterruptCommand}"
+                                                ToolTip.Tip="Send Ctrl+C (stops the running command)" AutomationProperties.Name="Send Ctrl+C">
+                                            <TextBlock Classes="keyCap" Text="^C"/>
+                                        </Button>
+                                        <Button Classes="icon" Focusable="False" Click="OnHistoryPrevious"
+                                                ToolTip.Tip="Previous command" AutomationProperties.Name="Previous command">
+                                            <Path Classes="glyph" Data="{StaticResource SshIcoUp}"/>
+                                        </Button>
+                                        <Button Classes="icon" Focusable="False" Click="OnHistoryNext"
+                                                ToolTip.Tip="Next command" AutomationProperties.Name="Next command">
+                                            <Path Classes="glyph" Data="{StaticResource SshIcoDown}"/>
+                                        </Button>
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                         </Grid>
@@ -796,7 +829,8 @@
                                     </Grid>
                                 </Border>
                                 <ListBox x:Name="SshFileList" KeyDown="OnFileListKeyDown" Grid.Row="1" ItemsSource="{Binding FileRows}" SelectedItem="{Binding SelectedFile}"
-                                         SelectionMode="Single" ScrollViewer.HorizontalScrollBarVisibility="Disabled" DoubleTapped="OnFileDoubleTapped">
+                                         SelectionMode="Single" ScrollViewer.HorizontalScrollBarVisibility="Disabled" DoubleTapped="OnFileDoubleTapped"
+                                         Tapped="OnFileTapped">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate x:DataType="helpers:SshFileRow">
                                             <Grid ColumnDefinitions="Auto, *, Auto, Auto, Auto" ColumnSpacing="10" Margin="12,4" Background="Transparent">
@@ -870,11 +904,11 @@
                                     <Grid x:Name="SshDynFields" ColumnDefinitions="*, 72" ColumnSpacing="10" IsEnabled="{Binding CanEditTunnel}">
                                         <StackPanel>
                                             <TextBlock Classes="fieldLabel" Text="Listen on"/>
-                                            <TextBox Classes="field mono" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding TunnelHost}" PlaceholderText="127.0.0.1"/>
+                                            <TextBox Classes="field mono" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding TunnelHost}" TextInputOptions.ContentType="Url" PlaceholderText="127.0.0.1"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1">
                                             <TextBlock Classes="fieldLabel" Text="Port"/>
-                                            <TextBox Classes="field mono" Text="{Binding TunnelPort}" PlaceholderText="Port"/>
+                                            <TextBox Classes="field mono" Text="{Binding TunnelPort}" TextInputOptions.ContentType="Digits" PlaceholderText="Port"/>
                                         </StackPanel>
                                     </Grid>
                                 </Grid>
@@ -900,8 +934,8 @@
                                     <StackPanel x:Name="SshFwdBind">
                                         <TextBlock Classes="fieldLabel" Text="{Binding NewForwardBindLabel}"/>
                                         <Grid ColumnDefinitions="*, 64" ColumnSpacing="6">
-                                            <TextBox Classes="field mono" Text="{Binding NewForwardBindHost}" PlaceholderText="127.0.0.1"/>
-                                            <TextBox Grid.Column="1" Classes="field mono" Text="{Binding NewForwardBindPort}" PlaceholderText="Port">
+                                            <TextBox Classes="field mono" Text="{Binding NewForwardBindHost}" TextInputOptions.ContentType="Url" PlaceholderText="127.0.0.1"/>
+                                            <TextBox Grid.Column="1" Classes="field mono" Text="{Binding NewForwardBindPort}" TextInputOptions.ContentType="Digits" PlaceholderText="Port">
                                                 <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding AddForwardCommand}"/></TextBox.KeyBindings>
                                             </TextBox>
                                         </Grid>
@@ -910,10 +944,10 @@
                                     <StackPanel x:Name="SshFwdTarget">
                                         <TextBlock Classes="fieldLabel" Text="{Binding NewForwardTargetLabel}"/>
                                         <Grid ColumnDefinitions="*, 64" ColumnSpacing="6">
-                                            <TextBox Classes="field mono" Text="{Binding NewForwardTargetHost}" PlaceholderText="Host">
+                                            <TextBox Classes="field mono" Text="{Binding NewForwardTargetHost}" TextInputOptions.ContentType="Url" PlaceholderText="Host">
                                                 <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding AddForwardCommand}"/></TextBox.KeyBindings>
                                             </TextBox>
-                                            <TextBox Grid.Column="1" Classes="field mono" Text="{Binding NewForwardTargetPort}" PlaceholderText="Port">
+                                            <TextBox Grid.Column="1" Classes="field mono" Text="{Binding NewForwardTargetPort}" TextInputOptions.ContentType="Digits" PlaceholderText="Port">
                                                 <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding AddForwardCommand}"/></TextBox.KeyBindings>
                                             </TextBox>
                                         </Grid>

@@ -54,10 +54,13 @@ public static class SshKeys
         catch (DirectoryNotFoundException) { return Fail("Key file not found: " + Path.GetFileName(path)); }
         catch (UnauthorizedAccessException)
         {
-            // Mac App Store sandbox: a file is readable only in the run it was picked in (the saved path stays, the grant doesn't)
+            // Mac App Store sandbox: a file is readable only in the run it was picked in (the saved path stays, the grant doesn't).
+            // iOS the same for a key outside Echoes' own folder (iCloud Drive, another app's); a key kept in that folder lasts.
             return Fail(AppInfo.IsMacSandbox
                 ? "Pick the key file again: macOS only lets Echoes read it right after it is picked."
-                : "Can't read the key file: access denied.");
+                : OperatingSystem.IsIOS()
+                    ? "Pick the key file again, or keep it in Files › On My iPhone › Echoes."
+                    : "Can't read the key file: access denied.");
         }
         catch (InvalidDataException) { return Fail("This file is too large to be a private key."); }
         catch (Exception ex) { return Fail("Can't read the key file: " + ex.Message); }

@@ -527,7 +527,7 @@ public partial class TlsViewModel : ObservableObject
         var sb = new StringBuilder();
         sb.Append($"TLS inspection — {SocketNet.Target(r.Host, r.Port)}");
         if (r.Address != null) sb.Append($" ({r.Address})");
-        sb.Append($" — {r.CheckedAt:yyyy-MM-dd HH:mm}\n");
+        sb.Append(string.Create(CultureInfo.InvariantCulture, $" — {r.CheckedAt:yyyy-MM-dd HH:mm}\n"));
         sb.Append($"Verdict: {VerdictText}\n");
         if (r.Error != null) sb.Append($"Error: {r.Error}\n");
         if (r.Handshaken) sb.Append($"Connection: {SummaryText}\n");
@@ -667,7 +667,7 @@ public partial class TlsViewModel : ObservableObject
     [RelayCommand]
     private Task CopyBulk() => BulkRows.Count == 0 ? Task.CompletedTask : ClipboardHelper.SetTextAsync(BuildCsv());
 
-    public string SuggestedCsvName => $"tls-check-{DateTime.Now:yyyyMMdd-HHmm}.csv";
+    public string SuggestedCsvName => string.Create(CultureInfo.InvariantCulture, $"tls-check-{DateTime.Now:yyyyMMdd-HHmm}.csv");
 
     public async Task ExportCsvAsync(Stream stream)
     {

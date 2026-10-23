@@ -21,8 +21,14 @@ public partial class TgView : UserControl
         InitializeComponent();
         // Tunnel: before a TextBox turns Enter into a new line.
         AddHandler(KeyDownEvent, OnKeyDownTunnel, RoutingStrategies.Tunnel);
-        // A phone's box cut "from @BotFather" in half; the line under it already says where the token comes from.
-        if (AppPlatform.IsMobile) TokenBox.PlaceholderText = "Bot token";
+        if (AppPlatform.IsMobile)
+        {
+            // A phone's box cut "from @BotFather" in half; the line under it already says where the token comes from.
+            TokenBox.PlaceholderText = "Bot token";
+            // A phone has no Ctrl+Enter, and is tapped rather than clicked.
+            SendStepText.Text = "Fill in the fields and press Send.";
+            HistoryEmptyText.Text = "Sent calls show up here until you close Echoes. Tap one to reopen it.";
+        }
     }
 
     private TgViewModel? Vm => DataContext as TgViewModel;
@@ -43,7 +49,8 @@ public partial class TgView : UserControl
         Avalonia.Threading.Dispatcher.UIThread.Post(() => MethodSearchBox.Focus(), Avalonia.Threading.DispatcherPriority.Input);
     }
 
-    // Ctrl+Enter sends from anywhere in the tool; Enter sends from a one-line parameter box; Escape closes the picker.
+    // Ctrl+Enter sends from anywhere in the tool; Enter sends from a one-line parameter box (not on a phone, where the
+    // keyboard's Return / Done would send a half-filled call); Escape closes the picker.
     private void OnKeyDownTunnel(object? sender, KeyEventArgs e)
     {
         if (Vm is not { } vm) return;
@@ -53,7 +60,7 @@ public partial class TgView : UserControl
             if (!vm.IsSending) vm.SendCommand.Execute(null);
             e.Handled = true;
         }
-        else if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.None
+        else if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.None && !AppPlatform.IsMobile
                  && e.Source is Visual v && v.FindAncestorOfType<TextBox>(includeSelf: true) is { AcceptsReturn: false } tb
                  && tb.Classes.Contains("sendOnEnter"))
         {

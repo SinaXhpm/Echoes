@@ -634,7 +634,7 @@ public partial class SocketViewModel : ObservableObject
     private void SessionEnded()
     {
         _timer?.Stop();
-        if (_guardHeld) { BackgroundGuard.Release(); _guardHeld = false; }
+        if (_guardHeld) { BackgroundGuard.Release("Socket session"); _guardHeld = false; }
         _lastSender = null;
         ResetPeers();
         UpdateTraffic();
@@ -1117,7 +1117,7 @@ public partial class SocketViewModel : ObservableObject
                 4 => "ws-" + (WebSocketClient.TryNormalizeUrl(WsUrl, out var u, out _) ? u!.IdnHost.Trim('[', ']') : "session"),
                 _ => (Host ?? "").Length > 0 ? $"{Host}-{Port}" : "session",
             };
-            return SocketPayload.SafeFileName($"socket-{what}-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+            return SocketPayload.SafeFileName(string.Create(CultureInfo.InvariantCulture, $"socket-{what}-{DateTime.Now:yyyyMMdd-HHmmss}.txt"));
         }
     }
 
@@ -1127,7 +1127,7 @@ public partial class SocketViewModel : ObservableObject
         var snap = Entries.ToArray();
         int view = ViewIndex;
         string mode = ModeIndex switch { 1 => "TCP server", 2 => "UDP client", 3 => "UDP server", 4 => "WebSocket client", _ => "TCP client" };
-        string header = $"# Echoes socket transcript — {mode} — {StatusText} — saved {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+        string header = string.Create(CultureInfo.InvariantCulture, $"# Echoes socket transcript — {mode} — {StatusText} — saved {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         await Task.Run(() =>
         {
             using var w = new StreamWriter(stream, new UTF8Encoding(false), 1 << 16, leaveOpen: true);
@@ -1203,7 +1203,7 @@ public partial class SocketViewModel : ObservableObject
     private static bool TryPort(string? text, out int port, out string? error)
     {
         error = null;
-        if (int.TryParse((text ?? string.Empty).Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out port) && port is >= 1 and <= 65535)
+        if (int.TryParse(LocalDigits.Fold((text ?? string.Empty).Trim()), NumberStyles.None, CultureInfo.InvariantCulture, out port) && port is >= 1 and <= 65535)
             return true;
         error = string.IsNullOrWhiteSpace(text) ? "Enter a port (1–65535)." : $"\"{text!.Trim()}\" isn't a port — use a number from 1 to 65535.";
         return false;

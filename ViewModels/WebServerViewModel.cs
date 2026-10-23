@@ -40,6 +40,46 @@ public sealed partial class SharedFileRow : ObservableObject
         BytesServed = 0;
         OnPropertyChanged(nameof(HasDownloads));
     }
+
+    // ---- the direct link (/f/{token}/{name}): set while the server runs, on the address the page's link uses ----
+
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasLink))] private string _linkUrl = string.Empty;
+    public bool HasLink => LinkUrl.Length > 0;
+    [ObservableProperty] private bool _linkCopied;
+
+    // The same link without the file name, for the QR code: the server ignores the name (and sends it with the file), and
+    // an escaped long or Persian name made the code too dense to scan, or longer than a QR code holds.
+    private string _qrLink = string.Empty;
+    private Bitmap? _qr;
+    /// <summary>The link's QR code, made the first time the row's link panel shows it.</summary>
+    public Bitmap? Qr => _qr ??= _qrLink.Length > 0 ? WebServerViewModel.BuildQr(_qrLink) : null;
+
+    /// <summary>Points the direct link at the server at <paramref name="baseUrl"/> ("https://192.168.1.5:8443/"), or
+    /// removes it (empty: the server is off).</summary>
+    internal void SetLink(string baseUrl)
+    {
+        _qrLink = baseUrl.Length > 0 ? baseUrl + "f/" + Item.LinkToken : string.Empty;
+        LinkUrl = _qrLink.Length > 0 ? _qrLink + "/" + Uri.EscapeDataString(Item.Name) : string.Empty;
+    }
+
+    partial void OnLinkUrlChanged(string value)
+    {
+        var old = _qr;
+        _qr = null;
+        OnPropertyChanged(nameof(Qr));
+        old?.Dispose();
+    }
+
+    // The link panel's Copy: "Copied" on the button for a moment.
+    [RelayCommand]
+    private async Task CopyLink()
+    {
+        if (!HasLink) return;
+        await ClipboardHelper.SetTextAsync(LinkUrl);
+        LinkCopied = true;
+        await Task.Delay(1500);
+        LinkCopied = false;
+    }
 }
 
 /// <summary>One entry in the "how to listen" dropdown. <see cref="Kind"/> is "all" | "loopback" | "iface".</summary>
@@ -261,7 +301,9 @@ public partial class WebServerViewModel : ObservableObject
             LastModifiedUtc = lastModifiedUtc,
         };
         lock (_itemsLock) _items.Add(item);
-        Files.Add(new SharedFileRow { Item = item });
+        var row = new SharedFileRow { Item = item };
+        row.SetLink(FileLinkBase);
+        Files.Add(row);
         OnPropertyChanged(nameof(HasFiles));
         if (notify) _hub?.NotifyFilesChanged();
         return item;

@@ -316,8 +316,14 @@ public partial class CloudflareViewModel
             return;
         }
         rec.DdnsOn = true;
-        SetStatus($"{rec.Name} ({rec.Type}) now follows your public {(rec.Type == "AAAA" ? "IPv6" : "IPv4")}: checked now, then every 5 minutes while Echoes runs.");
+        SetStatus($"{rec.Name} ({rec.Type}) now follows your public {(rec.Type == "AAAA" ? "IPv6" : "IPv4")}: checked now, then every 5 minutes {DdnsWhile}.");
     }
+
+    // When the 5-minute checks run: iOS suspends Echoes soon after it leaves the screen, and Android stops them with the
+    // process (the desktop keeps them going in the tray).
+    private static string DdnsWhile => OperatingSystem.IsIOS() ? "while Echoes is on screen"
+        : OperatingSystem.IsAndroid() ? "while Android keeps Echoes running"
+        : "while Echoes runs";
 
     private string? AddDdns(CfRecord rec, CfZone zone)
     {

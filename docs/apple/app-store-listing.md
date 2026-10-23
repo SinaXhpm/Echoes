@@ -1,15 +1,15 @@
 # App Store Connect: the text to paste
 
-Everything App Store Connect asks for when you create the Echoes app record (iOS and macOS), ready to copy. Character
-limits are Apple's; every value below was counted against them. The iOS wording is a draft: adjust it to what the iOS
-build can really do when it ships (see [README.md](README.md), "iOS: what works and what is left").
+Everything App Store Connect asks for in the Echoes app record (iOS and macOS), ready to copy. Character limits are
+Apple's; every value below was counted against them. Each claim must hold on every platform the text is shown for (App
+Review guideline 2.3.1): see [README.md](README.md), "iOS: what works and what is left".
 
 ## App record (New App)
 
 | Field | Value |
 | :--- | :--- |
 | Platforms | iOS, macOS (one record, universal purchase) |
-| Name (max 30) | `Echoes Network Toolkit` (the name `Echoes` alone is taken) |
+| Name (max 30) | `Echoes: Network Tools & Ping` from 1.0.1 (was `Echoes Network Toolkit`; the name `Echoes` alone is taken) |
 | Primary language | English (U.S.) |
 | Bundle ID | `com.sinaxhpm.echoes` (register it first: Certificates, Identifiers & Profiles > Identifiers) |
 | SKU | `echoes` (internal, never shown, can't change later) |
@@ -17,65 +17,79 @@ build can really do when it ships (see [README.md](README.md), "iOS: what works 
 
 ## Version page (same text for iOS and macOS unless noted)
 
+Plain words for everyone, not only network people, with the words people search for. App Store search reads the name, the
+subtitle and the keywords (and, since 2025, the headlines on the screenshots); the description is for the reader. A word
+in the name or subtitle needn't be repeated in the keywords.
+
 **Subtitle (max 30):**
 ```
-Ping, DNS, speed and port scan
+Speed test, DNS & port scanner
 ```
 
 **Promotional text (max 170, can change without a new build):**
 ```
-Find out why a site won't open. Ping, trace routes, test speed, scan ports, look up DNS and share files: 20 network tools in one free, open-source app.
+Website not opening? Echoes finds out why in one tap. Ping, test your speed, look up DNS, scan ports and share files: 20 network tools in one free app. No ads.
 ```
 
 **Keywords (max 100, comma-separated, no spaces after commas):**
 ```
-ping,traceroute,dns,whois,port scanner,ssh,sftp,curl,tls,ssl,bandwidth,mtr,proxy,uptime,diagnostics
+traceroute,mtr,wifi,ip,whois,ssl,certificate,ssh,curl,http,api,monitor,uptime,lan,router,latency
 ```
 
 **Description (max 4000):**
 ```
-Echoes is a free, open-source toolkit for diagnosing a network and working with servers. Twenty tools in one app, with no account, no ads and no tracking.
+Echoes puts 20 network tools in one free app. Find out why a website won't open, test your internet speed, ping a server, look up a domain, check a website's security certificate, or send files to another phone or computer on your Wi-Fi. No account, no ads, no tracking.
 
-FIND OUT WHY A SITE WON'T OPEN
-The Doctor checks your network, DNS, the connection, TLS and HTTP step by step, compares with servers abroad and tells you in one sentence what is wrong: DNS tampering, SNI filtering, a blocked IP, a filter page, or a site that is down for everyone.
+WEBSITE NOT OPENING?
+Tap Doctor and Echoes checks everything for you: your connection, DNS, the server and its certificate. Then it tells you in plain words what is wrong and what you can do about it.
 
-TEST THE CONNECTION
-• Ping with a live latency graph, loss and jitter (ICMP, UDP or TCP)
-• Traceroute and MTR: see the hop where packet loss starts
-• Speed test: download, upload, latency under load and a bufferbloat grade
-• Port scanner and ping sweep for your own network or a server you manage
-• Check Host: test a site or a port from servers around the world
+TEST YOUR CONNECTION
+• Ping any website or server and watch the delay and packet loss live
+• Traceroute and MTR: see where on the way the slowdown starts
+• Speed test: download, upload and ping in seconds
+• Port scanner: find the devices on your network and what they run
+• Check Host: test a website from servers around the world
 
 LOOK THINGS UP
-• DNS lookups, DNS over HTTPS and a resolver comparison
-• WHOIS / RDAP, IP information and an SSL/TLS certificate inspector
-• Mail check: MX, SPF, DKIM, DMARC and blocklists
+• DNS lookup, also over HTTPS and TLS
+• WHOIS: where a domain is registered and when it expires
+• Your IP address and where it is
+• SSL certificate check: who issued it and when it runs out
+• Email check: MX, SPF, DKIM and DMARC records
 
-WORK WITH SERVERS
-• SSH and SFTP client with port forwarding
-• cURL / HTTP client: paste a "Copy as cURL" command and send it
-• Raw TCP, UDP and WebSocket sockets, as client or server
-• Cloudflare manager for DNS records and settings, with dynamic DNS
-• Uptime monitor with Telegram alerts
+FOR DEVELOPERS AND ADMINS
+• SSH terminal and SFTP file transfer
+• HTTP client: paste a curl command and send it
+• TCP, UDP and WebSocket tester
+• Uptime monitor with sound and Telegram alerts
+• Cloudflare DNS manager with dynamic DNS
+• Telegram bot tester
 
-SHARE AND CONNECT
-• File sharing and chat over HTTPS: start the server, scan the QR code, and send text and files both ways with any device that has a browser
-• Request catcher for webhooks, and a proxy server
-• Servers and monitors run while Echoes is open
+SEND FILES WITHOUT CABLES
+Start the web server and scan its QR code with another phone or computer: you can send files and messages both ways in the browser. Every file you share also gets its own download link and QR code. On iPhone and iPad, servers, monitors and dynamic DNS run while Echoes is on screen.
 
-AND MORE
-• Encrypted notes, string and JSON tools, and a history for every tool
-• Dark and light themes
+HANDY EXTRAS
+• Strong password generator
+• Hash, Base64, URL, JSON and JWT tools
+• Encrypted notes
+• A history in every tool, and dark and light mode
 
 PRIVATE BY DESIGN
-No account, no ads, no analytics. Your data stays on your device and secrets are encrypted. Echoes contacts only the hosts you test and the public services a tool needs. Open source under the MIT license: github.com/SinaXhpm/Echoes
+No account, no ads, no analytics. Your data stays on your device, and passwords and tokens are stored encrypted. Echoes only talks to the servers you choose to test. Free and open source: github.com/SinaXhpm/Echoes
 ```
 
-**What's new (max 4000), first version:**
+**What's new in 1.0.1 (iOS):**
 ```
-First release on the App Store.
+• Share a file with its own download link and QR code: scan it with another phone to get the file.
+• Easier typing: no autocorrect in address fields, a number pad for ports, and Persian, Arabic and other digits just work.
+• Press and hold a button to see what it does.
+• Pages scroll when the keyboard is open or the phone is sideways.
+• Servers start again by themselves if iOS closed them while Echoes was away.
+• Ping matches every reply to its own request, so a device that is offline never shows as online.
+• Lighter on battery and memory, plus many small fixes.
 ```
 
+**What's new (max 4000), first version (macOS 1.0.0):** not asked for.
 **URLs and legal:**
 
 | Field | Value |
@@ -95,7 +109,7 @@ Contact: your name, phone and e-mail. Demo account: not needed (no account). Not
 ```
 Echoes is a network diagnostic and developer toolkit (ping, traceroute, DNS, port scanner, SSH client, speed test, HTTP client, file sharing). There is no account, login or in-app purchase, so no demo account is needed. It is open source (MIT): https://github.com/SinaXhpm/Echoes
 
-Every network action starts from the user's own button press and targets a host the user typed. Nothing runs in the background and nothing is sent to the developer: there is no analytics, advertising or tracking SDK.
+Every network action starts from the user's own button press, or from a setting the user turned on (such as starting the monitor when the app opens), and targets a host the user entered. Nothing runs while the app is closed and nothing is sent to the developer: there is no analytics, advertising or tracking SDK, and the App Store build never checks for updates itself.
 
 - Local Network permission: the scanner, ping sweep and LAN file sharing talk to devices on the user's own Wi-Fi. The first use shows the system prompt with the purpose string.
 - Port scanner: a plain TCP connect scan of an address range the user enters, meant for their own network or servers they manage (like other network utilities on the App Store).
@@ -117,8 +131,8 @@ crash reporting or any SDK later, redo this questionnaire first. Privacy Policy 
 Answer the questionnaire **None** for violence, sexual content, profanity, gambling, horror, medical and drug
 questions. Two need a deliberate answer:
 
-- **Unrestricted web access:** answer **No**. The cURL tool shows a page's HTML in a web view with scripts and outside
-  resources blocked, and it is not a browser. (If App Review disagrees, the rating moves up; it is not a rejection.)
+- **Unrestricted web access:** answer **No**. The cURL tool shows a page's HTML in a web view with scripts, forms and
+  navigation blocked, and it is not a browser. (If App Review disagrees, the rating moves up; it is not a rejection.)
 - **Messaging and chat:** answer **Yes**: the Web Server's chat lets the people the owner lets in with a PIN write to
   each other. **User-generated content:** **No**, there is nothing public. Declaring the chat does not change the
   rating: App Store Connect still computes 4+.

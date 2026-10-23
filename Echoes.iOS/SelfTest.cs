@@ -255,7 +255,7 @@ internal static class SelfTest
             BackgroundGuard.Acquire("self-test");
             await Task.Delay(700, ct).ConfigureAwait(false);
             bool on = await Dispatcher.UIThread.InvokeAsync(() => UIKit.UIApplication.SharedApplication.IdleTimerDisabled);
-            BackgroundGuard.Release();
+            BackgroundGuard.Release("self-test");
             await Task.Delay(700, ct).ConfigureAwait(false);
             bool off = !await Dispatcher.UIThread.InvokeAsync(() => UIKit.UIApplication.SharedApplication.IdleTimerDisabled);
             if (!on || !off) throw new InvalidOperationException($"the screen stayed on: {on} while running, released after: {off}");
@@ -397,9 +397,9 @@ internal static class SelfTest
             return null;
         }
         if (tag == "DATA")   // History and Backup share one entry (two tabs: only the first one is on screen)
-            return Page(shell.FindControl<Decorator>("HistoryHost")?.Child as Control, "History", true)
-                ?? Page(shell.FindControl<Decorator>("BackupHost")?.Child as Control, "Backup", false);
-        return index < pages.ItemCount && pages.Items[index] is Decorator host ? Page(host.Child as Control, tag, true) : $"no page for {tag}";
+            return Page(shell.FindControl<Decorator>("HistoryHost") is { } history ? ToolViews.ViewIn(history) : null, "History", true)
+                ?? Page(shell.FindControl<Decorator>("BackupHost") is { } backup ? ToolViews.ViewIn(backup) : null, "Backup", false);
+        return index < pages.ItemCount && pages.Items[index] is Decorator host ? Page(ToolViews.ViewIn(host), tag, true) : $"no page for {tag}";
     }
 
     // UI thread: a picture of the whole shell (the app bar and the page) at twice the size, for the CI artifacts.

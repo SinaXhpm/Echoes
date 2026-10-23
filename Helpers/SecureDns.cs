@@ -65,6 +65,7 @@ public sealed class ResolverSpec
         spec = null;
         error = "";
         string s = (text ?? "").Trim();
+        if (!LocalDigits.HasNonAsciiLetter(s)) s = LocalDigits.Fold(s);   // a resolver IP typed in Persian / Arabic digits
         if (s.Length == 0) { error = "empty"; return false; }
         if (s.Length > 512) { error = "too long"; return false; }
 
@@ -189,7 +190,8 @@ public sealed class ResolverSpec
         else
         {
             string ascii;
-            try { ascii = new IdnMapping().GetAscii(host.TrimEnd('.')); } catch { ascii = host; }
+            // lowercased first: in invariant mode (the desktop release) GetAscii doesn't fold "Ä", and gave another xn-- name
+            try { ascii = new IdnMapping().GetAscii(host.TrimEnd('.').ToLowerInvariant()); } catch { ascii = host; }
             if (!HostExtractor.IsHostName(ascii, requireDot: true)) { error = "not a host name or IP"; return false; }
             host = ascii.ToLowerInvariant();
             tlsName = host;
@@ -937,7 +939,7 @@ public static class SecureDns
     public static string ToAscii(string host)
     {
         if (string.IsNullOrEmpty(host) || IPAddress.TryParse(host, out _)) return host;
-        try { return new IdnMapping().GetAscii(host.TrimEnd('.')); }
+        try { return new IdnMapping().GetAscii(host.TrimEnd('.').ToLowerInvariant()); }   // lowercased: see TryParse
         catch { return host; }
     }
 }

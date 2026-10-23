@@ -154,7 +154,8 @@ internal static class ToolViews
         if (host.Child is not null) return;
         try
         {
-            host.Child = Create(tool, vm);
+            var view = Create(tool, vm);
+            host.Child = view is not null && AppPlatform.IsMobile ? PhonePage(view) : view;
         }
         catch (Exception ex)
         {
@@ -172,6 +173,39 @@ internal static class ToolViews
             host.Child = error;
         }
     }
+
+    // A phone page is laid out at the screen's height, but never below this: in landscape, or with the keyboard over half
+    // the screen, a page squeezed into what was left clipped its lower fields and buttons out of reach. Below it the page
+    // scrolls as a whole (the shell brings the focused box above the keyboard); from it up the page is exactly the screen,
+    // laid out as before. A tool that already scrolls as a whole is left as it is.
+    private const double PhoneMinHeight = 600;
+
+    private static Control PhonePage(Control view)
+    {
+        // a page that scrolls as a whole already, and cURL, whose web preview is a native view (a scroller can't clip one)
+        if (view is UserControl { Content: ScrollViewer } or CurlView) return view;
+        var frame = new Decorator { Child = view, Height = PhoneMinHeight };
+        var page = new ScrollViewer
+        {
+            Content = frame,
+            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+        };
+        page.Classes.Add(PhonePageClass);
+        page.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == ScrollViewer.ViewportProperty)
+                frame.Height = Math.Max(PhoneMinHeight, page.Viewport.Height);
+        };
+        return page;
+    }
+
+    private const string PhonePageClass = "phonePage";
+
+    /// <summary>The tool view a page host holds (on a phone it sits inside the page's scroller).</summary>
+    public static Control? ViewIn(Decorator host)
+        => host.Child is ScrollViewer { Content: Decorator { Child: Control view } } page && page.Classes.Contains(PhonePageClass)
+            ? view : host.Child;
 
     // Keyed by the nav Tag shared by both shells. The VMs come from MainViewModel's lazy getters (the one
     // source of VMs); TELEGRAM BOT, SPEED TEST, TLS and SOCKET have no slot there and own their VM (the view,

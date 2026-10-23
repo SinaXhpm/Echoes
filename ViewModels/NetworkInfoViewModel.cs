@@ -56,8 +56,9 @@ public partial class NetworkInfoViewModel : ObservableObject
     [ObservableProperty] private bool _routesHasRows;
     [ObservableProperty] private string _routesNote = string.Empty;
 
-    /// <summary>The sub-tab shown (0 Interfaces · 1 Wi-Fi · 2 Neighbors · 3 Ports · 4 Routing): the one used last.</summary>
-    [ObservableProperty] private int _tabIndex = Math.Clamp(ProfileService.Instance.GetInt(TabKey, 0), 0, 4);
+    /// <summary>The sub-tab shown (0 Interfaces · 1 Wi-Fi · 2 Neighbors · 3 Ports · 4 Routing): the one used last, unless
+    /// this platform doesn't show it.</summary>
+    [ObservableProperty] private int _tabIndex = ShownTab(ProfileService.Instance.GetInt(TabKey, 0));
     private const string TabKey = "net.tab";
 
     partial void OnTabIndexChanged(int value)
@@ -66,13 +67,35 @@ public partial class NetworkInfoViewModel : ObservableObject
             ProfileService.Instance.SetSetting(TabKey, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
+    // The tabs this platform can fill: a tab that could only say "not available" isn't shown. Phones keep the Wi-Fi scan,
+    // ARP, socket and routing tables from apps, so they show Interfaces alone (and no tab strip for it); macOS has no
+    // Wi-Fi, ARP or routing reader here.
+    public bool ShowWifiTab => WifiScanner.IsAvailable;
+    public bool ShowNeighborsTab => NetTables.CanReadNeighbors;
+    public bool ShowPortsTab => NetTables.CanReadPorts;
+    public bool ShowRoutesTab => NetTables.CanReadRoutes;
+    public bool ShowTabStrip => ShowWifiTab || ShowNeighborsTab || ShowPortsTab || ShowRoutesTab;
+
+    private static int ShownTab(int index) => index switch
+    {
+        1 when WifiScanner.IsAvailable => 1,
+        2 when NetTables.CanReadNeighbors => 2,
+        3 when NetTables.CanReadPorts => 3,
+        4 when NetTables.CanReadRoutes => 4,
+        _ => 0,
+    };
+
+    /// <summary>Android / iOS: the fields the OS keeps from apps (every card shows "—" for them), said once.</summary>
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasHiddenFieldsNote))] private string _hiddenFieldsNote = string.Empty;
+    public bool HasHiddenFieldsNote => HiddenFieldsNote.Length > 0;
+
     public NetworkInfoViewModel()
     {
         RestoreWifiSort();
         _ = RefreshAsync();
-        _ = RefreshPorts();
-        _ = RefreshNeighbors();
-        _ = RefreshRoutes();
+        if (ShowPortsTab) _ = RefreshPorts();
+        if (ShowNeighborsTab) _ = RefreshNeighbors();
+        if (ShowRoutesTab) _ = RefreshRoutes();
     }
 
     [RelayCommand]
@@ -116,11 +139,28 @@ public partial class NetworkInfoViewModel : ObservableObject
         {
             var list = await Task.Run(BuildAdapters);
             Adapters = new ObservableCollection<NetworkAdapterInfo>(list);
+            HiddenFieldsNote = HiddenFields(list);
         }
         catch
         {
             Adapters = new ObservableCollection<NetworkAdapterInfo>();
+            HiddenFieldsNote = string.Empty;
         }
+    }
+
+    // Android and iOS withhold some fields from apps, and every card then shows "—" for them: name those (the ones no
+    // adapter has) once, so the dashes don't read as a fault. Desktops have no such rule.
+    private static string HiddenFields(List<NetworkAdapterInfo> list)
+    {
+        string os = OperatingSystem.IsAndroid() ? "Android" : OperatingSystem.IsIOS() ? "iOS" : string.Empty;
+        if (os.Length == 0 || list.Count == 0) return string.Empty;
+        var hidden = new List<string>();
+        if (list.All(a => a.Gateway == "—")) hidden.Add("gateway");
+        if (list.All(a => a.Dns == "—")) hidden.Add("DNS servers");
+        if (list.All(a => a.MacAddress == "—")) hidden.Add("MAC");
+        if (hidden.Count == 0) return string.Empty;
+        string what = hidden.Count == 1 ? hidden[0] : string.Join(", ", hidden.Take(hidden.Count - 1)) + " and " + hidden[^1];
+        return $"{os} hides the {what} from apps.";   // "Android hides the gateway, DNS servers and MAC from apps."
     }
 
     [RelayCommand]
@@ -170,10 +210,12 @@ public partial class NetworkInfoViewModel : ObservableObject
                 }
                 catch { /* GetIPProperties unsupported for this interface — keep name/type/status */ }
 
-                // MAC: unavailable on Android 6+ (returns empty / 02:00:00:00:00:00 by OS privacy policy).
+                // MAC: unavailable on Android 6+ and iOS (empty, or the 02:00:00:00:00:00 placeholder by OS privacy
+                // policy): the placeholder shows as "—", not as an address.
                 try
                 {
                     var m = ni.GetPhysicalAddress().ToString();
+                    if (m == "020000000000") m = string.Empty;
                     if (m.Length == 12) mac = string.Join(":", Enumerable.Range(0, 6).Select(i => m.Substring(i * 2, 2)));
                     else if (m.Length > 0) mac = m;
                 }

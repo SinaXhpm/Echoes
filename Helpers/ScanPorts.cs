@@ -23,9 +23,9 @@ public sealed class ScanPortSpec
         var seenUdp = new HashSet<int>();
         bool useTcp = tcp, useUdp = udp;
 
-        foreach (var raw in input.Split(new[] { ',', ';', ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+        foreach (var raw in input.Split(new[] { ',', ';', ' ', '\t', '\r', '\n', '\u060C', '\u061B' }, StringSplitOptions.RemoveEmptyEntries))
         {
-            string item = raw.Trim();
+            string item = LocalDigits.Fold(raw.Trim());   // digits typed in the phone's language
             if (item.Length >= 2 && item[1] == ':' && item[0] is 'T' or 't' or 'U' or 'u')
             {
                 useTcp = item[0] is 'T' or 't';

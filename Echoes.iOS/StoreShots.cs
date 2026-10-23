@@ -40,7 +40,10 @@ internal static class StoreShots
                 ?? throw new InvalidOperationException("the shell has no view-model");
 
             await Run("doctor", Doctor);
+            await Run("menu", Menu);
             await Run("ping", Ping);
+            await Run("speed", Speed);
+            await Run("monitor", Monitor);
             await Run("share", Share);
             await Run("dns", Dns);
             await Run("tls", Tls);
@@ -64,9 +67,46 @@ internal static class StoreShots
     {
         await Open("DOCTOR");
         var vm = _main.DoctorVM;
-        await Ui(() => { vm.Target = "example.com"; vm.ToggleRunCommand.Execute(null); });
+        // an iPad's tall page shows each check's steps too (Details), instead of half a page of nothing
+        bool wide = await Ui(() => _shell.Bounds.Width > 700);
+        await Ui(() => { vm.ShowDetails = wide; vm.Target = "example.com"; vm.ToggleRunCommand.Execute(null); });
         await Until(() => !vm.IsRunning, 150_000);
         await Shot("doctor");
+    }
+
+    // The drawer open over the Doctor's result: every tool at a glance.
+    private static async Task Menu()
+    {
+        await Ui(() => _shell.FindControl<SplitView>("Split")!.IsPaneOpen = true);
+        await Task.Delay(1000);
+        await Shot("menu");
+        await Ui(() => _shell.FindControl<SplitView>("Split")!.IsPaneOpen = false);
+        await Task.Delay(600);
+    }
+
+    private static async Task Speed()
+    {
+        await Open("SPEED TEST");
+        var vm = await Ui(() => (SpeedTestViewModel)ToolView<SpeedTestView>().DataContext!);
+        await Ui(() => vm.ToggleCommand.Execute(null));
+        await Until(() => !vm.IsRunning, 150_000);
+        await Shot("speed");
+    }
+
+    // A few public sites checked every 5 s for about 40 s: the list shows their state, latency and a short graph.
+    private static async Task Monitor()
+    {
+        await Open("MONITOR");
+        var vm = _main.MonitorVM;
+        await Ui(() =>
+        {
+            vm.NewTarget = "example.com\n1.1.1.1\nhttps://www.apple.com\ngithub.com:443\n8.8.8.8";
+            vm.AddTargetsCommand.Execute(null);
+            if (!vm.IsMonitoring) vm.ToggleMonitorCommand.Execute(null);
+        });
+        await Task.Delay(40_000);
+        await Shot("monitor");
+        await Ui(() => { if (vm.IsMonitoring) vm.ToggleMonitorCommand.Execute(null); });
     }
 
     private static async Task Ping()
@@ -150,6 +190,8 @@ internal static class StoreShots
         await Ui(() => { vm.UseDotNetEngine = true; vm.HttpMethod = "GET"; vm.Url = "https://example.com/"; });
         await Dispatcher.UIThread.InvokeAsync(() => vm.ToggleCurlCommand.ExecuteAsync(null));
         await Until(() => !vm.IsWorking, 60_000);
+        await Ui(() => vm.ResponseTabIndex = 2);   // Timing: where the time went (DNS, connect, TLS, first byte)
+        await Task.Delay(800);
         await Shot("curl");
     }
 
@@ -202,7 +244,7 @@ internal static class StoreShots
     {
         var nav = _shell.FindControl<ListBox>("Nav")!;
         var pages = _shell.FindControl<Carousel>("Pages")!;
-        return (pages.Items[nav.SelectedIndex] as Decorator)?.Child as T ?? throw new InvalidOperationException("the page isn't a " + typeof(T).Name);
+        return (pages.Items[nav.SelectedIndex] is Decorator host ? ToolViews.ViewIn(host) : null) as T ?? throw new InvalidOperationException("the page isn't a " + typeof(T).Name);
     }
 
     // Tells the workflow the scene is on screen and waits (at most a minute) until it has taken the screenshot.

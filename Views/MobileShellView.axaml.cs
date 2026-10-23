@@ -1,7 +1,13 @@
 using System;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Echoes.Helpers;
 using Echoes.ViewModels;
 
@@ -46,20 +52,58 @@ public partial class MobileShellView : UserControl
             _top.BackRequested += OnBackRequested;
             _pane = _top.InputPane;
             if (_pane is not null) _pane.StateChanged += OnInputPaneChanged;
+            _overlays = OverlayLayer.GetOverlayLayer(this);
+            if (_overlays is not null) _overlays.Children.CollectionChanged += OnOverlaysChanged;
+            UpdateOverlay();
         };
         DetachedFromVisualTree += (_, _) => Unhook();
+
+        Split.PropertyChanged += (_, e) => { if (e.Property == SplitView.IsPaneOpenProperty) UpdateOverlay(); };
+
+        // handledEventsToo: buttons mark their presses handled; tunnel: before the control under the finger acts on them
+        AddHandler(HoldingEvent, OnHolding, RoutingStrategies.Bubble, handledEventsToo: true);
+        AddHandler(PointerPressedEvent, (_, _) => { _swallowRelease = false; CloseHeldTip(); }, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(PointerReleasedEvent, OnPointerReleasedAfterHold, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
     private TopLevel? _top;
     private Avalonia.Controls.Platform.IInputPane? _pane;
+    private OverlayLayer? _overlays;
+    private MainViewModel? _vm;
     private Thickness? _pagesMargin;   // the page area's own margin, before any room was made for the keyboard
 
     private void Unhook()
     {
         if (_top is not null) _top.BackRequested -= OnBackRequested;
         if (_pane is not null) _pane.StateChanged -= OnInputPaneChanged;
+        if (_overlays is not null) _overlays.Children.CollectionChanged -= OnOverlaysChanged;
         _top = null;
         _pane = null;
+        _overlays = null;
+    }
+
+    // ---------------------------------------------------------------- what covers the page
+
+    // cURL's web preview is a native view, drawn above everything Avalonia draws: it hides while the drawer, the About box
+    // or a flyout / menu / drop-down list is open over the page (AppPlatform.OverlayOpen).
+    private void UpdateOverlay()
+        => AppPlatform.SetOverlay(Split is { IsPaneOpen: true } || _vm is { IsAboutOpen: true } || TopPopup() is not null);
+
+    private void OnOverlaysChanged(object? sender, NotifyCollectionChangedEventArgs e) => UpdateOverlay();
+
+    private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.IsAboutOpen)) UpdateOverlay();
+    }
+
+    // The popup drawn last, the one on top: a flyout, a menu or a drop-down list (a tooltip has no Popup of its own).
+    private Popup? TopPopup()
+    {
+        if (_overlays is null) return null;
+        for (int i = _overlays.Children.Count - 1; i >= 0; i--)
+            if (_overlays.Children[i] is OverlayPopupHost { IsVisible: true, Content: Control { Parent: Popup { IsOpen: true } popup } })
+                return popup;
+        return null;
     }
 
     // The on-screen keyboard is drawn OVER the app: a box in the lower half (a chat's message box, a form's last field)
@@ -81,12 +125,87 @@ public partial class MobileShellView : UserControl
                 Avalonia.Threading.DispatcherPriority.Background);
     }
 
-    // Android back with the drawer open closes the drawer instead of leaving the app (the About box handles its own).
+    // Android back closes what is on top first, the way Escape does on a desktop: the drawer, then a flyout, menu or
+    // drop-down list (Avalonia closes none of them on back), then whatever the page closes on Escape (cURL's import and
+    // save panels, a rename, the Telegram browser). With nothing left to close, Android leaves the app as before. The About
+    // box handles its own.
     private void OnBackRequested(object? sender, RoutedEventArgs e)
     {
-        if (e.Handled || Split is not { IsPaneOpen: true }) return;
-        Split.IsPaneOpen = false;
-        e.Handled = true;
+        if (e.Handled) return;
+        if (Split is { IsPaneOpen: true }) { Split.IsPaneOpen = false; e.Handled = true; return; }
+        if (_vm is { IsAboutOpen: true }) return;
+        if (TopPopup() is { } popup) { popup.IsOpen = false; e.Handled = true; return; }
+        e.Handled = EscapeOnPage();
+    }
+
+    // An Escape press where the keyboard focus is (on the page itself when nothing there has focus).
+    private bool EscapeOnPage()
+    {
+        Interactive? target = _top?.FocusManager?.GetFocusedElement() is Control { IsEffectivelyVisible: true } focused
+                              && focused.IsAttachedToVisualTree() ? focused : SelectedPage();
+        if (target is null) return false;
+        var esc = new KeyEventArgs { RoutedEvent = KeyDownEvent, Key = Key.Escape, KeyDeviceType = KeyDeviceType.Keyboard };
+        target.RaiseEvent(esc);
+        return esc.Handled;
+    }
+
+    private Control? SelectedPage()
+        => Pages is { SelectedIndex: >= 0 } && Pages.SelectedIndex < Pages.ItemCount && Pages.Items[Pages.SelectedIndex] is Decorator host
+            ? ToolViews.ViewIn(host) : null;
+
+    // ---------------------------------------------------------------- long-press tooltips
+
+    // A phone has no hover, so the help kept in tooltips (what an option does, an icon button's name) never showed. A
+    // finger held on a control shows its tooltip for a few seconds, as Android does for icon buttons, and the release
+    // ending that press doesn't click it. Text boxes keep long-press for selecting text, and a control with a context menu
+    // keeps it for the menu.
+    private Control? _heldTip;
+    private bool _swallowRelease;
+    private DispatcherTimer? _tipTimer;
+
+    private void OnHolding(object? sender, HoldingRoutedEventArgs e)
+    {
+        if (e.HoldingState != HoldingState.Started || e.PointerType == PointerType.Mouse) return;
+        Control? tipped = null;
+        for (var v = e.Source as Visual; v is not null && !ReferenceEquals(v, this); v = v.GetVisualParent())
+        {
+            if (v is not Control c) continue;
+            if (tipped is null)
+            {
+                if (c is TextBox or AutoCompleteBox) return;   // a hold on the text selects it
+                if (c.ContextMenu is not null || c.ContextFlyout is not null) return;
+                if (ToolTip.GetTip(c) is not null) tipped = c;
+            }
+            // a menu further up opens on the same hold; a text box's own menu only from its text (the paste icon's
+            // hold doesn't reach it)
+            else if (c is not (TextBox or AutoCompleteBox) && (c.ContextMenu is not null || c.ContextFlyout is not null)) return;
+        }
+        if (tipped is not null) ShowHeldTip(tipped);
+    }
+
+    private void ShowHeldTip(Control c)
+    {
+        CloseHeldTip();
+        _heldTip = c;
+        _swallowRelease = true;
+        ToolTip.SetIsOpen(c, true);
+        _tipTimer ??= new DispatcherTimer(TimeSpan.FromSeconds(4), DispatcherPriority.Normal, (_, _) => CloseHeldTip());
+        _tipTimer.Stop();
+        _tipTimer.Start();
+    }
+
+    private void CloseHeldTip()
+    {
+        _tipTimer?.Stop();
+        if (_heldTip is { } c) ToolTip.SetIsOpen(c, false);
+        _heldTip = null;
+    }
+
+    private void OnPointerReleasedAfterHold(object? sender, PointerReleasedEventArgs e)
+    {
+        if (!_swallowRelease) return;
+        _swallowRelease = false;
+        e.Handled = true;   // the press showed a tooltip: the button under it isn't clicked
     }
 
     // Android draws the status / navigation bars itself. This picks their icons' dark or light look for the theme; the
@@ -104,7 +223,14 @@ public partial class MobileShellView : UserControl
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
-        if (DataContext is MainViewModel vm) EnsureSelectedToolView(vm);
+        if (_vm is not null) _vm.PropertyChanged -= OnVmPropertyChanged;
+        _vm = DataContext as MainViewModel;
+        if (_vm is not null)
+        {
+            _vm.PropertyChanged += OnVmPropertyChanged;
+            EnsureSelectedToolView(_vm);
+        }
+        UpdateOverlay();
     }
 
     private void TogglePane(object? sender, RoutedEventArgs e)

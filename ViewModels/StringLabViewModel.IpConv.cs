@@ -7,6 +7,7 @@ using System.Numerics;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Echoes.Helpers;
 
 namespace Echoes.ViewModels;
 
@@ -23,7 +24,7 @@ public partial class StringLabViewModel
         try
         {
             ResetError();
-            string s = IpConvInput.Trim();
+            string s = LocalDigits.Fold(IpConvInput.Trim());
             if (s.Length == 0) return;
 
             string? note = null;

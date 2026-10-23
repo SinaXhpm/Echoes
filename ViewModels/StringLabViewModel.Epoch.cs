@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Echoes.Helpers;
 
 namespace Echoes.ViewModels;
 
@@ -31,7 +32,7 @@ public partial class StringLabViewModel
         try
         {
             ResetError();
-            var s = EpochInput.Trim();
+            var s = LocalDigits.Fold(EpochInput.Trim());
             if (string.IsNullOrEmpty(s)) return;
 
             if (!TryParseEpochInput(s, out DateTimeOffset dto, out string how))

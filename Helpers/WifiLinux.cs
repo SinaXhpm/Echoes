@@ -83,7 +83,9 @@ public static class WifiLinux
                 CreateNoWindow = true,
             };
             foreach (var a in args) psi.ArgumentList.Add(a);
-            psi.Environment["LC_ALL"] = "C";   // units and messages in English, whatever the desktop's locale
+            // units and messages in English, whatever the desktop's locale; UTF-8, or GLib turned every non-ASCII SSID into
+            // "????" (where C.UTF-8 doesn't exist this is plain C, as before)
+            psi.Environment["LC_ALL"] = "C.UTF-8";
             using var p = Process.Start(psi);
             if (p is null) return (-1, "", "nmcli didn't start");
             // Both pipes are read in the background, so the deadline holds even while the tool keeps its output open (a

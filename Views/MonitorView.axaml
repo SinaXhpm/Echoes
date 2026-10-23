@@ -1014,7 +1014,7 @@
                         </StackPanel>
                         <!-- [address | user | password]; a phone gives the address its own row (styles above) -->
                         <Grid ColumnDefinitions="2*, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="8" IsVisible="{Binding TgUseProxy}">
-                            <TextBox x:Name="TgProxyAddr" Classes="field mono" Text="{Binding TgProxy}"
+                            <TextBox x:Name="TgProxyAddr" Classes="field mono" Text="{Binding TgProxy}" TextInputOptions.ContentType="Url"
                                      PlaceholderText="host:port or socks5://host:port" AutomationProperties.Name="Proxy address"/>
                             <TextBox x:Name="TgProxyUser" Classes="field" Text="{Binding TgProxyUser}" PlaceholderText="User (optional)"
                                      AutomationProperties.Name="Proxy user"/>

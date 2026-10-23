@@ -305,7 +305,7 @@ public static class SshText
     public static bool TryPort(string? text, bool allowZero, out int port)
     {
         port = 0;
-        return int.TryParse(text?.Trim(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out port)
+        return int.TryParse(LocalDigits.FoldOrNull(text)?.Trim(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out port)
                && port <= 65535 && (port > 0 || allowZero);
     }
 }

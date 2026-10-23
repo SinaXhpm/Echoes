@@ -46,6 +46,12 @@
 			<Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
 			<Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
 		</Style>
+		<!-- phones wrap them instead: a SHA-256 or Base64 line ran off the box. No sideways scrolling, or the text is
+			 measured unbounded and never wraps (LabRoot gets "touch" in code-behind) -->
+		<Style Selector="Grid#LabRoot.touch TextBox[IsReadOnly=True]">
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+		</Style>
 		<Style Selector="TextBox[IsReadOnly=True] /template/ Border#PART_BorderElement">
 			<Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
 			<Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
@@ -152,7 +158,7 @@
 		</Style>
 	</UserControl.Styles>
 
-	<Grid RowDefinitions="*, Auto, Auto">
+	<Grid x:Name="LabRoot" RowDefinitions="*, Auto, Auto">
 		<TabControl Grid.Row="0" Classes="seg cats" SelectedIndex="{Binding CategoryIndex}">
 
 			<!-- ============ ENCODE ============ -->
@@ -639,7 +645,7 @@
 										<WrapPanel Classes="actions">
 											<TextBox Classes="field" Width="130" Text="{Binding EditFind}" PlaceholderText="Find"/>
 											<TextBox Classes="field" Width="130" Text="{Binding EditReplace}" PlaceholderText="Replace with"/>
-											<CheckBox IsChecked="{Binding EditIgnoreCase}" Content="Aa"
+											<CheckBox IsChecked="{Binding EditIgnoreCase}" Content="Ignore case"
 													  ToolTip.Tip="Ignore case when finding"/>
 											<Button Command="{Binding EditActionCommand}" CommandParameter="replace" Content="Replace all" Classes="secondary"/>
 										</WrapPanel>
@@ -1063,12 +1069,12 @@
 							<WrapPanel Grid.Row="0" Classes="options">
 								<StackPanel>
 									<TextBlock Classes="fieldLabel" Text="Length"/>
-									<TextBox Classes="field mono" Width="120" Text="{Binding GenerateLength}"
+									<TextBox Classes="field mono" Width="120" Text="{Binding GenerateLength}" TextInputOptions.ContentType="Digits"
 										 ToolTip.Tip="1–4096: characters for passwords, PINs and text tokens; bytes for the hex and Base64 tokens"/>
 								</StackPanel>
 								<StackPanel>
 									<TextBlock Classes="fieldLabel" Text="Count"/>
-									<TextBox Classes="field mono" Width="120" Text="{Binding GenerateCount}"
+									<TextBox Classes="field mono" Width="120" Text="{Binding GenerateCount}" TextInputOptions.ContentType="Digits"
 											 ToolTip.Tip="How many to generate (1–1000)"/>
 								</StackPanel>
 								<CheckBox IsChecked="{Binding GenSymbols}" Content="Symbols"/>

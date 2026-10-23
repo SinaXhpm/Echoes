@@ -148,5 +148,5 @@ public partial class PingViewModel
     }
 
     private static bool TryPort(string? text, out int port)
-        => int.TryParse(text?.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out port) && port is >= 1 and <= 65535;
+        => int.TryParse(LocalDigits.FoldOrNull(text)?.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out port) && port is >= 1 and <= 65535;
 }

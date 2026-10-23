@@ -35,6 +35,19 @@
                         </TextBlock>
                         <TextBlock><Run Text="Endpoint  " Foreground="{DynamicResource Text.Muted}"/><Run Text="{Binding Endpoint}"/></TextBlock>
                     </WrapPanel>
+                    <!-- the row menu's actions in reach: a phone has no right-click, and a long press is easy to miss -->
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="ghost" Padding="10,0" Command="{Binding CopyEndpointCommand}"
+                                ToolTip.Tip="Copy address:port" AutomationProperties.Name="Copy address:port">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Path Classes="btnIco" Data="{StaticResource GlyphCopy}"/>
+                                <TextBlock Text="Copy" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="ghost" Padding="10,0" Command="{Binding OpenInBrowserCommand}" IsVisible="{Binding IsWeb}">
+                            <TextBlock Text="Open in browser" VerticalAlignment="Center"/>
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </DataTemplate>
@@ -269,6 +282,10 @@
         <Style Selector="Border.detail TextBlock.note">
             <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
             <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+        </Style>
+        <!-- a details button's label brightens with the button (the text style above would keep it secondary) -->
+        <Style Selector="Border.detail Button:pointerover TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
         </Style>
 
         <!-- read-only report: an output surface, not an input -->

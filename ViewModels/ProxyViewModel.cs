@@ -57,6 +57,7 @@ public partial class ProxyViewModel : ObservableObject
     private PacedTimer? _statsTimer;
 
     private ProxyServer? _server;
+    private ListenerWatch? _watch;
     // What the running server is actually bound to: the address card shows these, not the (locked)
     // settings, which RebuildBindOptions may still re-pick if an interface goes away.
     private BindOption? _runningBind;
@@ -178,6 +179,9 @@ public partial class ProxyViewModel : ObservableObject
             ResetStats();
             _server = new ProxyServer(RequireAuth ? AuthUser : null, RequireAuth ? AuthPass : null, OnConnection, MaxConnections);
             _server.Start(bind, Port);
+            var server = _server;
+            _watch = new ListenerWatch(bind, Port, reason => RestartLost(server, reason));
+            server.ListenerLost += _watch.Lost;
             _runningBind = SelectedBind ?? new BindOption("All interfaces", IPAddress.Any, "all");
             _runningPort = Port;
             IsRunning = true;
@@ -215,12 +219,23 @@ public partial class ProxyViewModel : ObservableObject
         DrainLog();   // entries logged just before STOP still show
         try { _server?.Dispose(); } catch { }
         _server = null;
+        _watch?.Dispose();
+        _watch = null;
         IsRunning = false;
         if (wasRunning)
         {
-            BackgroundGuard.Release();
+            BackgroundGuard.Release("Proxy server");
             StatusMessage = "Stopped.";
         }
+    }
+
+    // The listening socket is gone (iOS reclaims a suspended app's): the proxy starts again with the same settings.
+    private void RestartLost(ProxyServer server, string reason)
+    {
+        if (!ReferenceEquals(_server, server)) return;
+        StopInternal();
+        Start();
+        if (IsRunning) StatusMessage = $"Started again: the listening socket had closed ({reason}). " + StatusMessage;
     }
 
     /// <summary>Release the listening socket + background guard on app shutdown (and stop a running proxy check).</summary>

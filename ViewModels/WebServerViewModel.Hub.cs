@@ -42,6 +42,7 @@ public partial class WebServerViewModel : IShareHubSink
     public bool IsIdle => !IsRunning && !IsStarting;
 
     private ShareHub? _hub;
+    private ListenerWatch? _watch;   // iOS: the listening socket closed while suspended -> start again
     private ShareCert? _cert;
     private bool _runningPinOn;
     private int _startGen;
@@ -130,7 +131,15 @@ public partial class WebServerViewModel : IShareHubSink
         // only while running (the link row shows then) — no QR per keystroke in the port box
         QrImage = IsRunning && link.Length > 0 ? BuildQr(link) : null;
         old?.Dispose();
+
+        // the shared files' direct links follow the same address, and exist only while the server runs
+        string fileBase = FileLinkBase;
+        foreach (var row in Files) row.SetLink(fileBase);
     }
+
+    /// <summary>Where the files' direct links point: the page's address (without the PIN: the link's own secret lets it
+    /// in), or empty while the server is off.</summary>
+    private string FileLinkBase => IsRunning && SelectedShareUrl is { Length: > 0 } u ? u : string.Empty;
 
     [RelayCommand]
     private async Task CopyLink()
@@ -208,7 +217,10 @@ public partial class WebServerViewModel : IShareHubSink
             return;
         }
 
-        _hub = hub;
+        var live = hub!;
+        _hub = live;
+        _watch = new ListenerWatch(bind.Address, port, reason => RestartLost(live, reason));
+        live.ListenerLost += _watch.Lost;
         _cert = cert;
         _activeBind = bind.Address;
         _activePort = port;
@@ -235,6 +247,17 @@ public partial class WebServerViewModel : IShareHubSink
         _lastActivity = -1;
         _uiTimer.Start();
         FlushUi();
+    }
+
+    // The listening socket is gone (iOS reclaims a suspended app's): the same server starts again, with its files, PIN
+    // and chat; the log says why.
+    private async void RestartLost(ShareHub hub, string reason)
+    {
+        if (!ReferenceEquals(_hub, hub)) return;
+        AppendLog($"the listening socket closed ({reason}): starting again");
+        StopInternal();
+        try { await StartAsync(); }
+        catch (Exception ex) { CrashLog.Write("WebServer.RestartLost", ex); }
     }
 
     // Off the UI thread: the stored certificate (or a new one), then a loopback handshake proving this platform can
@@ -272,6 +295,8 @@ public partial class WebServerViewModel : IShareHubSink
         bool wasRunning = IsRunning;
         var hub = _hub;
         _hub = null;
+        _watch?.Dispose();
+        _watch = null;
         if (hub is not null)
         {
             _history = hub.Messages();
@@ -292,7 +317,7 @@ public partial class WebServerViewModel : IShareHubSink
         RefreshStored();    // partial uploads the hub dropped on stop no longer count
         if (wasRunning)
         {
-            BackgroundGuard.Release();
+            BackgroundGuard.Release("Sharing & chat");
             AppendLog("stopped");
             StatusMessage = "Stopped.";
             StatusIsError = false;

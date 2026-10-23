@@ -544,7 +544,7 @@
                         </StackPanel>
                         <StackPanel x:Name="SkWsProxy">
                             <TextBlock Classes="fieldLabel" Text="Proxy"/>
-                            <TextBox Classes="field mono" Text="{Binding WsProxy}" PlaceholderText="e.g. 127.0.0.1:8080"
+                            <TextBox Classes="field mono" Text="{Binding WsProxy}" TextInputOptions.ContentType="Url" PlaceholderText="e.g. 127.0.0.1:8080"
                                      ToolTip.Tip="Optional HTTP (CONNECT) or SOCKS5 proxy. user:password@ in front of the host signs in."/>
                         </StackPanel>
                         <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,10,0,0">
@@ -576,7 +576,7 @@
                         <Grid x:Name="SkClientRest" ColumnDefinitions="Auto, Auto, *">
                             <StackPanel Grid.Column="0" Classes="hideRunning" Width="88" Margin="0,0,8,0">
                                 <TextBlock Classes="fieldLabel" Text="Port"/>
-                                <TextBox x:Name="PortBox" Classes="field mono" Text="{Binding Port}" PlaceholderText="Port"
+                                <TextBox x:Name="PortBox" Classes="field mono" Text="{Binding Port}" TextInputOptions.ContentType="Digits" PlaceholderText="Port"
                                          helpers:InputAssist.SelectAllOnFocus="True" IsEnabled="{Binding IsIdle}">
                                     <TextBox.KeyBindings>
                                         <KeyBinding Gesture="Enter" Command="{Binding ToggleSessionCommand}"/>
@@ -613,7 +613,7 @@
                         <Grid x:Name="SkServerRest" ColumnDefinitions="Auto, *">
                             <StackPanel Grid.Column="0" Classes="hideRunning" Width="88" Margin="0,0,8,0">
                                 <TextBlock Classes="fieldLabel" Text="Port"/>
-                                <TextBox Classes="field mono" Text="{Binding ListenPort}" PlaceholderText="Port"
+                                <TextBox Classes="field mono" Text="{Binding ListenPort}" TextInputOptions.ContentType="Digits" PlaceholderText="Port"
                                          helpers:InputAssist.SelectAllOnFocus="True" IsEnabled="{Binding IsIdle}">
                                     <TextBox.KeyBindings>
                                         <KeyBinding Gesture="Enter" Command="{Binding ToggleSessionCommand}"/>

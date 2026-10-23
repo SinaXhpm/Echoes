@@ -384,7 +384,7 @@ public partial class CheckHostViewModel
             sb.Append(char.IsAsciiLetterOrDigit(c) || c is '.' or '-' ? c : '_');
         string name = sb.ToString().Trim('_', '.');
         if (name.Length > 60) name = name[..60];
-        return $"check-host-{_runKind.Api()}-{(name.Length > 0 ? name : "result")}-{_runStarted.ToLocalTime():yyyyMMdd-HHmm}{ext}";
+        return string.Create(CultureInfo.InvariantCulture, $"check-host-{_runKind.Api()}-{(name.Length > 0 ? name : "result")}-{_runStarted.ToLocalTime():yyyyMMdd-HHmm}{ext}");
     }
 
     /// <summary>What an export of "txt" (the report), "csv" or "json" holds — as of now: a run still in progress exports

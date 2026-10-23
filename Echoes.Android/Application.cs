@@ -35,7 +35,17 @@ public class MainApplication : AvaloniaAndroidApplication<global::Echoes.App>
         var api = (int)global::Android.OS.Build.VERSION.SdkInt;
         Echoes.Helpers.AppInfo.PlatformOverride = $"Android {os} (API {api})";
         Echoes.Helpers.AppInfo.DeviceName = PhoneName();
+        //  • after a backup restore, "Restart now" opens Echoes again in a fresh process, which loads the restored files.
+        Echoes.Helpers.AppPlatform.RestartApp = RestartApp;
         base.OnCreate();
+    }
+
+    // The launcher activity in a new task, then this process ends (it holds the pre-restore state and saves nothing).
+    private void RestartApp()
+    {
+        if (PackageName is { } package && PackageManager?.GetLaunchIntentForPackage(package)?.Component is { } component)
+            StartActivity(global::Android.Content.Intent.MakeRestartActivityTask(component));
+        Java.Lang.JavaSystem.Exit(0);
     }
 
     // The name the user gave the phone (Settings › About phone › Device name, no permission needed), else maker + model.

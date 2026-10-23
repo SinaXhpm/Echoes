@@ -20,12 +20,33 @@ public static class AppPlatform
     public static bool IsInForeground { get; private set; } = true;
     public static event Action? ForegroundChanged;
 
+    /// <summary>Environment.TickCount64 when Echoes last went out of sight (0 = never): coming back after long enough,
+    /// the servers check iOS hasn't closed their listening sockets meanwhile.</summary>
+    public static long HiddenSince { get; private set; }
+
     public static void SetForeground(bool value)
     {
         if (IsInForeground == value) return;
         IsInForeground = value;
+        if (!value) HiddenSince = Environment.TickCount64;
         ForegroundChanged?.Invoke();
     }
+
+    /// <summary>True while the phone shell's drawer or the About box covers the page. A native view (cURL's web preview)
+    /// is drawn above everything Avalonia draws on Android and iOS, so it hides itself meanwhile.</summary>
+    public static bool OverlayOpen { get; private set; }
+    public static event Action? OverlayChanged;
+
+    public static void SetOverlay(bool open)
+    {
+        if (OverlayOpen == open) return;
+        OverlayOpen = open;
+        OverlayChanged?.Invoke();
+    }
+
+    /// <summary>Starts Echoes again in a fresh process (a restored backup is loaded that way), set by the Android head.
+    /// Null where an app can't do that itself: iOS forbids it, and on a desktop the user quits and starts it.</summary>
+    public static Action? RestartApp { get; set; }
 
     /// <summary>Whether <paramref name="view"/> can be seen: shown, in a window that isn't minimized, the app in front.</summary>
     public static bool OnScreen(Visual view)

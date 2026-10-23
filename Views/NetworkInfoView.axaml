@@ -12,14 +12,19 @@
 	</UserControl.Resources>
 
 	<UserControl.Styles>
-		<!-- ===== switcher: segmented pills; on a phone one row of four equal cells, so a larger
-		     platform font can never wrap it to a second line ===== -->
+		<!-- ===== switcher: segmented pills; on a phone one row of equal cells (one per tab shown), so a
+		     larger platform font can never wrap it to a second line ===== -->
 		<Style Selector="TabControl#NetTabs.seg.narrow">
 			<Setter Property="ItemsPanel">
 				<ItemsPanelTemplate>
-					<UniformGrid Columns="5" ColumnSpacing="4"/>
+					<UniformGrid Rows="1" ColumnSpacing="4"/>
 				</ItemsPanelTemplate>
 			</Setter>
+		</Style>
+		<!-- only Interfaces is left (phones: no other tab can work there): no strip for one tab. The strip goes, not the
+		     tab: a hidden tab can't stay selected, and its page would go blank -->
+		<Style Selector="TabControl#NetTabs.single /template/ ItemsPresenter#PART_ItemsPresenter">
+			<Setter Property="IsVisible" Value="False"/>
 		</Style>
 		<Style Selector="TabControl#NetTabs.seg.narrow > TabItem">
 			<Setter Property="Margin" Value="0"/>
@@ -333,13 +338,14 @@
 	</UserControl.Styles>
 
 	<!-- Padding 0: the shell already pads the page; content lines up with the switcher and title -->
-	<TabControl x:Name="NetTabs" Classes="seg" Padding="0" h:Responsive.BreakWidth="520" SelectedIndex="{Binding TabIndex}">
+	<TabControl x:Name="NetTabs" Classes="seg" Padding="0" h:Responsive.BreakWidth="520" SelectedIndex="{Binding TabIndex}"
+				Classes.single="{Binding !ShowTabStrip}">
 
 		<!-- ============================ INTERFACES ============================ -->
 		<TabItem Header="Interfaces">
 			<ctl:Deferred><DataTemplate x:DataType="vm:NetworkInfoViewModel">
 			<Grid x:Name="IfaceRoot" h:Responsive.BreakWidth="620" RowDefinitions="Auto, *" Margin="0,12,0,0">
-				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,12">
+				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="12" Margin="0,0,0,12">
 					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2" Background="Transparent"
 								ToolTip.Tip="Select any value to copy it, or copy a whole adapter with its copy button">
 						<StackPanel Orientation="Horizontal" Spacing="8">
@@ -355,6 +361,9 @@
 							<TextBlock Text="Refresh" VerticalAlignment="Center"/>
 						</StackPanel>
 					</Button>
+					<!-- Android / iOS: why some fields read "—" on every card -->
+					<TextBlock Grid.Row="1" Grid.ColumnSpan="2" Classes="sectionDesc" Margin="0,8,0,0"
+							   Text="{Binding HiddenFieldsNote}" IsVisible="{Binding HasHiddenFieldsNote}"/>
 				</Grid>
 
 				<!-- virtualized: an adapter card holds dozens of selectable text blocks, and machines with VPN / virtual
@@ -431,7 +440,7 @@
 
 		<!-- ============================ WI-FI ============================ -->
 		<!-- Reads only while this tab is on screen (code-behind tells the view-model): on show, every 10 s, on Refresh. -->
-		<TabItem Header="Wi-Fi">
+		<TabItem Header="Wi-Fi" IsVisible="{Binding ShowWifiTab}">
 			<ctl:Deferred><DataTemplate x:DataType="vm:NetworkInfoViewModel">
 			<Grid x:Name="WifiRoot" AttachedToVisualTree="WifiRoot_Attached" DetachedFromVisualTree="WifiRoot_Detached" h:Responsive.BreakWidth="560" RowDefinitions="Auto, Auto, Auto, *" Margin="0,12,0,0">
 				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,10">
@@ -613,7 +622,7 @@
 		</TabItem>
 
 		<!-- ============================ NEIGHBORS ============================ -->
-		<TabItem Header="Neighbors">
+		<TabItem Header="Neighbors" IsVisible="{Binding ShowNeighborsTab}">
 			<ctl:Deferred><DataTemplate x:DataType="vm:NetworkInfoViewModel">
 			<Grid RowDefinitions="Auto, *" Margin="0,12,0,0">
 				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,12">
@@ -672,7 +681,7 @@
 		</TabItem>
 
 		<!-- ============================ PORTS ============================ -->
-		<TabItem Header="Ports">
+		<TabItem Header="Ports" IsVisible="{Binding ShowPortsTab}">
 			<ctl:Deferred><DataTemplate x:DataType="vm:NetworkInfoViewModel">
 			<Grid RowDefinitions="Auto, *" Margin="0,12,0,0">
 				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,12">
@@ -733,7 +742,7 @@
 		</TabItem>
 
 		<!-- ============================ ROUTING ============================ -->
-		<TabItem Header="Routing">
+		<TabItem Header="Routing" IsVisible="{Binding ShowRoutesTab}">
 			<ctl:Deferred><DataTemplate x:DataType="vm:NetworkInfoViewModel">
 			<Grid RowDefinitions="Auto, *" Margin="0,12,0,0">
 				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,12">

@@ -326,7 +326,10 @@ public static class ShareTls
         var list = new List<IPAddress>();
         if (family == AddressFamily.InterNetwork)
         {
-            foreach (var (_, a) in NicSnapshot.UpIPv4()) if (!IPAddress.IsLoopback(a) && !list.Contains(a)) list.Add(a);
+            // not the cellular / VPN ones: nobody on the network reaches them, and a phone's carrier address changes all
+            // the time, which made a new certificate (and the browser's warning again) on every change
+            foreach (var (_, a) in NicSnapshot.UpIPv4())
+                if (!IPAddress.IsLoopback(a) && !NicSnapshot.IsWanLike(a) && !list.Contains(a)) list.Add(a);
             return list;
         }
         try

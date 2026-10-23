@@ -509,9 +509,13 @@
                                 </Grid>
                             </Grid>
 
-                            <!-- add a destination -->
+                            <!-- add a destination. On a phone the buttons join the title's line and the error comes under
+                                 it, above the fields: the keyboard covers the bottom of the screen (code-behind) -->
                             <StackPanel x:Name="EditPanel" IsVisible="{Binding IsEditing}" Spacing="10">
-                                <TextBlock Classes="pickTitle" Text="Add a destination"/>
+                                <Grid x:Name="EditHead" ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                                    <TextBlock Classes="pickTitle" Text="Add a destination" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </Grid>
                                 <StackPanel>
                                     <TextBlock Classes="fieldLabel" Text="Address"/>
                                     <TextBox x:Name="EditAddressBox" Classes="field mono" Text="{Binding EditAddress}" AutomationProperties.Name="Address"
@@ -542,10 +546,10 @@
                                     </TextBox>
                                 </StackPanel>
                                 <TextBlock Classes="hint" Text="{Binding EditDetected}" IsVisible="{Binding HasEditDetected}"/>
-                                <Border Classes="errorBanner" IsVisible="{Binding HasEditError}">
+                                <Border x:Name="EditErrorBanner" Classes="errorBanner" IsVisible="{Binding HasEditError}">
                                     <TextBlock Text="{Binding EditError}"/>
                                 </Border>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                                <StackPanel x:Name="EditButtons" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
                                     <Button Classes="ghost" Content="Cancel" Command="{Binding CancelEditCommand}"/>
                                     <Button Classes="primary" Content="Add" MinWidth="72" Command="{Binding SaveDestinationCommand}"/>
                                 </StackPanel>

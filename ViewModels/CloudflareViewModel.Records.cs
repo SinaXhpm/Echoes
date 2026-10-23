@@ -670,7 +670,7 @@ public partial class CloudflareViewModel
     }
 
     private static bool TryRange(string? text, int min, int max, out int value)
-        => int.TryParse((text ?? string.Empty).Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out value)
+        => int.TryParse(LocalDigits.Fold((text ?? string.Empty).Trim()), NumberStyles.None, CultureInfo.InvariantCulture, out value)
            && value >= min && value <= max;
 
     private static bool IsHostName(string s)

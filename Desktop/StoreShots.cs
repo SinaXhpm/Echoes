@@ -54,6 +54,8 @@ internal static class StoreShots
 
                 await Run("doctor", Doctor);
                 await Run("ping", Ping);
+                await Run("speed", Speed);
+                await Run("monitor", Monitor);
                 await Run("share", Share);
                 await Run("dns", Dns);
                 await Run("tls", Tls);
@@ -85,6 +87,31 @@ internal static class StoreShots
         await Ui(() => { vm.Target = "example.com"; vm.ToggleRunCommand.Execute(null); });
         await Until(() => !vm.IsRunning, 150_000);
         await Shot("doctor");
+    }
+
+    private static async Task Speed()
+    {
+        await Open("SPEED TEST");
+        var vm = await Ui(() => (SpeedTestViewModel)ToolView<SpeedTestView>().DataContext!);
+        await Ui(() => vm.ToggleCommand.Execute(null));
+        await Until(() => !vm.IsRunning, 150_000);
+        await Shot("speed");
+    }
+
+    // A few public sites checked every 5 s for about 40 s: the list shows their state, latency and a short graph.
+    private static async Task Monitor()
+    {
+        await Open("MONITOR");
+        var vm = _main.MonitorVM;
+        await Ui(() =>
+        {
+            vm.NewTarget = "example.com\n1.1.1.1\nhttps://www.apple.com\ngithub.com:443\n8.8.8.8";
+            vm.AddTargetsCommand.Execute(null);
+            if (!vm.IsMonitoring) vm.ToggleMonitorCommand.Execute(null);
+        });
+        await Task.Delay(40_000);
+        await Shot("monitor");
+        await Ui(() => { if (vm.IsMonitoring) vm.ToggleMonitorCommand.Execute(null); });
     }
 
     private static async Task Ping()
@@ -168,6 +195,8 @@ internal static class StoreShots
         await Ui(() => { vm.UseDotNetEngine = true; vm.HttpMethod = "GET"; vm.Url = "https://example.com/"; });
         await Dispatcher.UIThread.InvokeAsync(() => vm.ToggleCurlCommand.ExecuteAsync(null));
         await Until(() => !vm.IsWorking, 60_000);
+        await Ui(() => vm.ResponseTabIndex = 2);   // Timing: where the time went (DNS, connect, TLS, first byte)
+        await Task.Delay(800);
         await Shot("curl");
     }
 
@@ -232,6 +261,8 @@ internal static class StoreShots
             var px = new PixelSize((int)Math.Ceiling(size.Width * 2), (int)Math.Ceiling(size.Height * 2));
             using var window = new RenderTargetBitmap(px, new Vector(192, 192));
             window.Render(content);
+            // the window alone as well, at 2x: the store pictures frame it under a headline
+            window.Save(Path.Combine(_dir, $"window-{id}-{name}.png"), new PngBitmapEncoderOptions());
 
             // fit inside the canvas with a margin (normally 1:1: the window is about 860 x 650 points)
             double scale = Math.Min(1.0, Math.Min((CanvasW - 240.0) / px.Width, (CanvasH - 240.0) / px.Height));

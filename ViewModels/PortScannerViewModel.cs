@@ -168,6 +168,7 @@ public partial class PortScannerViewModel : ObservableObject
         ScanEngine? engine = null;
         Avalonia.Threading.DispatcherTimer? timer = null;
         bool guarded = false;
+        string guardReason = string.Empty;
         try
         {
             // Parse off the UI thread: a /16 expands to 65,536 addresses and "1-65535" to as many ports.
@@ -212,7 +213,8 @@ public partial class PortScannerViewModel : ObservableObject
             // counters and countdown then come from the pass itself).
             timer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
             timer.Tick += (_, _) => Tick(engine);
-            BackgroundGuard.Acquire(options.PingOnly ? "Finding live hosts" : "Scanning ports");
+            guardReason = options.PingOnly ? "Finding live hosts" : "Scanning ports";
+            BackgroundGuard.Acquire(guardReason);
             guarded = true;
 
             ScanSnapshot? previous = null;
@@ -276,7 +278,7 @@ public partial class PortScannerViewModel : ObservableObject
             _engine = null;
             Progress = 1;
             IsScanning = false;
-            if (guarded) BackgroundGuard.Release();
+            if (guarded) BackgroundGuard.Release(guardReason);
         }
     }
 

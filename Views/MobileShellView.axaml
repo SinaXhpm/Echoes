@@ -36,6 +36,18 @@
 		<Style Selector="CheckBox">
 			<Setter Property="MinHeight" Value="36"/>
 		</Style>
+		<!-- the paste icon inside a field and the sub-tabs, at finger size (class styles: these outrank the app's) -->
+		<Style Selector="Button.pasteBtn">
+			<Setter Property="Width" Value="40"/>
+			<Setter Property="Height" Value="40"/>
+			<Setter Property="Margin" Value="0,0,2,0"/>
+		</Style>
+		<Style Selector="TabItem">
+			<Setter Property="MinHeight" Value="40"/>
+		</Style>
+		<Style Selector="TabControl.seg > TabItem">
+			<Setter Property="MinHeight" Value="40"/>
+		</Style>
 
 		<!-- ===== Drawer nav item: [section label] + a pill with an accent indicator (as on desktop) ===== -->
 		<Style Selector="ListBox#Nav > ListBoxItem">

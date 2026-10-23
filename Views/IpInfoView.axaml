@@ -165,7 +165,7 @@
                               ColumnDefinitions="2*, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="8">
                             <StackPanel x:Name="IpProxyAddr" Grid.Column="0">
                                 <TextBlock Classes="fieldLabel" Text="Address"/>
-                                <AutoCompleteBox Classes="field" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding ProxyAddress}" PlaceholderText="host:port"
+                                <AutoCompleteBox Classes="field" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding ProxyAddress}" TextInputOptions.ContentType="Url" PlaceholderText="host:port"
                                                  ToolTip.Tip="The proxy as host:port, e.g. 127.0.0.1:8080" AutomationProperties.Name="Proxy address"
                                                  FontFamily="{StaticResource MonoFont}"
                                                  ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"/>

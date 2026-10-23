@@ -13,19 +13,22 @@ public interface IBackgroundGuard
 
     /// <summary>Release the keep-alive; the OS may reclaim the process once nothing else holds it.</summary>
     void Release();
+
+    /// <summary>What keeps Echoes running changed while the guard is held: the new text for the user.</summary>
+    void Update(string reason) { }
 }
 
 /// <summary>
 /// Reference-counted front door to the platform <see cref="IBackgroundGuard"/>. Both Monitor
 /// and Scanner can hold it at once; the underlying service is started on the first acquire and
-/// stopped only after the last matching release. Thread-safe and exception-swallowing so a VM
+/// stopped only after the last matching release. The text the user sees names everything holding it
+/// ("Monitoring targets · SSH session"), not just the first. Thread-safe and exception-swallowing so a VM
 /// loop can never fail because of a platform hiccup.
 /// </summary>
 public static class BackgroundGuard
 {
     private static IBackgroundGuard? _impl;
-    private static int _count;
-    private static string _reason = string.Empty;
+    private static readonly List<string> _reasons = new();   // one entry per Acquire not yet released
     // The platform refused the start: Android 12+ won't start a foreground service once the app is in the background (the
     // user tapped Start and switched away while a scan was still resolving names, or a web server made its certificate).
     // The job then showed "running" while Android froze the process; Reacquire makes the start once the app is back.
@@ -39,12 +42,9 @@ public static class BackgroundGuard
     {
         lock (_lock)
         {
-            _count++;
-            if (_count == 1)
-            {
-                _reason = reason;
-                StartLocked();
-            }
+            _reasons.Add(reason);
+            if (_reasons.Count == 1) StartLocked();
+            else UpdateLocked();
         }
     }
 
@@ -54,7 +54,7 @@ public static class BackgroundGuard
     {
         lock (_lock)
         {
-            if (_count > 0 && _failed) StartLocked();
+            if (_reasons.Count > 0 && _failed) StartLocked();
         }
     }
 
@@ -62,7 +62,7 @@ public static class BackgroundGuard
     {
         try
         {
-            _impl?.Acquire(_reason);
+            _impl?.Acquire(Text);
             _failed = false;
         }
         catch (Exception ex)
@@ -72,18 +72,31 @@ public static class BackgroundGuard
         }
     }
 
-    public static void Release()
+    /// <summary>Ends one <see cref="Acquire"/> made with the same <paramref name="reason"/>.</summary>
+    public static void Release(string reason)
     {
         lock (_lock)
         {
-            if (_count == 0) return;   // never let an unmatched release drive the count negative
-            _count--;
-            if (_count == 0)
+            if (_reasons.Count == 0) return;   // never let an unmatched release drive the count negative
+            int at = _reasons.LastIndexOf(reason);
+            _reasons.RemoveAt(at >= 0 ? at : _reasons.Count - 1);
+            if (_reasons.Count == 0)
             {
                 _failed = false;
                 try { _impl?.Release(); }
                 catch (Exception ex) { CrashLog.Write("BackgroundGuard.Release", ex); }
             }
+            else UpdateLocked();
         }
+    }
+
+    // Each running job once, in the order they started.
+    private static string Text => string.Join(" · ", _reasons.Distinct());
+
+    private static void UpdateLocked()
+    {
+        if (_failed) return;   // not started: Reacquire starts it with the text of then
+        try { _impl?.Update(Text); }
+        catch (Exception ex) { CrashLog.Write("BackgroundGuard.Update", ex); }
     }
 }

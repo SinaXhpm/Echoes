@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -580,7 +581,7 @@ public sealed class ProfileService
         catch (IOException) { return false; }             // still locked / unreachable (incl. a missing folder)
         catch (UnauthorizedAccessException) { }           // can't be read, but maybe renamed: set it aside below
         catch { return false; }
-        try { File.Move(_path, $"{_path}.corrupt-{DateTime.UtcNow:yyyyMMdd-HHmmss}.bak", overwrite: false); }
+        try { File.Move(_path, string.Create(CultureInfo.InvariantCulture, $"{_path}.corrupt-{DateTime.UtcNow:yyyyMMdd-HHmmss}.bak"), overwrite: false); }
         catch (FileNotFoundException) { }   // nothing there (any more) to keep
         catch { return false; }
         return true;

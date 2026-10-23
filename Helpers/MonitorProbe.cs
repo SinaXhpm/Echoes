@@ -204,7 +204,7 @@ public sealed class MonitorEndpoint
     }
 
     private static bool TryParsePort(string s, out int port)
-        => int.TryParse(s, NumberStyles.None, CultureInfo.InvariantCulture, out port) && port is > 0 and <= 65535;
+        => int.TryParse(LocalDigits.Fold(s), NumberStyles.None, CultureInfo.InvariantCulture, out port) && port is > 0 and <= 65535;
 
     // UriBuilder adds the [] an IPv6 host needs and omits a default port.
     private static string BuildUrl(string scheme, string host, int port)

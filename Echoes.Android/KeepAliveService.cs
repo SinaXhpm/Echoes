@@ -32,11 +32,14 @@ public class KeepAliveService : Service
     internal static volatile bool IsForeground;
     internal static volatile bool StopWanted;
 
+    // The notification's text: what runs now. Updated while the service runs (UpdateText); a start uses the newest.
+    internal static volatile string? Reason;
+
     public override IBinder? OnBind(Intent? intent) => null;
 
     public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
     {
-        string reason = intent?.GetStringExtra(ExtraReason) ?? "Working in the background";
+        string reason = Reason ?? intent?.GetStringExtra(ExtraReason) ?? "Working in the background";
 
         EnsureChannel();
         Notification notification = BuildNotification(reason);
@@ -103,10 +106,26 @@ public class KeepAliveService : Service
         base.OnDestroy();
     }
 
-    private void EnsureChannel()
+    /// <summary>What keeps Echoes running changed (a job started or ended beside another): the shown notification says
+    /// so. No intent to the service: posting under the same id replaces it, also from the background.</summary>
+    internal static void UpdateText(Context context, string reason)
+    {
+        Reason = reason;
+        if (!IsForeground) return;   // OnStartCommand picks Reason up
+        try
+        {
+            EnsureChannel(context);
+            (context.GetSystemService(NotificationService) as NotificationManager)?.Notify(NotificationId, BuildNotification(context, reason));
+        }
+        catch { }
+    }
+
+    private void EnsureChannel() => EnsureChannel(this);
+
+    private static void EnsureChannel(Context context)
     {
         if (!OperatingSystem.IsAndroidVersionAtLeast(26)) return;
-        if (GetSystemService(NotificationService) is not NotificationManager manager) return;
+        if (context.GetSystemService(NotificationService) is not NotificationManager manager) return;
         if (manager.GetNotificationChannel(ChannelId) != null) return;
 
         var channel = new NotificationChannel(ChannelId, "Background tasks", NotificationImportance.Low)
@@ -117,21 +136,23 @@ public class KeepAliveService : Service
         manager.CreateNotificationChannel(channel);
     }
 
-    private Notification BuildNotification(string reason)
+    private Notification BuildNotification(string reason) => BuildNotification(this, reason);
+
+    private static Notification BuildNotification(Context context, string reason)
     {
         Notification.Builder builder = OperatingSystem.IsAndroidVersionAtLeast(26)
-            ? new Notification.Builder(this, ChannelId)
-            : new Notification.Builder(this);
+            ? new Notification.Builder(context, ChannelId)
+            : new Notification.Builder(context);
 
         // Tapping the notification brings the app back to the foreground.
-        Intent? launch = PackageManager?.GetLaunchIntentForPackage(PackageName!);
+        Intent? launch = context.PackageManager?.GetLaunchIntentForPackage(context.PackageName!);
         if (launch != null)
         {
             launch.AddFlags(ActivityFlags.SingleTop);
             PendingIntentFlags pendingFlags = OperatingSystem.IsAndroidVersionAtLeast(31)
                 ? PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent
                 : PendingIntentFlags.UpdateCurrent;
-            builder.SetContentIntent(PendingIntent.GetActivity(this, 0, launch, pendingFlags));
+            builder.SetContentIntent(PendingIntent.GetActivity(context, 0, launch, pendingFlags));
         }
 
         return builder

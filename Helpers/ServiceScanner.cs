@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Security;
@@ -403,7 +404,7 @@ public static class ServiceScanner
             if (selfSigned) sb.Append(" · self-signed");
             else if (issuer.Length > 0) sb.Append(" · issuer ").Append(issuer);
             var expiry = cert.NotAfter.ToUniversalTime();
-            sb.Append(expiry < DateTime.UtcNow ? " · expired " : " · expires ").Append(expiry.ToString("yyyy-MM-dd"));
+            sb.Append(expiry < DateTime.UtcNow ? " · expired " : " · expires ").Append(expiry.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
             info.Detail = Sanitize(sb.ToString());
         }
         catch { /* an unreadable certificate: no details */ }

@@ -612,7 +612,7 @@
                             </DropDownButton.Flyout>
                         </DropDownButton>
                     </Panel>
-                    <TextBox x:Name="DnsResolverBox" Grid.Row="1" Classes="field multiline" Text="{Binding ResolverText}" AcceptsReturn="True"
+                    <TextBox x:Name="DnsResolverBox" Grid.Row="1" Classes="field multiline" Text="{Binding ResolverText}" TextInputOptions.ContentType="Url" AcceptsReturn="True"
                              VerticalAlignment="Stretch" FontFamily="{StaticResource MonoFont}"
                              PlaceholderText="One per line, e.g. 1.1.1.1"
                              ToolTip.Tip="{Binding ResolverHint}"/>

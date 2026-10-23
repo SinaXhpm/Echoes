@@ -178,6 +178,7 @@ public partial class WebServerViewModel : ICatcherSink
     [ObservableProperty] private string _catchCounts = string.Empty;
 
     private RequestCatcher? _catcher;
+    private ListenerWatch? _catchWatch;
     private IPAddress? _catchBindActive;
     private int _catchPortActive;
     private readonly ConcurrentQueue<(CapturedRequest Req, bool Replied)> _catchQueue = new();
@@ -389,6 +390,8 @@ public partial class WebServerViewModel : ICatcherSink
             return;
         }
         _catcher = c;
+        _catchWatch = new ListenerWatch(bind.Address, CatchPort, reason => RestartCatcher(c, reason));
+        c.ListenerLost += _catchWatch.Lost;
         _catchBindActive = bind.Address;
         _catchPortActive = CatchPort;
         IsCatching = true;
@@ -408,14 +411,25 @@ public partial class WebServerViewModel : ICatcherSink
         if (_catcher is null) return;
         try { _catcher.Dispose(); } catch { }
         _catcher = null;
+        _catchWatch?.Dispose();
+        _catchWatch = null;
         _catchTimer?.Stop();
         DrainCatcher();
         IsCatching = false;
-        BackgroundGuard.Release();
+        BackgroundGuard.Release("Catching requests");
         _catchBindActive = null;
         RefreshCatchUrls();
         CatchStatus = $"Stopped — {Plural(_catchTotal, "request")} caught.";
         UpdateCatchCounts();
+    }
+
+    // The listening socket is gone (iOS reclaims a suspended app's): catching starts again on the same address and port.
+    private void RestartCatcher(RequestCatcher catcher, string reason)
+    {
+        if (!ReferenceEquals(_catcher, catcher)) return;
+        StopCatcher();
+        StartCatcher();
+        if (IsCatching) CatchStatus = $"Started again: the listening socket had closed ({reason}).";
     }
 
     // ================================================================ catcher events

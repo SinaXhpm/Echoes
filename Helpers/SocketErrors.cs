@@ -17,6 +17,11 @@ public enum SocketAction { Resolve, Connect, Listen, Send, Receive, Tls }
 /// </summary>
 public static class SocketErrors
 {
+    /// <summary>Accepts (or receives) failing this many times in a row mean the socket itself is gone, not one client:
+    /// iOS closes the listening sockets of an app it has suspended for a while, and a bound address can vanish. The
+    /// servers then say so (and are started again) instead of retrying forever behind a "running" status.</summary>
+    public const int DeadListenerAfter = 30;
+
     /// <summary>
     /// <paramref name="target"/> is what the user asked for ("example.com:443", "udp 10.0.0.5:53", "port 80"),
     /// <paramref name="port"/> the port involved (for the privileged-port explanation).

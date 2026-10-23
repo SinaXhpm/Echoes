@@ -111,7 +111,7 @@ public static class SocketNet
         {
             if (c > 0x7F)
             {
-                try { return new IdnMapping().GetAscii(host); } catch { return host; }
+                try { return new IdnMapping().GetAscii(host.ToLowerInvariant()); } catch { return host; }   // lowercased: IcmpPinger.AsciiHost
             }
         }
         return host;
@@ -479,6 +479,7 @@ public sealed class TcpServerSession : IDisposable
 
     private async Task AcceptLoopAsync()
     {
+        int aborted = 0;
         while (!_cts.IsCancellationRequested)
         {
             Socket client;
@@ -489,9 +490,10 @@ public sealed class TcpServerSession : IDisposable
             catch (OperationCanceledException) { return; }
             catch (ObjectDisposedException) { return; }
             catch (SocketException ex) when (ex.SocketErrorCode is SocketError.ConnectionReset or SocketError.ConnectionAborted
-                                             or SocketError.Interrupted)
+                                             or SocketError.Interrupted
+                                         && ++aborted < SocketErrors.DeadListenerAfter)
             {
-                continue;   // a client gave up before it was accepted
+                continue;   // a client gave up before it was accepted (again and again: the listener itself is gone, below)
             }
             catch (Exception ex)
             {
@@ -500,6 +502,7 @@ public sealed class TcpServerSession : IDisposable
                 _sink.OnEnded("Stopped listening: " + SocketErrors.Describe(ex, SocketAction.Listen, SocketNet.Label(LocalEndPoint), LocalEndPoint.Port), true);
                 return;
             }
+            aborted = 0;
 
             IPEndPoint ep;
             try { ep = SocketNet.Normalize((IPEndPoint)client.RemoteEndPoint!); }
@@ -726,11 +729,13 @@ public sealed class UdpClientSession : IDisposable
     private async Task ReceiveLoopAsync()
     {
         var buf = new byte[65_536];
+        int errors = 0;   // in a row: one per datagram sent is normal; past many, a socket that only returns errors is paced
         while (true)
         {
             try
             {
                 int n = await _socket.ReceiveAsync(buf.AsMemory(), SocketFlags.None, _cts.Token).ConfigureAwait(false);
+                errors = 0;
                 Interlocked.Add(ref _in, n);
                 _sink.OnReceived(null, buf.AsSpan(0, n));
             }
@@ -739,10 +744,14 @@ public sealed class UdpClientSession : IDisposable
             {
                 // ICMP "port unreachable" for a datagram we sent: say so, keep the socket (the service may come up)
                 _sink.OnError(SocketErrors.Describe(ex, SocketAction.Receive, Target));
+                if (++errors >= SocketErrors.DeadListenerAfter)
+                    try { await Task.Delay(100, _cts.Token).ConfigureAwait(false); } catch { return; }
             }
             catch (SocketException ex) when (ex.SocketErrorCode == SocketError.MessageSize && Volatile.Read(ref _closed) == 0)
             {
                 _sink.OnError("A datagram larger than 64 KB was cut off.");
+                if (++errors >= SocketErrors.DeadListenerAfter)
+                    try { await Task.Delay(100, _cts.Token).ConfigureAwait(false); } catch { return; }
             }
             catch (Exception ex)
             {
@@ -827,6 +836,7 @@ public sealed class UdpServerSession : IDisposable
         var buf = new byte[65_536];
         EndPoint any = _socket.AddressFamily == AddressFamily.InterNetworkV6
             ? new IPEndPoint(IPAddress.IPv6Any, 0) : new IPEndPoint(IPAddress.Any, 0);
+        int errors = 0;
         while (!_cts.IsCancellationRequested)
         {
             SocketReceiveFromResult r;
@@ -837,7 +847,11 @@ public sealed class UdpServerSession : IDisposable
             catch (SocketException ex) when (ex.SocketErrorCode is SocketError.ConnectionReset or SocketError.ConnectionRefused
                                               or SocketError.MessageSize)
             {
-                continue;   // an ICMP error for an earlier reply / an oversized datagram: keep serving
+                // an ICMP error for an earlier reply / an oversized datagram: keep serving (paced once they keep coming:
+                // a socket that only returns errors must not spin a core)
+                if (++errors >= SocketErrors.DeadListenerAfter)
+                    try { await Task.Delay(100, _cts.Token).ConfigureAwait(false); } catch { return; }
+                continue;
             }
             catch (Exception ex)
             {
@@ -847,6 +861,7 @@ public sealed class UdpServerSession : IDisposable
                 return;
             }
 
+            errors = 0;
             var raw = (IPEndPoint)r.RemoteEndPoint;
             var ep = SocketNet.Normalize(raw);
             string key = SocketNet.Label(ep);

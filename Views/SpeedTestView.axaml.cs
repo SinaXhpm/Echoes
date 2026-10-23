@@ -11,8 +11,9 @@ namespace Echoes.Views;
 
 public partial class SpeedTestView : UserControl
 {
-    // Below this the history card would show its header and no row: it steps aside instead (a short phone screen).
-    private const double MinHistoryHeight = 72;
+    // Below this the history card would show its header and no row: it steps aside instead (a short phone screen). A
+    // phone's header is taller (a 44 px Clear button) and its rows take two lines: header + one row is ~110 px there.
+    private static double MinHistoryHeight => AppPlatform.IsMobile ? 112 : 72;
     private const double PickerWidth = 360;
 
     private SpeedTestViewModel? _vm;
@@ -37,6 +38,14 @@ public partial class SpeedTestView : UserControl
                 PickSearch.Focusable = true;
                 PickSearch.Focus();
             }, RoutingStrategies.Tunnel);
+
+            // The keyboard covers the lower half of the screen, where the add form's error line and buttons sat: Cancel /
+            // Add move up beside the title, and the error right under it, above the fields.
+            EditPanel.Children.Remove(EditButtons);
+            EditPanel.Children.Remove(EditErrorBanner);
+            Grid.SetColumn(EditButtons, 1);
+            EditHead.Children.Add(EditButtons);
+            EditPanel.Children.Insert(1, EditErrorBanner);
         }
     }
 

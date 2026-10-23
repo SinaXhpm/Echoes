@@ -22,6 +22,12 @@ public partial class BackupViewModel : ObservableObject
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _status = "Export to one encrypted file, or restore one.";
 
+    /// <summary>A backup was restored and Echoes can start itself again to load it (Android).</summary>
+    [ObservableProperty] private bool _canRestartNow;
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void RestartNow() => AppPlatform.RestartApp?.Invoke();
+
     // Build the encrypted backup bytes. Throws on bad input; the caller writes them to the chosen file.
     // Call on the UI thread: the data files are read here (alongside every other writer of them); only the
     // 600k-iteration PBKDF2 + AES runs on the thread pool, so the busy state can render meanwhile.

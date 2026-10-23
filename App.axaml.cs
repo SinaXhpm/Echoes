@@ -26,6 +26,16 @@ public partial class App : Avalonia.Application
 
     public override void Initialize()
     {
+        // Numbers and dates read and print the same on every system. The desktop builds run invariant
+        // (InvariantGlobalization); a phone ran with its own culture, so "0.5" read as 5 in German, a file stamp came out in
+        // the Persian calendar, counts got an Arabic-script thousands mark. Echoes' text is English throughout; the time
+        // zone stays the device's.
+        var invariant = System.Globalization.CultureInfo.InvariantCulture;
+        System.Globalization.CultureInfo.DefaultThreadCurrentCulture = invariant;
+        System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = invariant;
+        System.Globalization.CultureInfo.CurrentCulture = invariant;
+        System.Globalization.CultureInfo.CurrentUICulture = invariant;
+
         AvaloniaXamlLoader.Load(this);
     }
 
@@ -37,6 +47,9 @@ public partial class App : Avalonia.Application
 
         // The saved light / dark choice, before any window or view exists (nothing opens dark and then flips).
         Helpers.ThemeService.ApplySaved();
+
+        // Typed digits and masked boxes are handled for every field, including the first view's.
+        Helpers.InputAssist.Install();
 
         // Legacy code pages (windows-1252/1251/1256, shift_jis, gbk, …) aren't built into .NET; without the
         // provider Encoding.GetEncoding throws and pages declaring those charsets were decoded as UTF-8.

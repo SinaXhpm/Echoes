@@ -89,7 +89,9 @@ public interface IShareHubSink
 /// <para>Access: an 8-digit PIN (per-address lockout: 1 s, 2 s, 4 s … 5 min after 5 misses, and a pause for everyone
 /// after 300 misses in 10 minutes) buys a random session cookie (HttpOnly, SameSite=Strict, Secure on HTTPS; at most 16
 /// per address). Every API call needs the X-Echoes header and a same-origin Origin / Sec-Fetch-Site; the WebSocket needs
-/// the same Origin. Scripts download with the PIN as the Basic-auth password (<c>curl -k -u :PIN -OJ https://…/d/ID</c>).</para>
+/// the same Origin. Scripts download with the PIN as the Basic-auth password (<c>curl -k -u :PIN -OJ https://…/d/ID</c>).
+/// A shared file's direct link (<c>/f/{token}/{name}</c>, shown with a QR code in the app) downloads that one file without
+/// the PIN: the token is the file's own 128-bit secret, and it dies when the file stops being shared.</para>
 /// <para>Limits: connections (all / a quarter per address), request bodies (an idle timeout and a total deadline of at
 /// least ~4 KB/s), messages (16 KB, 20 at once then 2 a second per browser, 500 kept in memory), uploads (chunks of at
 /// most 8 MB, 2 at once per browser and 8 in all, a size cap, free space), WebSockets (4 per browser, 8 per address, 64
@@ -255,8 +257,14 @@ public sealed partial class ShareHub : IDisposable
 
     // ================================================================ accept / connection
 
+    /// <summary>The listening socket stopped working while the hub runs (raised once, on a pool thread): iOS closes the
+    /// listeners of an app it suspended, and a bound address can vanish. The owner starts the hub again.</summary>
+    public event Action<string>? ListenerLost;
+    private int _lost;
+
     private async Task AcceptLoopAsync(Socket listener, CancellationToken ct)
     {
+        int failures = 0;
         while (!ct.IsCancellationRequested)
         {
             // a slot BEFORE accepting: never more sockets in memory than the cap
@@ -266,13 +274,25 @@ public sealed partial class ShareHub : IDisposable
             try { client = await listener.AcceptAsync(ct).ConfigureAwait(false); }
             catch (OperationCanceledException) { _slots.Release(); return; }
             catch (ObjectDisposedException) { _slots.Release(); return; }
-            catch
+            catch (Exception ex)
             {
                 _slots.Release();
+                // accept failing again and again: the listening socket itself is gone, not one client (retried every
+                // 100 ms forever, the page said "sharing" and nothing could connect)
+                if (++failures >= SocketErrors.DeadListenerAfter)
+                {
+                    if (Interlocked.Exchange(ref _lost, 1) == 0)
+                    {
+                        Log("the listening socket stopped working: " + SocketErrors.Unwrap(ex).Message);
+                        try { ListenerLost?.Invoke(SocketErrors.Unwrap(ex).Message); } catch { }
+                    }
+                    return;
+                }
                 // a persistent accept failure (e.g. out of file descriptors) must not pin a CPU core
                 try { await Task.Delay(100, ct).ConfigureAwait(false); } catch { return; }
                 continue;
             }
+            failures = 0;
             _ = Task.Run(() => HandleAsync(client, ct));
         }
     }
@@ -455,6 +475,7 @@ public sealed partial class ShareHub : IDisposable
         if (path.StartsWith("/api/", StringComparison.Ordinal)) return await ApiAsync(c, req, ct).ConfigureAwait(false);
         if (path == "/ws") return await WebSocketAsync(c, req, ct).ConfigureAwait(false);
         if (path.StartsWith("/d/", StringComparison.Ordinal)) return await DownloadAsync(c, req, ct).ConfigureAwait(false);
+        if (path.StartsWith("/f/", StringComparison.Ordinal)) return await DirectAsync(c, req, ct).ConfigureAwait(false);
         return await RefuseAsync(c, req, 404, "Not Found", ct).ConfigureAwait(false);
     }
 
@@ -856,7 +877,29 @@ public sealed partial class ShareHub : IDisposable
         foreach (var it in _o.Items())
             if (string.Equals(it.Id, id, StringComparison.Ordinal)) { item = it; break; }
         if (item is null) return await RefuseAsync(c, req, 404, "Not Found - this file isn't shared any more", ct).ConfigureAwait(false);
+        return await ServeItemAsync(c, req, item, string.Empty, ct).ConfigureAwait(false);
+    }
 
+    // /f/{token}/{name}: a file's direct link (the app shows it, with its QR code, beside each shared file). The token is
+    // the file's own 128-bit secret (SharedItem.LinkToken): the link downloads that one file without the PIN, and nothing
+    // else; the name after it is only for the browser and curl -O. Compared in constant time.
+    private async Task<bool> DirectAsync(HubConn c, HubRequest req, CancellationToken ct)
+    {
+        if (req.Method is not ("GET" or "HEAD")) return await RefuseAsync(c, req, 405, "Method Not Allowed", ct).ConfigureAwait(false);
+        if (!await c.Reader.DrainAsync(req.ContentLength, MaxJsonBody, BodyIdleMs, ct).ConfigureAwait(false)) return false;
+
+        string rest = req.Path[3..];
+        int slash = rest.IndexOf('/');
+        byte[] token = Encoding.ASCII.GetBytes(slash < 0 ? rest : rest[..slash]);
+        SharedItem? item = null;
+        foreach (var it in _o.Items())
+            if (CryptographicOperations.FixedTimeEquals(token, Encoding.ASCII.GetBytes(it.LinkToken))) item = it;
+        if (item is null) return await RefuseAsync(c, req, 404, "Not Found - this link doesn't work any more (the file isn't shared now)", ct).ConfigureAwait(false);
+        return await ServeItemAsync(c, req, item, " (direct link)", ct).ConfigureAwait(false);
+    }
+
+    private async Task<bool> ServeItemAsync(HubConn c, HubRequest req, SharedItem item, string via, CancellationToken ct)
+    {
         var r = await FileHttpServer.ServeAsync(c.Stream, item, req.IsHead, req.Header("Range"), req.Header("If-Range"),
             HubHttp.CommonHeaders.Replace("Cache-Control: no-store\r\n", "Cache-Control: private, no-store\r\n", StringComparison.Ordinal),
             req.WantsKeepAlive, n => Interlocked.Add(ref _bytesSent, n), ct).ConfigureAwait(false);
@@ -865,7 +908,7 @@ public sealed partial class ShareHub : IDisposable
             if (r.Status == 200) Interlocked.Increment(ref _downloads);
             try { _sink.OnDownload(item.Id, r.Sent, r.Status == 200); } catch { }
         }
-        Log($"{c.Ip}  {req.Method} {Clean(item.Name)}  → {r.Status}");
+        Log($"{c.Ip}  {req.Method} {Clean(item.Name)}{via}  → {r.Status}");
         return r.KeepAlive;
     }
 

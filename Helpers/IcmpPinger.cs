@@ -124,7 +124,9 @@ public static class IcmpPinger
         foreach (char c in host)
         {
             if (c <= 0x7F) continue;
-            try { return new System.Globalization.IdnMapping().GetAscii(host); }
+            // lowercased first: in invariant mode (the desktop release) GetAscii doesn't fold non-ASCII capitals ("Ärzte.de"),
+            // which came out as another xn-- name
+            try { return new System.Globalization.IdnMapping().GetAscii(host.ToLowerInvariant()); }
             catch (ArgumentException) { return host; }   // not a valid IDN: let the resolver report it
         }
         return host;

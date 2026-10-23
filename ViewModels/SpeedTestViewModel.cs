@@ -179,6 +179,9 @@ public partial class SpeedTestViewModel : ObservableObject
         ServerText = ServerLabel(destination, null, null);
         Status = $"Connecting to {destination.Name}…";
 
+        // Android: a foreground service keeps the test running if Echoes goes to the background; iOS keeps the screen on
+        // (no-op on desktop). Released in the finally below, whatever ends the run.
+        BackgroundGuard.Acquire("Speed test");
         try
         {
             var engine = new SpeedTestEngine(target, options);
@@ -201,6 +204,7 @@ public partial class SpeedTestViewModel : ObservableObject
         }
         finally
         {
+            BackgroundGuard.Release("Speed test");
             if (run == _run)
             {
                 IsRunning = false;

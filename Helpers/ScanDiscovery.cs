@@ -36,6 +36,15 @@ public static class ScanDiscovery
     /// sockets / ephemeral ports) — the host is undetermined, never "down".</summary>
     public readonly record struct HostState(bool Up, string Reason, double LatencyMs, bool LocalError = false);
 
+    // iOS answers "no route to host" at once for every local address while Echoes may not use the local network (the
+    // Local Network permission turned off, or its prompt not answered yet). A sweep where nothing answered can then say
+    // why, though the engine keeps only "no-response" for a host found down: the local host checks are tallied here.
+    private static long s_lanDown, s_lanNoRoute;
+
+    /// <summary>Running totals: checks of a local-network address that found it down, and those where no TCP probe had a
+    /// route to it. A scan reads them before and after its pass.</summary>
+    public static (long Down, long NoRoute) LanDownTally => (Interlocked.Read(ref s_lanDown), Interlocked.Read(ref s_lanNoRoute));
+
     /// <param name="hostRtt">The host's own estimator (warms the port scan that follows).</param>
     /// <param name="sweepRtt">One estimator for the whole sweep; once warm it replaces the fixed per-probe timeout
     /// (a /16 at 1.5 s per dead host took ~16 min).</param>
@@ -53,6 +62,7 @@ public static class ScanDiscovery
         foreach (int p in Ports) tasks.Add(TcpProbe(addr, p, hostRtt, sweepRtt, timeout, linked.Token));
 
         bool localError = false;
+        int noRoute = 0;   // TCP probes that had no route to the host
         try
         {
             while (tasks.Count > 0)
@@ -62,13 +72,20 @@ public static class ScanDiscovery
                 HostState st = await done.ConfigureAwait(false);   // probes never throw
                 if (st.Up) return st;
                 localError |= st.LocalError;
+                if (st.Reason == "host-unreach") noRoute++;
             }
         }
         finally { try { linked.Cancel(); } catch { } }
 
         // "Down" only when every probe actually went out: the one that couldn't may have been the one that answers.
-        return localError ? new HostState(false, "socket-limit", 0, LocalError: true)
-                          : new HostState(false, "no-response", 0);
+        if (localError) return new HostState(false, "socket-limit", 0, LocalError: true);
+        bool unreachable = noRoute == Ports.Length;
+        if (!ct.IsCancellationRequested && IsLocalNetwork(addr))
+        {
+            Interlocked.Increment(ref s_lanDown);
+            if (unreachable) Interlocked.Increment(ref s_lanNoRoute);
+        }
+        return new HostState(false, unreachable ? "host-unreach" : "no-response", 0);
     }
 
     private static async Task<HostState> IcmpProbe(IPAddress addr, HostRtt sweepRtt, int timeoutMs, CancellationToken ct)
@@ -135,6 +152,8 @@ public static class ScanDiscovery
                     sweepRtt.AddSample(ms);
                     return new HostState(true, $"conn-refused ({port}/tcp)", Math.Max(ms, 0.1));
                 }
+                // No route to the host (a router said so, or iOS without Local Network access): no proof, but the reason.
+                if (err == SocketError.HostUnreachable) return new HostState(false, "host-unreach", 0);
                 // Out of sockets / ports on our side: no evidence either way — retried below. Anything else: no proof.
                 if (!ScanSocket.IsLocalExhaustion(err) || ct.IsCancellationRequested) return new HostState(false, "tcp", 0);
             }

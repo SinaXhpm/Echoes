@@ -192,8 +192,14 @@ public sealed class RequestCatcher : IDisposable
 
     // ================================================================ accept
 
+    /// <summary>The listening socket stopped working while the catcher runs (raised once, on a pool thread): iOS closes
+    /// the listeners of an app it suspended, and a bound address can vanish. The owner starts the catcher again.</summary>
+    public event Action<string>? ListenerLost;
+    private int _lost;
+
     private async Task AcceptLoopAsync(Socket listener, CancellationToken ct)
     {
+        int failures = 0;
         while (!ct.IsCancellationRequested)
         {
             // a slot BEFORE accepting: never more sockets in memory than the cap
@@ -203,12 +209,20 @@ public sealed class RequestCatcher : IDisposable
             try { client = await listener.AcceptAsync(ct).ConfigureAwait(false); }
             catch (OperationCanceledException) { _slots.Release(); return; }
             catch (ObjectDisposedException) { _slots.Release(); return; }
-            catch
+            catch (Exception ex)
             {
                 _slots.Release();
+                // accept failing again and again: the listening socket itself is gone, not one client
+                if (++failures >= SocketErrors.DeadListenerAfter)
+                {
+                    if (Interlocked.Exchange(ref _lost, 1) == 0)
+                        try { ListenerLost?.Invoke(SocketErrors.Unwrap(ex).Message); } catch { }
+                    return;
+                }
                 try { await Task.Delay(100, ct).ConfigureAwait(false); } catch { return; }
                 continue;
             }
+            failures = 0;
             _ = Task.Run(() => HandleAsync(client, ct));
         }
     }

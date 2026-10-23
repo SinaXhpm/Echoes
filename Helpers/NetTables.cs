@@ -14,8 +14,9 @@ namespace Echoes.Helpers;
 ///
 /// <para>Ports use the managed <see cref="IPGlobalProperties"/> (works on all desktops). Neighbors
 /// and routes have no BCL API, so they use light P/Invoke on Windows (iphlpapi) and <c>/proc/net/*</c>
-/// on Linux; every other platform (macOS, Android sandbox) reports <c>Supported = false</c> and the
-/// UI shows a "not available on this platform" notice instead of an empty list.</para>
+/// on Linux; every other platform (macOS, Android sandbox) reports <c>Supported = false</c>. The Network
+/// tool hides a table's tab where <see cref="NetTables.CanReadPorts"/> / <see cref="NetTables.CanReadNeighbors"/> /
+/// <see cref="NetTables.CanReadRoutes"/> say there is no reader; a read that still fails shows its note instead.</para>
 ///
 /// <para>No external binaries, no elevation, no drivers — just managed calls, so it stays within the
 /// app's standalone constraint on the platforms it does support.</para>
@@ -52,6 +53,13 @@ public sealed class RouteEntry
 
 public static class NetTables
 {
+    /// <summary>Whether this platform can list the ports at all: Android and iOS keep the socket tables from apps.</summary>
+    public static bool CanReadPorts => !OperatingSystem.IsAndroid() && !OperatingSystem.IsIOS();
+
+    /// <summary>Whether there is a reader for the neighbor (ARP) and routing tables here (Windows, desktop Linux).</summary>
+    public static bool CanReadNeighbors => OperatingSystem.IsWindows() || (OperatingSystem.IsLinux() && !OperatingSystem.IsAndroid());
+    public static bool CanReadRoutes => CanReadNeighbors;
+
     // ---------------------------------------------------------------- Ports
 
     public static NetResult<PortEntry> GetPorts()

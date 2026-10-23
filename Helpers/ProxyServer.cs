@@ -122,8 +122,14 @@ public sealed class ProxyServer : IDisposable
 
     public void Dispose() => Stop();
 
+    /// <summary>The listening socket stopped working while the proxy runs (raised once, on a pool thread): iOS closes
+    /// the listeners of an app it suspended, and a bound address can vanish. The owner starts the proxy again.</summary>
+    public event Action<string>? ListenerLost;
+    private int _lost;
+
     private async Task AcceptLoop(TcpListener listener, CancellationToken ct)
     {
+        int failures = 0;
         while (!ct.IsCancellationRequested)
         {
             // Take a slot before accepting so idle-but-accepted sockets can't grow past the cap.
@@ -134,13 +140,21 @@ public sealed class ProxyServer : IDisposable
             try { client = await listener.AcceptTcpClientAsync(ct).ConfigureAwait(false); }
             catch (OperationCanceledException) { _slots.Release(); break; }
             catch (ObjectDisposedException) { _slots.Release(); break; }
-            catch
+            catch (Exception ex)
             {
                 _slots.Release();
+                // accept failing again and again: the listening socket itself is gone, not one client
+                if (++failures >= SocketErrors.DeadListenerAfter)
+                {
+                    if (Interlocked.Exchange(ref _lost, 1) == 0)
+                        try { ListenerLost?.Invoke(SocketErrors.Unwrap(ex).Message); } catch { }
+                    break;
+                }
                 try { await Task.Delay(100, ct).ConfigureAwait(false); } catch { break; }
                 continue;
             }
 
+            failures = 0;
             _ = HandleAsync(client, ct);   // releases the slot in its finally
         }
     }

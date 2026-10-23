@@ -175,13 +175,36 @@ public partial class SshViewModel
     [RelayCommand]
     private void SendCommand()
     {
+        // An empty line is a bare Return, as in a terminal: it answers a "press Enter" prompt or a pager, or redraws the prompt.
+        string command = CommandInput ?? string.Empty;
+        if (!WriteToShell(command + "\r")) return;
+
+        if (command.Length > 0)
+        {
+            _history.Add(command);
+            // Memory only (never saved), but a long session mustn't grow it without end: Up / Down reach the last ones.
+            if (_history.Count > MaxCommandHistory) _history.RemoveRange(0, _history.Count - MaxCommandHistory);
+            CommandInput = string.Empty;
+        }
+        _historyIndex = _history.Count;
+    }
+
+    /// <summary>Ctrl+C: stops what runs in the shell (ping, tail -f) without ending the session. A phone keyboard has no
+    /// Ctrl key, so the terminal has a button for it.</summary>
+    [RelayCommand]
+    private void SendInterrupt() => WriteToShell("\x03");
+
+    // UI thread. False when there is no shell, or it just died (said in the terminal).
+    private bool WriteToShell(string text)
+    {
         var session = _session;
         var shell = session?.Shell;
-        if (shell is null || string.IsNullOrEmpty(CommandInput)) return;
+        if (shell is null) return false;
         try
         {
-            shell.Write(CommandInput + "\r");
+            shell.Write(text);
             shell.Flush();
+            return true;
         }
         catch (Exception ex)
         {
@@ -189,14 +212,8 @@ public partial class SshViewModel
             // on the UI thread, so an escaping ObjectDisposed/SshException would kill the app — report instead.
             AppendToTerminal($"\n# {ex.Message}\n");
             if (session != null) _ = Task.Run(() => StopSession(session));
-            return;
+            return false;
         }
-
-        _history.Add(CommandInput);
-        // Memory only (never saved), but a long session mustn't grow it without end: Up / Down reach the last ones.
-        if (_history.Count > MaxCommandHistory) _history.RemoveRange(0, _history.Count - MaxCommandHistory);
-        _historyIndex = _history.Count;
-        CommandInput = string.Empty;
     }
 
     [RelayCommand]

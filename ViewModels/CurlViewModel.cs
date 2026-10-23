@@ -47,6 +47,14 @@ public partial class CurlViewModel : ObservableObject
     /// <summary>Phones have no curl binary to shell out to: the engine switch is hidden and .NET is used.</summary>
     public bool CanChooseEngine => !OperatingSystem.IsAndroid() && !AppPlatform.IsMobile;
 
+    /// <summary>Android sends through its default network whatever the source address: a request bound to the mobile-data
+    /// address while Wi-Fi is up only timed out. There the picker is hidden and the OS routes (Auto).</summary>
+    public bool CanChooseInterface => !OperatingSystem.IsAndroid();
+
+    /// <summary>The empty Saved list's hint: a phone has no Ctrl+S (Save current… is right above it).</summary>
+    public string SaveHint => AppPlatform.IsMobile ? "A saved request keeps its headers, body and auth."
+        : "Ctrl+S keeps the request with its headers, body and auth.";
+
     public CurlViewModel()
     {
         Params = new CurlKvList(OnParamsChanged);
@@ -74,7 +82,7 @@ public partial class CurlViewModel : ObservableObject
 
     [ObservableProperty] private List<NicOption> _interfaces = new();
     [ObservableProperty] private NicOption? _selectedInterface;
-    private string? SelectedNicIp => SelectedInterface?.Ip;
+    private string? SelectedNicIp => CanChooseInterface ? SelectedInterface?.Ip : null;   // (an imported --interface too)
 
     // The adapter the user picked (curl.nicIp). Kept while it is down: a VPN that was off when the tab opened fell back to
     // Auto, and that fallback was saved over the choice for good. It is selected again once it comes back; only the user's
@@ -116,7 +124,8 @@ public partial class CurlViewModel : ObservableObject
         }
         catch { }
 
-        if (!_loaded) _preferredNicIp = ProfileService.Instance.GetSetting("curl.nicIp");
+        // (Android: never a saved adapter, see CanChooseInterface)
+        if (!_loaded) _preferredNicIp = CanChooseInterface ? ProfileService.Instance.GetSetting("curl.nicIp") : null;
         string? keep = _preferredNicIp;
         _applyingNics = true;   // a fallback to Auto (the adapter is down) is shown, not saved
         try
@@ -397,8 +406,15 @@ public partial class CurlViewModel : ObservableObject
         Avalonia.Platform.Storage.IStorageFile? file;
         lock (_pickedFiles) _pickedFiles.TryGetValue(path, out file);
         if (file != null) return file.OpenReadAsync().GetAwaiter().GetResult();   // called on the thread pool
-        return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, useAsync: true);
+        // Picked in an earlier run (or named by a saved request): an Android content URI opens only through the picker's
+        // grant of that run, and iOS lets Echoes read a file outside its own folder only through it too.
+        if (path.StartsWith("content:", StringComparison.OrdinalIgnoreCase)) throw new UnauthorizedAccessException(PickAgain);
+        try { return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, useAsync: true); }
+        catch (UnauthorizedAccessException) when (OperatingSystem.IsIOS()) { throw new UnauthorizedAccessException(PickAgain); }
     }
+
+    private static string PickAgain =>
+        $"Pick the file again: {(OperatingSystem.IsIOS() ? "iOS" : "Android")} doesn't keep access to it after Echoes restarts.";
 
     // ================================================================== request timer (live while in flight)
 

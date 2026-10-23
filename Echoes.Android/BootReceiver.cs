@@ -80,7 +80,7 @@ public sealed class BootReceiver : BroadcastReceiver
         }
         finally
         {
-            BackgroundGuard.Release();   // the running Monitor holds its own
+            BackgroundGuard.Release(MonitorViewModel.BackgroundReason);   // the running Monitor holds its own
         }
     }
 }

@@ -867,7 +867,7 @@
                 <!-- proxy: address | user | password (password kept in memory only) -->
                 <Grid IsVisible="{Binding UseProxy}" ColumnDefinitions="2*, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="8">
                     <AutoCompleteBox x:Name="ProxyAddrBox" Classes="field" helpers:InputAssist.SelectAllOnFocus="True"
-                                     Text="{Binding ProxyAddress}" ItemsSource="{Binding ProxyHistory}"
+                                     Text="{Binding ProxyAddress}" TextInputOptions.ContentType="Url" ItemsSource="{Binding ProxyHistory}"
                                      FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                      PlaceholderText="Proxy, e.g. 127.0.0.1:1080"
                                      ToolTip.Tip="host:port. Ports 1080 / 1081 / 9050 mean SOCKS5, others HTTP; or write the scheme (http://, socks5://)."/>
@@ -971,7 +971,7 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
                     <StackPanel Grid.Row="1" Grid.RowSpan="2" Margin="14,14,14,0" Spacing="6" IsVisible="{Binding ShowHistoryEmpty}">
-                        <TextBlock Classes="hint" Text="Sent calls show up here until you close Echoes. Click one to reopen it."/>
+                        <TextBlock x:Name="HistoryEmptyText" Classes="hint" Text="Sent calls show up here until you close Echoes. Click one to reopen it."/>
                     </StackPanel>
                     <Border Grid.Row="3" Classes="paneFooter" Padding="8,6">
                         <Border.IsVisible>
@@ -1281,7 +1281,7 @@
                                     </Grid>
                                     <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10">
                                         <Border Classes="step"><TextBlock Text="3"/></Border>
-                                        <TextBlock Grid.Column="1" Classes="stepText" Text="Fill in the fields and press Send (Ctrl+Enter)."/>
+                                        <TextBlock x:Name="SendStepText" Grid.Column="1" Classes="stepText" Text="Fill in the fields and press Send (Ctrl+Enter)."/>
                                     </Grid>
                                 </StackPanel>
                             </ScrollViewer>

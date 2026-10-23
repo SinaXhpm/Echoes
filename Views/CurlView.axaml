@@ -583,6 +583,11 @@
         <Style Selector="Grid#CurlRoot.narrow StackPanel#InterfaceField">
             <Setter Property="Grid.ColumnSpan" Value="2"/>
         </Style>
+        <!-- no interface picker (Android): the override takes its place (after the two above, so it wins) -->
+        <Style Selector="Grid.noNic > StackPanel#OverrideField">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+        </Style>
         <Style Selector="Grid#CurlRoot.narrow StackPanel#ProxyAddrField">
             <Setter Property="Grid.ColumnSpan" Value="3"/>
         </Style>
@@ -1109,7 +1114,7 @@
                                 <Grid ColumnDefinitions="2*, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="12" IsVisible="{Binding UseProxy}">
                                     <StackPanel x:Name="ProxyAddrField">
                                         <TextBlock Classes="fieldLabel" Text="Address"/>
-                                        <AutoCompleteBox Classes="field" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding Proxy}"
+                                        <AutoCompleteBox Classes="field" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding Proxy}" TextInputOptions.ContentType="Url"
                                                          ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                                          PlaceholderText="host:port"
                                                          ToolTip.Tip="host:port or socks5://host:port. Ports 1080 / 1081 / 9050 mean SOCKS5, others HTTP — or write the scheme."
@@ -1124,15 +1129,16 @@
                                         <TextBox Classes="field" Text="{Binding ProxyPass}" PlaceholderText="Optional" IsUndoEnabled="False" PasswordChar="●"/>
                                     </StackPanel>
                                 </Grid>
-                                <Grid ColumnDefinitions="3*, 2*" RowDefinitions="Auto, Auto" ColumnSpacing="12">
-                                    <StackPanel x:Name="InterfaceField">
+                                <Grid ColumnDefinitions="3*, 2*" RowDefinitions="Auto, Auto" ColumnSpacing="12"
+                                      Classes.noNic="{Binding !CanChooseInterface}">
+                                    <StackPanel x:Name="InterfaceField" IsVisible="{Binding CanChooseInterface}">
                                         <TextBlock Classes="fieldLabel" Text="Interface"/>
                                         <ComboBox Classes="field" ItemsSource="{Binding Interfaces}" SelectedItem="{Binding SelectedInterface}"
                                                   ToolTip.Tip="Outgoing network interface (binds the source IP). Auto = let the OS route."/>
                                     </StackPanel>
                                     <StackPanel x:Name="OverrideField">
                                         <TextBlock Classes="fieldLabel" Text="Override IP"/>
-                                        <TextBox Classes="field" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding OverrideIp}" PlaceholderText="IP or IP:port"
+                                        <TextBox Classes="field" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding OverrideIp}" TextInputOptions.ContentType="Url" PlaceholderText="IP or IP:port"
                                                  ToolTip.Tip="Optional. Connect to this address instead of resolving the host (curl --resolve / --connect-to)"/>
                                     </StackPanel>
                                 </Grid>
@@ -1504,7 +1510,7 @@
                             </StackPanel.IsVisible>
                             <TextBlock Text="No saved requests" HorizontalAlignment="Center" FontSize="{StaticResource Font.Title}"
                                        FontWeight="SemiBold" Foreground="{DynamicResource Text.Primary}"/>
-                            <TextBlock Classes="hint" TextAlignment="Center" Text="Ctrl+S keeps the request with its headers, body and auth."/>
+                            <TextBlock Classes="hint" TextAlignment="Center" Text="{Binding SaveHint}"/>
                         </StackPanel>
 
                         <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding LibraryShowHistory}">

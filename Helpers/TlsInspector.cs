@@ -296,8 +296,8 @@ public static class TlsInspector
                     (rep.Stapling, rep.StaplingSeverity) = st switch
                     {
                         null => ("Stapled, but the response couldn't be read", TlsSeverity.Warning),
-                        { Status: "good" } => ($"Stapled · good · produced {Ago(st.ProducedAt ?? st.ThisUpdate)}" + (st.NextUpdate is { } nu ? $" · valid until {nu:yyyy-MM-dd}" : ""), TlsSeverity.Ok),
-                        { Status: "revoked" } => ($"Stapled · REVOKED" + (st.RevokedAt is { } ra ? $" on {ra:yyyy-MM-dd}" : ""), TlsSeverity.Error),
+                        { Status: "good" } => ($"Stapled · good · produced {Ago(st.ProducedAt ?? st.ThisUpdate)}" + (st.NextUpdate is { } nu ? " · valid until " + nu.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""), TlsSeverity.Ok),
+                        { Status: "revoked" } => ($"Stapled · REVOKED" + (st.RevokedAt is { } ra ? " on " + ra.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""), TlsSeverity.Error),
                         _ => ($"Stapled · {st.Status}", TlsSeverity.Warning),
                     };
                     if (st is { Status: "revoked" })

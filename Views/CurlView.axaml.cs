@@ -4,9 +4,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.LogicalTree;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -62,6 +64,10 @@ namespace Echoes.Views
             SearchInput.KeyDown += OnSearchKeyDown;
             KeyDown += OnViewKeyDown;
             InstallRenameFocus();
+
+            // a phone keyboard has no Ctrl+S: the menu doesn't offer one
+            if (AppPlatform.IsMobile && MoreButton.Flyout is MenuFlyout more)
+                foreach (var item in more.Items.OfType<MenuItem>()) item.InputGesture = null;
         }
         // NIC list refresh is driven by MainView's tab SelectionChanged (deterministic).
 
@@ -250,7 +256,7 @@ namespace Echoes.Views
         private void OnSearchKeyDown(object? sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter) { BodyView.FindNext((e.KeyModifiers & KeyModifiers.Shift) != 0); e.Handled = true; }
-            else if (e.Key == Key.Escape && _vm != null) { _vm.SearchText = string.Empty; e.Handled = true; }
+            else if (e.Key == Key.Escape && _vm is { SearchText.Length: > 0 }) { _vm.SearchText = string.Empty; e.Handled = true; }   // (empty: a phone's Back goes on)
         }
 
         private void OnViewKeyDown(object? sender, KeyEventArgs e)
@@ -293,6 +299,48 @@ namespace Echoes.Views
         }
 
         // ================================================================== preview (web)
+
+        // On Android and iOS the native web view is drawn above everything Avalonia draws, so the phone's drawer, the About
+        // box (AppPlatform.OverlayOpen) and this page's own menus and drop-downs opened under the page. It steps aside while
+        // one is open. Only the page on screen listens.
+        private static CurlView? s_onScreen;
+        private static bool _popupHookInstalled;
+        private readonly HashSet<Popup> _openPopups = new();
+
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToVisualTree(e);
+            if (!AppPlatform.IsMobile) return;
+            s_onScreen = this;
+            AppPlatform.OverlayChanged += UpdateWebCover;
+            InstallPopupHook();
+            UpdateWebCover();
+        }
+
+        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnDetachedFromVisualTree(e);
+            AppPlatform.OverlayChanged -= UpdateWebCover;
+            if (ReferenceEquals(s_onScreen, this)) s_onScreen = null;
+            _openPopups.Clear();
+        }
+
+        // A flyout's popup belongs to its button, a drop-down's to its box's template: either way to this page (logically,
+        // or by where it is placed).
+        private static void InstallPopupHook()
+        {
+            if (_popupHookInstalled) return;
+            _popupHookInstalled = true;
+            Popup.IsOpenProperty.Changed.AddClassHandler<Popup>((popup, _) =>
+            {
+                if (s_onScreen is not { } view) return;
+                bool ours = view.IsLogicalAncestorOf(popup) || (popup.PlacementTarget is { } at && view.IsVisualAncestorOf(at));
+                bool changed = popup.IsOpen && ours ? view._openPopups.Add(popup) : view._openPopups.Remove(popup);
+                if (changed) view.UpdateWebCover();
+            });
+        }
+
+        private void UpdateWebCover() => Web.IsVisible = !AppPlatform.OverlayOpen && _openPopups.Count == 0;
 
         // A new response arrived: render it if the engine is ready; otherwise AdapterCreated will.
         private void OnRenderWebRequested() => Dispatcher.UIThread.Post(RenderWeb, DispatcherPriority.Background);

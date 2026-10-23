@@ -529,8 +529,8 @@ public sealed class CfCertPack
         {
             int days = (int)Math.Floor((exp - DateTimeOffset.UtcNow).TotalDays);
             soon = days < 14;
-            parts.Add(days < 0 ? $"expired {exp.ToLocalTime():yyyy-MM-dd}"
-                : $"expires {exp.ToLocalTime():yyyy-MM-dd} ({(days == 0 ? "today" : days == 1 ? "in 1 day" : $"in {days} days")})");
+            parts.Add(days < 0 ? string.Create(CultureInfo.InvariantCulture, $"expired {exp.ToLocalTime():yyyy-MM-dd}")
+                : string.Create(CultureInfo.InvariantCulture, $"expires {exp.ToLocalTime():yyyy-MM-dd} ({(days == 0 ? "today" : days == 1 ? "in 1 day" : $"in {days} days")})"));
         }
         if (CfJson.Int(o["validity_days"]) is int vd) parts.Add($"{vd}-day certificates");
 

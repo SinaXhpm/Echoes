@@ -169,6 +169,7 @@ public partial class SshViewModel : ObservableObject
 
     private SshSession? _session;
     private CancellationTokenSource? _connectCts;
+    private bool _guardHeld;   // BackgroundGuard, from BeginSession to OnSessionEnded (UI thread)
     private readonly Dictionary<string, Avalonia.Platform.Storage.IStorageFile> _pickedKeys = new(StringComparer.Ordinal);
 
     /// <summary>True while a session is live (tests, the view).</summary>
@@ -192,7 +193,8 @@ public partial class SshViewModel : ObservableObject
         else PostDisconnectedState();
     }
 
-    /// <summary>A key picked through the platform picker (Android: a content URI with no file path).</summary>
+    /// <summary>A key picked through the platform picker (Android: a content URI with no file path; iOS: a path that
+    /// opens only through the picker's grant).</summary>
     public void SetPickedKey(string path, Avalonia.Platform.Storage.IStorageFile? file)
     {
         if (file is not null) lock (_pickedKeys) _pickedKeys[path] = file;
@@ -203,7 +205,9 @@ public partial class SshViewModel : ObservableObject
     {
         Avalonia.Platform.Storage.IStorageFile? file;
         lock (_pickedKeys) _pickedKeys.TryGetValue(path, out file);
-        if (file is null || file.TryGetLocalPath() is not null) return null;   // a real path is read directly
+        // A real path is read directly. Not on iOS: a key from iCloud Drive or another app's folder is readable only
+        // through the access the picker grants, which the stream carries and a plain open by path doesn't.
+        if (file is null || (file.TryGetLocalPath() is not null && !OperatingSystem.IsIOS())) return null;
         return () => file.OpenReadAsync().GetAwaiter().GetResult();            // called on the thread pool
     }
 
@@ -317,6 +321,10 @@ public partial class SshViewModel : ObservableObject
         };
         IsConnected = true;
 
+        // Android freezes an app soon after the user switches away and iOS suspends it when the screen locks: the shell,
+        // the -L / -R / -D forwards and an SFTP transfer would all stop. Held until the session ends (OnSessionEnded).
+        if (!_guardHeld) { BackgroundGuard.Acquire("SSH session"); _guardHeld = true; }
+
         // Dedicated thread: ShellStream.Read blocks for the whole session.
         if (s.Shell is { } shell)
             _ = Task.Factory.StartNew(() => ReadFromStream(shell, s), CancellationToken.None,
@@ -384,6 +392,7 @@ public partial class SshViewModel : ObservableObject
 
     private void OnSessionEnded()
     {
+        if (_guardHeld) { BackgroundGuard.Release("SSH session"); _guardHeld = false; }
         ResetTunnelState();
         foreach (var r in Forwards) r.SetOff();
         CancelFilesWork();

@@ -6,6 +6,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -70,9 +71,15 @@ public partial class PortScannerViewModel
         ? "Open ports appear as they're found; the rest when the pass ends."
         : !CanExport ? "Add targets on Setup and press Start scan."
         : _lastPass is { Stopped: true } ? "The scan was stopped before anything was found."
+        : _lanBlocked ? "No route to the local network: turn on Echoes in Settings › Privacy & Security › Local Network."
         : "No host answered. To scan hosts that block pings, tick Skip ping.";
     partial void OnIsScanningChanged(bool value) { OnPropertyChanged(nameof(EmptyTitle)); OnPropertyChanged(nameof(EmptyText)); }
     partial void OnCanExportChanged(bool value) { OnPropertyChanged(nameof(EmptyTitle)); OnPropertyChanged(nameof(EmptyText)); }
+
+    // iOS: every local host of the last pass had no route — Echoes may not use the local network (the permission is off,
+    // or its prompt wasn't answered yet), which "no host answered" would hide. ScanDiscovery tallies the host checks.
+    private (long Down, long NoRoute) _lanTallyAtStart;
+    private bool _lanBlocked;
 
     public bool ViewAll => ViewMode == "all";
     public bool ViewOpen => ViewMode == "open";
@@ -137,6 +144,8 @@ public partial class PortScannerViewModel
     {
         _sink?.ResetBudget();
         _live = 0;
+        _lanTallyAtStart = ScanDiscovery.LanDownTally;
+        _lanBlocked = false;
         HiddenText = "";
         OpenCount = OpenFilteredCount = ClosedCount = FilteredCount = HostsUpCount = 0;
         _folded.Clear();
@@ -242,6 +251,9 @@ public partial class PortScannerViewModel
     private async Task FinishPassAsync(ScanPass pass, ScanDiff? diff, string portsText)
     {
         DiscardQueued();
+        var (lanDown, lanNoRoute) = ScanDiscovery.LanDownTally;
+        _lanBlocked = OperatingSystem.IsIOS() && pass.HostsUp == 0 && lanDown > _lanTallyAtStart.Down
+                      && lanNoRoute - _lanTallyAtStart.NoRoute == lanDown - _lanTallyAtStart.Down;
         _lastPass = pass;
         _lastDiff = diff;
         _lastPortsText = portsText;
@@ -475,7 +487,7 @@ public partial class PortScannerViewModel
             "txt" => (".txt", "Text report", "*.txt"),
             _ => (".json", "JSON", "*.json"),
         };
-        string stamp = pass.StartedUtc.ToLocalTime().ToString("yyyyMMdd-HHmm");
+        string stamp = pass.StartedUtc.ToLocalTime().ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
         var file = await storage.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "Export scan results",

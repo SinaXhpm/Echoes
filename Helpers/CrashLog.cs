@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -65,7 +66,7 @@ public static class CrashLog
             if (text.Length > MaxEntryChars) text = text[..MaxEntryChars] + " … [truncated]";
             try { text = Secrets.Replace(text, "•••"); }
             catch (RegexMatchTimeoutException) { }
-            string entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {text}{Environment.NewLine}{Environment.NewLine}";
+            string entry = string.Create(CultureInfo.InvariantCulture, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {text}{Environment.NewLine}{Environment.NewLine}");
             byte[] bytes = Encoding.UTF8.GetBytes(entry);
 
             // The per-user data folder (the one About → Data opens), never next to the executable: on macOS that is

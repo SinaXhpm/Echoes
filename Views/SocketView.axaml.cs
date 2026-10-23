@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Echoes.Helpers;
 using Echoes.ViewModels;
 
@@ -56,6 +57,8 @@ public partial class SocketView : UserControl
             HostBox.PlaceholderText = "Host name or IP";
             WsUrlBox.PlaceholderText = "wss://host/path";
             SkRoot.Classes.Add("touch");
+            // a long press is easy to miss: a tap on a message opens its menu too (copy as hex / escaped, send again)
+            TxList.Tapped += OnEntryTapped;
         }
     }
 
@@ -167,8 +170,19 @@ public partial class SocketView : UserControl
 
     private void OnEntryContext(object? sender, ContextRequestedEventArgs e)
     {
-        if (_vm is null || (e.Source as StyledElement)?.DataContext is not SocketEntry entry) return;
-        e.Handled = true;
+        if (OpenEntryMenu(e.Source)) e.Handled = true;
+    }
+
+    // Phone: a tap opens the same menu, except on a message's own button ("Connect anyway"), which stays a plain click.
+    private void OnEntryTapped(object? sender, TappedEventArgs e)
+    {
+        if ((e.Source as Visual)?.FindAncestorOfType<Button>(includeSelf: true) is not null) return;
+        if (OpenEntryMenu(e.Source)) e.Handled = true;
+    }
+
+    private bool OpenEntryMenu(object? source)
+    {
+        if (_vm is null || (source as StyledElement)?.DataContext is not SocketEntry entry) return false;
         var vm = _vm;
         var menu = new ContextMenu();
 
@@ -179,7 +193,7 @@ public partial class SocketView : UserControl
             menu.Items.Add(item);
         }
 
-        string? selection = (e.Source as SelectableTextBlock)?.SelectedText;
+        string? selection = (source as SelectableTextBlock)?.SelectedText;
         if (!string.IsNullOrEmpty(selection)) Add("Copy selection", () => _ = ClipboardHelper.SetTextAsync(selection));
         if (entry.Data != null)
         {
@@ -193,6 +207,7 @@ public partial class SocketView : UserControl
         menu.Items.Add(new Separator());
         Add("Copy the whole transcript", () => vm.CopyTranscriptCommand.Execute(null));
 
-        menu.Open(e.Source as Control ?? TxList);
+        menu.Open(source as Control ?? TxList);
+        return true;
     }
 }

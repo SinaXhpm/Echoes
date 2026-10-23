@@ -12,7 +12,12 @@ public partial class StringLabView : UserControl
 {
     // No DataContext here: the shell assigns the shared view-model (ToolViews.Create in MainView.axaml.cs).
     // Setting one in the constructor built a throwaway VM and bound every control to it first.
-    public StringLabView() => InitializeComponent();
+    public StringLabView()
+    {
+        InitializeComponent();
+        // phones: the outputs wrap (styles: LabRoot.touch)
+        if (Helpers.AppPlatform.IsMobile) LabRoot.Classes.Add("touch");
+    }
 
     // HASH → FILE…: the picker needs this view's TopLevel, so it lives here (as in WebServerView /
     // BackupView); the view-model only receives a stream opener and does the hashing off the UI thread.

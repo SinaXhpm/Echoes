@@ -18,6 +18,7 @@ public sealed class AndroidBackgroundGuard : IBackgroundGuard
     public void Acquire(string reason)
     {
         KeepAliveService.StopWanted = false;   // a release still pending from before is overtaken by this start
+        KeepAliveService.Reason = reason;
         var intent = new Intent(_context, typeof(KeepAliveService));
         intent.PutExtra(KeepAliveService.ExtraReason, reason);
 
@@ -40,4 +41,6 @@ public sealed class AndroidBackgroundGuard : IBackgroundGuard
         }
         _context.StopService(new Intent(_context, typeof(KeepAliveService)));
     }
+
+    public void Update(string reason) => KeepAliveService.UpdateText(_context, reason);
 }

@@ -882,6 +882,11 @@
         <Style Selector="Grid#CfMain.narrow Grid.recRow > StackPanel.recActions">
             <Setter Property="Grid.RowSpan" Value="2"/>
         </Style>
+        <!-- phones: no Edit / Delete on a narrow row (they left the name and content ~56 px); a tap opens the record
+             instead, and the editor has Delete (CfMain gets "touch" in code-behind) -->
+        <Style Selector="Grid#CfMain.narrow.touch Grid.recRow > StackPanel.recActions">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
         <Style Selector="Grid#CfMain.narrow Button.pill">
             <Setter Property="Height" Value="30"/>
         </Style>
@@ -991,15 +996,16 @@
         <Style Selector="Grid#CfMain.wide Grid#OverviewGrid">
             <Setter Property="Margin" Value="0,0,14,4"/>
         </Style>
-        <!-- overview: traffic | quick actions over top countries (wide) · one column (narrow) -->
+        <!-- overview: traffic | quick actions over top countries (wide) · one column (narrow). The right column is as
+             wide as its 320 cards (wide only): a fixed one was wider than a phone at a large display size -->
         <Style Selector="Grid#OverviewGrid.wide > Border#TrafficCard">
             <Setter Property="Grid.RowSpan" Value="2"/>
         </Style>
         <Style Selector="Grid#OverviewGrid.wide > Border#QuickCard">
-            <Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Grid.Column" Value="1"/><Setter Property="Width" Value="320"/>
         </Style>
         <Style Selector="Grid#OverviewGrid.wide > Border#CountryCard">
-            <Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.Row" Value="1"/>
+            <Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.Row" Value="1"/><Setter Property="Width" Value="320"/>
         </Style>
         <Style Selector="Grid#OverviewGrid.narrow > Border#TrafficCard">
             <Setter Property="Grid.ColumnSpan" Value="2"/>
@@ -1375,7 +1381,7 @@
                                     <Path Classes="glyph" Data="{StaticResource CfGlyphHelp}"/>
                                     <Button.Flyout>
                                         <Flyout Placement="Bottom">
-                                            <StackPanel MaxWidth="360" Spacing="8" Margin="2">
+                                            <StackPanel MaxWidth="300" Spacing="8" Margin="2">
                                                 <TextBlock Text="Which API token?" FontWeight="SemiBold" FontSize="{StaticResource Font.Body}"
                                                            Foreground="{DynamicResource Text.Primary}"/>
                                                 <TextBlock TextWrapping="Wrap" FontSize="{StaticResource Font.Small}" LineHeight="18"
@@ -1435,7 +1441,7 @@
                           IsVisible="{Binding Draft.UseProxy}">
                         <StackPanel x:Name="CfProxyAddrField">
                             <TextBlock Classes="fieldLabel" Text="Proxy"/>
-                            <AutoCompleteBox Classes="field" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding Draft.ProxyAddress}"
+                            <AutoCompleteBox Classes="field" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding Draft.ProxyAddress}" TextInputOptions.ContentType="Url"
                                      ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                      PlaceholderText="host:port" ToolTip.Tip="HTTP or SOCKS5 proxy, e.g. 127.0.0.1:1080"/>
                         </StackPanel>
@@ -1554,7 +1560,7 @@
                 <TabItem Header="Overview">
                     <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                        <Grid x:Name="OverviewGrid" ColumnDefinitions="*, 320" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="12" RowSpacing="12"
+                        <Grid x:Name="OverviewGrid" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="12" RowSpacing="12"
                               helpers:Responsive.BreakWidth="700">
                             <!-- traffic: GraphQL analytics -->
                             <Border x:Name="TrafficCard" Classes="card" Padding="12" VerticalAlignment="Top">
@@ -1752,7 +1758,8 @@
 
                                 <ListBox x:Name="RecordList" Grid.Row="1" ItemsSource="{Binding VisibleRecords}" SelectedItem="{Binding SelectedRecord}"
                                          Background="{DynamicResource Bg.Inset}" BorderThickness="0" Padding="0"
-                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" DoubleTapped="OnRecordDoubleTapped">
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" DoubleTapped="OnRecordDoubleTapped"
+                                         Tapped="OnRecordTapped">
                                     <ListBox.KeyBindings>
                                         <KeyBinding Gesture="Enter" Command="{Binding EditSelectedCommand}"/>
                                     </ListBox.KeyBindings>
@@ -2290,15 +2297,15 @@
                       <Grid IsVisible="{Binding ShowSrvFields}" ColumnDefinitions="*, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="12" RowSpacing="12">
                           <StackPanel Grid.Column="0">
                               <TextBlock Classes="fieldLabel" Text="Priority"/>
-                              <TextBox Classes="field mono" Text="{Binding EditSrvPriority}" PlaceholderText="10"/>
+                              <TextBox Classes="field mono" Text="{Binding EditSrvPriority}" TextInputOptions.ContentType="Digits" PlaceholderText="10"/>
                           </StackPanel>
                           <StackPanel Grid.Column="1">
                               <TextBlock Classes="fieldLabel" Text="Weight"/>
-                              <TextBox Classes="field mono" Text="{Binding EditSrvWeight}" PlaceholderText="5"/>
+                              <TextBox Classes="field mono" Text="{Binding EditSrvWeight}" TextInputOptions.ContentType="Digits" PlaceholderText="5"/>
                           </StackPanel>
                           <StackPanel Grid.Column="2">
                               <TextBlock Classes="fieldLabel" Text="Port"/>
-                              <TextBox Classes="field mono" Text="{Binding EditSrvPort}" PlaceholderText="443"/>
+                              <TextBox Classes="field mono" Text="{Binding EditSrvPort}" TextInputOptions.ContentType="Digits" PlaceholderText="443"/>
                           </StackPanel>
                           <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
                               <TextBlock Classes="fieldLabel" Text="Target"/>
@@ -2319,7 +2326,7 @@
                           </StackPanel>
                           <StackPanel Grid.Column="1" IsVisible="{Binding ShowPriorityField}">
                               <TextBlock Classes="fieldLabel" Text="Priority"/>
-                              <TextBox Classes="field mono" Text="{Binding EditPriority}" PlaceholderText="10" ToolTip.Tip="Lower is preferred (0–65535)"/>
+                              <TextBox Classes="field mono" Text="{Binding EditPriority}" TextInputOptions.ContentType="Digits" PlaceholderText="10" ToolTip.Tip="Lower is preferred (0–65535)"/>
                           </StackPanel>
                           <!-- beside the TTL: only A / AAAA / CNAME can be proxied, and only MX has a priority -->
                           <CheckBox Grid.Column="1" IsChecked="{Binding EditProxied}" IsVisible="{Binding ShowProxiedField}"

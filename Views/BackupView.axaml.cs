@@ -119,8 +119,13 @@ public partial class BackupView : UserControl
             await using (var stream = await files[0].OpenReadAsync())
                 data = await BackupVault.ReadFileAsync(stream);   // magic checked first, size capped
             string note = await vm.ApplyImportAsync(data);   // throws on wrong password / bad file
-            vm.Status = "Imported ✓  Restart Echoes now to load it: until then, changes aren't saved."
+            // a phone user doesn't "restart an app": Android does it with a tap, iOS says how
+            string restart = AppPlatform.RestartApp is not null ? "Restart Echoes to load it"
+                : OperatingSystem.IsIOS() ? "Close Echoes in the app switcher and open it again to load it"
+                : "Restart Echoes now to load it";
+            vm.Status = $"Imported ✓  {restart}: until then, changes aren't saved."
                         + (note.Length > 0 ? "\n" + note : string.Empty);
+            vm.CanRestartNow = AppPlatform.RestartApp is not null;
             vm.ClearPassword();
         }
         catch (Exception ex) { vm.Status = "Import failed: " + ex.Message; }
