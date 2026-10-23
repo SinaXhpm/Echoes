@@ -731,6 +731,7 @@
 
             <!-- ======== REQUEST ======== -->
             <TabItem Header="Request">
+                <ctl:Deferred><DataTemplate x:DataType="vm:CurlViewModel">
                 <TabControl SelectedIndex="{Binding RequestTabIndex}" Padding="0,10,0,0">
                     <TabControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
@@ -746,6 +747,7 @@
                                 </Border>
                             </StackPanel>
                         </TabItem.Header>
+                        <ctl:Deferred><DataTemplate x:DataType="vm:CurlViewModel">
                         <Grid RowDefinitions="Auto, *, Auto" RowSpacing="6">
                             <Grid ColumnDefinitions="28, 4*, 5*, Auto" ColumnSpacing="6">
                                 <TextBlock Grid.Column="1" Classes="colHead" Text="Key"/>
@@ -774,6 +776,7 @@
                                 </StackPanel>
                             </ScrollViewer>
                         </Grid>
+                        </DataTemplate></ctl:Deferred>
                     </TabItem>
 
                     <!-- headers -->
@@ -786,6 +789,7 @@
                                 </Border>
                             </StackPanel>
                         </TabItem.Header>
+                        <ctl:Deferred><DataTemplate x:DataType="vm:CurlViewModel">
                         <Grid RowDefinitions="Auto, *, Auto" RowSpacing="6">
                             <Grid ColumnDefinitions="28, 4*, 5*, Auto" ColumnSpacing="6">
                                 <TextBlock Grid.Column="1" Classes="colHead" Text="Name" IsVisible="{Binding !HeadersBulk}"/>
@@ -829,6 +833,7 @@
                                      AcceptsReturn="True" TextWrapping="NoWrap" ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                      PlaceholderText="Content-Type: application/json&#x0a;Authorization: Bearer …&#x0a;# X-Off: not sent"/>
                         </Grid>
+                        </DataTemplate></ctl:Deferred>
                     </TabItem>
 
                     <!-- body -->
@@ -841,6 +846,7 @@
                                 </Border>
                             </StackPanel>
                         </TabItem.Header>
+                        <ctl:Deferred><DataTemplate x:DataType="vm:CurlViewModel">
                         <Grid RowDefinitions="Auto, *, Auto" RowSpacing="8">
                             <WrapPanel ItemSpacing="8" LineSpacing="8">
                                 <ListBox Classes="switch" SelectedIndex="{Binding BodyModeIndex}" AutomationProperties.Name="Body type">
@@ -979,6 +985,7 @@
                                            Foreground="{DynamicResource Warning}"/>
                             </StackPanel>
                         </Grid>
+                        </DataTemplate></ctl:Deferred>
                     </TabItem>
 
                     <!-- auth -->
@@ -991,6 +998,7 @@
                                 </Border>
                             </StackPanel>
                         </TabItem.Header>
+                        <ctl:Deferred><DataTemplate x:DataType="vm:CurlViewModel">
                         <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Spacing="12">
                                 <ListBox Classes="switch" SelectedIndex="{Binding AuthModeIndex}" AutomationProperties.Name="Auth type">
@@ -1018,6 +1026,7 @@
                                            ToolTip.Tip="Credentials stay in memory: they are kept only in requests you save."/>
                             </StackPanel>
                         </ScrollViewer>
+                        </DataTemplate></ctl:Deferred>
                     </TabItem>
 
                     <!-- cookies -->
@@ -1030,6 +1039,7 @@
                                 </Border>
                             </StackPanel>
                         </TabItem.Header>
+                        <ctl:Deferred><DataTemplate x:DataType="vm:CurlViewModel">
                         <Grid RowDefinitions="Auto, *, Auto" RowSpacing="6">
                             <Grid ColumnDefinitions="28, 4*, 5*, Auto" ColumnSpacing="6">
                                 <TextBlock Grid.Column="1" Classes="colHead" Text="Name"/>
@@ -1059,10 +1069,12 @@
                                 </StackPanel>
                             </ScrollViewer>
                         </Grid>
+                        </DataTemplate></ctl:Deferred>
                     </TabItem>
 
                     <!-- options -->
                     <TabItem Header="Options">
+                        <ctl:Deferred><DataTemplate x:DataType="vm:CurlViewModel">
                         <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Spacing="14">
                                 <WrapPanel ItemSpacing="20" LineSpacing="10">
@@ -1126,8 +1138,10 @@
                                 </Grid>
                             </StackPanel>
                         </ScrollViewer>
+                        </DataTemplate></ctl:Deferred>
                     </TabItem>
                 </TabControl>
+                </DataTemplate></ctl:Deferred>
             </TabItem>
 
             <!-- ======== RESPONSE ======== -->
@@ -1234,6 +1248,7 @@
                                     </Border>
                                 </StackPanel>
                             </TabItem.Header>
+                            <ctl:Deferred><DataTemplate x:DataType="vm:CurlViewModel">
                             <Grid RowDefinitions="Auto, *" RowSpacing="8">
                                 <Grid ColumnDefinitions="*, Auto">
                                     <ListBox Classes="switch" SelectedIndex="{Binding HeadersViewIndex}">
@@ -1310,9 +1325,11 @@
                                     </Panel>
                                 </Border>
                             </Grid>
+                            </DataTemplate></ctl:Deferred>
                         </TabItem>
 
                         <TabItem Header="Timing">
+                            <ctl:Deferred><DataTemplate x:DataType="vm:CurlViewModel">
                             <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                                 <StackPanel Spacing="12">
                                     <TextBlock Classes="hint" Text="Send a request to see where the time went." IsVisible="{Binding !HasTiming}"/>
@@ -1353,20 +1370,25 @@
                                     </StackPanel>
                                 </StackPanel>
                             </ScrollViewer>
+                            </DataTemplate></ctl:Deferred>
                         </TabItem>
 
                         <TabItem Header="Logs">
+                            <ctl:Deferred><DataTemplate x:DataType="vm:CurlViewModel">
                             <Border Classes="card output" ClipToBounds="True">
                                 <TextBox Classes="out" Text="{Binding FullLog}" IsReadOnly="True" AcceptsReturn="True"
                                          PlaceholderText="The verbose exchange shows up here."/>
                             </Border>
+                            </DataTemplate></ctl:Deferred>
                         </TabItem>
 
                         <TabItem Header="TLS">
+                            <ctl:Deferred><DataTemplate x:DataType="vm:CurlViewModel">
                             <Border Classes="card output" ClipToBounds="True">
                                 <TextBox Classes="out" Text="{Binding SslLog}" IsReadOnly="True" AcceptsReturn="True"
                                          PlaceholderText="Certificate, chain and cipher of an https:// request."/>
                             </Border>
+                            </DataTemplate></ctl:Deferred>
                         </TabItem>
 
                         <!-- Renders the ACTUAL response body (code-behind calls NavigateToString) rather than re-navigating to the
@@ -1391,6 +1413,7 @@
 
             <!-- ======== CODE ======== -->
             <TabItem Header="Code">
+                <ctl:Deferred><DataTemplate x:DataType="vm:CurlViewModel">
                 <Grid RowDefinitions="Auto, *" RowSpacing="10">
                     <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="8">
                         <ComboBox Classes="field" ItemsSource="{Binding SnippetLanguages}" SelectedItem="{Binding SnippetLanguage}" MinWidth="160"/>
@@ -1411,10 +1434,12 @@
                                  IsReadOnly="True" AcceptsReturn="True"/>
                     </Border>
                 </Grid>
+                </DataTemplate></ctl:Deferred>
             </TabItem>
 
             <!-- ======== SAVED + HISTORY ======== -->
             <TabItem Header="Saved">
+                <ctl:Deferred><DataTemplate x:DataType="vm:CurlViewModel">
                 <Grid RowDefinitions="Auto, *, Auto" RowSpacing="8">
                     <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
                         <ListBox Classes="switch" SelectedIndex="{Binding LibraryIndex}">
@@ -1529,6 +1554,7 @@
                                Text="Saved: full request, auth too · History: method, URL, status."
                                ToolTip.Tip="Saved requests are stored in your Echoes profile — headers, body and auth included. History keeps only method, URL and status between sessions."/>
                 </Grid>
+                </DataTemplate></ctl:Deferred>
             </TabItem>
         </TabControl>
 

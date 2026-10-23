@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
 			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 			 xmlns:vm="using:Echoes.ViewModels"
+			 xmlns:ctl="using:Echoes.Views.Controls"
 			 xmlns:h="using:Echoes.Helpers"
 			 x:Class="Echoes.Views.NetworkInfoView"
 			 x:DataType="vm:NetworkInfoViewModel">
@@ -336,6 +337,7 @@
 
 		<!-- ============================ INTERFACES ============================ -->
 		<TabItem Header="Interfaces">
+			<ctl:Deferred><DataTemplate x:DataType="vm:NetworkInfoViewModel">
 			<Grid x:Name="IfaceRoot" h:Responsive.BreakWidth="620" RowDefinitions="Auto, *" Margin="0,12,0,0">
 				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,12">
 					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2" Background="Transparent"
@@ -424,6 +426,7 @@
 						</ItemsControl.ItemTemplate>
 					</ItemsControl>
 			</Grid>
+			</DataTemplate></ctl:Deferred>
 		</TabItem>
 
 		<!-- ============================ WI-FI ============================ -->
@@ -609,6 +612,7 @@
 
 		<!-- ============================ NEIGHBORS ============================ -->
 		<TabItem Header="Neighbors">
+			<ctl:Deferred><DataTemplate x:DataType="vm:NetworkInfoViewModel">
 			<Grid RowDefinitions="Auto, *" Margin="0,12,0,0">
 				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,12">
 					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2" Background="Transparent"
@@ -662,10 +666,12 @@
 					</StackPanel>
 				</Border>
 			</Grid>
+			</DataTemplate></ctl:Deferred>
 		</TabItem>
 
 		<!-- ============================ PORTS ============================ -->
 		<TabItem Header="Ports">
+			<ctl:Deferred><DataTemplate x:DataType="vm:NetworkInfoViewModel">
 			<Grid RowDefinitions="Auto, *" Margin="0,12,0,0">
 				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,12">
 					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2" Background="Transparent"
@@ -721,10 +727,12 @@
 					</StackPanel>
 				</Border>
 			</Grid>
+			</DataTemplate></ctl:Deferred>
 		</TabItem>
 
 		<!-- ============================ ROUTING ============================ -->
 		<TabItem Header="Routing">
+			<ctl:Deferred><DataTemplate x:DataType="vm:NetworkInfoViewModel">
 			<Grid RowDefinitions="Auto, *" Margin="0,12,0,0">
 				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,12">
 					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2" Background="Transparent"
@@ -777,6 +785,7 @@
 					</StackPanel>
 				</Border>
 			</Grid>
+			</DataTemplate></ctl:Deferred>
 		</TabItem>
 
 	</TabControl>

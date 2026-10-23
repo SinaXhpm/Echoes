@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
+             xmlns:ctl="using:Echoes.Views.Controls"
              xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.IpInfoView"
              x:DataType="vm:IpInfoViewModel">
@@ -305,6 +306,7 @@
 
         <!-- ============================ SUBNET / CIDR ============================ -->
         <TabItem Header="Subnet / CIDR">
+            <ctl:Deferred><DataTemplate x:DataType="vm:IpInfoViewModel">
             <Grid RowDefinitions="Auto, *" RowSpacing="12">
                 <Border Grid.Row="0" Classes="card" Padding="12">
                     <StackPanel>
@@ -348,6 +350,7 @@
                     </Grid>
                 </Border>
             </Grid>
+            </DataTemplate></ctl:Deferred>
         </TabItem>
     </TabControl>
 </UserControl>

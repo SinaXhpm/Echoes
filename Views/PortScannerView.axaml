@@ -688,6 +688,7 @@
 
         <!-- ===================== REPORT ===================== -->
         <TabItem Header="Report">
+            <ctl:Deferred><DataTemplate x:DataType="vm:PortScannerViewModel">
             <Grid Margin="0,12,0,0" RowDefinitions="Auto, *" RowSpacing="10">
                 <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10">
                     <TextBlock Classes="status" Text="Last finished pass, nmap style"/>
@@ -704,6 +705,7 @@
                          ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
                          PlaceholderText="Run a scan to see its report here."/>
             </Grid>
+            </DataTemplate></ctl:Deferred>
         </TabItem>
 
     </TabControl>

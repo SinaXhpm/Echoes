@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
+             xmlns:ctl="using:Echoes.Views.Controls"
              xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.TlsView"
              x:DataType="vm:TlsViewModel"
@@ -639,6 +640,7 @@
 
         <!-- ============================ BULK ============================ -->
         <TabItem Header="Bulk check">
+            <ctl:Deferred><DataTemplate x:DataType="vm:TlsViewModel">
             <Grid x:Name="BkRoot" helpers:Responsive.BreakWidth="640" ColumnDefinitions="Auto, *" RowDefinitions="Auto, *" Margin="0,12,0,0">
                 <Border x:Name="BkInput" Classes="card" Padding="12">
                     <Grid RowDefinitions="Auto, *, Auto, Auto">
@@ -736,6 +738,7 @@
                     </Grid>
                 </Border>
             </Grid>
+            </DataTemplate></ctl:Deferred>
         </TabItem>
     </TabControl>
 </UserControl>

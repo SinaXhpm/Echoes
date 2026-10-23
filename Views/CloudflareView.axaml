@@ -1552,6 +1552,7 @@
 
                 <!-- ======================= OVERVIEW ======================= -->
                 <TabItem Header="Overview">
+                    <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                         <Grid x:Name="OverviewGrid" ColumnDefinitions="*, 320" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="12" RowSpacing="12"
                               helpers:Responsive.BreakWidth="700">
@@ -1658,6 +1659,7 @@
                             </Border>
                         </Grid>
                     </ScrollViewer>
+                    </DataTemplate></ctl:Deferred>
                 </TabItem>
 
                 <!-- ======================= DNS RECORDS ======================= -->
@@ -1668,6 +1670,7 @@
                             <TextBlock Classes="wideOnly" Text=" records"/>
                         </StackPanel>
                     </TabItem.Header>
+                    <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                     <Grid RowDefinitions="Auto, *">
                         <!-- toolbar: [search ......][type] [Add record] [Backup] [Restore] [⋯] -->
                         <Grid x:Name="DnsBar" Grid.Row="0" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto"
@@ -1832,12 +1835,15 @@
                             </Grid>
                         </Border>
                     </Grid>
+                    </DataTemplate></ctl:Deferred>
                 </TabItem>
 
                 <!-- ======================= SSL / TLS ======================= -->
                 <TabItem Header="SSL/TLS">
+                    <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                     <TabControl Classes="sub" SelectedIndex="{Binding SslTabIndex}">
                         <TabItem Header="Encryption">
+                            <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                             <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                                 <StackPanel Classes="setStack" Spacing="12">
                                     <ContentControl Content="{Binding}" ContentTemplate="{StaticResource SettingsState}"
@@ -1854,8 +1860,10 @@
                                     </Border>
                                 </StackPanel>
                             </ScrollViewer>
+                            </DataTemplate></ctl:Deferred>
                         </TabItem>
                         <TabItem Header="Edge certificates">
+                            <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                             <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                                 <StackPanel Classes="setStack" Spacing="12">
                                     <TextBlock Classes="tabHint" Text="Loading certificates…"
@@ -1900,14 +1908,18 @@
                                     </Border>
                                 </StackPanel>
                             </ScrollViewer>
+                            </DataTemplate></ctl:Deferred>
                         </TabItem>
                     </TabControl>
+                    </DataTemplate></ctl:Deferred>
                 </TabItem>
 
                 <!-- ======================= SECURITY ======================= -->
                 <TabItem Header="Security">
+                    <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                     <TabControl Classes="sub" SelectedIndex="{Binding SecurityTabIndex}">
                         <TabItem Header="Settings">
+                            <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                             <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                                 <StackPanel Classes="setStack" Spacing="12">
                                     <ContentControl Content="{Binding}" ContentTemplate="{StaticResource SettingsState}"
@@ -1931,13 +1943,17 @@
                                     </Border>
                                 </StackPanel>
                             </ScrollViewer>
+                            </DataTemplate></ctl:Deferred>
                         </TabItem>
 
                         <TabItem Header="WAF rules">
+                            <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                             <ContentControl Content="{Binding CurrentExtras.Waf, FallbackValue={x:Null}}" ContentTemplate="{StaticResource RuleList}"/>
+                            </DataTemplate></ctl:Deferred>
                         </TabItem>
 
                         <TabItem Header="IP access">
+                            <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                             <Grid RowDefinitions="Auto, *">
                                 <!-- add: the kind of value (IP, range, AS number, country) is recognized from the text itself -->
                                 <Border Classes="card" Padding="12">
@@ -2024,8 +2040,10 @@
                                     </Panel>
                                 </Border>
                             </Grid>
+                            </DataTemplate></ctl:Deferred>
                         </TabItem>
                     </TabControl>
+                    </DataTemplate></ctl:Deferred>
                 </TabItem>
 
                 <!-- ======================= SPEED & CACHE ======================= -->
@@ -2036,8 +2054,10 @@
                             <TextBlock Classes="wideOnly" Text=" &amp; cache"/>
                         </StackPanel>
                     </TabItem.Header>
+                    <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                     <TabControl Classes="sub" SelectedIndex="{Binding SpeedTabIndex}">
                         <TabItem Header="Optimization">
+                            <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                             <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                                 <StackPanel Classes="setStack" Spacing="12">
                                     <ContentControl Content="{Binding}" ContentTemplate="{StaticResource SettingsState}"
@@ -2047,8 +2067,10 @@
                                     </Border>
                                 </StackPanel>
                             </ScrollViewer>
+                            </DataTemplate></ctl:Deferred>
                         </TabItem>
                         <TabItem Header="Cache">
+                            <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                             <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                                 <StackPanel Classes="setStack" Spacing="12">
                                     <ContentControl Content="{Binding}" ContentTemplate="{StaticResource SettingsState}"
@@ -2099,12 +2121,15 @@
                                     </Border>
                                 </StackPanel>
                             </ScrollViewer>
+                            </DataTemplate></ctl:Deferred>
                         </TabItem>
                     </TabControl>
+                    </DataTemplate></ctl:Deferred>
                 </TabItem>
 
                 <!-- ======================= NETWORK ======================= -->
                 <TabItem Header="Network">
+                    <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                         <StackPanel Classes="setStack" Spacing="12">
                             <ContentControl Content="{Binding}" ContentTemplate="{StaticResource SettingsState}"
@@ -2144,11 +2169,14 @@
                             </Border>
                         </StackPanel>
                     </ScrollViewer>
+                    </DataTemplate></ctl:Deferred>
                 </TabItem>
 
                 <!-- ======================= RULES (single redirects) ======================= -->
                 <TabItem Header="Rules">
+                    <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
                     <ContentControl Content="{Binding CurrentExtras.Redirects, FallbackValue={x:Null}}" ContentTemplate="{StaticResource RuleList}"/>
+                    </DataTemplate></ctl:Deferred>
                 </TabItem>
             </TabControl>
         </Grid>
@@ -2195,6 +2223,7 @@
 
       <!-- ============ RECORD EDITOR — takes over the tool on a solid backdrop (no see-through overlay) ============ -->
       <Border IsVisible="{Binding IsEditorOpen}" Background="{DynamicResource Bg.App}">
+          <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
           <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <Border Classes="card" Padding="24" MaxWidth="520" Margin="0,8" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                   <StackPanel Spacing="14">
@@ -2349,10 +2378,12 @@
                   </StackPanel>
               </Border>
           </ScrollViewer>
+          </DataTemplate></ctl:Deferred>
       </Border>
 
       <!-- ============ RESTORE — preview first, then progress, then a summary (solid backdrop) ============ -->
       <Border IsVisible="{Binding IsRestoreOpen}" Background="{DynamicResource Bg.App}">
+          <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
           <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <Border Classes="card" Padding="24" MaxWidth="640" Margin="0,8" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                   <StackPanel Spacing="12">
@@ -2463,10 +2494,12 @@
                   </StackPanel>
               </Border>
           </ScrollViewer>
+          </DataTemplate></ctl:Deferred>
       </Border>
 
       <!-- ============ RULE EDITOR (a custom rule or a redirect) — solid backdrop ============ -->
       <Border IsVisible="{Binding IsRuleEditorOpen}" Background="{DynamicResource Bg.App}">
+          <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
           <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <Border Classes="card" Padding="24" MaxWidth="600" Margin="0,8" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                   <StackPanel Spacing="14">
@@ -2570,10 +2603,12 @@
                   </StackPanel>
               </Border>
           </ScrollViewer>
+          </DataTemplate></ctl:Deferred>
       </Border>
 
       <!-- ============ DNSSEC — status, on / off, and the DS record for the registrar (solid backdrop) ============ -->
       <Border IsVisible="{Binding IsDnssecOpen}" Background="{DynamicResource Bg.App}">
+          <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
           <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <Border Classes="card" Padding="24" MaxWidth="640" Margin="0,8" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                   <StackPanel Classes="page" Spacing="14" helpers:Responsive.BreakWidth="440">
@@ -2632,11 +2667,13 @@
                   </StackPanel>
               </Border>
           </ScrollViewer>
+          </DataTemplate></ctl:Deferred>
       </Border>
 
       <!-- ============ DYNAMIC DNS — the records kept on this device's public IP (solid backdrop) ============
            The card takes the page's height; only the list scrolls. -->
       <Border IsVisible="{Binding IsDdnsOpen}" Background="{DynamicResource Bg.App}">
+          <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
           <Border Classes="card" Padding="20" MaxWidth="640" MaxHeight="640" Margin="0,8"
                   HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
               <Grid x:Name="DdnsPage" RowDefinitions="Auto, Auto, *, Auto, Auto" RowSpacing="12" helpers:Responsive.BreakWidth="440">
@@ -2728,10 +2765,12 @@
                   </Grid>
               </Grid>
           </Border>
+          </DataTemplate></ctl:Deferred>
       </Border>
 
       <!-- ============ IMPORT A BIND ZONE FILE — preview first, then the result (solid backdrop) ============ -->
       <Border IsVisible="{Binding IsImportOpen}" Background="{DynamicResource Bg.App}">
+          <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
           <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <Border Classes="card" Padding="24" MaxWidth="640" Margin="0,8" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                   <StackPanel Spacing="12">
@@ -2803,10 +2842,12 @@
                   </StackPanel>
               </Border>
           </ScrollViewer>
+          </DataTemplate></ctl:Deferred>
       </Border>
 
       <!-- ============ ADD A SITE — the domain, then its name servers (solid backdrop) ============ -->
       <Border IsVisible="{Binding IsAddZoneOpen}" Background="{DynamicResource Bg.App}">
+          <ctl:Deferred><DataTemplate x:DataType="vm:CloudflareViewModel">
           <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <Border Classes="card" Padding="24" MaxWidth="520" Margin="0,8" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                   <StackPanel Classes="page" Spacing="14" helpers:Responsive.BreakWidth="440">
@@ -2865,6 +2906,7 @@
                   </StackPanel>
               </Border>
           </ScrollViewer>
+          </DataTemplate></ctl:Deferred>
       </Border>
     </Panel>
 </UserControl>

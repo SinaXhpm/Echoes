@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
+             xmlns:ctl="using:Echoes.Views.Controls"
              xmlns:helpers="using:Echoes.Helpers"
              x:Class="Echoes.Views.SshView"
              x:DataType="vm:SshViewModel">
@@ -852,6 +853,7 @@
 
                 <!-- ============ forwarding ============ -->
                 <TabItem Header="Forwarding">
+                    <ctl:Deferred><DataTemplate x:DataType="vm:SshViewModel">
                     <ScrollViewer x:Name="SshFwdScroll" helpers:Responsive.BreakWidth="560" HorizontalScrollBarVisibility="Disabled" Margin="0,10,0,0">
                     <Grid x:Name="SshFwdGrid" RowDefinitions="Auto, Auto, *" RowSpacing="10">
 
@@ -967,6 +969,7 @@
                         </Border>
                     </Grid>
                     </ScrollViewer>
+                    </DataTemplate></ctl:Deferred>
                 </TabItem>
 
                 <!-- ============ server health ============ -->

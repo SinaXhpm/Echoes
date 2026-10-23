@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
+             xmlns:ctl="using:Echoes.Views.Controls"
              xmlns:helpers="using:Echoes.Helpers"
              xmlns:sys="using:System"
              x:Class="Echoes.Views.ProxyView"
@@ -337,6 +338,7 @@
     <!-- Padding 0: the shell already pads the page; the views line up with the switcher -->
     <TabControl x:Name="PxTabs" Classes="seg" Padding="0" SelectedIndex="{Binding ViewIndex}">
       <TabItem Header="Server">
+    <ctl:Deferred><DataTemplate x:DataType="vm:ProxyViewModel">
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,12,0,0">
         <!-- At least as tall as the visible area: the connection log (the star row) takes the spare height
              instead of leaving it empty under the cards; taller content still scrolls. -->
@@ -533,11 +535,13 @@
 
         </Grid>
     </ScrollViewer>
+    </DataTemplate></ctl:Deferred>
       </TabItem>
 
       <!-- ============ CHECK PROXIES: paste a list, test them all, keep the working ones ============
            Fits the page: the input card on top, the results card takes the rest and only its list scrolls. -->
       <TabItem Header="Check proxies">
+        <ctl:Deferred><DataTemplate x:DataType="vm:ProxyViewModel">
         <Grid x:Name="PcPage" RowDefinitions="Auto, *" Margin="0,12,0,0" helpers:Responsive.BreakWidth="480">
             <Border Grid.Row="0" Classes="card section">
                 <StackPanel Spacing="10">
@@ -654,6 +658,7 @@
                 </Grid>
             </Border>
         </Grid>
+        </DataTemplate></ctl:Deferred>
       </TabItem>
     </TabControl>
 </UserControl>

@@ -133,7 +133,8 @@ public partial class CloudflareView : UserControl
     private void OnRecordDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (DataContext is not CloudflareViewModel vm) return;
-        for (var v = e.Source as Avalonia.Visual; v != null && !ReferenceEquals(v, RecordList); v = v.GetVisualParent())
+        // (sender: the record list, built when its tab is first shown)
+        for (var v = e.Source as Avalonia.Visual; v != null && !ReferenceEquals(v, sender); v = v.GetVisualParent())
         {
             if (v is Button) return;
             if (v is ListBoxItem { DataContext: CfRecord rec })

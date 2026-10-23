@@ -283,6 +283,8 @@ internal static class SelfTest
             var opened = new List<string>();
             var problems = new List<string>();
             long heapBefore = GC.GetTotalMemory(forceFullCollection: true);
+            long openedHeap = 0;
+            int tabsVisited = 0;
             for (int i = 0; i < count; i++)
             {
                 int at = i;
@@ -300,8 +302,11 @@ internal static class SelfTest
                 long openMs = sw.ElapsedMilliseconds;
                 await Task.Delay(1200, ct).ConfigureAwait(false);   // layout, and the refresh that runs once the page is drawn
                 long heap1 = GC.GetTotalMemory(forceFullCollection: true);
+                openedHeap += heap1 - heap0;
                 int visuals = await Dispatcher.UIThread.InvokeAsync(() => CountVisuals(pages, at));
                 Line($"SELFTEST info open {tag}: {openMs} ms, {(heap1 - heap0) / 1048576.0:+0.0;-0.0} MB managed, {visuals} visuals");
+                // every tab of the page once (parts built when first shown, Views/Controls/Deferred.cs, are built here)
+                tabsVisited += await VisitTabsAsync(pages, at, ct);
                 string? problem = await Dispatcher.UIThread.InvokeAsync(() => Inspect(shell, pages, at, tag));
                 string file = Path.Combine(shots, $"{at + 1:00}-{tag.ToLowerInvariant().Replace(' ', '-')}.png");
                 await Dispatcher.UIThread.InvokeAsync(() => Shot(shell, file));
@@ -320,7 +325,8 @@ internal static class SelfTest
             long heapAfter = GC.GetTotalMemory(forceFullCollection: true);
             long resident = 0;
             try { resident = Environment.WorkingSet; } catch { }
-            Line($"SELFTEST info all tools open: {(heapAfter - heapBefore) / 1048576.0:0.0} MB managed added, {heapAfter / 1048576.0:0.0} MB managed in all"
+            Line($"SELFTEST info all tools open: {openedHeap / 1048576.0:0.0} MB managed for opening them; after visiting their {tabsVisited} tabs "
+                 + $"{(heapAfter - heapBefore) / 1048576.0:0.0} MB added, {heapAfter / 1048576.0:0.0} MB managed in all"
                  + (resident > 0 ? $", {resident / 1048576.0:0} MB resident" : ""));
             foreach (string entry in NewCrashEntries(crashLog, logged)) problems.Add("crash log: " + entry);
             if (problems.Count > 0) throw new InvalidOperationException(string.Join(" | ", problems));
@@ -329,6 +335,39 @@ internal static class SelfTest
 
         Line($"SELFTEST DONE failures={failures}");
         return failures;
+    }
+
+    // Selects every tab of every tab strip on the page (and of the strips those tabs show), waiting for each to be laid
+    // out, then puts the first selection back. Returns how many tabs were shown.
+    private static async Task<int> VisitTabsAsync(Carousel pages, int index, CancellationToken ct)
+    {
+        var seen = new HashSet<TabControl>();
+        int shown = 0;
+        for (int round = 0; round < 4; round++)   // nested strips appear once their parent tab is shown
+        {
+            var strips = await Dispatcher.UIThread.InvokeAsync(() =>
+                index < pages.ItemCount && pages.Items[index] is Visual host
+                    ? Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(host).OfType<TabControl>()
+                        .Where(t => t.IsEffectivelyVisible && !seen.Contains(t)).ToList()
+                    : new List<TabControl>());
+            if (strips.Count == 0) break;
+            foreach (var strip in strips)
+            {
+                seen.Add(strip);
+                var (first, n) = await Dispatcher.UIThread.InvokeAsync(() => (strip.SelectedIndex, strip.ItemCount));
+                for (int i = 0; i < n; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    int at = i;
+                    await Dispatcher.UIThread.InvokeAsync(() => strip.SelectedIndex = at);
+                    await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+                    await Task.Delay(150, ct).ConfigureAwait(false);
+                    shown++;
+                }
+                await Dispatcher.UIThread.InvokeAsync(() => strip.SelectedIndex = first);
+            }
+        }
+        return shown;
     }
 
     // UI thread: the visuals under one drawer entry's page.

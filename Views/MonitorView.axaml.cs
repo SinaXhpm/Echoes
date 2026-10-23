@@ -45,11 +45,8 @@ public partial class MonitorView : UserControl
             MonRoot.Classes.Add("touch");   // row icon buttons at the touch height (Control.Height)
         }
 
-        // One-line boxes: Enter saves the token / the monitor's checks (desktop and phone alike).
-        TgTokenBox.KeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Enter && _vm is { } vm) { vm.SaveTgTokenCommand.Execute(null); e.Handled = true; }
-        };
+        // One-line boxes: Enter saves the token / the monitor's checks (desktop and phone alike). (The token box is in the
+        // settings panel, built when it's first opened: its handler is set in the XAML.)
         KeywordBox.KeyDown += (_, e) =>
         {
             if (e.Key == Key.Enter && _vm is { } vm) { vm.SaveChecksCommand.Execute(null); e.Handled = true; }
@@ -97,6 +94,11 @@ public partial class MonitorView : UserControl
     private void Vm_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MonitorViewModel.HasSelection)) UpdateLayoutClasses();
+    }
+
+    private void TgTokenBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && _vm is { } vm) { vm.SaveTgTokenCommand.Execute(null); e.Handled = true; }
     }
 
     // Enter adds what's typed and starts monitoring if it's stopped (an empty box just starts); Shift+Enter is a newline.

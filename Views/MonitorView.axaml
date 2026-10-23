@@ -371,7 +371,6 @@
             <Setter Property="Orientation" Value="Vertical"/><Setter Property="Spacing" Value="6"/>
         </Style>
         <!-- one column: the interval / timeout boxes line up with the threshold boxes below -->
-        <Style Selector="Grid#MonRoot:not(.sform) TextBlock.timeLead"><Setter Property="MinWidth" Value="{Binding #UpLead.Bounds.Width}"/></Style>
         <Style Selector="Grid#MonRoot:not(.sform) Grid#SetDown"><Setter Property="Grid.Row" Value="6"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
         <Style Selector="Grid#MonRoot:not(.sform) Grid#SetUp"><Setter Property="Grid.Row" Value="7"/><Setter Property="Margin" Value="0,6,0,0"/></Style>
         <Style Selector="Grid#MonRoot:not(.sform) Grid#SetSounds"><Setter Property="Grid.Row" Value="8"/><Setter Property="Margin" Value="0,10,0,0"/></Style>
@@ -386,7 +385,6 @@
         <Style Selector="Grid#MonRoot:not(.sform):not(.phone) StackPanel#SetTiming">
             <Setter Property="Orientation" Value="Horizontal"/><Setter Property="Spacing" Value="24"/>
         </Style>
-        <Style Selector="Grid#MonRoot:not(.sform):not(.phone) StackPanel#SetInterval"><Setter Property="MinWidth" Value="{Binding #SetDown.Bounds.Width}"/></Style>
         <Style Selector="Grid#MonRoot:not(.sform):not(.phone) Grid#SetDown"><Setter Property="Grid.ColumnSpan" Value="1"/></Style>
         <!-- … and the note on the automatic checks beside the check switches -->
         <Style Selector="Grid#MonRoot:not(.sform):not(.phone) StackPanel#SetChecks"><Setter Property="Grid.ColumnSpan" Value="1"/></Style>
@@ -855,7 +853,14 @@
         <!-- ===================== SETTINGS ===================== -->
         <!-- Placement per layout (sform / one column) is in the styles above. -->
         <Border x:Name="SettingsCard" Classes="card" Margin="0,10,0,0" IsVisible="{Binding IsSettingsOpen}">
+            <ctl:Deferred><DataTemplate x:DataType="vm:MonitorViewModel">
             <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <!-- here, not with the other layout styles: they bind to rows of this panel by name, and the panel is built
+                     when it is first opened (its own name scope) -->
+                <ScrollViewer.Styles>
+                    <Style Selector="Grid#MonRoot:not(.sform) TextBlock.timeLead"><Setter Property="MinWidth" Value="{Binding #UpLead.Bounds.Width}"/></Style>
+                    <Style Selector="Grid#MonRoot:not(.sform):not(.phone) StackPanel#SetInterval"><Setter Property="MinWidth" Value="{Binding #SetDown.Bounds.Width}"/></Style>
+                </ScrollViewer.Styles>
                 <Grid x:Name="SetGrid" Margin="14,10,14,12" ColumnDefinitions="Auto,*" Grid.IsSharedSizeScope="True"
                       RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
                     <!-- starting by itself: first, so it's easy to find -->
@@ -1032,7 +1037,7 @@
                                     </Button>
                                 </Grid>
                                 <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8" IsVisible="{Binding ShowTgTokenBox}">
-                                    <TextBox x:Name="TgTokenBox" Classes="field mono" PasswordChar="•" Text="{Binding TgTokenInput}"
+                                    <TextBox x:Name="TgTokenBox" KeyDown="TgTokenBox_KeyDown" Classes="field mono" PasswordChar="•" Text="{Binding TgTokenInput}"
                                              PlaceholderText="e.g. 123456789:AAH…" MaxLength="200"
                                              ToolTip.Tip="The token @BotFather gave your bot"
                                              AutomationProperties.Name="Bot token"/>
@@ -1076,6 +1081,7 @@
                             Command="{Binding ToggleSettingsCommand}"/>
                 </Grid>
             </ScrollViewer>
+            </DataTemplate></ctl:Deferred>
         </Border>
 
         <!-- ===================== MONITORS / EVENTS ===================== -->
@@ -1474,6 +1480,7 @@
                     </StackPanel>
                 </TabItem.Header>
 
+                <ctl:Deferred><DataTemplate x:DataType="vm:MonitorViewModel">
                 <Border Classes="card output" Margin="0,10,0,0">
                     <Grid RowDefinitions="Auto, Auto, *">
                         <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="14,6,8,6" MinHeight="{DynamicResource Control.Height}">
@@ -1510,6 +1517,7 @@
                         </Panel>
                     </Grid>
                 </Border>
+                </DataTemplate></ctl:Deferred>
             </TabItem>
         </TabControl>
     </Grid>

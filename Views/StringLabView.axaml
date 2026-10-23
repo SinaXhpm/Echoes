@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
 			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 			 xmlns:vm="using:Echoes.ViewModels"
+			 xmlns:ctl="using:Echoes.Views.Controls"
 			 xmlns:helpers="using:Echoes.Helpers"
 			 x:Class="Echoes.Views.StringLabView"
 			 x:DataType="vm:StringLabViewModel">
@@ -156,9 +157,11 @@
 
 			<!-- ============ ENCODE ============ -->
 			<TabItem Header="Encode">
+				<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 				<TabControl Classes="tools" SelectedIndex="{Binding EncodeToolIndex}">
 
 					<TabItem Header="Base64">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="*, Auto, *" RowSpacing="12">
 							<DockPanel Grid.Row="0">
 								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
@@ -182,9 +185,11 @@
 										 PlaceholderText="Binary data shows as a hex dump"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="URL">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="*, Auto, *" RowSpacing="12">
 							<DockPanel Grid.Row="0">
 								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
@@ -210,9 +215,11 @@
 										 PlaceholderText="Result, or the URL's parts"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="Hex">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="*, Auto, Auto, *" RowSpacing="12">
 							<DockPanel Grid.Row="0">
 								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
@@ -244,9 +251,11 @@
 										 PlaceholderText="Hex, binary or decoded text"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="Escape">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="*, Auto, *" RowSpacing="12">
 							<DockPanel Grid.Row="0">
 								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
@@ -279,10 +288,12 @@
 										 PlaceholderText="Escaped or unescaped text"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="Hash">
 						<!-- the input is usually short; the digest table gets the larger share -->
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="*, Auto, Auto, 2*" RowSpacing="12">
 							<DockPanel Grid.Row="0">
 								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
@@ -367,9 +378,11 @@
 										 PlaceholderText="Digests appear here"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="Hash ID">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="Auto, Auto, *" RowSpacing="12">
 							<StackPanel Grid.Row="0">
 								<TextBlock Classes="fieldLabel" Text="Hash"/>
@@ -392,9 +405,11 @@
 										 PlaceholderText="Likely hash types, best match first"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="JWT">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="Auto, Auto, Auto, *" RowSpacing="12">
 							<StackPanel Grid.Row="0">
 								<TextBlock Classes="fieldLabel" Text="Token"/>
@@ -430,9 +445,11 @@
 										 PlaceholderText="Header, payload and claims"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="JWT sign">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="Auto, *, Auto, Auto, *" RowSpacing="12">
 							<StackPanel Grid.Row="0">
 								<TextBlock Classes="fieldLabel" Text="Header"/>
@@ -471,16 +488,20 @@
 										 ScrollViewer.HorizontalScrollBarVisibility="Disabled" PlaceholderText="The signed token"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 				</TabControl>
+				</DataTemplate></ctl:Deferred>
 			</TabItem>
 
 			<!-- ============ TEXT ============ -->
 			<TabItem Header="Text">
+				<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 				<TabControl Classes="tools" SelectedIndex="{Binding TextToolIndex}">
 
 					<TabItem Header="Regex">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="Auto, *, Auto, Auto, *" RowSpacing="12">
 							<!-- Wide: pattern | replacement side by side. Narrow (phone): stacked. -->
 							<Grid Grid.Row="0" helpers:Responsive.BreakWidth="520" ColumnDefinitions="*, *" RowDefinitions="Auto, Auto" ColumnSpacing="12">
@@ -554,9 +575,11 @@
 										 PlaceholderText="Matches, replaced text or split parts"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="Text lab">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="*, Auto" RowSpacing="12">
 							<DockPanel Grid.Row="0">
 								<!-- live counters -->
@@ -629,9 +652,11 @@
 								</StackPanel>
 							</ScrollViewer>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="Case">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="*, Auto, *" RowSpacing="12">
 							<DockPanel Grid.Row="0">
 								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
@@ -669,9 +694,11 @@
 										 PlaceholderText="Converted text"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="Diff">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="*, Auto, Auto, *" RowSpacing="12">
 							<!-- Wide: original | changed side by side. Narrow (phone): stacked, each full width. -->
 							<Grid Grid.Row="0" helpers:Responsive.BreakWidth="520" ColumnDefinitions="*, *" RowDefinitions="*, *" ColumnSpacing="12" RowSpacing="12">
@@ -720,16 +747,20 @@
 										 PlaceholderText="- removed, + added"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 				</TabControl>
+				</DataTemplate></ctl:Deferred>
 			</TabItem>
 
 			<!-- ============ DATA ============ -->
 			<TabItem Header="Data">
+				<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 				<TabControl Classes="tools" SelectedIndex="{Binding DataToolIndex}">
 
 					<TabItem Header="JSON">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="*, Auto, *" RowSpacing="12">
 							<DockPanel Grid.Row="0">
 								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
@@ -757,9 +788,11 @@
 										 PlaceholderText="Formatted JSON or the check result"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="XML">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="*, Auto, *" RowSpacing="12">
 							<DockPanel Grid.Row="0">
 								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
@@ -782,9 +815,11 @@
 										 PlaceholderText="Formatted XML or JSON"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="Convert">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="*, Auto, *" RowSpacing="12">
 							<DockPanel Grid.Row="0">
 								<TextBlock DockPanel.Dock="Top" Classes="fieldLabel" Text="Input"/>
@@ -811,16 +846,20 @@
 										 PlaceholderText="Converted data"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 				</TabControl>
+				</DataTemplate></ctl:Deferred>
 			</TabItem>
 
 			<!-- ============ DEV ============ -->
 			<TabItem Header="Dev">
+				<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 				<TabControl Classes="tools" SelectedIndex="{Binding DevToolIndex}">
 
 					<TabItem Header="Subnet">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="Auto, Auto, *" RowSpacing="12">
 							<StackPanel Grid.Row="0">
 								<TextBlock Classes="fieldLabel" Text="Network (CIDR)"/>
@@ -844,9 +883,11 @@
 										 PlaceholderText="Network, mask, range and host count"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="IP conv">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="Auto, Auto, *" RowSpacing="12">
 							<StackPanel Grid.Row="0">
 								<TextBlock Classes="fieldLabel" Text="IP address"/>
@@ -872,9 +913,11 @@
 										 PlaceholderText="Integer, hex, binary, IPv6 and PTR forms"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="Epoch">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="Auto, Auto, *" RowSpacing="12">
 							<StackPanel Grid.Row="0">
 								<TextBlock Classes="fieldLabel" Text="Timestamp or date"/>
@@ -900,9 +943,11 @@
 										 PlaceholderText="Converted timestamps"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="Base conv">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="Auto, Auto, Auto, *" RowSpacing="12">
 							<StackPanel Grid.Row="0">
 								<TextBlock Classes="fieldLabel" Text="Number"/>
@@ -937,9 +982,11 @@
 										 PlaceholderText="Decimal, hex, octal, binary and base N"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="Cron">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="Auto, Auto, Auto, *" RowSpacing="12">
 							<!-- the assembled (editable) expression + copy, and the presets. Wide: one row.
 								 Narrow (phone): the presets drop to their own row. -->
@@ -1007,9 +1054,11 @@
 								<TextBox Text="{Binding CronNextRuns, Mode=OneWay, Converter={x:Static helpers:DisplayCapConverter.Instance}}" IsReadOnly="True" PlaceholderText="Upcoming run times"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 					<TabItem Header="Generate">
+						<ctl:Deferred><DataTemplate x:DataType="vm:StringLabViewModel">
 						<Grid RowDefinitions="Auto, Auto, *" RowSpacing="12">
 							<WrapPanel Grid.Row="0" Classes="options">
 								<StackPanel>
@@ -1075,9 +1124,11 @@
 										 PlaceholderText="Generated values (crypto RNG)"/>
 							</DockPanel>
 						</Grid>
+						</DataTemplate></ctl:Deferred>
 					</TabItem>
 
 				</TabControl>
+				</DataTemplate></ctl:Deferred>
 			</TabItem>
 
 		</TabControl>
