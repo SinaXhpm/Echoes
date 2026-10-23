@@ -84,13 +84,21 @@ internal static class StoreShots
         await Task.Delay(600);
     }
 
+    // The test caught mid-download, the gauge live, on a file server near the runner: Cloudflare refuses tests from the
+    // data-centre addresses CI runs on (HTTP 403, in the download or the upload), which put an error on the picture.
     private static async Task Speed()
     {
         await Open("SPEED TEST");
         var vm = await Ui(() => (SpeedTestViewModel)ToolView<SpeedTestView>().DataContext!);
-        await Ui(() => vm.ToggleCommand.Execute(null));
-        await Until(() => !vm.IsRunning, 150_000);
+        await Ui(() =>
+        {
+            if (SpeedTestDestinations.FindCurated("lw-wdc") is { } near) vm.SelectedDestination = near;
+            vm.ToggleCommand.Execute(null);
+        });
+        await Until(() => vm.DownloadProgress >= 0.6 || !vm.IsRunning, 150_000);
         await Shot("speed");
+        await Ui(() => { if (vm.IsRunning) vm.ToggleCommand.Execute(null); });
+        await Until(() => !vm.IsRunning, 30_000);
     }
 
     // A few public sites checked every 5 s for about 40 s: the list shows their state, latency and a short graph.
