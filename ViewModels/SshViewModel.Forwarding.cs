@@ -178,12 +178,13 @@ public partial class SshViewModel
     private static int s_poolRaised;
 
     // SSH.NET serves each forwarded connection on a pool thread for its whole life; past the pool's minimum, new ones got
-    // in at ~1/s (the pool's thread injection rate) and the rest were refused. Raised once, never lowered.
+    // in at ~1/s (the pool's thread injection rate) and the rest were refused. A browser on a -D tunnel keeps more than 64
+    // idle keep-alive connections open. Raised once, never lowered; threads are still only made when needed.
     private static void EnsurePoolForForwards()
     {
         if (Interlocked.Exchange(ref s_poolRaised, 1) != 0) return;
         ThreadPool.GetMinThreads(out int workers, out int io);
-        if (workers < 64) ThreadPool.SetMinThreads(64, io);
+        if (workers < 128) ThreadPool.SetMinThreads(128, io);
     }
 
     private static string ForwardStartError(Exception ex, SshForwardSpec spec)

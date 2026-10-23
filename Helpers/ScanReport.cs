@@ -220,8 +220,6 @@ public static class ScanReport
 
         // nmap's collapse: a state with more than 25 ports on this host is summarized, the rest listed.
         var notShown = h.Reasons
-            .Select(kv => (Parts: kv.Key.Split('|'), Count: kv.Value))
-            .Select(x => (State: (PortState)int.Parse(x.Parts[0]), Proto: (ScanProto)int.Parse(x.Parts[1]), Reason: x.Parts[2], x.Count))
             .Where(x => h.Count(x.State) > ListThreshold)
             .OrderBy(x => x.State).ThenBy(x => x.Proto).ThenByDescending(x => x.Count)
             .Select(x => $"{x.Count:N0} {ScanText.State(x.State)} {ScanText.Proto(x.Proto)} port{(x.Count == 1 ? "" : "s")} ({x.Reason})")

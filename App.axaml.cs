@@ -116,9 +116,16 @@ public partial class App : Avalonia.Application
             activatable.Deactivated += (_, e) =>
             {
                 if (e.Kind != ActivationKind.Background) return;
-                if (Dispatcher.UIThread.CheckAccess()) viewModel.FlushPersistence();
-                else Dispatcher.UIThread.Invoke(viewModel.FlushPersistence);
+                if (Dispatcher.UIThread.CheckAccess()) Background();
+                else Dispatcher.UIThread.Invoke(Background);
             };
+            activatable.Activated += (_, _) => Dispatcher.UIThread.Post(() => Helpers.AppPlatform.SetForeground(true));
+
+            void Background()
+            {
+                Helpers.AppPlatform.SetForeground(false);
+                viewModel.FlushPersistence();
+            }
         }
 
         base.OnFrameworkInitializationCompleted();

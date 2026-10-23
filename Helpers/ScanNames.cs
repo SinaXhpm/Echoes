@@ -24,7 +24,7 @@ public sealed class ScanNames
     private readonly Action<ScanHost> _resolved;
     private readonly ConcurrentDictionary<string, Task> _lookups = new(StringComparer.OrdinalIgnoreCase);
     private readonly CancellationTokenSource _drop = new();
-    private int _pending;
+    private int _pending, _queued;
 
     /// <param name="resolved">Called (from a worker thread) when a host gets a name.</param>
     public ScanNames(int parallel, Action<ScanHost> resolved)
@@ -39,9 +39,11 @@ public sealed class ScanNames
     /// <summary>Start a lookup for this host unless one ran already. Never throws.</summary>
     public void Queue(ScanHost host)
     {
-        if (host.ReverseName is not null || _lookups.Count >= MaxLookups) return;
+        // (a counter, not _lookups.Count: that takes every lock of the dictionary, once per live host of a sweep)
+        if (host.ReverseName is not null || Volatile.Read(ref _queued) >= MaxLookups) return;
         _lookups.GetOrAdd(host.Ip, _ =>
         {
+            Interlocked.Increment(ref _queued);
             Interlocked.Increment(ref _pending);
             return LookupAsync(host);
         });

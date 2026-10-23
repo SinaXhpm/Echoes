@@ -66,7 +66,7 @@ public partial class StringLabViewModel
 
         // Indentation grows with the depth on every line: 21 KB nested 3,000 deep formatted to 18 M chars (quadratic),
         // so the writer stops at the output ceiling.
-        using (var writer = XmlWriter.Create(new CappedStringWriter(sb, "Formatted XML"), new XmlWriterSettings
+        using (var writer = XmlWriter.Create(CappedText(sb, "Formatted XML"),new XmlWriterSettings
         {
             Indent = indent,
             IndentChars = "  ",

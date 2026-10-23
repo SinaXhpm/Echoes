@@ -8,8 +8,12 @@ public partial class CurlViewModel
 {
     // WebBaseUri (direct requests only) lets the document's relative styles/images resolve against the original URL. The
     // view (code-behind) renders via NativeWebView.NavigateToString when RenderWebRequested fires.
-    public string WebHtml { get; private set; } = string.Empty;
+    // Built when the view renders it (only while Preview is open), not for every response: a copy of up to 2 M chars.
+    public string WebHtml => _webHtml ??= PrepareWebDocument(
+        string.IsNullOrEmpty(_webBody) ? string.Empty : (_webBody.Length > WebRenderCap ? _webBody[..WebRenderCap] : _webBody), _webRouted);
     public Uri? WebBaseUri { get; private set; }
+    private string? _webBody, _webHtml;
+    private bool _webRouted;
     public event Action? RenderWebRequested;
 
     // WebView2's NavigateToString caps around 2 MB; keep the rendered document under that (the full body stays in Body).
@@ -30,8 +34,9 @@ public partial class CurlViewModel
 
     private void RenderWeb(string? body, string? url, bool routed)
     {
-        string doc = string.IsNullOrEmpty(body) ? string.Empty : (body.Length > WebRenderCap ? body[..WebRenderCap] : body);
-        WebHtml = PrepareWebDocument(doc, routed);
+        _webBody = body;
+        _webRouted = routed;
+        _webHtml = null;
         WebBaseUri = !routed && Uri.TryCreate(url, UriKind.Absolute, out var u) &&
                      (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps) ? u : null;
         RenderWebRequested?.Invoke();

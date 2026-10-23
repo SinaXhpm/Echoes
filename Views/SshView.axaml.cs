@@ -54,7 +54,8 @@ public partial class SshView : UserControl
         if (_vm is not null) _vm.ServerViewProbe = null;
         _vm = DataContext as SshViewModel;
         if (_vm is null) return;
-        _vm.ServerViewProbe = () => SshServerPane.IsEffectivelyVisible;
+        // a minimized window or a phone app in the background keeps the pane "visible": no commands on the server then
+        _vm.ServerViewProbe = () => AppPlatform.OnScreen(SshServerPane);
         _vm.FilesViewShown = TopLevel.GetTopLevel(SshFilesPane) is not null;
         _vm.ServerViewShown = TopLevel.GetTopLevel(SshServerPane) is not null;
     }

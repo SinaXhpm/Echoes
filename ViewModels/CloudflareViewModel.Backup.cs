@@ -22,7 +22,7 @@ public partial class CloudflareViewModel
 
     /// <summary>The backup file of the selected zone: whitelisted record fields only (never ids, timestamps or
     /// credentials). Null (with the reason in the status line) when the records aren't loaded.</summary>
-    public (byte[] Data, string FileName, int Count)? BuildBackup()
+    public async Task<(byte[] Data, string FileName, int Count)?> BuildBackupAsync()
     {
         if (SelectedZone is not { } zone || !CanBackup)
         {
@@ -30,7 +30,8 @@ public partial class CloudflareViewModel
             return null;
         }
         var entries = Records.Select(r => r.ToEntry()).ToList();
-        byte[] data = CloudflareBackup.Write(zone.Name, entries, DateTimeOffset.UtcNow);
+        // writing (and validating) every record of a big zone off the UI thread
+        byte[] data = await Task.Run(() => CloudflareBackup.Write(zone.Name, entries, DateTimeOffset.UtcNow));
         return (data, CloudflareBackup.SuggestedFileName(zone.Name, DateTime.Now, "dns") + ".json", entries.Count);
     }
 
@@ -125,12 +126,14 @@ public partial class CloudflareViewModel
     {
         if (IsLocked || SelectedZone is not { } zone) return;
         CloudflareBackup.Parsed parsed;
-        try { parsed = CloudflareBackup.Parse(bytes); }
+        // up to 5 MB and 20,000 entries, each validated: off the UI thread
+        try { parsed = await Task.Run(() => CloudflareBackup.Parse(bytes)); }
         catch (FormatException ex)
         {
             SetError("Restore: " + ex.Message);
             return;
         }
+        if (IsLocked || !ReferenceEquals(zone, SelectedZone)) return;
 
         // The comparison needs the zone's current records.
         if (_recordsZoneId != zone.Id)

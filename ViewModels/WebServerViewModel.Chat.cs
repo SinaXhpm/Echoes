@@ -232,27 +232,8 @@ public partial class WebServerViewModel
         return Avalonia.Application.Current?.ApplicationLifetime switch
         {
             IClassicDesktopStyleApplicationLifetime d => d.MainWindow is { IsActive: true, IsVisible: true } w && w.WindowState != WindowState.Minimized,
-            ISingleViewApplicationLifetime => s_foreground,
+            ISingleViewApplicationLifetime => AppPlatform.IsInForeground,   // phones: in front or not
             _ => true,
         };
-    }
-
-    // Android: in front or not (the activity's own lifetime events); hooked once.
-    private static bool s_foreground = true;
-    private static bool s_foregroundHooked;
-
-    private static void HookForeground()
-    {
-        if (s_foregroundHooked) return;
-        s_foregroundHooked = true;
-        try
-        {
-            if (Avalonia.Application.Current?.TryGetFeature<IActivatableLifetime>() is { } a)
-            {
-                a.Activated += (_, _) => s_foreground = true;
-                a.Deactivated += (_, e) => { if (e.Kind == ActivationKind.Background) s_foreground = false; };
-            }
-        }
-        catch { /* no lifetime events here: always "in front" (no sound) */ }
     }
 }

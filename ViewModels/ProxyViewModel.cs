@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using Avalonia.Collections;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -43,8 +44,9 @@ public partial class ProxyViewModel : ObservableObject
     [ObservableProperty] private long _totalConnections;
     [ObservableProperty] private string _trafficText = "↑ 0 B   ↓ 0 B";
 
-    // Newest connection first; capped so a busy proxy can't grow the list unbounded.
-    public ObservableCollection<ProxyLogEntry> Connections { get; } = new();
+    // Newest connection first; capped so a busy proxy can't grow the list unbounded. Filled a batch at a time (one insert
+    // per entry shifted and restyled every striped row once per entry: ~50 a page load).
+    public AvaloniaList<ProxyLogEntry> Connections { get; } = new() { ResetBehavior = ResetBehavior.Reset };
     public bool HasConnections => Connections.Count > 0;
     private const int MaxLogRows = 200;
 
@@ -234,6 +236,7 @@ public partial class ProxyViewModel : ObservableObject
     {
         _pendingLog.Enqueue(e);
         while (_pendingLog.Count > MaxLogRows && _pendingLog.TryDequeue(out _)) { }
+        _statsTimer?.Poke();   // the first connection after a quiet spell is listed at once
     }
 
     // UI timer tick (while running): refresh the live counters and flush queued log entries.
@@ -255,10 +258,13 @@ public partial class ProxyViewModel : ObservableObject
 
     private bool DrainLog()
     {
-        bool any = false;
-        while (_pendingLog.TryDequeue(out var e)) { Connections.Insert(0, e); any = true; }
-        if (!any) return false;
-        while (Connections.Count > MaxLogRows) Connections.RemoveAt(Connections.Count - 1);
+        List<ProxyLogEntry>? batch = null;
+        while (_pendingLog.TryDequeue(out var e)) (batch ??= new()).Add(e);
+        if (batch is null) return false;
+        batch.Reverse();   // newest first
+        if (batch.Count > MaxLogRows) batch.RemoveRange(MaxLogRows, batch.Count - MaxLogRows);
+        Connections.InsertRange(0, batch);
+        if (Connections.Count > MaxLogRows) Connections.RemoveRange(MaxLogRows, Connections.Count - MaxLogRows);
         OnPropertyChanged(nameof(HasConnections));
         return true;
     }

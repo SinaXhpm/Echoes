@@ -73,75 +73,20 @@ public partial class StringLabViewModel : ObservableObject
     private static InvalidOperationException OutputTooLarge(string what)
         => new($"{what} would be over {MaxOutputChars / 1_000_000} M characters — refusing. Use a smaller input.");
 
-    // Pretty-printers multiply their input, and not by a fixed factor: indentation is paid on every line at every level
-    // (JSON nested 62 deep around 300 K values beautified ×64, XML nested 3,000 deep formatted ×850 — quadratic in the
-    // depth), so a few hundred KB grew until the process ran out of memory. The writers below stop at the ceiling.
+    // Pretty-printers multiply their input by more than a fixed factor: the writers (Helpers/CappedWriters.cs) stop at the
+    // output ceiling.
 
     /// <summary>JSON written into a buffer that refuses to grow past the output ceiling (UTF-8 bytes, so the text that
     /// comes back is within the char ceiling too).</summary>
     private static string WriteJsonCapped(JsonWriterOptions options, Action<Utf8JsonWriter> write, string what)
     {
-        var buffer = new CappedBufferWriter(MaxOutputChars, what);
+        var buffer = new CappedBufferWriter(MaxOutputChars, () => OutputTooLarge(what));
         using (var w = new Utf8JsonWriter(buffer, options)) write(w);
         return Encoding.UTF8.GetString(buffer.WrittenSpan);
     }
 
-    private sealed class CappedBufferWriter : IBufferWriter<byte>
-    {
-        private byte[] _buffer = new byte[16 * 1024];
-        private int _written;
-        private readonly long _max;
-        private readonly string _what;
-
-        public CappedBufferWriter(long max, string what)
-        {
-            _max = max;
-            _what = what;
-        }
-
-        public ReadOnlySpan<byte> WrittenSpan => _buffer.AsSpan(0, _written);
-
-        public void Advance(int count) => _written += count;
-
-        public Memory<byte> GetMemory(int sizeHint = 0)
-        {
-            Reserve(sizeHint);
-            return _buffer.AsMemory(_written);
-        }
-
-        public Span<byte> GetSpan(int sizeHint = 0)
-        {
-            Reserve(sizeHint);
-            return _buffer.AsSpan(_written);
-        }
-
-        private void Reserve(int sizeHint)
-        {
-            int hint = Math.Max(sizeHint, 1);
-            if (_buffer.Length - _written >= hint) return;
-            long need = (long)_written + hint;
-            if (need > _max) throw OutputTooLarge(_what);
-            Array.Resize(ref _buffer, (int)Math.Max(need, Math.Min((long)_buffer.Length * 2, _max)));
-        }
-    }
-
     /// <summary>The StringWriter an XmlWriter formats into, refusing to grow past the output ceiling.</summary>
-    private sealed class CappedStringWriter : StringWriter
-    {
-        private readonly string _what;
-
-        public CappedStringWriter(StringBuilder sb, string what) : base(sb, CultureInfo.InvariantCulture) => _what = what;
-
-        private void Check(long more)
-        {
-            if (GetStringBuilder().Length + more > MaxOutputChars) throw OutputTooLarge(_what);
-        }
-
-        public override void Write(char value) { Check(1); base.Write(value); }
-        public override void Write(char[] buffer, int index, int count) { Check(count); base.Write(buffer, index, count); }
-        public override void Write(ReadOnlySpan<char> buffer) { Check(buffer.Length); base.Write(buffer); }
-        public override void Write(string? value) { Check(value?.Length ?? 0); base.Write(value); }
-    }
+    private static CappedStringWriter CappedText(StringBuilder sb, string what) => new(sb, MaxOutputChars, () => OutputTooLarge(what));
 
     /// <summary>For writers that build a StringBuilder line by line (YAML, the YAML subset's JSON): call per line.</summary>
     private static void CheckOutput(StringBuilder sb, string what)

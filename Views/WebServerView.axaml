@@ -953,30 +953,29 @@
                                 <Border Classes="emptyLine" IsVisible="{Binding !HasFiles}">
                                     <TextBlock Classes="hint" Text="Nothing shared yet. Added files appear as downloads on the page."/>
                                 </Border>
-                                <ScrollViewer MaxHeight="104" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasFiles}">
-                                    <ItemsControl ItemsSource="{Binding Files}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:SharedFileRow">
-                                                <Border Classes="fileRow">
-                                                    <Grid ColumnDefinitions="Auto, *, Auto, Auto, Auto" ColumnSpacing="8">
-                                                        <Path Grid.Column="0" Classes="fileIcon" Data="{StaticResource WsIcoFile}"/>
-                                                        <TextBlock Grid.Column="1" Classes="fileName" Text="{Binding Name}" ToolTip.Tip="{Binding Name}"/>
-                                                        <TextBlock Grid.Column="2" Text="{Binding Downloads, StringFormat='↓ {0}'}" IsVisible="{Binding HasDownloads}"
-                                                                   FontSize="{StaticResource Font.Small}" FontWeight="SemiBold" Foreground="{DynamicResource Success}"
-                                                                   VerticalAlignment="Center" ToolTip.Tip="Complete downloads of this file"/>
-                                                        <TextBlock Grid.Column="3" Text="{Binding SizeText}" FontSize="{StaticResource Font.Small}"
-                                                                   Foreground="{DynamicResource Text.Muted}" FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center"/>
-                                                        <Button Grid.Column="4" Classes="rowAction" ToolTip.Tip="Stop sharing it"
-                                                                Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).RemoveFileCommand}"
-                                                                CommandParameter="{Binding}">
-                                                            <Path Classes="glyph" Data="{StaticResource WsIcoClose}"/>
-                                                        </Button>
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
+                                <!-- virtualized (Classes="received"): hundreds of shared files built every row -->
+                                <ItemsControl Classes="received" ItemsSource="{Binding Files}" MaxHeight="104" IsVisible="{Binding HasFiles}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SharedFileRow">
+                                            <Border Classes="fileRow">
+                                                <Grid ColumnDefinitions="Auto, *, Auto, Auto, Auto" ColumnSpacing="8">
+                                                    <Path Grid.Column="0" Classes="fileIcon" Data="{StaticResource WsIcoFile}"/>
+                                                    <TextBlock Grid.Column="1" Classes="fileName" Text="{Binding Name}" ToolTip.Tip="{Binding Name}"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding Downloads, StringFormat='↓ {0}'}" IsVisible="{Binding HasDownloads}"
+                                                               FontSize="{StaticResource Font.Small}" FontWeight="SemiBold" Foreground="{DynamicResource Success}"
+                                                               VerticalAlignment="Center" ToolTip.Tip="Complete downloads of this file"/>
+                                                    <TextBlock Grid.Column="3" Text="{Binding SizeText}" FontSize="{StaticResource Font.Small}"
+                                                               Foreground="{DynamicResource Text.Muted}" FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center"/>
+                                                    <Button Grid.Column="4" Classes="rowAction" ToolTip.Tip="Stop sharing it"
+                                                            Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).RemoveFileCommand}"
+                                                            CommandParameter="{Binding}">
+                                                        <Path Classes="glyph" Data="{StaticResource WsIcoClose}"/>
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </Panel>
 
                             <!-- RECEIVED: the folder they go to (in full), what is stored there and Clean up, the size cap -->

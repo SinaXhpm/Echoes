@@ -246,8 +246,10 @@ public partial class WebServerViewModel : ObservableObject
 
     // --- shared files (this device → browsers) ---
 
-    /// <summary>Called from the view after the file picker resolves each file. Returns the shared item.</summary>
-    public SharedItem AddSharedFile(string name, long size, Func<Task<Stream>> open, DateTime? lastModifiedUtc = null)
+    /// <summary>Called from the view after the file picker resolves each file. Returns the shared item. A picker batch
+    /// passes notify: false and calls <see cref="SharedFilesAdded"/> once: each notice sends the whole list to every
+    /// browser (300 files one by one were ~4 MB per page, which dropped them as not reading).</summary>
+    public SharedItem AddSharedFile(string name, long size, Func<Task<Stream>> open, DateTime? lastModifiedUtc = null, bool notify = true)
     {
         var item = new SharedItem
         {
@@ -261,9 +263,11 @@ public partial class WebServerViewModel : ObservableObject
         lock (_itemsLock) _items.Add(item);
         Files.Add(new SharedFileRow { Item = item });
         OnPropertyChanged(nameof(HasFiles));
-        _hub?.NotifyFilesChanged();
+        if (notify) _hub?.NotifyFilesChanged();
         return item;
     }
+
+    public void SharedFilesAdded() => _hub?.NotifyFilesChanged();
 
     [RelayCommand]
     private void RemoveFile(SharedFileRow? row)

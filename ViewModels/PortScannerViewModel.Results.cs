@@ -139,6 +139,7 @@ public partial class PortScannerViewModel
         _live = 0;
         HiddenText = "";
         OpenCount = OpenFilteredCount = ClosedCount = FilteredCount = HostsUpCount = 0;
+        _folded.Clear();
         // A repeating scan keeps the last pass on screen and updates it in place; the first pass starts empty.
         if (repeating) return;
         _listed.Clear();
@@ -206,17 +207,19 @@ public partial class PortScannerViewModel
         return Insert(_portRows[(f.Host.Ip, f.Key)] = new ScanPortRow(f)) | rebuild;
     }
 
-    // A host just proved to answer everything: its open TCP rows go.
+    // A host just proved to answer everything: its open TCP rows go. Once per host and pass (no such row is added after:
+    // UpsertPort skips them); every later event of that host walked the whole list again — thousands of tarpit hosts
+    // were millions of steps a tick.
+    private readonly HashSet<ScanHost> _folded = new();
+
     private bool FoldAcceptAll(ScanHost h)
     {
-        var gone = _listed.OfType<ScanPortRow>()
-                          .Where(r => ReferenceEquals(r.Host, h) && r.Finding.Proto == ScanProto.Tcp && r.Finding.State == PortState.Open).ToList();
+        if (!_folded.Add(h)) return false;
+        var gone = new HashSet<ScanRow>(_listed.OfType<ScanPortRow>()
+                          .Where(r => ReferenceEquals(r.Host, h) && r.Finding.Proto == ScanProto.Tcp && r.Finding.State == PortState.Open));
         if (gone.Count == 0) return false;
-        foreach (var r in gone)
-        {
-            _listed.Remove(r);
-            _portRows.Remove((h.Ip, r.Finding.Key));
-        }
+        _listed.RemoveAll(gone.Contains);
+        foreach (ScanPortRow r in gone) _portRows.Remove((h.Ip, r.Finding.Key));
         return true;
     }
 

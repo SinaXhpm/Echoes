@@ -305,6 +305,9 @@ public static class WifiLinux
 /// <summary>The Wi-Fi analyzer's one entry point: the platform's reader, or a "not available" note.</summary>
 public static class WifiScanner
 {
+    /// <summary>Whether this platform has a reader at all (elsewhere Read only ever says "not available").</summary>
+    public static bool IsAvailable => OperatingSystem.IsWindows() || (OperatingSystem.IsLinux() && !OperatingSystem.IsAndroid());
+
     /// <summary>Reads the connection and the networks around. <paramref name="requestScan"/> also asks the radio for a
     /// fresh scan (Windows: results land a few seconds later, so the caller reads again). Never throws; blocking — call
     /// it off the UI thread.</summary>

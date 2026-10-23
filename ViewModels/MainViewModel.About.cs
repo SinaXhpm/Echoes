@@ -59,11 +59,16 @@ public partial class MainViewModel
     private void OpenAbout()
     {
         IsAboutOpen = true;
-        // Automatic: a fresh answer from this run is shown as is; none yet, a failed one or an old one is re-checked.
-        if (UpdateState is UpdateCheckState.NotChecked or UpdateCheckState.Failed
-            || (UpdateState is not UpdateCheckState.Checking && DateTime.Now - _lastUpdateCheck > RecheckAfter))
-            _ = CheckForUpdatesAsync();
+        _ = CheckForUpdatesIfStale();
     }
+
+    /// <summary>Automatic: a fresh answer from this run is kept as is; none yet, a failed one or an old one is re-checked.
+    /// (The shell's Loaded comes again with every new Android activity: it asked GitHub again each time.)</summary>
+    public Task CheckForUpdatesIfStale()
+        => UpdateState is UpdateCheckState.NotChecked or UpdateCheckState.Failed
+           || (UpdateState is not UpdateCheckState.Checking && DateTime.Now - _lastUpdateCheck > RecheckAfter)
+            ? CheckForUpdatesAsync()
+            : Task.CompletedTask;
 
     [RelayCommand]
     private void CloseAbout() => IsAboutOpen = false;

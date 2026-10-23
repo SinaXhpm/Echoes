@@ -35,7 +35,7 @@ public partial class CloudflareView : UserControl
     {
         try
         {
-            if (DataContext is not CloudflareViewModel vm || vm.BuildBackup() is not { } backup) return;
+            if (DataContext is not CloudflareViewModel vm || await vm.BuildBackupAsync() is not { } backup) return;
             var file = await PickSaveAsync("Back up DNS records", backup.FileName, "json", JsonBackup);
             if (file is null) return;
             await using (var stream = await file.OpenWriteAsync())

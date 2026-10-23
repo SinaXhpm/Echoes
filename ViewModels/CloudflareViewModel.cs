@@ -137,7 +137,8 @@ public partial class CloudflareViewModel : ObservableObject
             OnPropertyChanged(nameof(AccountSummary));
             OnPropertyChanged(nameof(AccountStatus));
         };
-        Records.CollectionChanged += (_, _) => OnPropertyChanged(nameof(CanBackup));
+        // (CanBackup isn't raised per record: a zone's 20,000 records were 20,000 notices to every binding of this page.
+        // What it reads, the zone, RecordsZoneId and IsLoadingRecords, raise it.)
         InitRecordEditor();
         AccessMode = AccessModeOptions[0];
 
@@ -795,6 +796,7 @@ public partial class CloudflareViewModel : ObservableObject
         CurrentSettings = value is null ? null : SettingsFor(value);
         CurrentExtras = value is null ? null : ExtrasFor(value);
         OnPropertyChanged(nameof(CurrentAnalytics));
+        OnPropertyChanged(nameof(CanBackup));
         if (value is null || IsLocked) return;
 
         // Remember it for this profile (saved with the vault, reselected after the next unlock).

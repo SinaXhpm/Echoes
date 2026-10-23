@@ -385,6 +385,7 @@ public partial class SshViewModel
     private long _xferTotal = -1, _xferDone;
     private string _xferLabel = string.Empty;
     private int _xferPosted;
+    private long _xferLastPost;
 
     private CancellationTokenSource BeginTransfer(string label, long total)
     {
@@ -409,11 +410,15 @@ public partial class SshViewModel
         TransferPercent = 0;
     }
 
-    // Any thread: progress callbacks come every 32 KB or so — at most one UI update is queued at a time.
+    // Any thread: progress callbacks come every 32 KB or so — at most one UI update is queued at a time, and at most ~7 a
+    // second (a fast transfer otherwise redrew the bar at the frame rate for its whole length).
     private void ReportTransfer(long done)
     {
         Interlocked.Exchange(ref _xferDone, done);
+        long now = Environment.TickCount64;
+        if (now - Interlocked.Read(ref _xferLastPost) < 150) return;
         if (Interlocked.Exchange(ref _xferPosted, 1) == 1) return;
+        Interlocked.Exchange(ref _xferLastPost, now);
         Dispatcher.UIThread.Post(() =>
         {
             Interlocked.Exchange(ref _xferPosted, 0);

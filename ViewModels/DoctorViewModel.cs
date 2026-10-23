@@ -131,8 +131,14 @@ public partial class DoctorViewModel : ObservableObject
     private void ApplyExpansion(DoctorStepRow row)
         => row.IsExpanded = ShowDetails ? row.HasTrace : row.HasTrace && row.State is DoctorState.Warning or DoctorState.Fail;
 
+    // Only when the proxy rows come or go: every Diagnose rebuilt the 12-19 step rows (each a dozen controls) to show the
+    // same rows again, which the run then resets in place.
+    private bool? _itemsWithProxy;
+
     private void RebuildItems()
     {
+        if (_itemsWithProxy == _withProxy) return;
+        _itemsWithProxy = _withProxy;
         Items.Clear();
         foreach (var s in Steps.Where(s => !DoctorEngine.IsProxy(s.Check))) Items.Add(s);
         if (!_withProxy) return;

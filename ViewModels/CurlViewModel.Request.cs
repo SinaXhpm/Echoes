@@ -228,7 +228,7 @@ public partial class CurlViewModel
     public bool BodyIsFile => BodyModeIndex == 4;
     public bool HasBodyFile => BodyFilePath.Length > 0;
     public string BodyFileLabel => BodyFilePath.Length == 0 ? string.Empty : CurlPartRow.DisplayName(BodyFilePath);
-    public bool CanFormatBody => BodyIsRaw && RawTypeIndex is 0 or 1 && RequestBody.Trim().Length > 0;
+    public bool CanFormatBody => BodyIsRaw && RawTypeIndex is 0 or 1 && !string.IsNullOrWhiteSpace(RequestBody);
 
     /// <summary>HEAD never carries a body: said where the body is edited.</summary>
     public string BodyIgnoredNote => HttpMethod == "HEAD" && BodyModeIndex != 0 ? "HEAD requests are sent without a body." : string.Empty;
@@ -301,7 +301,7 @@ public partial class CurlViewModel
         _validateTimer?.Stop();
         int gen = ++_validateGen;
         string text = RequestBody;
-        if (!BodyIsRaw || text.Trim().Length == 0 || RawTypeIndex is not (0 or 1)) { BodyStatus = string.Empty; return; }
+        if (!BodyIsRaw || string.IsNullOrWhiteSpace(text) || RawTypeIndex is not (0 or 1)) { BodyStatus = string.Empty; return; }
         bool json = RawTypeIndex == 0;
         string? error;
         try { error = await Task.Run(() => json ? CurlBody.JsonError(text) : CurlBody.XmlError(text)); }
@@ -560,11 +560,20 @@ public partial class CurlViewModel
     [ObservableProperty] private string _snippetCode = string.Empty;
     partial void OnSnippetLanguageChanged(string value) => RegenerateSnippet();
 
-    // Every keystroke used to rebuild the whole snippet (re-escaping a 1 MB body each time): rebuilt once typing pauses.
+    // Every keystroke used to rebuild the whole snippet (re-escaping a 1 MB body each time): rebuilt once typing pauses,
+    // and only while Code is the open section (otherwise when it's opened, or copied).
     private Avalonia.Threading.DispatcherTimer? _snippetTimer;
+    private bool _snippetDirty;
+    private const int CodeSection = 2;
 
     private void ScheduleSnippet()
     {
+        if (SectionIndex != CodeSection)
+        {
+            _snippetTimer?.Stop();
+            _snippetDirty = true;
+            return;
+        }
         if (_snippetTimer is null)
         {
             _snippetTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
@@ -577,6 +586,7 @@ public partial class CurlViewModel
     private void RegenerateSnippet()
     {
         _snippetTimer?.Stop();
+        _snippetDirty = false;
         try { SnippetCode = RequestSnippets.Build(SnippetLanguage, BuildModel()); }
         catch (Exception ex) { SnippetCode = "# " + ex.Message; }
     }
@@ -584,7 +594,7 @@ public partial class CurlViewModel
     [RelayCommand]
     private async Task CopySnippet()
     {
-        if (_snippetTimer is { IsEnabled: true }) RegenerateSnippet();
+        if (_snippetDirty || _snippetTimer is { IsEnabled: true }) RegenerateSnippet();
         await ClipboardHelper.SetTextAsync(SnippetCode);
         Flash("Copied the " + SnippetLanguage + " snippet");
     }

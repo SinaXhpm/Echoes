@@ -58,6 +58,10 @@ public sealed partial class MonitorTarget
     internal List<MonitorWarning> Warnings = new();
     /// <summary>Signatures of the warnings already alerted (persisted: a restart doesn't alert them again).</summary>
     internal readonly HashSet<string> Alerted = new(StringComparer.Ordinal);
+    /// <summary>The UTC day the warnings were last worked out. What they depend on changes only when a slow check
+    /// finishes (which works them out again) or the day turns ("expires in 3 days"), so a round re-checks them only on a
+    /// new day, not every few seconds for every monitor. default = not yet.</summary>
+    internal DateTime WarningsDay;
 
     internal string? CertKey => Endpoint.IsHttps ? Endpoint.Host.ToLowerInvariant() + ":" + Endpoint.Port : null;
     internal bool HasKeyword => !string.IsNullOrEmpty(Keyword) && Endpoint.HasHttp;
@@ -254,6 +258,7 @@ public sealed partial class MonitorViewModel
             if (!_domains.TryGetValue(d, out var de)) _domains[d] = de = new MonitorDomainEntry();
             t.DomainInfo = de;
         }
+        t.WarningsDay = default;   // worked out again on its next round
         t.RefreshExtraChips(DateTime.UtcNow);
     }
 
@@ -477,6 +482,7 @@ public sealed partial class MonitorViewModel
             if (raiseEvents) AddEvent(t, MonitorEventKind.Resolved, ResolvedText(t, kind, dnsResolvedText));
         }
         t.Warnings = fresh;
+        t.WarningsDay = now.Date;
         t.RefreshExtraChips(now);
         if (persist) PersistTargets();
         return raised;
@@ -671,6 +677,7 @@ public sealed partial class MonitorViewModel
         t.DnsWatch = t.CanWatchDns ? o.Dns : MonitorDnsKind.Off;
         t.DnsBaseline = t.DnsWatch == MonitorDnsKind.Off ? null : o.Baseline;
         foreach (var s in o.Alerted) t.Alerted.Add(s);
+        t.WarningsDay = default;
     }
 
     /// <summary>

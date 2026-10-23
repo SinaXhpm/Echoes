@@ -111,6 +111,9 @@ public partial class MainWindow : Window
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
+        // hidden in the tray or minimized: nobody sees the pages (their clocks pause, see AppPlatform.IsInForeground)
+        if (change.Property == WindowStateProperty || change.Property == IsVisibleProperty)
+            Helpers.AppPlatform.SetForeground(IsVisible && WindowState != WindowState.Minimized);
         if (change.Property == WindowStateProperty)
         {
             var state = change.GetNewValue<WindowState>();

@@ -17,8 +17,7 @@ public partial class NetworkInfoView : UserControl
         {
             // a minimized window counts as hidden too (its controls stay "visible", and a laptop scanned on regardless)
             if (DataContext is NetworkInfoViewModel vm)
-                vm.WifiShown(() => WifiRoot.IsEffectivelyVisible && TopLevel.GetTopLevel(WifiRoot) is { } top
-                                   && (top is not Window w || w.WindowState != WindowState.Minimized));
+                vm.WifiShown(() => Helpers.AppPlatform.OnScreen(WifiRoot));
         };
         WifiRoot.DetachedFromVisualTree += (_, _) =>
         {

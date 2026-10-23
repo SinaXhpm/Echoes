@@ -588,7 +588,8 @@ function addMessage(m, live) {
   row.appendChild(meta);
   row.appendChild(bubble);
   row._seq = m.seq;
-  var box = $('msgs'), stick = atBottom();
+  /* only a live message asks where the view is (the question forces a layout: 500 of them on every page load) */
+  var box = $('msgs'), stick = live && atBottom();
   box.appendChild(row);
   /* the oldest rows go, and their seen-marks with them: a page left open on a busy share kept one per message ever */
   while (box.childNodes.length > 601) {

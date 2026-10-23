@@ -199,6 +199,8 @@ public partial class CloudflareViewModel
                              && !r.Content.Contains(q, StringComparison.OrdinalIgnoreCase)) continue;
             list.Add(r);
         }
+        // the same rows as shown (a keystroke that matched the same records): the list isn't reset and rebuilt
+        if (list.Count == VisibleRecords.Count && list.SequenceEqual(VisibleRecords)) return;
         VisibleRecords = list;
     }
 

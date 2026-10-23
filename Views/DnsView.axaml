@@ -661,43 +661,50 @@
                 <Border Grid.Row="1" Classes="divider"/>
 
                 <Panel Grid.Row="2">
-                    <!-- DNS lookup → one row per answer -->
-                    <ScrollViewer IsVisible="{Binding ShowRecords}" VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl ItemsSource="{Binding Records}" Margin="0,0,0,8">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:DnsRecordRow">
-                                    <Border Classes="recRow">
-                                        <Grid ColumnDefinitions="Auto, *, Auto">
-                                            <Border Grid.Column="0" Classes="badge recType"
-                                                    Classes.accent="{Binding IsRecord}" Classes.warning="{Binding IsStatus}">
-                                                <TextBlock Text="{Binding Type}"/>
-                                            </Border>
-                                            <!-- value + resolver · transport · time: side by side when wide, stacked on a phone -->
-                                            <Grid Grid.Column="1" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto"
-                                                  VerticalAlignment="Center">
-                                                <SelectableTextBlock Classes="recValue" Classes.status="{Binding IsStatus}"
-                                                                     Text="{Binding Value}"/>
-                                                <!-- row / column come from the wide / narrow styles above -->
-                                                <TextBlock Classes="recServer" Text="{Binding ServerLine}" ToolTip.Tip="{Binding ServerTip}"/>
-                                            </Grid>
-                                            <!-- copy this record -->
-                                            <Panel Grid.Column="2" Classes="recCopy">
-                                                <Button Classes="icon" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                                        IsVisible="{Binding IsRecord}"
-                                                        Command="{Binding $parent[ItemsControl].((vm:DnsViewModel)DataContext).CopyRowCommand}"
-                                                        CommandParameter="{Binding}"
-                                                        ToolTip.Tip="Copy this record">
-                                                    <Path Data="{StaticResource DnsCopyGlyph}" Width="15" Height="15" Stretch="Uniform"
-                                                          StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"/>
-                                                </Button>
-                                            </Panel>
+                    <!-- DNS lookup → one row per answer; virtualized (only the rows on screen are built) -->
+                    <ItemsControl IsVisible="{Binding ShowRecords}" ItemsSource="{Binding Records}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.Template>
+                            <ControlTemplate>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" Margin="0,0,0,8"/>
+                                </ScrollViewer>
+                            </ControlTemplate>
+                        </ItemsControl.Template>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DnsRecordRow">
+                                <Border Classes="recRow">
+                                    <Grid ColumnDefinitions="Auto, *, Auto">
+                                        <Border Grid.Column="0" Classes="badge recType"
+                                                Classes.accent="{Binding IsRecord}" Classes.warning="{Binding IsStatus}">
+                                            <TextBlock Text="{Binding Type}"/>
+                                        </Border>
+                                        <!-- value + resolver · transport · time: side by side when wide, stacked on a phone -->
+                                        <Grid Grid.Column="1" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto"
+                                              VerticalAlignment="Center">
+                                            <SelectableTextBlock Classes="recValue" Classes.status="{Binding IsStatus}"
+                                                                 Text="{Binding Value}"/>
+                                            <!-- row / column come from the wide / narrow styles above -->
+                                            <TextBlock Classes="recServer" Text="{Binding ServerLine}" ToolTip.Tip="{Binding ServerTip}"/>
                                         </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
+                                        <!-- copy this record -->
+                                        <Panel Grid.Column="2" Classes="recCopy">
+                                            <Button Classes="icon" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                    IsVisible="{Binding IsRecord}"
+                                                    Command="{Binding $parent[ItemsControl].((vm:DnsViewModel)DataContext).CopyRowCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip.Tip="Copy this record">
+                                                <Path Data="{StaticResource DnsCopyGlyph}" Width="15" Height="15" Stretch="Uniform"
+                                                      StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"/>
+                                            </Button>
+                                        </Panel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
                     <!-- WHOIS / RDAP → freeform text -->
                     <TextBox Classes="readout" IsVisible="{Binding !ShowRecords}" Text="{Binding LogText}" IsReadOnly="True" AcceptsReturn="True"

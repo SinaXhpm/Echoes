@@ -1,5 +1,7 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Echoes.Helpers;
@@ -17,6 +19,11 @@ public readonly record struct CurlToken(int Start, int Length, CurlTokenKind Kin
 /// </summary>
 public sealed class CurlTextDocument
 {
+    // What Create rewrites: \r, tabs and the other C0 controls (not \n), DEL. Most bodies hold none, and their text is
+    // kept as it came (no second multi-MB copy). Declared before Empty: static fields initialize in order.
+    private static readonly SearchValues<char> Rewritten =
+        SearchValues.Create(Enumerable.Range(0, 0x20).Where(c => c != '\n').Select(c => (char)c).Append('\x7F').ToArray());
+
     public static readonly CurlTextDocument Empty = Create(string.Empty, CurlSyntax.None);
 
     /// <summary>Lines longer than this aren't coloured (a minified multi-MB line would be lexed whole for one frame).</summary>
@@ -43,6 +50,7 @@ public sealed class CurlTextDocument
     public static CurlTextDocument Create(string? source, CurlSyntax syntax)
     {
         source ??= string.Empty;
+        if (source.AsSpan().IndexOfAny(Rewritten) < 0) return Indexed(source, syntax);
         var sb = new StringBuilder(source.Length);
         var starts = new List<int>(Math.Max(16, source.Length / 40)) { 0 };
         int col = 0, maxLen = 0;
@@ -76,6 +84,21 @@ public sealed class CurlTextDocument
         maxLen = Math.Max(maxLen, col);
         starts.Add(sb.Length + 1);   // sentinel: the last line ends at Text.Length
         return new CurlTextDocument(sb.ToString(), starts.ToArray(), maxLen, syntax);
+    }
+
+    /// <summary>Create for a text with nothing to rewrite: only the line index is built.</summary>
+    private static CurlTextDocument Indexed(string text, CurlSyntax syntax)
+    {
+        var starts = new List<int>(Math.Max(16, text.Length / 40)) { 0 };
+        int at = 0, maxLen = 0;
+        for (int nl; (nl = text.IndexOf('\n', at)) >= 0; at = nl + 1)
+        {
+            maxLen = Math.Max(maxLen, nl - at);
+            starts.Add(nl + 1);
+        }
+        maxLen = Math.Max(maxLen, text.Length - at);
+        starts.Add(text.Length + 1);   // sentinel: the last line ends at Text.Length
+        return new CurlTextDocument(text, starts.ToArray(), maxLen, syntax);
     }
 
     public int LineStart(int line) => _starts[Math.Clamp(line, 0, LineCount)];

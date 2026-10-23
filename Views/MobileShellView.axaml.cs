@@ -34,7 +34,7 @@ public partial class MobileShellView : UserControl
         Loaded += async (s, e) =>
         {
             if (DataContext is MainViewModel vm)
-                await vm.CheckForUpdatesAsync();
+                await vm.CheckForUpdatesIfStale();
         };
         AttachedToVisualTree += (_, _) => ApplySystemBars();
         ActualThemeVariantChanged += (_, _) => ApplySystemBars();

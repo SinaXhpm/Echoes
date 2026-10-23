@@ -115,7 +115,8 @@ public partial class NetworkInfoViewModel
                 if (_wifiVisible?.Invoke() == true) _ = WifiReadAsync(scan: ScanDue(WifiScanGap), followUp: false);
             };
         }
-        _wifiTimer.Start();
+        // no reader on this platform (macOS, phones): the note is read once, not every 10 s
+        if (WifiScanner.IsAvailable || WifiSource != (Func<bool, WifiScanResult>)WifiScanner.Read) _wifiTimer.Start();
         // a quick look back to the view: re-read unless the last read is very recent
         if (_wifiLast is null || DateTimeOffset.Now - _wifiLast.Time > TimeSpan.FromSeconds(5))
             _ = WifiReadAsync(scan: ScanDue(TimeSpan.FromSeconds(30)), followUp: true);

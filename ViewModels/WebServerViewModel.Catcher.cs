@@ -182,6 +182,7 @@ public partial class WebServerViewModel : ICatcherSink
     private int _catchPortActive;
     private readonly ConcurrentQueue<(CapturedRequest Req, bool Replied)> _catchQueue = new();
     private int _catchPending, _catchDropped;
+    private int _shownDropped;   // the skipped count the line shows: once a flood is over, the drain is idle again
     private PacedTimer? _catchTimer;
     private readonly Dictionary<long, CatcherRow> _rowsById = new();
     private long _catchTotal;
@@ -439,13 +440,16 @@ public partial class WebServerViewModel : ICatcherSink
             r.Note ??= "The body wasn't kept — too much was arriving at once.";
         }
         _catchQueue.Enqueue((r, replied));
+        _catchTimer?.Poke();   // the first request after a quiet spell is listed at once
     }
 
     /// <summary>UI thread: moves what arrived into the list in one batch (newest first, capped). True when anything had
     /// arrived (the paced timer then keeps its fast interval).</summary>
     internal bool DrainCatcher()
     {
-        if (_catchQueue.IsEmpty && Volatile.Read(ref _catchDropped) == 0) return false;
+        int dropped = Volatile.Read(ref _catchDropped);
+        if (_catchQueue.IsEmpty && dropped == _shownDropped) return false;
+        _shownDropped = dropped;
         var fresh = new List<CatcherRow>();
         bool selectedChanged = false;
         while (_catchQueue.TryDequeue(out var item))
@@ -509,6 +513,7 @@ public partial class WebServerViewModel : ICatcherSink
         _retainedBodyBytes = 0;
         _catchTotal = 0;
         Interlocked.Exchange(ref _catchDropped, 0);
+        _shownDropped = 0;
         SelectedRequest = null;
         OnPropertyChanged(nameof(HasRequests));
         UpdateCatchCounts();

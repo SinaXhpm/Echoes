@@ -151,7 +151,7 @@
         <Setter Property="VerticalAlignment" Value="Top"/>
         <Setter Property="Margin" Value="0,5,4,0"/>
     </Style>
-    <Style Selector="Button.pasteBtn Path">
+    <Style Selector="Button.pasteBtn > Path">
         <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
         <Setter Property="StrokeThickness" Value="1.6"/>
         <Setter Property="StrokeLineCap" Value="Round"/>
@@ -163,7 +163,7 @@
     <Style Selector="Button.pasteBtn:pressed /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
     </Style>
-    <Style Selector="Button.pasteBtn:pointerover Path">
+    <Style Selector="Button.pasteBtn:pointerover > Path">
         <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
     </Style>
 
@@ -193,7 +193,7 @@
         <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
-    <Style Selector="Border.badge TextBlock">
+    <Style Selector="Border.badge > TextBlock, Border.badge > StackPanel > TextBlock">
         <Setter Property="FontSize" Value="10.5"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
@@ -202,27 +202,27 @@
         <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
     </Style>
-    <Style Selector="Border.badge.accent TextBlock"><Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/></Style>
+    <Style Selector="Border.badge.accent > TextBlock, Border.badge.accent > StackPanel > TextBlock"><Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/></Style>
     <Style Selector="Border.badge.success">
         <Setter Property="Background" Value="{DynamicResource Success.Soft}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Success.Border}"/>
     </Style>
-    <Style Selector="Border.badge.success TextBlock"><Setter Property="Foreground" Value="{DynamicResource Success}"/></Style>
+    <Style Selector="Border.badge.success > TextBlock, Border.badge.success > StackPanel > TextBlock"><Setter Property="Foreground" Value="{DynamicResource Success}"/></Style>
     <Style Selector="Border.badge.warning">
         <Setter Property="Background" Value="{DynamicResource Warning.Soft}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Warning.Border}"/>
     </Style>
-    <Style Selector="Border.badge.warning TextBlock"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+    <Style Selector="Border.badge.warning > TextBlock, Border.badge.warning > StackPanel > TextBlock"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
     <Style Selector="Border.badge.danger">
         <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
     </Style>
-    <Style Selector="Border.badge.danger TextBlock"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+    <Style Selector="Border.badge.danger > TextBlock, Border.badge.danger > StackPanel > TextBlock"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
     <Style Selector="Border.badge.info">
         <Setter Property="Background" Value="{DynamicResource Info.Soft}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Info.Border}"/>
     </Style>
-    <Style Selector="Border.badge.info TextBlock"><Setter Property="Foreground" Value="{DynamicResource Info}"/></Style>
+    <Style Selector="Border.badge.info > TextBlock, Border.badge.info > StackPanel > TextBlock"><Setter Property="Foreground" Value="{DynamicResource Info}"/></Style>
 
     <!-- ===== buttons ===== -->
     <!-- shared metrics for every styled button -->
@@ -337,10 +337,10 @@
         <Setter Property="Background" Value="{DynamicResource Bg.RaisedHover}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}"/>
     </Style>
-    <Style Selector="Button.icon Path">
+    <Style Selector="Button.icon > Path">
         <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
     </Style>
-    <Style Selector="Button.icon:pointerover Path">
+    <Style Selector="Button.icon:pointerover > Path">
         <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
     </Style>
 
@@ -423,10 +423,10 @@
     <Style Selector="Button.sideLink:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
     </Style>
-    <Style Selector="Button.sideLink:pointerover TextBlock.sideLabel">
+    <Style Selector="Button.sideLink:pointerover > Grid > TextBlock.sideLabel, Button.sideLink:pointerover > StackPanel > TextBlock.sideLabel">
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
     </Style>
-    <Style Selector="Button.sideLink:pointerover Path.ico">
+    <Style Selector="Button.sideLink:pointerover > Path.ico, Button.sideLink:pointerover > Grid > Path.ico, Button.sideLink:pointerover > StackPanel > Path.ico">
         <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
     </Style>
     <Style Selector="Button.updatePill">
@@ -442,7 +442,7 @@
         <Setter Property="Background" Value="{DynamicResource Accent.SoftHover}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
     </Style>
-    <Style Selector="Button.updatePill TextBlock.sideLabel">
+    <Style Selector="Button.updatePill > StackPanel > TextBlock.sideLabel">
         <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>

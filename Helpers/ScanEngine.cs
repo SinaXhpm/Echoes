@@ -695,7 +695,7 @@ public sealed class ScanEngine : IDisposable
         var h = f.Host;
         Interlocked.Increment(ref h.Tally[(int)f.Proto * 5 + (int)f.State]);
         if (f.State != PortState.Open)
-            h.ReasonTally.AddOrUpdate($"{(int)f.State}|{(int)f.Proto}|{f.Reason}", 1, static (_, n) => n + 1);
+            h.CountReason(f.State, f.Proto, f.Reason ?? "");
         switch (f.State)
         {
             case PortState.Open: Interlocked.Increment(ref Progress.Open); break;

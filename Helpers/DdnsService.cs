@@ -659,7 +659,11 @@ public sealed class DdnsService
         List<Job> due;
         lock (_gate)
         {
-            due = _jobs.Where(j => force || j.Next <= now).ToList();
+            // Jobs due within the next minute come along: one public-IP lookup for them all. Each job's next time is set
+            // when it finishes, so jobs checked one after another drifted apart by seconds, and every later one woke its
+            // own pass (and lookup: 2-4 HTTPS requests) 5 s after the last, every 5 minutes for good.
+            long horizon = now + PassHorizonSeconds;
+            due = _jobs.Where(j => force || j.Next <= horizon).ToList();
             foreach (var j in due) j.Busy = true;
         }
         if (due.Count == 0) return NextWait();
@@ -706,11 +710,14 @@ public sealed class DdnsService
         return NextWait();
     }
 
+    private const long PassHorizonSeconds = 60;
+
     private TimeSpan NextWait()
     {
         lock (_gate)
         {
-            if (_jobs.Count == 0) return Interval;
+            // nothing to keep: sleep until a job is added (Add, Reload and CheckNow wake the loop)
+            if (_jobs.Count == 0) return Timeout.InfiniteTimeSpan;
             long next = _jobs.Min(j => j.Next);
             long secs = Math.Clamp(next - Now, 5, (long)Interval.TotalSeconds);
             return TimeSpan.FromSeconds(secs);

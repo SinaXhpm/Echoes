@@ -26,7 +26,7 @@ public partial class MainView : UserControl
         {
             if (DataContext is MainViewModel vm)
             {
-                await vm.CheckForUpdatesAsync();
+                await vm.CheckForUpdatesIfStale();
             }
         };
     }
@@ -105,7 +105,7 @@ internal static class ToolViews
             Run(vm, tool, where);
             return;
         }
-        if (tool is "CURL" or "WEB SERVER" or "PROXY")
+        if (tool is "CURL" or "WEB SERVER" or "PROXY" && AddressesMayHaveChanged(tool))
             Avalonia.Threading.Dispatcher.UIThread.Post(() => Run(vm, tool, where), Avalonia.Threading.DispatcherPriority.Background);
 
         static void Run(MainViewModel vm, string tool, string where)
@@ -123,6 +123,30 @@ internal static class ToolViews
             }
             catch (Exception ex) { CrashLog.Write(where, ex); }
         }
+    }
+
+    // Switching back and forth between tools listed the adapters again on every visit (a hitch right after the page drew).
+    // A tool's addresses are listed again when the network changed since its last listing (the system's address-changed
+    // event), and in any case after AddressesMaxAge: where that event doesn't come, a list is never older than that.
+    private static readonly TimeSpan AddressesMaxAge = TimeSpan.FromSeconds(30);
+    private static int s_netEpoch;
+    private static bool s_netHooked;
+    private static readonly Dictionary<string, (int Epoch, long At)> s_listed = new();
+
+    private static bool AddressesMayHaveChanged(string tool)
+    {
+        if (!s_netHooked)
+        {
+            s_netHooked = true;
+            try { System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged += (_, _) => Interlocked.Increment(ref s_netEpoch); }
+            catch { /* not on this platform: the age rule alone */ }
+        }
+        int epoch = Volatile.Read(ref s_netEpoch);
+        long now = Environment.TickCount64;
+        if (s_listed.TryGetValue(tool, out var last) && last.Epoch == epoch && now - last.At < (long)AddressesMaxAge.TotalMilliseconds)
+            return false;
+        s_listed[tool] = (epoch, now);
+        return true;
     }
 
     public static void Fill(Decorator host, string tool, MainViewModel vm)

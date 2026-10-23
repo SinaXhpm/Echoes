@@ -78,6 +78,8 @@ public partial class CurlViewModel
 
     /// <summary>Largest image the preview decodes (~128 MB of pixels): a few KB of PNG can declare 50000×50000.</summary>
     private const long MaxPreviewPixels = 32_000_000;
+    /// <summary>Wider images are decoded scaled down to this (a 6000×4000 photo took 96 MB to show ~650 px of it).</summary>
+    private const int MaxPreviewWidth = 2560;
     [ObservableProperty] private string _bodyKindText = string.Empty;
     [ObservableProperty] private string _bodyNote = string.Empty;
     public bool HasBodyNote => BodyNote.Length > 0;
@@ -287,18 +289,30 @@ public partial class CurlViewModel
             {
                 Bitmap? image = null;
                 string? tooBig = null;
+                int width = 0, height = 0;
                 try
                 {
                     // The dimensions first, from the header only: decoding a decompression bomb would take gigabytes.
                     using (var probe = new MemoryStream(buf, 0, len, writable: false))
                     using (var codec = SkiaSharp.SKCodec.Create(probe))
-                        if (codec is not null && (long)codec.Info.Width * codec.Info.Height > MaxPreviewPixels)
-                            tooBig = $"{codec.Info.Width}×{codec.Info.Height}";
-                    if (tooBig is null) { using var ms = new MemoryStream(buf, 0, len, writable: false); image = new Bitmap(ms); }
+                        if (codec is not null)
+                        {
+                            (width, height) = (codec.Info.Width, codec.Info.Height);
+                            if ((long)width * height > MaxPreviewPixels) tooBig = $"{width}×{height}";
+                        }
+                    if (tooBig is null)
+                    {
+                        // the preview only ever shrinks it to fit: a big photo is decoded at a preview width, not in full
+                        using var ms = new MemoryStream(buf, 0, len, writable: false);
+                        image = width > MaxPreviewWidth ? Bitmap.DecodeToWidth(ms, MaxPreviewWidth, BitmapInterpolationMode.MediumQuality) : new Bitmap(ms);
+                    }
                 }
                 catch { /* not decodable: fall back to the hex view */ }
                 if (image != null)
-                    return new BodyBuild(kind, string.Empty, null, null, image, $"Image · {media} · {image.PixelSize.Width}×{image.PixelSize.Height} · {size}", note);
+                {
+                    if (width <= 0) (width, height) = (image.PixelSize.Width, image.PixelSize.Height);
+                    return new BodyBuild(kind, string.Empty, null, null, image, $"Image · {media} · {width}×{height} · {size}", note);
+                }
                 if (tooBig is not null && note.Length == 0)
                     note = $"Image too large to preview ({tooBig} pixels): shown as hex. Save keeps the original bytes.";
                 goto case CurlBodyKind.Binary;

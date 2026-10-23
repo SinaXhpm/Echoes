@@ -327,7 +327,7 @@ public partial class SocketViewModel
                 text = connection.SentClose != null ? "Disconnected — the server hung up without answering the close." : "Disconnected.";
                 error = false;
             }
-            _vm._queue.Enqueue(new Ev(EvKind.Ended, _gen, null, null, text, error, DateTime.Now));
+            _vm.Queue(new Ev(EvKind.Ended, _gen, null, null, text, error, DateTime.Now));
         }
     }
 }

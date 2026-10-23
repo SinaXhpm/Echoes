@@ -350,9 +350,10 @@ public sealed class CurlCodeView : Control, ILogicalScrollable
                 double x0 = textLeft;
                 if (!Wrap)
                 {
-                    // only the visible columns of a long line are laid out
-                    c0 = Math.Min(end, Math.Max(0, (int)Math.Floor(_offset.X / _cw) - 4));
-                    c1 = Math.Min(end, (int)Math.Ceiling((_offset.X + _viewport.Width) / _cw) + 4);
+                    // only the visible columns of a long line are laid out, in 64-column steps: a window that moved with
+                    // every pixel of a sideways scroll missed the layout cache for each visible line on every frame
+                    c0 = Math.Min(end, Math.Max(0, (int)Math.Floor(_offset.X / _cw) - 4) & ~63);
+                    c1 = Math.Min(end, (((int)Math.Ceiling((_offset.X + _viewport.Width) / _cw) + 4) | 63) + 1);
                     x0 = textLeft + c0 * _cw - _offset.X;
                 }
 

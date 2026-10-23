@@ -159,15 +159,18 @@ public partial class SshViewModel
     private string SanitizeAnsi(string input)
     {
         if (string.IsNullOrEmpty(input)) return input;
-        // OSC (ESC ] … BEL|ST, e.g. a window title) must come first: the 2-char "ESC ]" alternative would
-        // otherwise match and leak the title text ("0;user@host: ~") into the terminal.
-        // Two-char escapes are every ESC + 0x30-0x7E except '[' (CSI), not only 0x40-0x5F: zsh's stock zshrc
-        // (Debian/Ubuntu/Kali, oh-my-zsh) sends keypad mode ESC = / ESC > around every prompt for vt100, which
-        // showed as "=" / ">" garbage; ESC 7/8 and ESC c too. ESC + intermediates + final = charset (ESC ( 0).
-        string pattern = @"\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)|\x1B(?:[0-Z\\-~]|\[[0-?]*[ -/]*[@-~]|[ -/]+[0-~])|\x07";
-        string result = Regex.Replace(input, pattern, string.Empty);
+        string result = input.AsSpan().IndexOfAny('\x1B', '\x07') < 0 ? input : AnsiEscapes().Replace(input, string.Empty);
         return result.Replace("\r\n", "\n").Replace("\r", "\n");
     }
+
+    // OSC (ESC ] … BEL|ST, e.g. a window title) must come first: the 2-char "ESC ]" alternative would
+    // otherwise match and leak the title text ("0;user@host: ~") into the terminal.
+    // Two-char escapes are every ESC + 0x30-0x7E except '[' (CSI), not only 0x40-0x5F: zsh's stock zshrc
+    // (Debian/Ubuntu/Kali, oh-my-zsh) sends keypad mode ESC = / ESC > around every prompt for vt100, which
+    // showed as "=" / ">" garbage; ESC 7/8 and ESC c too. ESC + intermediates + final = charset (ESC ( 0).
+    // Source-generated: the interpreted pattern ran over every chunk of output (`cat` of a big file, `top`).
+    [GeneratedRegex(@"\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)|\x1B(?:[0-Z\\-~]|\[[0-?]*[ -/]*[@-~]|[ -/]+[0-~])|\x07")]
+    private static partial Regex AnsiEscapes();
 
     [RelayCommand]
     private void SendCommand()

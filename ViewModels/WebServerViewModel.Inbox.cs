@@ -107,7 +107,6 @@ public partial class WebServerViewModel
 
     private void InitInbox()
     {
-        HookForeground();
         // back on Share & chat with the Chat tab showing: what arrived is read
         PropertyChanged += (_, e) =>
         {
@@ -405,17 +404,25 @@ public partial class WebServerViewModel
 
     private List<Tracked> TrackedLocked() => _tracked ??= ParseTracked(ProfileService.Instance.GetSetting(KReceived));
 
-    private void Track(string path, string from)
+    // The files of one UI tick at once: one save and one re-measure for a batch (200 photos each re-measuring every tracked
+    // file and re-saving the list were ~100k file stats and ~15 MB of JSON).
+    private void Track(List<(string Path, string From)> done)
     {
-        long size;
-        try { size = new FileInfo(path).Length; } catch { return; }
-        lock (_trackedGate)
+        bool any = false;
+        foreach (var (path, from) in done)
         {
-            var list = TrackedLocked();
-            list.RemoveAll(t => string.Equals(t.Path, path, StringComparison.OrdinalIgnoreCase));
-            list.Insert(0, new Tracked(path, size, from, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
-            if (list.Count > MaxTracked) list.RemoveRange(MaxTracked, list.Count - MaxTracked);
+            long size;
+            try { size = new FileInfo(path).Length; } catch { continue; }
+            lock (_trackedGate)
+            {
+                var list = TrackedLocked();
+                list.RemoveAll(t => string.Equals(t.Path, path, StringComparison.OrdinalIgnoreCase));
+                list.Insert(0, new Tracked(path, size, from, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
+                if (list.Count > MaxTracked) list.RemoveRange(MaxTracked, list.Count - MaxTracked);
+            }
+            any = true;
         }
+        if (!any) return;
         SaveTracked();
         RefreshStored();
     }
@@ -503,7 +510,8 @@ public partial class WebServerViewModel
     // UI thread (FlushUi): upload events into rows, and the progress of the ones arriving.
     private void DrainUploads()
     {
-        bool changed = false;
+        bool changed = false, stored = false;
+        List<(string Path, string From)>? done = null;
         while (_pendingUploads.TryDequeue(out var u))
         {
             changed = true;
@@ -532,13 +540,15 @@ public partial class WebServerViewModel
                 if (OperatingSystem.IsAndroid())
                 {
                     if (_androidFolder is not null) _ = DeliverAsync(row);
-                    RefreshStored();
+                    stored = true;
                 }
-                else Track(u.Path, u.Upload.From);
+                else (done ??= new()).Add((u.Path, u.Upload.From));
             }
             else if (u.Error is "Canceled by the sender.") ReceivedFiles.Remove(row);
             else row.Error = u.Error ?? "Not received.";
         }
+        if (done is not null) Track(done);
+        if (stored) RefreshStored();
 
         if (_hub is { } hub && ReceivedFiles.Any(r => r.IsPending))
         {

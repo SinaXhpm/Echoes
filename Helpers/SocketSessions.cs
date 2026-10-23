@@ -21,8 +21,9 @@ namespace Echoes.Helpers;
 /// </summary>
 public interface ISocketSink
 {
-    /// <summary>Bytes received. <paramref name="peer"/> is null for the client modes (one remote).</summary>
-    void OnReceived(SocketPeer? peer, byte[] data);
+    /// <summary>Bytes received (the reader's buffer: copied only if kept). <paramref name="peer"/> is null for the client
+    /// modes (one remote).</summary>
+    void OnReceived(SocketPeer? peer, ReadOnlySpan<byte> data);
     void OnInfo(string text);
     void OnError(string text);
     void OnPeerJoined(SocketPeer peer);
@@ -385,7 +386,7 @@ public sealed class TcpClientSession : IDisposable
                 int n = await _stream.ReadAsync(buf, _cts.Token).ConfigureAwait(false);
                 if (n == 0) { reason = "The remote side closed the connection."; break; }
                 Interlocked.Add(ref _in, n);
-                _sink.OnReceived(null, buf.AsSpan(0, n).ToArray());
+                _sink.OnReceived(null, buf.AsSpan(0, n));
             }
         }
         catch (Exception ex)
@@ -587,7 +588,7 @@ public sealed class TcpServerSession : IDisposable
                 if (n == 0) { reason = peer.KickedByUser ? "was disconnected" : "closed the connection"; break; }
                 Interlocked.Add(ref peer.BytesInRaw, n);
                 peer.LastSeen = DateTime.Now;
-                _sink.OnReceived(peer, buf.AsSpan(0, n).ToArray());
+                _sink.OnReceived(peer, buf.AsSpan(0, n));
             }
         }
         catch (Exception ex)
@@ -731,7 +732,7 @@ public sealed class UdpClientSession : IDisposable
             {
                 int n = await _socket.ReceiveAsync(buf.AsMemory(), SocketFlags.None, _cts.Token).ConfigureAwait(false);
                 Interlocked.Add(ref _in, n);
-                _sink.OnReceived(null, buf.AsSpan(0, n).ToArray());
+                _sink.OnReceived(null, buf.AsSpan(0, n));
             }
             catch (SocketException ex) when (ex.SocketErrorCode is SocketError.ConnectionReset or SocketError.ConnectionRefused
                                               && Volatile.Read(ref _closed) == 0)
@@ -868,7 +869,7 @@ public sealed class UdpServerSession : IDisposable
             peer.LastSeen = DateTime.Now;
             Interlocked.Add(ref peer.BytesInRaw, r.ReceivedBytes);
             Interlocked.Add(ref _in, r.ReceivedBytes);
-            _sink.OnReceived(peer, buf.AsSpan(0, r.ReceivedBytes).ToArray());
+            _sink.OnReceived(peer, buf.AsSpan(0, r.ReceivedBytes));
         }
     }
 

@@ -243,7 +243,9 @@ public partial class SocketViewModel : ObservableObject
             Host = h;
             if (pt > 0) Port = pt.ToString(CultureInfo.InvariantCulture);
         }
-        RebuildBindOptions(p.GetSetting(KBind));
+        // listing the adapters costs tens of ms with many (virtual) ones: only a server shows them (switching to a server
+        // mode, or opening the box, lists them then)
+        if (IsServerMode) RebuildBindOptions(p.GetSetting(KBind));
         _restoring = false;
         ResetPeers();
         UpdateIdleStatus();
@@ -838,34 +840,51 @@ public partial class SocketViewModel : ObservableObject
         private readonly int _gen;
         public Sink(SocketViewModel vm, int gen) { _vm = vm; _gen = gen; }
 
-        public void OnReceived(SocketPeer? peer, byte[] data) => _vm.EnqueueData(new Ev(EvKind.Received, _gen, peer, data, null, false, DateTime.Now));
-        public void OnInfo(string text) => _vm._queue.Enqueue(new Ev(EvKind.Info, _gen, null, null, text, false, DateTime.Now));
-        public void OnError(string text) => _vm._queue.Enqueue(new Ev(EvKind.Error, _gen, null, null, text, false, DateTime.Now));
-        public void OnPeerJoined(SocketPeer peer) => _vm._queue.Enqueue(new Ev(EvKind.PeerJoined, _gen, peer, null, null, false, DateTime.Now));
-        public void OnPeerLeft(SocketPeer peer, string? reason) => _vm._queue.Enqueue(new Ev(EvKind.PeerLeft, _gen, peer, null, reason, false, DateTime.Now));
-        public void OnEnded(string reason, bool isError) => _vm._queue.Enqueue(new Ev(EvKind.Ended, _gen, null, null, reason, isError, DateTime.Now));
+        // copied only once admitted: a flood past the caps is counted straight from the reader's buffer
+        public void OnReceived(SocketPeer? peer, ReadOnlySpan<byte> data)
+        {
+            if (_vm.Admit(data.Length)) _vm.Queue(new Ev(EvKind.Received, _gen, peer, data.ToArray(), null, false, DateTime.Now));
+        }
+        public void OnInfo(string text) => _vm.Queue(new Ev(EvKind.Info, _gen, null, null, text, false, DateTime.Now));
+        public void OnError(string text) => _vm.Queue(new Ev(EvKind.Error, _gen, null, null, text, false, DateTime.Now));
+        public void OnPeerJoined(SocketPeer peer) => _vm.Queue(new Ev(EvKind.PeerJoined, _gen, peer, null, null, false, DateTime.Now));
+        public void OnPeerLeft(SocketPeer peer, string? reason) => _vm.Queue(new Ev(EvKind.PeerLeft, _gen, peer, null, reason, false, DateTime.Now));
+        public void OnEnded(string reason, bool isError) => _vm.Queue(new Ev(EvKind.Ended, _gen, null, null, reason, isError, DateTime.Now));
     }
 
     // socket threads: a reader far ahead of the UI only counts what it can't queue
     private void EnqueueData(Ev ev)
     {
-        int len = ev.Data!.Length;
+        if (Admit(ev.Data!.Length)) Queue(ev);
+    }
+
+    /// <summary>Socket threads: whether <paramref name="len"/> more bytes may be queued (then they are counted as
+    /// pending); otherwise they are counted as skipped.</summary>
+    private bool Admit(int len)
+    {
         // A flood of tiny datagrams / reads barely moves the byte cap below (1-byte packets would queue millions of
         // events before it trips): count them too.
         if (_queue.Count >= MaxQueuedEvents)
         {
             Interlocked.Add(ref _droppedBytes, len);
             Interlocked.Increment(ref _droppedChunks);
-            return;
+            return false;
         }
         if (Interlocked.Add(ref _pendingBytes, len) > MaxPendingBytes)
         {
             Interlocked.Add(ref _pendingBytes, -len);
             Interlocked.Add(ref _droppedBytes, len);
             Interlocked.Increment(ref _droppedChunks);
-            return;
+            return false;
         }
+        return true;
+    }
+
+    // any thread: queued for the UI timer, which shows it at once if it had slowed down
+    private void Queue(Ev ev)
+    {
         _queue.Enqueue(ev);
+        _timer?.Poke();
     }
 
     /// <summary>UI thread: moves everything queued into the transcript in one batch. True when anything was queued.</summary>

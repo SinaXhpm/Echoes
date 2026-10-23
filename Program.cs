@@ -61,6 +61,10 @@ class Program
         // already finds the pipe (a request that arrives before the window exists is dropped: startup shows it anyway).
         if (_instanceLock is not null) Desktop.SingleInstance.StartListening();
 
+        // The profile (read, parsed, its history cleaned) loads while Avalonia and Skia start, instead of on the UI thread
+        // at the theme's first look at it. No UI types in it; the type initializer makes the two callers wait for one load.
+        if (_instanceLock is not null) _ = System.Threading.Tasks.Task.Run(() => Helpers.ProfileService.Instance);
+
         // "Open Echoes when I sign in" edits the real login entry only from here, the desktop head: tests, the designer
         // and the Android head never arm it. An entry left pointing at a moved / deleted copy is pointed at this one
         // (off the UI thread: a registry value or a small file).

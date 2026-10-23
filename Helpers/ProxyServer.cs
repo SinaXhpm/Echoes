@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -972,28 +973,53 @@ public sealed class ProxyServer : IDisposable
         // The disposing 'using' on both endpoints unblocks whichever pump is still reading.
     }
 
-    // Copies src → dst until EOF, then passes the half-close on. Every read re-arms the shared idle timer.
-    // True = clean EOF from src; false = reset / idle timeout / stop.
+    // Copies src → dst until EOF, then passes the half-close on. Traffic re-arms the shared idle timer (at most once a
+    // second: a fast download is thousands of reads a second). True = clean EOF from src; false = reset / idle timeout / stop.
+    // The copy buffer is pooled and given back while the tunnel waits for data (a zero-byte read), so the dozens of idle
+    // keep-alive tunnels a browser holds open cost no buffers.
     private async Task<bool> Pump(NetworkStream src, NetworkStream dst, bool up, CancellationTokenSource idle)
     {
         var tok = idle.Token;
-        var buf = new byte[16 * 1024];
+        byte[]? buf = ArrayPool<byte>.Shared.Rent(RelayBuffer);
+        long armed = Environment.TickCount64;
         bool clean = false;
         try
         {
-            int n;
-            while ((n = await src.ReadAsync(buf.AsMemory(0, buf.Length), tok).ConfigureAwait(false)) > 0)
+            while (true)
             {
-                idle.CancelAfter(IdleMs);
+                var wait = src.ReadAsync(Memory<byte>.Empty, tok);
+                if (wait.IsCompletedSuccessfully) _ = wait.Result;
+                else
+                {
+                    var giveBack = buf;
+                    buf = null;   // never returned twice when the wait throws
+                    ArrayPool<byte>.Shared.Return(giveBack);
+                    await wait.ConfigureAwait(false);
+                    buf = ArrayPool<byte>.Shared.Rent(RelayBuffer);
+                }
+                int n = await src.ReadAsync(buf.AsMemory(), tok).ConfigureAwait(false);
+                if (n == 0) break;
+                long now = Environment.TickCount64;
+                if (now - armed >= 1000)
+                {
+                    armed = now;
+                    idle.CancelAfter(IdleMs);
+                }
                 await dst.WriteAsync(buf.AsMemory(0, n), tok).ConfigureAwait(false);
                 if (up) Interlocked.Add(ref _bytesUp, n); else Interlocked.Add(ref _bytesDown, n);
             }
             clean = true;
         }
         catch { /* peer closed / reset / idle — normal end of a tunnel */ }
+        finally
+        {
+            if (buf is not null) ArrayPool<byte>.Shared.Return(buf);
+        }
         try { dst.Socket.Shutdown(SocketShutdown.Send); } catch { }
         return clean;
     }
+
+    private const int RelayBuffer = 64 * 1024;
 
     private static async Task ReadExact(NetworkStream s, byte[] buf, int n, CancellationToken ct)
     {

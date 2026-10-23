@@ -46,6 +46,7 @@ public class MainActivity : AvaloniaMainActivity
     protected override void OnStart()
     {
         base.OnStart();
+        Echoes.Helpers.AppPlatform.SetForeground(true);
         Echoes.Helpers.BackgroundGuard.Reacquire();
     }
 
@@ -104,6 +105,7 @@ public class MainActivity : AvaloniaMainActivity
     protected override void OnStop()
     {
         base.OnStop();
+        Echoes.Helpers.AppPlatform.SetForeground(false);   // the clocks of views nobody sees stop (Monitor's ages)
         try { Echoes.Helpers.ProfileService.Instance.Flush(); }
         catch (Exception ex) { Echoes.Helpers.CrashLog.Write("MainActivity.OnStop", ex); }
     }

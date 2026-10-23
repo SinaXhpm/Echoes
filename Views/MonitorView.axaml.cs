@@ -71,20 +71,28 @@ public partial class MonitorView : UserControl
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        _vm?.Tick();
-        _clock.Start();
+        AppPlatform.ForegroundChanged += OnForegroundChanged;
+        OnForegroundChanged();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        AppPlatform.ForegroundChanged -= OnForegroundChanged;
         _clock.Stop();
         base.OnDetachedFromVisualTree(e);
     }
 
-    // The window hidden in the tray (monitoring goes on there) or minimized keeps this view attached: skip the per-second
-    // refresh of every row's age then. Shown again, the next tick (within a second) brings the ages back up to date.
-    private bool OnScreen()
-        => IsEffectivelyVisible && TopLevel.GetTopLevel(this) is not Window { WindowState: WindowState.Minimized };
+    // The window hidden in the tray (monitoring goes on there) or minimized, or the phone app in the background (its
+    // views stay "visible" there), keeps this view attached: the per-second refresh of every row's age stops then, and
+    // coming back brings the ages up to date at once.
+    private void OnForegroundChanged()
+    {
+        if (!AppPlatform.IsInForeground) { _clock.Stop(); return; }
+        _vm?.Tick();
+        _clock.Start();
+    }
+
+    private bool OnScreen() => AppPlatform.OnScreen(this);
 
     private void Vm_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {

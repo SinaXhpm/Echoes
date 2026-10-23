@@ -282,7 +282,10 @@ public sealed class WsConnection : IDisposable
                     return;
                 }
 
-                // payload: keep up to the cap, count (and skip) the rest
+                // payload: keep up to the cap, count (and skip) the rest. The buffer takes the frame's kept part at once: a
+                // one-frame message (most are) is one exact allocation and no copy, not 4 KB for 20 bytes, nor a 1 MB one
+                // grown 64K → 128K → … → 1M with a copy (on the large-object heap) at every step.
+                if (len > 0 && msgLen < _maxMessage) msg = Grow(msg, msgLen + (int)Math.Min(len, _maxMessage - msgLen));
                 long remaining = len;
                 long frameOffset = 0;
                 while (remaining > 0)
@@ -349,7 +352,7 @@ public sealed class WsConnection : IDisposable
     private static byte[] Grow(byte[]? buf, int need)
     {
         if (buf != null && buf.Length >= need) return buf;
-        int size = Math.Max(need, buf == null ? 4096 : Math.Min(int.MaxValue / 2, buf.Length * 2));
+        int size = buf == null ? need : Math.Max(need, (int)Math.Min(int.MaxValue / 2, (long)buf.Length * 2));
         var nb = new byte[size];
         if (buf != null) Buffer.BlockCopy(buf, 0, nb, 0, buf.Length);
         return nb;

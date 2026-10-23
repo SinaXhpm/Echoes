@@ -121,8 +121,9 @@ public partial class CurlViewModel : ObservableObject
         _applyingNics = true;   // a fallback to Auto (the adapter is down) is shown, not saved
         try
         {
-            Interfaces = list;
-            SelectedInterface = (!string.IsNullOrEmpty(keep) ? list.FirstOrDefault(n => n.Ip == keep) : null) ?? list[0];
+            // the same adapters as last time (every visit refreshes): the list isn't swapped, so the box isn't rebuilt
+            if (!list.SequenceEqual(Interfaces)) Interfaces = list;
+            SelectedInterface = (!string.IsNullOrEmpty(keep) ? Interfaces.FirstOrDefault(n => n.Ip == keep) : null) ?? Interfaces[0];
         }
         finally { _applyingNics = false; }
     }
@@ -319,7 +320,9 @@ public partial class CurlViewModel : ObservableObject
         if (UseProxy && !string.IsNullOrWhiteSpace(Proxy)) HistoryService.Instance.Add("curl.proxy", StripUserInfo(Proxy));
 
         string? nic = SelectedNicIp;
-        _ = RunTlsProbe(req, nic, ++_sslGen);
+        SslLog = string.Empty;
+        _tlsPending = (req, nic, ++_sslGen);
+        StartTlsProbeIfShown();
 
         var opt = new CurlRunOptions { PreferDotNet = UseDotNetEngine || !CanChooseEngine, NicIp = nic, OpenFile = OpenPickedFile };
         CurlResult res;
@@ -351,9 +354,28 @@ public partial class CurlViewModel : ObservableObject
         ShowStopped();
     }
 
+    // The TLS tab's report is a second connection and handshake to the host: made when the tab is opened for this response,
+    // not on every send (a phone woke its radio twice per request for a tab rarely looked at).
+    private (CurlRequest Req, string? Nic, int Gen)? _tlsPending;
+    private const int ResponseSection = 1, TlsTab = 4;
+
+    partial void OnSectionIndexChanged(int value)
+    {
+        StartTlsProbeIfShown();
+        if (value == CodeSection && _snippetDirty) RegenerateSnippet();
+    }
+
+    partial void OnResponseTabIndexChanged(int value) => StartTlsProbeIfShown();
+
+    private void StartTlsProbeIfShown()
+    {
+        if (_tlsPending is not { } p || SectionIndex != ResponseSection || ResponseTabIndex != TlsTab) return;
+        _tlsPending = null;
+        if (p.Gen == _sslGen) _ = RunTlsProbe(p.Req, p.Nic, p.Gen);
+    }
+
     private async Task RunTlsProbe(CurlRequest req, string? nic, int gen)
     {
-        SslLog = string.Empty;
         try
         {
             string report = await Task.Run(() => CurlTlsProbe.InspectAsync(req, nic, CancellationToken.None));

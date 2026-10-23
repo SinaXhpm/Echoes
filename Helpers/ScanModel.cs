@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace Echoes.Helpers;
@@ -85,17 +86,35 @@ public sealed class ScanHost
     // from the retained rows so they stay exact when rows are capped.
     internal readonly int[] Tally = new int[10];
 
-    // "state|proto|reason" → count, for the "Not shown: 95 closed tcp ports (conn-refused)" breakdown. It and SilentUdp
-    // are created on first use: an empty ConcurrentDictionary costs ~1 KB (its lock array grows with the core count) and
-    // an empty ConcurrentQueue ~0.4 KB, and a /16 target list is 65,536 hosts that mostly never answer — ~117 MB held
-    // before the first probe.
-    private ConcurrentDictionary<string, int>? _reasonTally;
-    internal ConcurrentDictionary<string, int> ReasonTally
-        => Volatile.Read(ref _reasonTally) ?? Create(ref _reasonTally, new ConcurrentDictionary<string, int>(StringComparer.Ordinal));
+    // (state, proto, reason) → count, for the "Not shown: 95 closed tcp ports (conn-refused)" breakdown; under Gate. It and
+    // SilentUdp are created on first use: a /16 target list is 65,536 hosts that mostly never answer. A small plain
+    // dictionary with a tuple key: a ConcurrentDictionary cost ~1 KB a host (its lock array grows with the core count; a
+    // -Pn /16 held ~80 MB) and its "state|proto|reason" key a new string per closed port probed.
+    private Dictionary<(PortState State, ScanProto Proto, string Reason), int>? _reasons;
 
-    /// <summary>The reason breakdown, without creating it (empty when nothing was tallied).</summary>
-    internal IEnumerable<KeyValuePair<string, int>> Reasons
-        => (IEnumerable<KeyValuePair<string, int>>?)Volatile.Read(ref _reasonTally) ?? Array.Empty<KeyValuePair<string, int>>();
+    internal void CountReason(PortState state, ScanProto proto, string reason)
+    {
+        lock (Gate)
+        {
+            _reasons ??= new(2);
+            CollectionsMarshal.GetValueRefOrAddDefault(_reasons, (state, proto, reason), out _)++;
+        }
+    }
+
+    /// <summary>The reason breakdown (empty when nothing was tallied).</summary>
+    internal List<(PortState State, ScanProto Proto, string Reason, int Count)> Reasons
+    {
+        get
+        {
+            lock (Gate)
+            {
+                var list = new List<(PortState, ScanProto, string, int)>(_reasons?.Count ?? 0);
+                if (_reasons is not null)
+                    foreach (var kv in _reasons) list.Add((kv.Key.State, kv.Key.Proto, kv.Key.Reason, kv.Value));
+                return list;
+            }
+        }
+    }
 
     private static T Create<T>(ref T? field, T made) where T : class
         => Interlocked.CompareExchange(ref field, made, null) ?? made;   // racing threads all get the one that won
@@ -127,7 +146,7 @@ public sealed class ScanHost
         AcceptsAll = false;
         LocalAnswerPorts = "";
         Array.Clear(Tally);
-        Volatile.Write(ref _reasonTally, null);   // (no probe of this host runs yet: nothing writes to it meanwhile)
+        lock (Gate) _reasons = null;   // (no probe of this host runs yet: nothing writes to it meanwhile)
         SkippedTcp = 0; ControlCheck = null; RstCount = 0;
         MinRstMs = double.MaxValue;
         UdpUnreach = 0; MinUnreachMs = double.MaxValue;

@@ -235,6 +235,7 @@ public partial class DnsViewModel : ObservableObject
         LogText = string.Empty;
         ShowRecords = true;
         Records.Clear();
+        _rowQueue.Clear();
         _rowBudget = MaxLookupRows;
         _charBudget = MaxShownChars;
 
@@ -455,8 +456,8 @@ public partial class DnsViewModel : ObservableObject
         await ClipboardHelper.SetTextAsync(row.CopyValue);
     }
 
-    // The results list isn't virtualized: 20 resolvers × 10 types × 100 answers would be 20,000 rows. Past this many in one
-    // lookup, one status line says so and the rest is dropped.
+    // 20 resolvers × 10 types × 100 answers would be 20,000 rows. Past this many in one lookup, one status line says so and
+    // the rest is dropped. (The list is virtualized: only the rows on screen are built.)
     private const int MaxLookupRows = 600;
     private int _rowBudget = MaxLookupRows;
     // Characters shown over one lookup's rows (each row shows at most DnsRecordRow.MaxShown): laying out long values
@@ -472,7 +473,18 @@ public partial class DnsViewModel : ObservableObject
             row = new DnsRecordRow { Type = "MORE", IsStatus = true, Value = $"more than {MaxLookupRows} rows — the rest isn't shown (ask fewer resolvers or types)" };
         else if (row.Value.Length > ShownPastBudget && Interlocked.Add(ref _charBudget, -row.Value.Length) < 0)
             row.ShowAtMost(ShownPastBudget);
-        Dispatcher.UIThread.Post(() => Records.Add(row));
+        // the answers of all resolvers arrive at once: queued, and added in one UI job (not one job per row)
+        _rowQueue.Enqueue(row);
+        if (Interlocked.Exchange(ref _rowPosted, 1) == 0) Dispatcher.UIThread.Post(DrainRows);
+    }
+
+    private readonly System.Collections.Concurrent.ConcurrentQueue<DnsRecordRow> _rowQueue = new();
+    private int _rowPosted;
+
+    private void DrainRows()
+    {
+        Interlocked.Exchange(ref _rowPosted, 0);
+        while (_rowQueue.TryDequeue(out var row)) Records.Add(row);
     }
 
     // ---------------------------------------------------------------- presets

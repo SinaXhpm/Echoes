@@ -409,8 +409,11 @@ public static class MonitorProbe
         var ep = spec.Endpoint;
         int timeout = Math.Clamp(o.TimeoutMs, MinTimeoutMs, MaxTimeoutMs);
         string? keyword = string.IsNullOrEmpty(spec.Keyword) ? null : spec.Keyword;
-        var ping = o.Ping ? PingAsync(ep.Host, timeout, ct) : Task.FromResult((default(ProbeResult), (string?)null));
-        var tcp = o.Tcp ? TcpAsync(ep.Host, ep.Port, timeout, ct) : Task.FromResult(default(ProbeResult));
+        // Ping and TCP look up the same name: once for both (where the system lookup can't be asynchronous — Android,
+        // Apple — each one held a pool thread, two per monitor per round), with the same budget each had.
+        var lookup = o.Ping && o.Tcp && !IPAddress.TryParse(ep.Host, out _) ? LookupAsync(ep.Host, timeout, ct) : null;
+        var ping = o.Ping ? PingAsync(ep.Host, lookup, timeout, ct) : Task.FromResult((default(ProbeResult), (string?)null));
+        var tcp = o.Tcp ? TcpAsync(ep.Host, ep.Port, lookup, timeout, ct) : Task.FromResult(default(ProbeResult));
         var web = (o.Http || spec.ForceHttp) && ep.HasHttp
             ? HttpAsync(ep.HttpUrl, timeout, http, keyword, spec.KeywordMustContain, ct)
             : Task.FromResult(default(ProbeResult));
@@ -429,15 +432,32 @@ public static class MonitorProbe
         };
     }
 
-    private static async Task<(ProbeResult, string?)> PingAsync(string host, int timeout, CancellationToken ct)
+    // The lookup gets the probe's budget: a resolver that hangs (seen on Android) must not stall the round.
+    private static async Task<IPAddress[]> LookupAsync(string host, int timeout, CancellationToken ct)
+    {
+        using var dns = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        dns.CancelAfter(timeout);
+        return await Dns.GetHostAddressesAsync(IcmpPinger.AsciiHost(host), dns.Token).ConfigureAwait(false);
+    }
+
+    private static async Task<(ProbeResult, string?)> PingAsync(string host, Task<IPAddress[]>? lookup, int timeout, CancellationToken ct)
     {
         IPAddress addr;
         try
         {
-            // The lookup gets the same budget: a resolver that hangs (seen on Android) must not stall the round.
-            using var dns = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            dns.CancelAfter(timeout);
-            addr = await IcmpPinger.ResolveAsync(host, dns.Token).ConfigureAwait(false);
+            if (lookup is not null)
+            {
+                var found = await lookup.ConfigureAwait(false);
+                // Prefer IPv4, as ping does (IcmpPinger.ResolveAsync).
+                addr = found.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork) ?? found.FirstOrDefault()
+                       ?? throw new SocketException((int)SocketError.HostNotFound);
+            }
+            else
+            {
+                using var dns = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                dns.CancelAfter(timeout);
+                addr = await IcmpPinger.ResolveAsync(host, dns.Token).ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return (ProbeResult.Failure("DNS lookup timed out"), null); }
         catch (Exception) { return (ProbeResult.Failure(ct.IsCancellationRequested ? "canceled" : DnsFailed), null); }
@@ -463,7 +483,7 @@ public static class MonitorProbe
         return "no reply";
     }
 
-    private static async Task<ProbeResult> TcpAsync(string host, int port, int timeout, CancellationToken ct)
+    private static async Task<ProbeResult> TcpAsync(string host, int port, Task<IPAddress[]>? lookup, int timeout, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
         // Linked CTS: the timeout cancels the lookup and every pending connect attempt (no orphaned timer / socket).
@@ -472,7 +492,9 @@ public static class MonitorProbe
         try
         {
             // Only a completed connect is "up"; a refused/unreachable one fails fast — not a timeout.
-            using var socket = await ConnectAsync(host, port, budget.Token).ConfigureAwait(false);
+            using var socket = lookup is not null
+                ? await ConnectAsync(await lookup.WaitAsync(budget.Token).ConfigureAwait(false), port, budget.Token).ConfigureAwait(false)
+                : await ConnectAsync(host, port, budget.Token).ConfigureAwait(false);
             int ms = (int)sw.ElapsedMilliseconds;
             // Make the `using` dispose an abortive close (RST): a graceful one leaves this end in TIME_WAIT for 1-2 min,
             // and 256 targets every 2 s pile up ~15K of them, near the ephemeral-port limit. Best effort: if the option
@@ -495,7 +517,13 @@ public static class MonitorProbe
     {
         IPAddress[] found = IPAddress.TryParse(host, out var literal)
             ? new[] { literal }
-            : await Dns.GetHostAddressesAsync(host, ct).ConfigureAwait(false);
+            : await Dns.GetHostAddressesAsync(IcmpPinger.AsciiHost(host), ct).ConfigureAwait(false);
+        return await ConnectAsync(found, port, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>The same, with the addresses already looked up.</summary>
+    internal static async Task<Socket> ConnectAsync(IPAddress[] found, int port, CancellationToken ct)
+    {
         var ordered = new List<IPAddress>(Math.Min(found.Length, 4));
         foreach (var a in found) if (a.AddressFamily == AddressFamily.InterNetwork && ordered.Count < 4) ordered.Add(a);
         foreach (var a in found) if (a.AddressFamily == AddressFamily.InterNetworkV6 && ordered.Count < 4) ordered.Add(a);

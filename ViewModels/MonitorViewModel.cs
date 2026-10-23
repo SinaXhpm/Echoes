@@ -765,7 +765,7 @@ public sealed partial class MonitorViewModel : ObservableObject
 
             if (r.CertRecheck) RecheckCertSoon(t);
             var change = t.Tracker.Record(r.Ok, now, downThreshold, upThreshold);
-            if (RefreshWarnings(t, raiseEvents: true)) anyWarning = true;
+            if (t.WarningsDay != DateTime.UtcNow.Date && RefreshWarnings(t, raiseEvents: true)) anyWarning = true;
             t.Apply(r, now, o);
             switch (change)
             {

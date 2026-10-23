@@ -325,11 +325,12 @@ public partial class WebServerViewModel : IShareHubSink
     }
 
     // ================================================================ hub callbacks (connection threads: queue only)
+    // The UI timer slows down when nothing happens: a chat message after a quiet spell pokes it (shown at once).
 
     void IShareHubSink.OnLog(string line) => AppendLog(line);
-    void IShareHubSink.OnMessage(ShareMessage message) => _pendingChat.Enqueue(message);
-    void IShareHubSink.OnChatCleared() => _pendingChat.Enqueue(null);
-    void IShareHubSink.OnUploadStarted(ShareUpload upload) => _pendingUploads.Enqueue((upload, null, null, true));
-    void IShareHubSink.OnUploadFinished(ShareUpload upload, string? path, string? error) => _pendingUploads.Enqueue((upload, path, error, false));
+    void IShareHubSink.OnMessage(ShareMessage message) { _pendingChat.Enqueue(message); _uiTimer?.Poke(); }
+    void IShareHubSink.OnChatCleared() { _pendingChat.Enqueue(null); _uiTimer?.Poke(); }
+    void IShareHubSink.OnUploadStarted(ShareUpload upload) { _pendingUploads.Enqueue((upload, null, null, true)); _uiTimer?.Poke(); }
+    void IShareHubSink.OnUploadFinished(ShareUpload upload, string? path, string? error) { _pendingUploads.Enqueue((upload, path, error, false)); _uiTimer?.Poke(); }
     void IShareHubSink.OnDownload(string itemId, long bytes, bool complete) => _pendingDownloads.Enqueue((itemId, bytes, complete));
 }

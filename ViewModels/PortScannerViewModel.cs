@@ -228,9 +228,15 @@ public partial class PortScannerViewModel : ObservableObject
                 var pass = await Task.Run(() => engine.RunPassAsync(targets, ports));
                 timer.Stop();
 
-                ScanDiff? diff = previous is not null && !pass.Stopped ? previous.Compare(pass) : null;
+                // Comparing with the last pass and keeping this one for the next (only when repeating) walk every finding:
+                // off the UI thread (the workers are done, both are pure).
+                var prev = previous;
+                bool repeat = Repeat;
+                var (diff, snapshot) = await Task.Run(() => (
+                    prev is not null && !pass.Stopped ? prev.Compare(pass) : null,
+                    !pass.Stopped && repeat ? ScanSnapshot.Of(pass) : null));
                 await FinishPassAsync(pass, diff, portsText);
-                if (!pass.Stopped) previous = ScanSnapshot.Of(pass);
+                if (!pass.Stopped) previous = snapshot;
 
                 string done = Summary(pass) + (diff is null ? "" : diff.Any ? $" · changed: {diff.Summary}" : " · no changes")
                               + skipped + capped;

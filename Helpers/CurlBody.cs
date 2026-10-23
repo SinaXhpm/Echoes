@@ -139,12 +139,16 @@ public static class CurlBody
         catch { return null; }
     }
 
+    // Indentation is paid on every line at every level, so a deeply nested (or hostile) body formats to many times its own
+    // size: past this the pretty view is skipped (null) and Raw is shown, as for a body over PrettyLimit.
+    private const int PrettyOutputLimit = 32 * 1024 * 1024;
+
     private static string Indent(JsonDocument doc)
     {
-        using var ms = new MemoryStream();
-        using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, SkipValidation = true }))
+        var buffer = new CappedBufferWriter(PrettyOutputLimit, () => new InvalidOperationException("too large to format"));
+        using (var w = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, SkipValidation = true }))
             doc.WriteTo(w);
-        return Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length);
+        return Encoding.UTF8.GetString(buffer.WrittenSpan);
     }
 
     /// <summary>Where a JSON text is broken ("Line 3, column 7: …"), or null when it's valid.</summary>
@@ -177,7 +181,12 @@ public static class CurlBody
             using var sr = new StringReader(text);
             using var reader = XmlReader.Create(sr, settings);
             var doc = XDocument.Load(reader);
-            string body = doc.ToString(SaveOptions.None);
+            // what doc.ToString() writes, into a writer that stops at the output ceiling
+            var sb = new StringBuilder(text.Length);
+            using (var w = XmlWriter.Create(new CappedStringWriter(sb, PrettyOutputLimit, () => new InvalidOperationException("too large to format")),
+                                            new XmlWriterSettings { OmitXmlDeclaration = true, Indent = true }))
+                foreach (var node in doc.Nodes()) node.WriteTo(w);
+            string body = sb.ToString();
             return doc.Declaration != null ? doc.Declaration + "\n" + body : body;
         }
         catch { return null; }

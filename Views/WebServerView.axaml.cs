@@ -143,6 +143,7 @@ public partial class WebServerView : UserControl
         var top = TopLevel.GetTopLevel(this);
         if (top is null) return;
 
+        var added = new List<SharedItem>();
         try
         {
             var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -204,14 +205,22 @@ public partial class WebServerView : UserControl
                     open = () => file.OpenReadAsync();
                 }
 
-                var item = vm.AddSharedFile(name, size, open, mtime);
-                if (postToChat) vm.ShareInChat(item);
+                added.Add(vm.AddSharedFile(name, size, open, mtime, notify: false));
             }
         }
         catch (Exception ex)
         {
             string why = "Adding files failed: " + ex.Message;
             if (postToChat) vm.ChatError = why; else vm.FilesError = why;
+        }
+        finally
+        {
+            // the pages hear of the batch once, then each file goes into the chat
+            if (added.Count > 0)
+            {
+                vm.SharedFilesAdded();
+                if (postToChat) foreach (var item in added) vm.ShareInChat(item);
+            }
         }
     }
 
