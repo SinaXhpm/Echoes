@@ -18,12 +18,17 @@ public sealed class DoctorFacts
 
     public DoctorTarget Target { get; }
     public DoctorLocal? Local { get; set; }
-    /// <summary>A probe (1.1.1.1:443, 8.8.8.8:443) connected; null = not checked.</summary>
+    /// <summary>A probe (1.1.1.1:443, 8.8.8.8:443; their IPv6 addresses on an IPv6-only network) connected; null = not checked.</summary>
     public bool? InternetTcp { get; set; }
     /// <summary>The system resolver answered for a well-known name.</summary>
     public bool? InternetDns { get; set; }
     public bool? Captive { get; set; }
     public string? CaptiveDetail { get; set; }
+    /// <summary>No IPv4 route, an IPv6 one: an IPv6-only network (mobile data on some carriers). The public resolvers and
+    /// probes are then asked at their IPv6 addresses, and an IPv4 address is dialled through NAT64.</summary>
+    public bool Ipv6Only { get; set; }
+    /// <summary>The network's NAT64 /96 prefix (IPv6-only), from its DNS64 answer for ipv4only.arpa; null when not found.</summary>
+    public IPAddress? Nat64 { get; set; }
 
     public DoctorDnsAnswer? Sys { get; set; }
     public List<DoctorDnsAnswer> Plain { get; set; } = new();
@@ -156,6 +161,15 @@ public static class DoctorEngine
         var f = new DoctorFacts(t) { Plan = t.Plan(env.DefaultHttpsPort, env.DefaultHttpPort), Proxy = proxy };
         using var doh = DoctorDns.CreateDohClient();
 
+        // an IPv6-only network: no IPv4 address can be dialled there, so 1.1.1.1 and 8.8.8.8 "didn't answer" while everything
+        // worked, and DNS64's answers for IPv4-only sites (inside the NAT64 prefix) looked forged
+        var (v4, v6) = env.Routes();
+        if (!v4 && v6)
+        {
+            f.Ipv6Only = true;
+            f.Nat64 = await DoctorNet.Nat64PrefixAsync(env.SystemResolve, ct).ConfigureAwait(false);
+        }
+
         var local = Step(sink, new[] { DoctorCheck.Network, DoctorCheck.Internet }, () => LocalAsync(f, env, sink, ct));
         var proxyRows = new[] { DoctorCheck.ProxyServer, DoctorCheck.ProxyDns, DoctorCheck.ProxyConnect, DoctorCheck.ProxyTls, DoctorCheck.ProxyHttps, DoctorCheck.ProxyHttp };
         var via = proxy != null ? Step(sink, proxyRows, () => ViaProxyAsync(f, env, proxy, sink, ct)) : Task.CompletedTask;
@@ -201,6 +215,10 @@ public static class DoctorEngine
     // The path to the trusted address: connection, ping, path MTU, TLS, HTTP (and the outside view once the port is known).
     private static async Task PathAsync(DoctorFacts f, DoctorEnvironment env, HttpClient doh, IDoctorSink sink, bool runOutside, CancellationToken ct)
     {
+        // IPv6-only: the site's IPv6 addresses first, then its IPv4 ones as NAT64 reaches them
+        if (f.Ipv6Only)
+            f.Trusted = f.Trusted.Where(a => a.AddressFamily == AddressFamily.InterNetworkV6)
+                .Concat(f.Trusted.Where(a => a.AddressFamily == AddressFamily.InterNetwork).Select(a => Dial(f, a))).Distinct().ToList();
         var target0 = f.Trusted[0];
         var ping = Step(sink, new[] { DoctorCheck.Ping }, () => PingAsync(f, target0, sink, ct));
         var mtu = Step(sink, new[] { DoctorCheck.Mtu }, () => MtuAsync(f, target0, sink, ct));
@@ -255,14 +273,25 @@ public static class DoctorEngine
         }
     }
 
+    // An IPv6-only network asks the public resolvers and probes at their IPv6 addresses: the IPv4 ones can't be reached.
+    private static IReadOnlyList<IPEndPoint> ProbesFor(DoctorFacts f, DoctorEnvironment env) => f.Ipv6Only ? env.InternetProbesV6 : env.InternetProbes;
+    private static IReadOnlyList<IPEndPoint> PlainDnsFor(DoctorFacts f, DoctorEnvironment env) => f.Ipv6Only ? env.PlainDnsV6 : env.PlainDns;
+    private static IReadOnlyList<DoctorDohEndpoint> DohFor(DoctorFacts f, DoctorEnvironment env) => f.Ipv6Only ? env.DohV6 : env.Doh;
+
+    // An address as this network dials it: on an IPv6-only one, an IPv4 address through NAT64 (the network's prefix, else
+    // the well-known 64:ff9b::/96).
+    private static IPAddress Dial(DoctorFacts f, IPAddress a)
+        => f.Ipv6Only && a.AddressFamily == AddressFamily.InterNetwork ? DoctorIp.ViaNat64(a, f.Nat64 ?? DoctorIp.WellKnownNat64) : a;
+
     // ------------------------------------------------------------------ network + internet
 
     private static async Task LocalAsync(DoctorFacts f, DoctorEnvironment env, IDoctorSink sink, CancellationToken ct)
     {
         sink.Report(DoctorCheck.Network, DoctorState.Running, "Looking at this device's network…");
-        sink.Report(DoctorCheck.Internet, DoctorState.Running, "Reaching " + string.Join(" and ", env.InternetProbes.Select(p => p.Address)) + "…");
+        var probeEndpoints = ProbesFor(f, env);
+        sink.Report(DoctorCheck.Internet, DoctorState.Running, "Reaching " + string.Join(" and ", probeEndpoints.Select(p => p.Address)) + "…");
         var sw = Stopwatch.StartNew();
-        var probes = env.InternetProbes.Select(ep => DoctorNet.ConnectAsync(ep.Address, ep.Port, 3000, ct)).ToList();
+        var probes = probeEndpoints.Select(ep => DoctorNet.ConnectAsync(ep.Address, ep.Port, 3000, ct)).ToList();
         var names = env.WellKnownNames.Select(n => DoctorDns.SystemAsync(env.SystemResolve, n, 4000, ct)).ToList();
         var captive = DoctorNet.CaptiveAsync(env.CaptiveChecks, 3500, ct);
         var proxy = DoctorNet.SystemProxyAsync(1500);
@@ -275,6 +304,7 @@ public static class DoctorEngine
         if (local.Interface != null) parts.Add(local.Interface);
         if (local.Gateway != null) parts.Add("gateway " + local.Gateway);
         if (local.Vpn != null) parts.Add("VPN " + local.Vpn);
+        if (f.Ipv6Only) parts.Add(f.Nat64 is { } nat64 ? $"IPv6 only, NAT64 {nat64}/96" : "IPv6 only");
         if (local.SystemProxy != null) parts.Add($"system proxy {local.SystemProxy} (these checks go direct)");
         if (local.HasNetwork == false)
             sink.Report(DoctorCheck.Network, DoctorState.Fail, "Not connected: no network interface has a gateway", localMs);
@@ -347,8 +377,10 @@ public static class DoctorEngine
             return;
         }
 
-        sink.Report(DoctorCheck.DnsPlain, DoctorState.Running, "Asking " + string.Join(" and ", env.PlainDns.Select(s => s.Address)) + " over UDP…");
-        sink.Report(DoctorCheck.DnsEncrypted, DoctorState.Running, "Asking " + string.Join(", ", env.Doh.Take(3).Select(d => d.Name)) + " over HTTPS…");
+        var plainDns = PlainDnsFor(f, env);
+        var dohEndpoints = DohFor(f, env);
+        sink.Report(DoctorCheck.DnsPlain, DoctorState.Running, "Asking " + string.Join(" and ", plainDns.Select(s => s.Address)) + " over UDP…");
+        sink.Report(DoctorCheck.DnsEncrypted, DoctorState.Running, "Asking " + string.Join(", ", dohEndpoints.Take(3).Select(d => d.Name)) + " over HTTPS…");
 
         async Task<DoctorDnsAnswer> SystemTask()
         {
@@ -358,16 +390,16 @@ public static class DoctorEngine
         }
         async Task<List<DoctorDnsAnswer>> PlainTask()
         {
-            var list = (await Task.WhenAll(env.PlainDns.Select(s => DoctorDns.UdpAsync(s, t.AsciiHost, 3000, ct))).ConfigureAwait(false)).ToList();
+            var list = (await Task.WhenAll(plainDns.Select(s => DoctorDns.UdpAsync(s, t.AsciiHost, 3000, ct))).ConfigureAwait(false)).ToList();
             sink.Report(DoctorCheck.DnsPlain, DoctorState.Running, "Comparing with encrypted DNS…", list.Where(a => a.Answered).Select(a => a.Ms).DefaultIfEmpty(0).Min());
             return list;
         }
         var sysT = SystemTask();
         var plainT = PlainTask();
         // a control: does the same plain resolver answer a name nobody blocks? (tells "this name is dropped" from "port 53 is")
-        var controlT = env.PlainDns.Count > 0 && env.WellKnownNames.Count > 0
-            ? DoctorDns.UdpAsync(env.PlainDns[0], env.WellKnownNames[0], 3000, ct) : Task.FromResult(new DoctorDnsAnswer());
-        var dohList = await DoctorDns.DohAllAsync(doh, env.Doh, t.AsciiHost, 4500, ct).ConfigureAwait(false);
+        var controlT = plainDns.Count > 0 && env.WellKnownNames.Count > 0
+            ? DoctorDns.UdpAsync(plainDns[0], env.WellKnownNames[0], 3000, ct) : Task.FromResult(new DoctorDnsAnswer());
+        var dohList = await DoctorDns.DohAllAsync(doh, dohEndpoints, t.AsciiHost, 4500, ct).ConfigureAwait(false);
         var sys = await sysT.ConfigureAwait(false);
         var plain = await plainT.ConfigureAwait(false);
         f.PlainControlOk = (await controlT.ConfigureAwait(false)).Addresses.Count > 0;
@@ -381,9 +413,9 @@ public static class DoctorEngine
         var trustedSet = DoctorIp.Ordered(dohGood.SelectMany(a => a.Addresses));
         bool nx = known && dohGood.Any(a => a.NoSuchName) && dohGood.All(a => a.NoSuchName || a.Addresses.Count == 0);
         f.DohAnswered = known;
-        f.WorkingDoh = env.Doh.Where(d => dohGood.Any(a => a.Source == d.Name)).ToList();
-        f.SysMatch = DoctorDns.Compare(sys, trustedSet, known, nx);
-        f.PlainMatch = plain.Select(p => DoctorDns.Compare(p, trustedSet, known, nx)).ToList();
+        f.WorkingDoh = dohEndpoints.Where(d => dohGood.Any(a => a.Source == d.Name)).ToList();
+        f.SysMatch = DoctorDns.Compare(sys, trustedSet, known, nx, f.Nat64);
+        f.PlainMatch = plain.Select(p => DoctorDns.Compare(p, trustedSet, known, nx, f.Nat64)).ToList();
         f.NameMissing = nx ? (sys.NoSuchName || sys.Addresses.Count == 0 || !sys.Answered)
                            : !known && sys.NoSuchName && plain.Any(p => p.NoSuchName) && plain.All(p => p.NoSuchName || !p.Answered);
         TraceDns(sink, f);
@@ -830,14 +862,14 @@ public static class DoctorEngine
 
         // a redirect's host: through the encrypted resolvers that answered in this run (blocked ones would only burn
         // time), else this system's resolver
-        var working = env.Doh.Where(d => f.Doh.Any(a => a.Good && a.Source == d.Name)).Take(2).ToList();
+        var working = f.WorkingDoh.Take(2).ToList();
         async Task<IPAddress?> ResolveOther(string host, CancellationToken token)
         {
             if (working.Count > 0)
             {
                 var answers = await DoctorDns.DohAllAsync(doh, working, host, 3000, token).ConfigureAwait(false);
                 var a = DoctorIp.Ordered(answers.Where(x => x.Good).SelectMany(x => x.Addresses).Where(DoctorIp.IsPublic)).FirstOrDefault();
-                if (a != null) return a;
+                if (a != null) return Dial(f, a);
             }
             var s = await DoctorDns.SystemAsync(env.SystemResolve, host, 4000, token).ConfigureAwait(false);
             return s.Addresses.FirstOrDefault(DoctorIp.IsPublic) ?? s.Addresses.FirstOrDefault();

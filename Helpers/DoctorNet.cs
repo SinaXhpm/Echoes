@@ -53,6 +53,42 @@ public static class DoctorNet
 {
     // ------------------------------------------------------------------ this device
 
+    /// <summary>Whether the system has a route to the internet over IPv4 and over IPv6. A UDP socket "connected" to a
+    /// public address sends nothing: the system only picks the route and the source address, and refuses at once when it
+    /// has none (an IPv6-only network has no IPv4 route; a CLAT, where there is one, gives it one).</summary>
+    public static (bool V4, bool V6) Routes()
+    {
+        return (Has(IPAddress.Parse("1.1.1.1")), Has(IPAddress.Parse("2606:4700:4700::1111")));
+
+        static bool Has(IPAddress to)
+        {
+            try
+            {
+                using var s = new Socket(to.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+                s.Connect(new IPEndPoint(to, 53));
+                return s.LocalEndPoint is IPEndPoint { Address: var from } && !from.Equals(IPAddress.Any) && !from.Equals(IPAddress.IPv6Any);
+            }
+            catch (SocketException) { return false; }
+            catch (NotSupportedException) { return false; }   // no IPv6 stack at all
+        }
+    }
+
+    /// <summary>RFC 7050: the NAT64 /96 prefix of an IPv6-only network, read from its DNS64 answer for ipv4only.arpa. Null
+    /// when the system resolver gives no such address (no DNS64, or a prefix that isn't a /96).</summary>
+    public static async Task<IPAddress?> Nat64PrefixAsync(Func<string, CancellationToken, Task<IPAddress[]>> resolve, CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(2500);
+        try
+        {
+            foreach (var a in await resolve("ipv4only.arpa", cts.Token).ConfigureAwait(false))
+                if (DoctorIp.Nat64PrefixOf(a) is { } prefix) return prefix;
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { }
+        catch (SocketException) { }
+        return null;
+    }
+
     public static DoctorLocal Local()
     {
         NetworkInterface[] all;

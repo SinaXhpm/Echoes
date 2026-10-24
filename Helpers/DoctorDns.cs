@@ -415,10 +415,14 @@ public static class DoctorDns
     /// <paramref name="trustedKnown"/> says whether any encrypted resolver answered at all, <paramref name="trustedNx"/>
     /// that they all said "no such name".
     /// </summary>
-    public static DoctorDnsMatch Compare(DoctorDnsAnswer a, IReadOnlyCollection<IPAddress> trusted, bool trustedKnown, bool trustedNx)
+    public static DoctorDnsMatch Compare(DoctorDnsAnswer a, IReadOnlyCollection<IPAddress> trusted, bool trustedKnown, bool trustedNx,
+                                         IPAddress? nat64 = null)
     {
         if (!a.Answered) return DoctorDnsMatch.Unknown;
-        var bogus = a.Addresses.Where(x => !DoctorIp.IsPublic(x)).ToList();
+        // DNS64 (an IPv6-only network) answers an IPv4-only site with that IPv4 address inside its NAT64 prefix: the same
+        // site, compared as the IPv4 address it carries
+        var addrs = a.Addresses.Select(x => DoctorIp.FromNat64(x, nat64) ?? DoctorIp.Normal(x)).ToList();
+        var bogus = addrs.Where(x => !DoctorIp.IsPublic(x)).ToList();
         if (bogus.Count > 0)
         {
             if (bogus.Any(DoctorIp.IsKnownFilter)) return DoctorDnsMatch.Bogus;
@@ -428,8 +432,8 @@ public static class DoctorDns
         if (!trustedKnown) return DoctorDnsMatch.Unknown;
         if (trustedNx) return a.NoSuchName || a.Addresses.Count == 0 ? DoctorDnsMatch.Same : DoctorDnsMatch.Differs;
         if (a.NoSuchName || a.Addresses.Count == 0) return trusted.Count > 0 ? DoctorDnsMatch.Missing : DoctorDnsMatch.Same;
-        if (a.Addresses.Any(x => trusted.Contains(x))) return DoctorDnsMatch.Same;
-        if (a.Addresses.Any(x => trusted.Any(t => DoctorIp.SameNetwork(x, t)))) return DoctorDnsMatch.Similar;
+        if (addrs.Any(x => trusted.Contains(x))) return DoctorDnsMatch.Same;
+        if (addrs.Any(x => trusted.Any(t => DoctorIp.SameNetwork(x, t)))) return DoctorDnsMatch.Similar;
         return DoctorDnsMatch.Differs;
     }
 

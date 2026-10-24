@@ -276,6 +276,29 @@ internal sealed class DoctorEnvironment
         new IPEndPoint(IPAddress.Parse("8.8.8.8"), 443),
     };
 
+    /// <summary>The IPv6 addresses of the same resolvers and probes, asked instead of the IPv4 ones on an IPv6-only network
+    /// (mobile data on some carriers), where an IPv4 address can't be dialled. Their certificates name these too.</summary>
+    public IReadOnlyList<IPEndPoint> PlainDnsV6 { get; init; } = new[]
+    {
+        new IPEndPoint(IPAddress.Parse("2606:4700:4700::1111"), 53),
+        new IPEndPoint(IPAddress.Parse("2001:4860:4860::8888"), 53),
+    };
+    public IReadOnlyList<DoctorDohEndpoint> DohV6 { get; init; } = new[]
+    {
+        new DoctorDohEndpoint("2606:4700:4700::1111", new Uri("https://[2606:4700:4700::1111]/dns-query"), "Cloudflare"),
+        new DoctorDohEndpoint("2001:4860:4860::8888", new Uri("https://[2001:4860:4860::8888]/dns-query"), "Google"),
+        new DoctorDohEndpoint("2606:4700:4700::1001", new Uri("https://[2606:4700:4700::1001]/dns-query"), "Cloudflare"),
+        new DoctorDohEndpoint("2001:4860:4860::8844", new Uri("https://[2001:4860:4860::8844]/dns-query"), "Google"),
+    };
+    public IReadOnlyList<IPEndPoint> InternetProbesV6 { get; init; } = new[]
+    {
+        new IPEndPoint(IPAddress.Parse("2606:4700:4700::1111"), 443),
+        new IPEndPoint(IPAddress.Parse("2001:4860:4860::8888"), 443),
+    };
+
+    /// <summary>Whether this device has a route to the internet over IPv4 and over IPv6 (tests: a fixed answer).</summary>
+    public Func<(bool V4, bool V6)> Routes { get; init; } = DoctorNet.Routes;
+
     /// <summary>Names every resolver knows (does the system resolver answer at all).</summary>
     public IReadOnlyList<string> WellKnownNames { get; init; } = new[] { "www.google.com", "www.microsoft.com" };
 
