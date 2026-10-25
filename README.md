@@ -1,13 +1,20 @@
-# Echoes — Free Network Toolkit for Windows, macOS, Linux and Android
+# Echoes — Free Network Tools for iPhone, iPad, Mac, Windows, Linux and Android
 
-**Connection doctor, ping, traceroute and MTR, internet speed test, port scanner, SSH and SFTP client, cURL / HTTP client, DNS over HTTPS and WHOIS lookup, SSL/TLS checker, Cloudflare manager with dynamic DNS, uptime monitor with Telegram alerts, Wi-Fi analyzer, proxy server, and HTTPS file sharing with chat for any browser: 20 network and developer tools in one free, open-source app.**
+**Connection doctor, ping, traceroute and MTR, internet speed test, port scanner, SSH and SFTP client, cURL / HTTP client, DNS over HTTPS and WHOIS lookup, SSL/TLS checker, Cloudflare manager with dynamic DNS, uptime monitor with Telegram alerts, Wi-Fi analyzer, proxy server, and HTTPS file sharing with chat for any browser: 20 network and developer tools in one free, open-source app. Now on the App Store for iPhone, iPad and Mac.**
 
 [![License: MIT](https://img.shields.io/github/license/SinaXhpm/Echoes)](https://github.com/SinaXhpm/Echoes/blob/master/LICENSE)
-![Platforms: Windows, macOS, Linux, Android](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android-blue)
+![Platforms: iOS, iPadOS, macOS, Windows, Linux, Android](https://img.shields.io/badge/platform-iOS%20%7C%20iPadOS%20%7C%20macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Android-blue)
+[![App Store](https://img.shields.io/badge/App_Store-iPhone%20%7C%20iPad%20%7C%20Mac-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/app/id6824582968)
 [![Latest release](https://img.shields.io/github/v/release/SinaXhpm/Echoes)](https://github.com/SinaXhpm/Echoes/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/SinaXhpm/Echoes/total)](https://github.com/SinaXhpm/Echoes/releases)
 
-**[Download](https://github.com/SinaXhpm/Echoes/releases/latest)** · [Tools](#tools-at-a-glance) · [Screenshots](#screenshots) · [Install](#download-and-install) · [FAQ](#faq) · [Telegram](https://t.me/the_pink_palace)
+<p align="center">
+  <a href="https://apps.apple.com/app/id6824582968"><img src="https://img.shields.io/badge/Download_on_the-App_Store-0D96F6?style=for-the-badge&logo=apple&logoColor=white" alt="Download Echoes network tools on the App Store for iPhone and iPad"></a>
+  <a href="https://apps.apple.com/app/id6824582968?platform=mac"><img src="https://img.shields.io/badge/Download_on_the-Mac_App_Store-0D96F6?style=for-the-badge&logo=apple&logoColor=white" alt="Download Echoes network tools on the Mac App Store"></a>
+  <a href="https://github.com/SinaXhpm/Echoes/releases/latest"><img src="https://img.shields.io/badge/Download-Windows_%7C_Linux_%7C_Android_%7C_macOS-2DD4BF?style=for-the-badge&logo=github&logoColor=white" alt="Download Echoes for Windows, Linux, Android and macOS from GitHub releases"></a>
+</p>
+
+**[App Store](https://apps.apple.com/app/id6824582968)** · **[Download](https://github.com/SinaXhpm/Echoes/releases/latest)** · [Tools](#tools-at-a-glance) · [Screenshots](#screenshots) · [Install](#download-and-install) · [iPhone & iPad](#iphone-ipad-and-mac-app-store) · [FAQ](#faq) · [Telegram](https://t.me/the_pink_palace)
 
 <p align="center">
   <img src="docs/screenshots/demo.gif" width="860" alt="Echoes network toolkit slideshow: connection doctor finding SNI filtering with an anti-DPI fragment test, internet speed test with bufferbloat grade, ping latency graph, LAN file sharing and chat with QR code, uptime monitor, DNS over HTTPS resolver comparison, Wi-Fi analyzer, port scanner, cURL HTTP client, SSL/TLS inspector, proxy checker, Cloudflare DNS manager, SSH server health and String Lab JWT decoder">
@@ -20,7 +27,7 @@ Echoes is a free, open-source network toolkit with a simple graphical interface.
 - **One app, 20 tools.** Test a connection, find the problem, fix your DNS and share a file without switching windows.
 - **Finds the cause for you.** The Doctor tells you in one sentence why a site won't open: DNS tampering, SNI filtering, a blocked IP, a filter page, or a server that is down for everyone.
 - **Connects your devices.** Send files and chat between a PC and a phone, a laptop or any other device over HTTPS: scan a QR code, and the other side needs only a browser.
-- **Runs everywhere.** Windows, macOS (Intel and Apple Silicon), Linux and Android, from one codebase.
+- **Runs everywhere.** iPhone and iPad ([App Store](https://apps.apple.com/app/id6824582968)), Mac ([Mac App Store](https://apps.apple.com/app/id6824582968?platform=mac), or a notarized download for Intel and Apple Silicon), Windows, Linux and Android, from one codebase.
 - **Nothing extra to install.** Desktop builds are self-contained native apps: no .NET runtime, fast start-up, low memory use.
 - **No admin rights needed.** Where the system blocks normal (ICMP) ping, Echoes switches to UDP by itself.
 - **Private.** No account, no ads, no telemetry. Your data stays on your device and secrets are encrypted.
@@ -37,6 +44,7 @@ Echoes is a free, open-source network toolkit with a simple graphical interface.
 - [Servers and connections](#servers-and-connections)
 - [Workspace and developer tools](#workspace-and-developer-tools)
 - [Interface](#interface)
+- [iPhone, iPad and Mac App Store](#iphone-ipad-and-mac-app-store)
 - [Android](#android)
 - [Privacy and security](#privacy-and-security)
 - [FAQ](#faq)
@@ -46,10 +54,12 @@ Echoes is a free, open-source network toolkit with a simple graphical interface.
 
 ## Download and install
 
-Get the latest version from the **[Releases page](https://github.com/SinaXhpm/Echoes/releases/latest)**.
+On **iPhone, iPad and Mac**, get Echoes from the **[App Store](https://apps.apple.com/app/id6824582968)**: free, with no ads or in-app purchases, and updated through the App Store. For **Windows, Linux, Android** and a direct macOS download, get the latest version from the **[Releases page](https://github.com/SinaXhpm/Echoes/releases/latest)**.
 
 | Platform | File | How to install |
 | :--- | :--- | :--- |
+| **iPhone and iPad** (iOS / iPadOS 15+) | [App Store](https://apps.apple.com/app/id6824582968) | Install it from the App Store. |
+| **Mac** (macOS 12+, Intel and Apple Silicon) | [Mac App Store](https://apps.apple.com/app/id6824582968?platform=mac) | Install it from the Mac App Store, or use a .dmg below. |
 | **Windows 10 / 11** (x64) | `Echoes-Windows-x64.zip` | Extract the zip and run `Echoes.exe`. |
 | **macOS** (Intel) | `Echoes-osx-x64.dmg` | Open the .dmg and drag `Echoes.app` to Applications. |
 | **macOS** (Apple Silicon M1 / M2 / M3 / M4) | `Echoes-osx-arm64.dmg` | Open the .dmg and drag `Echoes.app` to Applications. |
@@ -63,8 +73,9 @@ First launch:
 - **Windows:** the app isn't code-signed, so SmartScreen may show "Windows protected your PC". Click **More info → Run anyway**.
 - **macOS:** the app is signed with a Developer ID certificate and notarized by Apple, so it opens like any other app. It needs macOS 12 or newer. On macOS 15+, allow **Local Network** access when asked (or later in System Settings › Privacy & Security), or local devices look unreachable. Sites that accept only TLS 1.3 can't be opened by the macOS TLS stack of .NET 8; the TLS Inspector still analyses them.
 - **Linux:** needs glibc 2.35 or newer (Ubuntu 22.04+, Debian 12+, Fedora 36+). The tray icon needs a StatusNotifierItem host (KDE Plasma, or GNOME with the AppIndicator extension).
+- **iPhone and iPad:** allow **Local Network** access when the port scanner, LAN ping or file sharing first asks (or later in Settings › Privacy & Security › Local Network), or devices on your Wi-Fi look unreachable.
 
-Echoes shows a small notice in the sidebar when a new version is out. The **About** box (the ⓘ button next to the name, or **About** in the Android menu) shows your version, checks for updates on demand, links to GitHub, the releases and the issue tracker, and copies your version and platform details for a bug report.
+The App Store versions update through the App Store. The downloaded versions show a small notice in the sidebar when a new version is out. The **About** box (the ⓘ button next to the name, or **About** in the phone menu) shows your version, checks for updates on demand, links to GitHub, the releases and the issue tracker, and copies your version and platform details for a bug report.
 
 <p align="center">
   <img src="docs/screenshots/about-box.png" width="640" alt="Echoes About box: version, update check against GitHub releases, platform and runtime details, data folder, and links to GitHub, releases and bug reports">
@@ -462,6 +473,27 @@ Everyday developer text tools in one place.
 - **Smart paste:** every host, URL and proxy field cleans what you paste. It takes the host out of a URL, log line, e-mail address, `user@host:port` or defanged link (`hxxps://evil[.]com`), and the addresses out of a block of text for the scanner. A short hint says what was cleaned; **Ctrl+Z** undoes it, and **Ctrl+Shift+V** pastes the raw text.
 - The Inter font on every platform.
 
+## iPhone, iPad and Mac App Store
+
+Echoes is on the App Store as **[Echoes: Network Tools & Ping](https://apps.apple.com/app/id6824582968)**, free for iPhone, iPad and Mac. It's the same open-source app: a network troubleshooter, ping and traceroute, internet speed test, port scanner, DNS lookup, SSL certificate checker, SSH client, HTTP / API client and Wi-Fi file sharing, made for touch on iPhone and iPad.
+
+<p align="center">
+  <img src="docs/screenshots/ios-menu.png" width="200" alt="Echoes on iPhone: the menu of 20 network tools, including ping, speed test, DNS, port scanner and SSH">
+  <img src="docs/screenshots/ios-doctor.png" width="200" alt="Echoes Doctor on iPhone: finds why a website won't open by checking the connection, DNS, TLS and HTTP">
+  <img src="docs/screenshots/ios-speed-test.png" width="200" alt="Internet speed test on iPhone with download speed, ping and jitter">
+  <img src="docs/screenshots/ios-share.png" width="200" alt="Wi-Fi file sharing and chat on iPhone with any browser, over HTTPS with a PIN">
+</p>
+<p align="center">
+  <img src="docs/screenshots/mac-app-store-doctor.png" width="640" alt="Echoes on the Mac App Store: the connection doctor beside the sidebar of all 20 network tools">
+</p>
+
+- **Made for touch:** a slide-out menu with all 20 tools, finger-sized controls, pages that scroll in landscape or with the keyboard open, and press-and-hold to see what a button does.
+- **Easy typing:** host and URL fields have no autocorrect and use the URL keyboard, ports get the number pad, and digits typed in Persian, Arabic or other scripts are read as normal digits.
+- **Share files with any device:** the Web Server shows a QR code for its page, and every shared file gets its own download link and QR code. Files you receive appear in Files › On My iPhone › Echoes.
+- **While Echoes is on screen:** iOS pauses apps in the background, so the Web Server, proxy, uptime monitor, scans and dynamic DNS run while Echoes is on screen (it keeps the screen on while one of them runs), and pick up again when you come back.
+- **What iOS keeps from apps:** the Network tool shows your interfaces and addresses only (no Wi-Fi scan, ARP table, open ports or routing table), and the scanner can't show MAC addresses or vendors. cURL uses the built-in engine.
+- **Mac App Store:** the same desktop app as the download, inside Apple's sandbox. Files you receive go to Downloads › Echoes (or a folder you pick), and updates come through the App Store.
+
 ## Android
 
 The Android app has the same tools, made for touch: a slide-out menu, bigger touch targets and layouts that fit phone screens. The Uptime Monitor, Port Scanner, Web Server and Proxy keep running in the background, so a scan or a file share isn't cut off when you switch apps.
@@ -474,8 +506,8 @@ Not available on Android: the system curl engine (the built-in engine is used in
 
 ## Privacy and security
 
-- **No account, no ads, no telemetry.** Echoes only contacts the hosts you test and the services a tool is built on (for example check-host.net, the speed test's servers (Cloudflare, or the server you pick), public DNS-over-HTTPS resolvers, the IP-info providers and rdap.org / rdap.verisign.com; the uptime monitor looks up its domains' expiry there; the Doctor checks internet access with connectivitycheck.gstatic.com; Dynamic DNS reads your public IP from Cloudflare, ipify, ident.me and icanhazip), plus GitHub to check for updates.
-- **Your data stays on your device:** `%APPDATA%\Echoes` on Windows, `~/Library/Application Support/Echoes` on macOS and `~/.config/Echoes` on Linux (the app's private storage on Android).
+- **No account, no ads, no telemetry.** Echoes only contacts the hosts you test and the services a tool is built on (for example check-host.net, the speed test's servers (Cloudflare, or the server you pick), public DNS-over-HTTPS resolvers, the IP-info providers and rdap.org / rdap.verisign.com; the uptime monitor looks up its domains' expiry there; the Doctor checks internet access with connectivitycheck.gstatic.com; Dynamic DNS reads your public IP from Cloudflare, ipify, ident.me and icanhazip), plus GitHub to check for updates (not in the App Store versions, which update through the App Store).
+- **Your data stays on your device:** `%APPDATA%\Echoes` on Windows, `~/Library/Application Support/Echoes` on macOS and `~/.config/Echoes` on Linux (the app's private storage on Android, iPhone and iPad, and the sandbox container with the Mac App Store version).
 - **Secrets are encrypted:** notes and the Cloudflare vault use AES-256-GCM with a key made from your master password; saved requests, SSH passwords, the Telegram alert token and other secrets are encrypted on disk with a per-install key. Dynamic DNS keeps such a device-encrypted copy of its account's token so it can run while the vault is locked; removing the record or the account deletes it. In memory, keys and decrypted data are wiped after use, on lock and on exit.
 - **Servers are opt-in and guarded:** nothing listens until you press Start. File sharing runs over HTTPS (TLS 1.2 and 1.3) behind an 8-digit PIN, wrong PINs are slowed down per device, and uploads respect a size cap and the free disk space. The proxy refuses other networks' private ranges and mail ports while it has no password, and the request catcher listens on this device only until you choose another interface.
 - **Open source (MIT):** every line can be read, checked and built by anyone.
@@ -483,10 +515,19 @@ Not available on Android: the system curl engine (the built-in engine is used in
 ## FAQ
 
 **What is Echoes?**
-A free, open-source, all-in-one network and developer toolkit for Windows, macOS, Linux and Android: ping and MTR, speed test, port scanner, SSH, raw sockets, DNS and WHOIS, check host, cURL, TLS inspector, file-sharing web server, proxy server, Cloudflare manager, IP lookup, uptime monitor, encrypted notes and string / JSON tools.
+A free, open-source, all-in-one network and developer toolkit for iPhone, iPad, Mac, Windows, Linux and Android: ping and MTR, speed test, port scanner, SSH, raw sockets, DNS and WHOIS, check host, cURL, TLS inspector, file-sharing web server, proxy server, Cloudflare manager, IP lookup, uptime monitor, encrypted notes and string / JSON tools.
+
+**Is Echoes on the App Store? Is there an iPhone, iPad or Mac app?**
+Yes. Search for **Echoes: Network Tools & Ping** or open the [App Store page](https://apps.apple.com/app/id6824582968): one free app for iPhone and iPad (iOS 15 or later) and Mac (macOS 12 or later, also on the [Mac App Store](https://apps.apple.com/app/id6824582968?platform=mac)). See [iPhone, iPad and Mac App Store](#iphone-ipad-and-mac-app-store) for what differs on iOS.
+
+**What's the best free network tools app for iPhone?**
+If you want ping, traceroute, a speed test, DNS lookup, a port scanner, an SSL checker, an SSH client and file sharing in one app with no ads or account, try Echoes. Its Doctor also explains in plain words why a website won't open.
+
+**Mac: App Store or the download?**
+Either: it's the same app. The Mac App Store version updates through the App Store and runs in Apple's sandbox; the notarized .dmg from GitHub Releases tells you when a new version is out on GitHub.
 
 **Is Echoes really free?**
-Yes. It is MIT-licensed, with no ads, no paid version and no account.
+Yes. It is MIT-licensed, with no ads, no paid version, no in-app purchases and no account, on every platform.
 
 **Do I need admin or root rights?**
 No. Echoes runs as a normal user. Where the system doesn't allow normal (ICMP) ping, it switches to UDP by itself.
@@ -565,11 +606,11 @@ Native AOT on Windows also needs Visual Studio's "Desktop development with C++" 
 
 ## Built with
 
-- **[Avalonia UI](https://avaloniaui.net/)** with **.NET 8** (desktop, Native AOT) and **.NET 10** (Android).
+- **[Avalonia UI](https://avaloniaui.net/)** with **.NET 8** (desktop, Native AOT) and **.NET 10** (Android, iOS and iPadOS).
 - [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet), [SSH.NET](https://github.com/sshnet/SSH.NET), [DnsClient.NET](https://github.com/MichaCo/DnsClient.NET) and the [Inter](https://rsms.me/inter/) font.
 - Developed with AI assistance. Named after *"Echoes"* by Pink Floyd.
 
-Primary development and testing happen on **Windows**; the macOS, Linux and Android builds may have small rough edges. Bug reports and ideas are welcome in [Issues](https://github.com/SinaXhpm/Echoes/issues) or on [Telegram](https://t.me/the_pink_palace).
+Primary development and testing happen on **Windows**; the macOS, Linux, Android and iOS builds may have small rough edges. Bug reports and ideas are welcome in [Issues](https://github.com/SinaXhpm/Echoes/issues) or on [Telegram](https://t.me/the_pink_palace).
 
 ## License
 
