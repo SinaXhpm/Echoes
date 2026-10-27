@@ -3,11 +3,14 @@
         xmlns:glob="clr-namespace:System.Globalization;assembly=System.Runtime">
 
     <!-- ============================================================
-         Echoes design system — v3. Colors / radii / type scale live in
-         Styles/Tokens.axaml (all SOLID: no alpha, no blur, no shadows);
-         Fluent's own control brushes are re-pointed there too, so the
-         state colors (hover / focus / pressed / disabled) of inputs,
-         combos, checks and menus come from the tokens automatically.
+         Echoes design system — v4, after the modern macOS look: neutral
+         graphite / light-grey surfaces, grouped boxes, a source-list
+         sidebar, white-on-accent buttons, segmented controls with a raised
+         thumb. Colors / radii / type scale live in Styles/Tokens.axaml (all
+         SOLID: no alpha, no blur, no shadows); Fluent's own control brushes
+         are re-pointed there too, so the state colors (hover / focus /
+         pressed / disabled) of inputs, combos, checks and menus come from
+         the tokens automatically.
 
          Building blocks used by the views:
            text     TextBlock.pageTitle / .pageSubtitle / .sectionTitle /
@@ -18,7 +21,8 @@
                     .toggle (+ .active = STOP) / .icon
            surfaces Border.card (+ .output = darker inset), Border.divider
            badges   Border.badge (+ .accent .success .warning .danger .info)
-           tabs     TabItem (underline sub-tabs), TabControl.seg (segmented)
+           tabs     TabItem (underline sub-tabs), TabControl.seg and
+                    ListBox.modeSwitch (segmented: a track with a thumb)
          Only one cheap transition (input border on focus); nothing animates
          continuously.
          ============================================================ -->
@@ -26,9 +30,9 @@
     <!-- ===== typography ===== -->
     <Style Selector="TextBlock.pageTitle">
         <Setter Property="FontSize" Value="{StaticResource Font.Page}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontWeight" Value="Bold"/>
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
-        <Setter Property="LetterSpacing" Value="-0.2"/>
+        <Setter Property="LetterSpacing" Value="-0.3"/>
     </Style>
     <Style Selector="TextBlock.pageSubtitle">
         <Setter Property="FontSize" Value="11.5"/>
@@ -40,20 +44,18 @@
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
     </Style>
-    <!-- Field label: small eyebrow above an input -->
+    <!-- Field label: small label above an input -->
     <Style Selector="TextBlock.fieldLabel">
-        <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="LetterSpacing" Value="0.3"/>
-        <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
         <Setter Property="Margin" Value="2,0,0,4"/>
     </Style>
-    <!-- Card header: accent eyebrow inside a card -->
+    <!-- Card header: the group's name, quiet like a macOS group box title (the content carries the color) -->
     <Style Selector="TextBlock.cardHeader">
-        <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
-        <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="LetterSpacing" Value="0.4"/>
-        <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        <Setter Property="FontSize" Value="11.5"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
         <Setter Property="Margin" Value="14,10,0,0"/>
     </Style>
     <Style Selector="TextBlock.muted">
@@ -247,9 +249,9 @@
     <Style Selector="Button.primary, Button.secondary, Button.ghost, Button.danger, Button.toggle">
         <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
         <Setter Property="MinHeight" Value="0"/>
-        <Setter Property="Padding" Value="12,0"/>
+        <Setter Property="Padding" Value="14,0"/>
         <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -314,29 +316,36 @@
         <Setter Property="Background" Value="{DynamicResource Bg.RaisedPressed}"/>
     </Style>
 
-    <!-- ghost: no fill until hovered (for CLEAR / low-emphasis actions) -->
+    <!-- ghost: a quiet push button (COPY / CLEAR / low-emphasis actions), a soft grey bezel without a border, as
+         macOS draws small secondary buttons -->
     <Style Selector="Button.ghost">
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
-        <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
-    </Style>
-    <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}"/>
+        <Setter Property="Background" Value="{DynamicResource Btn.Quiet}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Btn.Quiet}"/>
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
     </Style>
+    <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Btn.QuietHover}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Btn.QuietHover}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Text.Bright}"/>
+    </Style>
     <Style Selector="Button.ghost:pressed /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource Bg.Pressed}"/>
+        <Setter Property="Background" Value="{DynamicResource Btn.QuietPressed}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Btn.QuietPressed}"/>
     </Style>
 
     <!-- disabled look for the neutral buttons -->
-    <Style Selector="Button.secondary:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.ghost:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Style Selector="Button.secondary:disabled /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
         <Setter Property="Foreground" Value="{DynamicResource Text.Disabled}"/>
     </Style>
+    <Style Selector="Button.ghost:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Btn.Quiet}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Btn.Quiet}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Text.Disabled}"/>
+    </Style>
 
-    <!-- icon: square icon-only button (copy, refresh, …) -->
+    <!-- icon: square icon-only button (copy, refresh, …): borderless like a macOS toolbar button, filled on hover -->
     <Style Selector="Button.icon">
         <Setter Property="Width" Value="{DynamicResource Control.Height}"/>
         <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
@@ -344,29 +353,50 @@
         <Setter Property="MinHeight" Value="0"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
-        <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
     <Style Selector="Button.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource Bg.RaisedHover}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}"/>
+        <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Bg.Hover}"/>
+    </Style>
+    <Style Selector="Button.icon:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Bg.Pressed}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Bg.Pressed}"/>
+    </Style>
+    <Style Selector="Button.icon:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
     <Style Selector="Button.icon > Path">
         <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
     </Style>
     <Style Selector="Button.icon:pointerover > Path">
-        <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+    </Style>
+    <Style Selector="Button.icon:disabled > Path">
+        <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
     </Style>
 
-    <!-- ===== check boxes ===== -->
+    <!-- ===== check boxes: a small rounded square, like macOS (Fluent's is a 20px box) ===== -->
     <Style Selector="CheckBox">
         <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
-        <!-- the 8px control radius would turn the 20px box into a circle -->
-        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+    <!-- The template sets 20 x 20 on the box itself, which a plain style can't override; a style with a state in its
+         selector can (the two cover every state). -->
+    <Style Selector="CheckBox:checked /template/ Border#NormalRectangle, CheckBox:not(:checked) /template/ Border#NormalRectangle">
+        <Setter Property="Width" Value="16"/>
+        <Setter Property="Height" Value="16"/>
+    </Style>
+    <!-- the check mark's box (Fluent sizes it to the 20px column): kept inside the smaller square -->
+    <Style Selector="CheckBox /template/ Viewbox">
+        <Setter Property="Width" Value="12"/>
+        <Setter Property="Height" Value="12"/>
     </Style>
 
     <!-- ===== sub-tabs inside a tool (underline style; accent pipe). The space between tabs is margin,
@@ -378,31 +408,112 @@
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Margin" Value="0,0,24,0"/>
     </Style>
-    <!-- segmented variant: <TabControl Classes="seg"> — compact pills, no pipe -->
+    <!-- segmented variant: <TabControl Classes="seg">, a macOS segmented control. The tabs sit edge to edge on one
+         track (each tab's outer border is a piece of it, rounded at the two ends); the chosen one gets a raised thumb. -->
     <Style Selector="TabControl.seg > TabItem">
         <Setter Property="MinHeight" Value="28"/>
-        <Setter Property="Padding" Value="12,0"/>
-        <Setter Property="Margin" Value="0,0,6,0"/>
+        <Setter Property="Height" Value="28"/>
+        <Setter Property="Padding" Value="2"/>
+        <Setter Property="Margin" Value="0"/>
         <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Foreground" Value="{DynamicResource Seg.Text}"/>
+        <!-- the thumb (the header presenter) fills the tab's height; its own alignment centers the label -->
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
     </Style>
     <Style Selector="TabControl.seg > TabItem /template/ Border#PART_LayoutRoot">
-        <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
-        <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Background" Value="{DynamicResource Seg.Track}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="TabControl.seg > TabItem:nth-child(1) /template/ Border#PART_LayoutRoot">
+        <Setter Property="CornerRadius" Value="7,0,0,7"/>
+    </Style>
+    <Style Selector="TabControl.seg > TabItem:nth-last-child(1) /template/ Border#PART_LayoutRoot">
+        <Setter Property="CornerRadius" Value="0,7,7,0"/>
+    </Style>
+    <Style Selector="TabControl.seg > TabItem:nth-child(1):nth-last-child(1) /template/ Border#PART_LayoutRoot">
+        <Setter Property="CornerRadius" Value="7"/>
+    </Style>
+    <Style Selector="TabControl.seg > TabItem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Padding" Value="11,0"/>
+        <Setter Property="CornerRadius" Value="5"/>
         <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="VerticalAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
-    <Style Selector="TabControl.seg > TabItem:pointerover /template/ Border#PART_LayoutRoot">
-        <Setter Property="Background" Value="{DynamicResource Bg.CardHover}"/>
+    <Style Selector="TabControl.seg > TabItem:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
     </Style>
-    <Style Selector="TabControl.seg > TabItem:selected /template/ Border#PART_LayoutRoot">
-        <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+    <Style Selector="TabControl.seg > TabItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Seg.Thumb}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Seg.ThumbBorder}"/>
     </Style>
     <Style Selector="TabControl.seg > TabItem:selected">
-        <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Seg.TextSelected}"/>
     </Style>
     <Style Selector="TabControl.seg > TabItem /template/ Border#PART_SelectedPipe">
         <Setter Property="IsVisible" Value="False"/>
+    </Style>
+
+    <!-- The same control as a ListBox: <ListBox Classes="modeSwitch"> picks a mode (one segment is always on). Items are
+         as wide as their labels unless a view gives the list a UniformGrid. -->
+    <Style Selector="ListBox.modeSwitch">
+        <!-- a segmented switch always has one segment on: Ctrl+click otherwise cleared it, and the mode went to -1 -->
+        <Setter Property="SelectionMode" Value="AlwaysSelected"/>
+        <Setter Property="Padding" Value="2"/>
+        <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Background" Value="{DynamicResource Seg.Track}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Seg.Track}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="ItemsPanel">
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="ListBox.modeSwitch > ListBoxItem">
+        <Setter Property="Padding" Value="13,0"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Foreground" Value="{DynamicResource Seg.Text}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="ListBox.modeSwitch > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.modeSwitch > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+    </Style>
+    <Style Selector="ListBox.modeSwitch > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                     ListBox.modeSwitch > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                     ListBox.modeSwitch > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
+                     ListBox.modeSwitch > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Seg.Thumb}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Seg.ThumbBorder}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Seg.TextSelected}"/>
+    </Style>
+    <!-- locked while a run goes on: the chosen mode stays marked, the others read as unavailable -->
+    <Style Selector="ListBox.modeSwitch:disabled > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Foreground" Value="{DynamicResource Text.Disabled}"/>
+    </Style>
+    <Style Selector="ListBox.modeSwitch:disabled > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Foreground" Value="{DynamicResource Seg.TextSelected}"/>
     </Style>
 
     <!-- ===== shell pieces (desktop sidebar + mobile drawer) ===== -->

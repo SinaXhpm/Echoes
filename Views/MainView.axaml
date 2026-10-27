@@ -102,9 +102,10 @@
 			</Setter>
 		</Style>
 
-		<!-- ===== Sidebar nav item: [section label] + a pill with an accent indicator ===== -->
+		<!-- ===== Sidebar nav item, a macOS source list: [section label] + a row with a teal glyph; the chosen row is
+		     filled with the accent, its label and glyph white ===== -->
 		<Style Selector="TabItem.navtab">
-			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
 			<Setter Property="FontSize" Value="12.5"/>
 			<Setter Property="FontWeight" Value="Medium"/>
 			<Setter Property="Margin" Value="0"/>
@@ -118,43 +119,29 @@
 								   IsVisible="{TemplateBinding Group, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 						<Border Name="PART_Pill" Height="24" CornerRadius="6" Padding="9,0"
 								Background="{DynamicResource Bg.Sidebar}">
-							<Panel>
-								<Border Name="PART_Indicator" Width="3" Height="14" CornerRadius="2" Margin="-9,0,0,0"
-										HorizontalAlignment="Left" VerticalAlignment="Center"
-										Background="{DynamicResource Accent}" IsVisible="False"/>
-								<ContentPresenter Name="PART_ContentPresenter" VerticalAlignment="Center"
-												  Content="{TemplateBinding Header}"
-												  ContentTemplate="{TemplateBinding HeaderTemplate}"
-												  Foreground="{TemplateBinding Foreground}"/>
-							</Panel>
+							<ContentPresenter Name="PART_ContentPresenter" VerticalAlignment="Center"
+											  Content="{TemplateBinding Header}"
+											  ContentTemplate="{TemplateBinding HeaderTemplate}"
+											  Foreground="{TemplateBinding Foreground}"/>
 						</Border>
 					</StackPanel>
 				</ControlTemplate>
 			</Setter>
 		</Style>
 		<Style Selector="TabItem.navtab:pointerover /template/ Border#PART_Pill">
-			<Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
-		</Style>
-		<Style Selector="TabItem.navtab:pointerover">
-			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+			<Setter Property="Background" Value="{DynamicResource Nav.Hover}"/>
 		</Style>
 		<Style Selector="TabItem.navtab:selected /template/ Border#PART_Pill">
-			<Setter Property="Background" Value="{DynamicResource Bg.Selected}"/>
-		</Style>
-		<Style Selector="TabItem.navtab:selected:pointerover /template/ Border#PART_Pill">
-			<Setter Property="Background" Value="{DynamicResource Bg.SelectedHover}"/>
-		</Style>
-		<Style Selector="TabItem.navtab:selected /template/ Border#PART_Indicator">
-			<Setter Property="IsVisible" Value="True"/>
+			<Setter Property="Background" Value="{DynamicResource Accent}"/>
 		</Style>
 		<Style Selector="TabItem.navtab:selected">
-			<Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.OnAccent}"/>
 		</Style>
 		<!-- A Path doesn't inherit Foreground: glyphs follow the state through Stroke. Child selectors on
 		     purpose: the header panel is the item's direct child, while the open tool (also a logical
 		     descendant of the item) must keep its own icon colours. -->
 		<Style Selector="TabItem.navtab > StackPanel > Path.ico">
-			<Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+			<Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
 		</Style>
 		<!-- Sidebar glyphs at 18px: the shared 24-unit icons drawn three quarters size (a thicker stroke keeps the
 		     line weight the same), with the -3 margins shrinking their layout box to match. Smaller glyphs are most of
@@ -164,11 +151,8 @@
 			<Setter Property="Margin" Value="-3"/>
 			<Setter Property="StrokeThickness" Value="2"/>
 		</Style>
-		<Style Selector="TabItem.navtab:pointerover > StackPanel > Path.ico">
-			<Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
-		</Style>
 		<Style Selector="TabItem.navtab:selected > StackPanel > Path.ico">
-			<Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+			<Setter Property="Stroke" Value="{DynamicResource Text.OnAccent}"/>
 		</Style>
 		<Style Selector="TabItem.navtab:focus-visible /template/ Border#PART_Pill">
 			<Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>

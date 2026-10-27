@@ -49,9 +49,10 @@
 			<Setter Property="MinHeight" Value="40"/>
 		</Style>
 
-		<!-- ===== Drawer nav item: [section label] + a pill with an accent indicator (as on desktop) ===== -->
+		<!-- ===== Drawer nav item, as on desktop: [section label] + a row with a teal glyph; the chosen row is filled
+		     with the accent, its label and glyph white ===== -->
 		<Style Selector="ListBox#Nav > ListBoxItem">
-			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
 			<Setter Property="FontSize" Value="15"/>
 			<Setter Property="FontWeight" Value="Medium"/>
 			<Setter Property="Padding" Value="0"/>
@@ -64,39 +65,31 @@
 								   IsVisible="{TemplateBinding Group, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 						<Border Name="PART_Pill" Height="46" CornerRadius="10" Padding="14,0"
 								Background="{DynamicResource Bg.Sidebar}">
-							<Panel>
-								<Border Name="PART_Indicator" Width="3" Height="20" CornerRadius="2" Margin="-14,0,0,0"
-										HorizontalAlignment="Left" VerticalAlignment="Center"
-										Background="{DynamicResource Accent}" IsVisible="False"/>
-								<ContentPresenter VerticalAlignment="Center" Content="{TemplateBinding Content}"
-												  ContentTemplate="{TemplateBinding ContentTemplate}"
-												  Foreground="{TemplateBinding Foreground}"/>
-							</Panel>
+							<ContentPresenter VerticalAlignment="Center" Content="{TemplateBinding Content}"
+											  ContentTemplate="{TemplateBinding ContentTemplate}"
+											  Foreground="{TemplateBinding Foreground}"/>
 						</Border>
 					</StackPanel>
 				</ControlTemplate>
 			</Setter>
 		</Style>
 		<Style Selector="ListBox#Nav > ListBoxItem:pointerover /template/ Border#PART_Pill">
-			<Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+			<Setter Property="Background" Value="{DynamicResource Nav.Hover}"/>
 		</Style>
 		<Style Selector="ListBox#Nav > ListBoxItem:selected /template/ Border#PART_Pill">
-			<Setter Property="Background" Value="{DynamicResource Bg.Selected}"/>
-		</Style>
-		<Style Selector="ListBox#Nav > ListBoxItem:selected /template/ Border#PART_Indicator">
-			<Setter Property="IsVisible" Value="True"/>
+			<Setter Property="Background" Value="{DynamicResource Accent}"/>
 		</Style>
 		<Style Selector="ListBox#Nav > ListBoxItem:selected">
-			<Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.OnAccent}"/>
 		</Style>
 		<Style Selector="ListBox#Nav > ListBoxItem:nth-child(1) /template/ TextBlock.navgroup">
 			<Setter Property="Margin" Value="14,4,0,7"/>
 		</Style>
 		<Style Selector="ListBox#Nav Path.ico">
-			<Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+			<Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
 		</Style>
 		<Style Selector="ListBox#Nav > ListBoxItem:selected Path.ico">
-			<Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+			<Setter Property="Stroke" Value="{DynamicResource Text.OnAccent}"/>
 		</Style>
 		<Style Selector="TextBlock.navgroup">
 			<Setter Property="Margin" Value="14,18,0,7"/>

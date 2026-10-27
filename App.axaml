@@ -22,27 +22,28 @@
   <Application.Styles>
     <FluentTheme>
       <!-- A fully SOLID palette: Fluent normally builds its hover / pressed / selection / border colors
-           with alpha; with solid inputs everything it derives stays a flat fill, on-brand (teal). -->
+           with alpha; with solid inputs everything it derives stays a flat fill: neutral graphite / light grey
+           with the brand teal, as in Styles/Tokens.axaml. -->
       <FluentTheme.Palettes>
         <ColorPaletteResources x:Key="Dark"
-                               Accent="#2DD4BF"
-                               RegionColor="#0B0E14"
-                               AltHigh="#0B0E14" AltMediumHigh="#0E1219" AltMedium="#121720" AltMediumLow="#151B25" AltLow="#18202C"
-                               BaseHigh="#E6EAF2" BaseMediumHigh="#C7CEDB" BaseMedium="#A9B2C4" BaseMediumLow="#747F96" BaseLow="#262F40"
-                               ChromeAltLow="#C7CEDB" ChromeBlackHigh="#000000" ChromeBlackLow="#0D1118" ChromeBlackMedium="#0B0E14"
-                               ChromeBlackMediumLow="#0E1219" ChromeDisabledHigh="#262F40" ChromeDisabledLow="#747F96" ChromeGray="#8A94A8"
-                               ChromeHigh="#36415A" ChromeLow="#121720" ChromeMedium="#151B25" ChromeMediumLow="#1A212C" ChromeWhite="#FFFFFF"
-                               ErrorText="#F87171" ListLow="#151B25" ListMedium="#1B2230"/>
+                               Accent="#0F8F80"
+                               RegionColor="#1C1C1E"
+                               AltHigh="#1C1C1E" AltMediumHigh="#212123" AltMedium="#2A2A2D" AltMediumLow="#2C2C2F" AltLow="#303033"
+                               BaseHigh="#E8E8ED" BaseMediumHigh="#C9C9CE" BaseMedium="#AEAEB4" BaseMediumLow="#8A8A90" BaseLow="#424245"
+                               ChromeAltLow="#C9C9CE" ChromeBlackHigh="#000000" ChromeBlackLow="#19191B" ChromeBlackMedium="#1C1C1E"
+                               ChromeBlackMediumLow="#212123" ChromeDisabledHigh="#424245" ChromeDisabledLow="#8A8A90" ChromeGray="#98989E"
+                               ChromeHigh="#55555A" ChromeLow="#2A2A2D" ChromeMedium="#2C2C2F" ChromeMediumLow="#3A3A3D" ChromeWhite="#FFFFFF"
+                               ErrorText="#FF6961" ListLow="#303033" ListMedium="#38383B"/>
         <!-- light: solid stand-ins for Fluent's light defaults (which are black/white WITH alpha) -->
         <ColorPaletteResources x:Key="Light"
-                               Accent="#0F766E"
-                               RegionColor="#F4F6FA"
-                               AltHigh="#FFFFFF" AltMediumHigh="#FBFCFD" AltMedium="#F7F9FC" AltMediumLow="#F1F4F8" AltLow="#EEF2F7"
-                               BaseHigh="#141B26" BaseMediumHigh="#344054" BaseMedium="#5B6475" BaseMediumLow="#8A94A6" BaseLow="#D0D7E2"
-                               ChromeAltLow="#1F2937" ChromeBlackHigh="#000000" ChromeBlackLow="#D0D7E2" ChromeBlackMedium="#5B6475"
-                               ChromeBlackMediumLow="#8A94A6" ChromeDisabledHigh="#D0D7E2" ChromeDisabledLow="#8A94A6" ChromeGray="#687387"
-                               ChromeHigh="#D0D7E2" ChromeLow="#F1F4F8" ChromeMedium="#E6EBF2" ChromeMediumLow="#F1F4F8" ChromeWhite="#FFFFFF"
-                               ErrorText="#DC2626" ListLow="#EEF2F7" ListMedium="#E2E7EE"/>
+                               Accent="#0E7C72"
+                               RegionColor="#F5F5F7"
+                               AltHigh="#FFFFFF" AltMediumHigh="#FBFBFC" AltMedium="#F9F9FB" AltMediumLow="#F4F4F6" AltLow="#EFEFF2"
+                               BaseHigh="#1D1D1F" BaseMediumHigh="#3A3A3E" BaseMedium="#5E5E63" BaseMediumLow="#8E8E93" BaseLow="#D2D2D7"
+                               ChromeAltLow="#2C2C2E" ChromeBlackHigh="#000000" ChromeBlackLow="#D2D2D7" ChromeBlackMedium="#5E5E63"
+                               ChromeBlackMediumLow="#8E8E93" ChromeDisabledHigh="#D2D2D7" ChromeDisabledLow="#8E8E93" ChromeGray="#6E6E73"
+                               ChromeHigh="#D2D2D7" ChromeLow="#F4F4F6" ChromeMedium="#EDEDF0" ChromeMediumLow="#F4F4F6" ChromeWhite="#FFFFFF"
+                               ErrorText="#D1291F" ListLow="#EFEFF2" ListMedium="#E3E3E8"/>
       </FluentTheme.Palettes>
     </FluentTheme>
     <StyleInclude Source="avares://Echoes/Styles/AppStyles.axaml"/>
