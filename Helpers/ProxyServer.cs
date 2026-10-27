@@ -155,6 +155,7 @@ public sealed class ProxyServer : IDisposable
             }
 
             failures = 0;
+            BackgroundGuard.NoteActivity();
             _ = HandleAsync(client, ct);   // releases the slot in its finally
         }
     }

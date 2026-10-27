@@ -659,7 +659,7 @@ public sealed partial class MonitorViewModel : ObservableObject
         var token = cts.Token;
         // Keep the process alive while monitoring so an Android background switch doesn't silently freeze the checks
         // (no-op on desktop).
-        BackgroundGuard.Acquire(BackgroundReason);
+        BackgroundGuard.Acquire(BackgroundReason, GuardKind.Ticks);
         try
         {
             while (!token.IsCancellationRequested)

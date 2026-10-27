@@ -214,7 +214,7 @@ public partial class PortScannerViewModel : ObservableObject
             timer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
             timer.Tick += (_, _) => Tick(engine);
             guardReason = options.PingOnly ? "Finding live hosts" : "Scanning ports";
-            BackgroundGuard.Acquire(guardReason);
+            BackgroundGuard.Acquire(guardReason, GuardKind.Finite);
             guarded = true;
 
             ScanSnapshot? previous = null;

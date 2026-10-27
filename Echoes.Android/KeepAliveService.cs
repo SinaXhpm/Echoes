@@ -5,9 +5,10 @@ using Android.OS;
 namespace Echoes.Android;
 
 /// <summary>
-/// A foreground service that keeps the process running (and the CPU awake via a partial
-/// wake lock) while a long-running tool — Monitor or Port Scanner — is active. Started and
-/// stopped by <see cref="AndroidBackgroundGuard"/>, which is driven by the shared
+/// A foreground service that keeps the process running while a long-running tool (a server, a
+/// session, Monitor, Port Scanner…) is active, and the CPU awake via a partial wake lock only
+/// while one of them needs it (<see cref="SetCpuAwake"/>). Started and stopped by
+/// <see cref="AndroidBackgroundGuard"/>, which is driven by the shared
 /// <c>Echoes.Helpers.BackgroundGuard</c> ref-count.
 ///
 /// Declared as a <c>dataSync</c> foreground service; the <c>[Service]</c> attribute emits the
@@ -22,7 +23,13 @@ public class KeepAliveService : Service
     private const int NotificationId = 0x4563;          // arbitrary, non-zero
     private const string ChannelId = "echoes.keepalive";
 
-    private PowerManager.WakeLock? _wakeLock;
+    private PowerManager.WakeLock? _wakeLock;   // under _wakeGate
+    private readonly object _wakeGate = new();
+    private static volatile KeepAliveService? s_running;
+
+    // Whether a running job needs the CPU awake (a monitor, a scan, a speed test), not only the process kept (a server,
+    // a session). Set by AndroidBackgroundGuard before a start and whenever it changes; the running service follows it.
+    internal static volatile bool CpuWanted;
 
     // Set by AndroidBackgroundGuard (mostly from the UI thread) and this service's callbacks. A service started with
     // StartForegroundService MUST reach StartForeground before it is stopped — otherwise Android kills the whole app
@@ -59,7 +66,8 @@ public class KeepAliveService : Service
             return StartCommandResult.NotSticky;
         }
 
-        AcquireWakeLock();
+        s_running = this;
+        FollowCpuWanted();
 
         // If the OS kills us under pressure, don't auto-restart with a null intent — the VM
         // re-acquires when the user starts a tool again.
@@ -71,7 +79,7 @@ public class KeepAliveService : Service
     // platform limit. This API 34 overload is only called for the shortService type; kept as a harmless fallback.
     public override void OnTimeout(int startId)
     {
-        ReleaseWakeLock();
+        Leave();
         StopSelf();
         base.OnTimeout(startId);
     }
@@ -83,7 +91,7 @@ public class KeepAliveService : Service
     [System.Runtime.Versioning.SupportedOSPlatform("android35.0")]
     public override void OnTimeout(int startId, global::Android.Content.PM.ForegroundService fgsType)
     {
-        ReleaseWakeLock();
+        Leave();
         StopSelf();
         base.OnTimeout(startId, fgsType);
     }
@@ -92,7 +100,7 @@ public class KeepAliveService : Service
     public override void OnDestroy()
     {
         IsForeground = false;
-        ReleaseWakeLock();
+        Leave();
         try
         {
             if (OperatingSystem.IsAndroidVersionAtLeast(24))
@@ -163,22 +171,52 @@ public class KeepAliveService : Service
             .Build();
     }
 
+    /// <summary>A job that needs the CPU started or ended (<see cref="CpuWanted"/>): the running service takes or drops its
+    /// wake lock at once. Any thread.</summary>
+    internal static void SetCpuAwake(bool awake)
+    {
+        CpuWanted = awake;
+        s_running?.FollowCpuWanted();
+    }
+
+    private void FollowCpuWanted()
+    {
+        lock (_wakeGate)
+        {
+            if (CpuWanted && ReferenceEquals(s_running, this)) AcquireWakeLock();
+            else ReleaseWakeLock();
+        }
+    }
+
+    // Stopping (destroyed, or timed out by the platform): no wake lock outlives the service.
+    private void Leave()
+    {
+        if (ReferenceEquals(s_running, this)) s_running = null;
+        ReleaseWakeLock();
+    }
+
     private void AcquireWakeLock()
     {
-        if (_wakeLock != null) return;
-        if (GetSystemService(PowerService) is not PowerManager power) return;
+        lock (_wakeGate)
+        {
+            if (_wakeLock != null) return;
+            if (GetSystemService(PowerService) is not PowerManager power) return;
 
-        _wakeLock = power.NewWakeLock(WakeLockFlags.Partial, "echoes:keepalive");
-        try { _wakeLock?.Acquire(); } catch { }
+            _wakeLock = power.NewWakeLock(WakeLockFlags.Partial, "echoes:keepalive");
+            try { _wakeLock?.Acquire(); } catch { }
+        }
     }
 
     private void ReleaseWakeLock()
     {
-        try
+        lock (_wakeGate)
         {
-            if (_wakeLock is { IsHeld: true } wl) wl.Release();
+            try
+            {
+                if (_wakeLock is { IsHeld: true } wl) wl.Release();
+            }
+            catch { }
+            _wakeLock = null;
         }
-        catch { }
-        _wakeLock = null;
     }
 }

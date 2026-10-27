@@ -181,7 +181,7 @@ public partial class SpeedTestViewModel : ObservableObject
 
         // Android: a foreground service keeps the test running if Echoes goes to the background; iOS keeps the screen on
         // (no-op on desktop). Released in the finally below, whatever ends the run.
-        BackgroundGuard.Acquire("Speed test");
+        BackgroundGuard.Acquire("Speed test", GuardKind.Finite);
         try
         {
             var engine = new SpeedTestEngine(target, options);

@@ -252,14 +252,36 @@ internal static class SelfTest
 
         await Check("the screen stays on while something runs", async ct =>
         {
-            BackgroundGuard.Acquire("self-test");
+            static Task<bool> ScreenKept() => Dispatcher.UIThread.InvokeAsync(() => UIKit.UIApplication.SharedApplication.IdleTimerDisabled).GetTask();
+            BackgroundGuard.Acquire("self-test", GuardKind.Finite);
             await Task.Delay(700, ct).ConfigureAwait(false);
-            bool on = await Dispatcher.UIThread.InvokeAsync(() => UIKit.UIApplication.SharedApplication.IdleTimerDisabled);
+            bool on = await ScreenKept();
             BackgroundGuard.Release("self-test");
             await Task.Delay(700, ct).ConfigureAwait(false);
-            bool off = !await Dispatcher.UIThread.InvokeAsync(() => UIKit.UIApplication.SharedApplication.IdleTimerDisabled);
+            bool off = !await ScreenKept();
             if (!on || !off) throw new InvalidOperationException($"the screen stayed on: {on} while running, released after: {off}");
-            return "on while a job runs, back to normal after it";
+
+            // a waiting job (a server): on right after a touch, then the phone may lock again (unless it charges)
+            var (window, every) = (IosBackgroundGuard.IdleWindow, IosBackgroundGuard.CheckEvery);
+            IosBackgroundGuard.IdleWindow = TimeSpan.FromMilliseconds(600);
+            IosBackgroundGuard.CheckEvery = TimeSpan.FromMilliseconds(250);
+            try
+            {
+                BackgroundGuard.NoteActivity();
+                BackgroundGuard.Acquire("self-test server");
+                await Task.Delay(300, ct).ConfigureAwait(false);
+                bool fresh = await ScreenKept();
+                await Task.Delay(1500, ct).ConfigureAwait(false);
+                bool later = await ScreenKept();
+                bool charging = await Dispatcher.UIThread.InvokeAsync(() => UIKit.UIDevice.CurrentDevice.BatteryState
+                                                                             is UIKit.UIDeviceBatteryState.Charging or UIKit.UIDeviceBatteryState.Full);
+                BackgroundGuard.Release("self-test server");
+                if (!fresh) throw new InvalidOperationException("a waiting job didn't keep the screen on right after a touch");
+                if (later && !charging) throw new InvalidOperationException("a waiting job kept the screen on long after the last touch, on battery");
+                return "on while a job runs, back to normal after it; a waiting job lets the phone lock "
+                       + (charging ? "(charging here: kept on)" : "a while after the last touch");
+            }
+            finally { (IosBackgroundGuard.IdleWindow, IosBackgroundGuard.CheckEvery) = (window, every); }
         });
 
         // Opens every tool in the touch shell, one after another, like a person tapping through the drawer. A tool whose

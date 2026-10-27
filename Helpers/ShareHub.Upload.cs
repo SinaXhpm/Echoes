@@ -290,6 +290,7 @@ public sealed partial class ShareHub
                         idle.CancelAfter(BodyIdleMs);
                         int n = await c.Reader.ReadAsync(buf.AsMemory(0, (int)Math.Min(buf.Length, left)), idle.Token).ConfigureAwait(false);
                         if (n <= 0) break;
+                        BackgroundGuard.NoteActivity();
                         try { await fs.WriteAsync(buf.AsMemory(0, n), CancellationToken.None).ConfigureAwait(false); }
                         catch (IOException ex) { failure = DiskError(ex); break; }
                         left -= n;

@@ -43,4 +43,8 @@ public sealed class AndroidBackgroundGuard : IBackgroundGuard
     }
 
     public void Update(string reason) => KeepAliveService.UpdateText(_context, reason);
+
+    // Only a job on its own clock or one running to its end holds the CPU awake: a server or a session is woken by its
+    // packets, and a wake lock held for hours of waiting is what got Echoes flagged for background battery use.
+    public void Needs(bool cpu, bool finite) => KeepAliveService.SetCpuAwake(cpu);
 }

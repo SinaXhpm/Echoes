@@ -459,6 +459,7 @@ public sealed partial class ShareHub : IDisposable
 
     private async Task<bool> RouteAsync(HubConn c, HubRequest req, CancellationToken ct)
     {
+        BackgroundGuard.NoteActivity();   // a visitor: an iPhone keeps its screen (and so the server) on a while longer
         string path = req.Path;
         if (path is "/" or "/index.html")
         {
@@ -902,7 +903,7 @@ public sealed partial class ShareHub : IDisposable
     {
         var r = await FileHttpServer.ServeAsync(c.Stream, item, req.IsHead, req.Header("Range"), req.Header("If-Range"),
             HubHttp.CommonHeaders.Replace("Cache-Control: no-store\r\n", "Cache-Control: private, no-store\r\n", StringComparison.Ordinal),
-            req.WantsKeepAlive, n => Interlocked.Add(ref _bytesSent, n), ct).ConfigureAwait(false);
+            req.WantsKeepAlive, n => { Interlocked.Add(ref _bytesSent, n); BackgroundGuard.NoteActivity(); }, ct).ConfigureAwait(false);
         if (!req.IsHead && r.Status is 200 or 206)
         {
             if (r.Status == 200) Interlocked.Increment(ref _downloads);

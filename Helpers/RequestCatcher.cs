@@ -223,6 +223,7 @@ public sealed class RequestCatcher : IDisposable
                 continue;
             }
             failures = 0;
+            BackgroundGuard.NoteActivity();
             _ = Task.Run(() => HandleAsync(client, ct));
         }
     }

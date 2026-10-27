@@ -62,7 +62,10 @@ public partial class MobileShellView : UserControl
 
         // handledEventsToo: buttons mark their presses handled; tunnel: before the control under the finger acts on them
         AddHandler(HoldingEvent, OnHolding, RoutingStrategies.Bubble, handledEventsToo: true);
-        AddHandler(PointerPressedEvent, (_, _) => { _swallowRelease = false; CloseHeldTip(); }, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(PointerPressedEvent, (_, _) => { _swallowRelease = false; CloseHeldTip(); BackgroundGuard.NoteActivity(); },
+                   RoutingStrategies.Tunnel, handledEventsToo: true);
+        // typing counts as use too (the iPhone keeps its screen on for a waiting job only a while after the last use)
+        AddHandler(TextInputEvent, (_, _) => BackgroundGuard.NoteActivity(), RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(PointerReleasedEvent, OnPointerReleasedAfterHold, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
