@@ -139,4 +139,27 @@ public static class DoctorIp
     /// <summary>"[v6]:port" / "v4:port".</summary>
     public static string EndPoint(IPAddress a, int port)
         => a.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{a}]:{port}" : $"{a}:{port}";
+
+    /// <summary>The override IP field: one IPv4 or IPv6 address to connect to (brackets allowed), no port and no name.</summary>
+    public static bool TryParseOverride(string? text, out IPAddress? ip, out string error)
+    {
+        ip = null;
+        error = "";
+        string s = (text ?? "").Trim();
+        if (s.Length > 1 && s[0] == '[' && s[^1] == ']') s = s[1..^1];
+        // strict: "20" or "10.0.0" would read as 0.0.0.20 / 10.0.0.0 to IPAddress.TryParse, and "[v6]:443" as the
+        // address without its port
+        if (s.IndexOfAny(new[] { '[', ']' }) >= 0 || !ScanTargets.TryParseIp(s, out var a))
+        {
+            error = $"\"{(s.Length > 40 ? s[..40] + "…" : s)}\" isn't an IP address: enter one IPv4 or IPv6 address (no port), or leave the field empty.";
+            return false;
+        }
+        if (a.Equals(IPAddress.Any) || a.Equals(IPAddress.IPv6Any) || a.Equals(IPAddress.Broadcast))
+        {
+            error = $"{a} isn't an address to connect to.";
+            return false;
+        }
+        ip = a;
+        return true;
+    }
 }

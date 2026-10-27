@@ -110,11 +110,14 @@ public static class DoctorHttp
     }
 
     /// <summary>The same GET through <paramref name="proxy"/>: an HTTP proxy the standard way (absolute URLs, CONNECT for
-    /// https), other kinds through the Doctor's own tunnel. Names are resolved by the proxy.</summary>
-    public static async Task<DoctorHttpResult> GetViaProxyAsync(Uri url, DoctorProxy proxy, CancellationToken ct)
+    /// https), other kinds through the Doctor's own tunnel. Names are resolved by the proxy — except the site's own name
+    /// when <paramref name="dial"/> (the override IP) is set: its tunnels go to that address. An http:// request through
+    /// an HTTP proxy names the site and the proxy connects to it, so the override can't apply there.</summary>
+    public static async Task<DoctorHttpResult> GetViaProxyAsync(Uri url, DoctorProxy proxy, IPAddress? dial, CancellationToken ct)
     {
         using var handler = NewHandler();
-        if (proxy.Kind == DoctorProxyKind.Http)
+        string site = url.IdnHost.Trim('[', ']');
+        if (proxy.Kind == DoctorProxyKind.Http && (dial == null || url.Scheme == Uri.UriSchemeHttp))
         {
             handler.Proxy = new WebProxy(new Uri($"http://{(proxy.Host.Contains(':') ? $"[{proxy.Host}]" : proxy.Host)}:{proxy.Port}"))
             {
@@ -125,7 +128,11 @@ public static class DoctorHttp
         }
         else
             handler.ConnectCallback = async (ctx, token) =>
-                (await proxy.OpenAsync(ctx.DnsEndPoint.Host.Trim('[', ']'), ctx.DnsEndPoint.Port, 8000, token).ConfigureAwait(false)).Stream;
+            {
+                string h = ctx.DnsEndPoint.Host.Trim('[', ']');
+                if (dial != null && h.Equals(site, StringComparison.OrdinalIgnoreCase)) h = dial.ToString();
+                return (await proxy.OpenAsync(h, ctx.DnsEndPoint.Port, 8000, token).ConfigureAwait(false)).Stream;
+            };
         var res = await RunAsync(url, handler, null, ct).ConfigureAwait(false);
         if (res.Answered && res.Status == 407)
         {

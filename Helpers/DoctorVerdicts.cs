@@ -16,11 +16,35 @@ namespace Echoes.Helpers;
 public static class DoctorVerdicts
 {
     private const string UseVpn = "Use a VPN or a proxy for this site; changing DNS alone won't help.";
+    private const string OverrideTag = " (the override IP)";
 
     public static DoctorVerdict Decide(DoctorFacts f)
     {
         var direct = DecideDirect(f);
+        // with an override IP the path went there: the verdict says so, and how DNS compares (unless it did already)
+        if (f.Override is { } ov && !direct.Sentence.Contains(OverrideTag, StringComparison.Ordinal))
+            direct = direct with { Sentence = $"{direct.Sentence} Tested at {ov}{OverrideTag}; {OverrideClause(f)}." };
         return f.Proxy != null && f.Via != null ? WithProxy(f, direct) : direct;
+    }
+
+    /// <summary>What DNS says about the override IP, as a clause: "DNS gives the same address", "your DNS gives
+    /// 10.10.34.35 (a filtered answer)", "DNS gives 93.184.215.14 instead (not tested)" …</summary>
+    public static string OverrideClause(DoctorFacts f)
+    {
+        var sys = f.Sys;
+        string sysList = sys != null ? DoctorIp.List(sys.Addresses) : "";
+        return f.OverrideDns switch
+        {
+            DoctorOverrideDns.Same => "DNS gives the same address",
+            DoctorOverrideDns.EncryptedOnly => $"encrypted DNS gives it too (your resolver: {sysList}, another server of the site)",
+            DoctorOverrideDns.Other => $"DNS gives {sysList} instead (not tested here)",
+            DoctorOverrideDns.Forged => f.ForgedAddress is { } fa
+                ? $"your DNS gives {fa} ({(DoctorIp.IsPublic(fa) ? "a server that isn't the site's" : "a filtered answer")})"
+                : "your DNS hides it (no address, though encrypted DNS knows the name)",
+            DoctorOverrideDns.Missing => sys is { NoSuchName: true } ? "DNS says the name doesn't exist" : "DNS has no address for it",
+            DoctorOverrideDns.NoAnswer => "DNS doesn't answer for it",
+            _ => "nothing to compare with DNS",
+        };
     }
 
     // When the name's handshake is cut by SNI filtering but a fragmented ClientHello gets through, say exactly that:
@@ -59,6 +83,8 @@ public static class DoctorVerdicts
         string hp = t.Display(f.Port);
         var plan = f.Plan;
         var c = f.Connect;
+        // the override IP: the path checks went there instead of to the DNS answer
+        string? at = f.Override is { } ovr ? $"{ovr}{OverrideTag}" : null;
 
         // ---- this device and its network
         if (f.Local?.HasNetwork == false && f.InternetTcp != true)
@@ -71,8 +97,8 @@ public static class DoctorVerdicts
             return Problem("Your connection has no internet access: nothing outside your network answers, and DNS fails.",
                            "Restart the router or modem, reconnect your VPN if you use one, or call your provider.");
 
-        // ---- the name
-        if (f.NameMissing)
+        // ---- the name (with an override IP the path was tested anyway: a server can answer before DNS knows its name)
+        if (f.NameMissing && at == null)
             return Problem($"{h} doesn't exist: no DNS server knows the name.", "Check the spelling of the address.");
 
         // ---- which scheme decides: the one asked for; with both (no scheme given), HTTPS unless only HTTP connected.
@@ -101,6 +127,18 @@ public static class DoctorVerdicts
             return "";
         }
 
+        // ---- the override IP doesn't answer: nothing else of the path could be tested
+        if (at != null && !mainConnected)
+        {
+            var tries = c?.Attempts.Where(a => a.Port == mainPort).ToList() ?? new List<DoctorConnectAttempt>();
+            bool refused = tries.Count > 0 && tries.All(a => a.Code == SocketError.ConnectionRefused);
+            string ports = mainPort?.ToString(CultureInfo.InvariantCulture) ?? string.Join(" and ", plan.All);
+            bool noV6 = f.Override!.AddressFamily == AddressFamily.InterNetworkV6 && f.NoIpv6;
+            return Problem($"Nothing answers at {at} on port {ports}" + (noV6 ? ": this device has no IPv6 route" : refused ? ": it refuses the connection" : "")
+                           + $"; {OverrideClause(f)}.",
+                           noV6 ? "Use its IPv4 address, or a network with IPv6." : "Check the IP, or clear it to test the address DNS gives.");
+        }
+
         // ---- DNS tampered with, or the name's lookups dropped
         if (f.SysTampered || f.DnsDropped)
         {
@@ -109,8 +147,8 @@ public static class DoctorVerdicts
                 ? $"DNS answers for {h} are tampered with on your network{forged}"
                 : $"DNS lookups for {h} go unanswered on your network, while other names resolve";
             string clause = f.SysTampered ? "its DNS answers are tampered with" : "its DNS lookups go unanswered";
-            // a real address to test the path with: from encrypted DNS
-            bool realAddress = f.Trusted.Count > 0 && f.TrustedFrom == "encrypted DNS";
+            // a real address to test the path with: from encrypted DNS, or the one the user gave
+            bool realAddress = f.Trusted.Count > 0 && f.TrustedFrom is DoctorFacts.FromDoh or DoctorFacts.FromOverride;
             // name a resolver that actually answered from this network (1.1.1.1 / 8.8.8.8 are often the blocked ones)
             string dohHint = f.WorkingDoh.FirstOrDefault() is { } w
                 ? $"{(w.Provider.Length > 0 ? w.Provider : w.Name)}, which answered here: {w.Uri}"
@@ -122,29 +160,41 @@ public static class DoctorVerdicts
                 return f.DohAnswered
                     ? Problem(what + ".", dnsFix)
                     : Problem(what + ", and encrypted DNS is blocked too, so its real address can't be checked.",
-                              "Use a VPN or a proxy for this site.");
+                              "Use a VPN or a proxy for this site, or enter its IP address (if you know it) in the IP field and run again.");
+            string real = at ?? "its real address";
             if (tls?.Outcome == DoctorTlsOutcome.SniFiltered)
                 return Problem($"{h} is filtered on your network: {clause}, and connections that name the site are cut (SNI filtering){OtherClause()}.{FragClause(f)}", SniAdvice(f));
             if (!connected)
                 return Problem($"{h} is blocked on your network: {clause}{forged}, and its real addresses don't answer from here either.", UseVpn);
             if (tlsBlocked)
-                return Problem($"{h} is blocked on your network: {clause}, and TLS connections to its real address are cut{OtherClause()}.", UseVpn);
+                return Problem($"{h} is blocked on your network: {clause}, and TLS connections to {real} are cut{OtherClause()}.", UseVpn);
             if (filterPage != null && !Works(http))
                 return Problem($"{h} is blocked on your network: {clause}, and its pages are replaced by the filter's block page.", UseVpn);
             if (pathWorks)
-                return Problem(what + "; it works over encrypted DNS.", dnsFix);
+                return Problem(what + (at != null ? $"; it works at {at}: DNS is the problem." : "; it works over encrypted DNS."), dnsFix);
             return Problem(what + ".", dnsFix);
         }
 
-        // ---- no address at all
+        // ---- no address at all: no answer to trust, and no override IP to test instead
         if (f.Trusted.Count == 0)
         {
             if (f.InternetDns == false)
                 return Problem("DNS doesn't work on your network: the system resolver answers nothing.",
                                "Check the DNS settings (or set 1.1.1.1 / 8.8.8.8), or restart the router.");
-            return Unknown($"{h} can't be resolved: this system's resolver doesn't answer for it and encrypted DNS is unreachable.",
-                           "Run again in a minute; if it persists, try a VPN.");
+            if (f.DohAnswered)
+                return Problem($"{h} has no address: the name exists, but it has no A or AAAA record (it may be set up for mail only).",
+                               $"Check the address; the site may be at www.{h}.");
+            string sysSays = f.Sys is { Answered: false } ? "this system's resolver doesn't answer for it"
+                           : f.Sys is { NoSuchName: true } ? "this system's resolver says it doesn't exist"
+                           : "no resolver gives a usable address";
+            return Unknown($"{h} has no trustworthy address: {sysSays}, and encrypted DNS is unreachable to check it.",
+                           "Enter its IP address (if you know it) in the IP field to test the connection anyway, or try a VPN.");
         }
+
+        // an address nothing could cross-check (encrypted DNS out of reach): a failure may be that address's
+        bool unverified = at == null && !t.IsIp && !t.IsLocal && !f.DohAnswered;
+        string Unverified() => unverified
+            ? $" (Its address, {f.Trusted[0]} from {f.TrustedFrom}, couldn't be checked: encrypted DNS is unreachable.)" : "";
 
         // ---- the connection
         if (tls?.Outcome == DoctorTlsOutcome.SniFiltered)
@@ -161,14 +211,14 @@ public static class DoctorVerdicts
                         : $"{hp} doesn't answer on your local network: the device may be off, or the port closed.",
                     "Check that the device is on and the service runs on that port.");
             if (refused)
-                return Problem($"{h} refuses connections on port {ports}: the service isn't running, or a firewall rejects it.",
+                return Problem($"{h} refuses connections on port {ports}: the service isn't running, or a firewall rejects it.{Unverified()}",
                                "Check the port number; try again later.");
-            return Unknown($"{h} doesn't answer on port {ports} from here: the site may be down, or its address is blocked on your network.",
+            return Unknown($"{h} doesn't answer on port {ports} from here: the site may be down, or its address is blocked on your network.{Unverified()}",
                            "Run it again with a proxy (or through a VPN): if it works there, your network blocks it.");
         }
 
         if (tls?.Outcome == DoctorTlsOutcome.AllCut)
-            return Problem($"TLS connections to {h} are cut whatever the name: its address is blocked for HTTPS on your network{OtherClause()}.",
+            return Problem($"TLS connections to {h} are cut whatever the name: its address is blocked for HTTPS on your network{OtherClause()}.{Unverified()}",
                            UseVpn + QuicNote(f));
         if (tls?.Outcome == DoctorTlsOutcome.HandshakeCut)
             return Problem($"The secure connection to {h} is cut on your network, though simple probes get through: a filter likely recognizes it{OtherClause()}.{FragClause(f)}", SniAdvice(f));
@@ -236,14 +286,18 @@ public static class DoctorVerdicts
                                      : "Only the site's owner can fix it; don't bypass the warning on a site that takes passwords.");
         }
 
-        // ---- it works
-        var fine = new List<string> { "DNS", "the connection" };
+        // ---- it works (at the override IP: a name no DNS server knows still won't open anywhere else)
+        if (at != null && f.NameMissing && (http == null || http.Status < 400))
+            return Problem($"{h} answers at {at}, but no DNS server knows the name: a browser can't find it without a hosts-file entry.",
+                           "Add the name to its DNS zone, or wait until the change reaches the resolvers.");
+        // DNS didn't pick the address the path used: it is the connection that was tested
+        var fine = at != null ? new List<string> { "the connection" } : new List<string> { "DNS", "the connection" };
         if (f.Tls?.Outcome == DoctorTlsOutcome.Ok) fine.Add("TLS");
         if (Works(f.Https)) fine.Add("HTTPS");
         if (Works(f.PlainHttp)) fine.Add("HTTP");
-        string what2 = http != null || f.Tls != null
-            ? string.Join(", ", fine.Take(fine.Count - 1)) + " and " + fine[^1] + (fine.Count > 2 ? " are all fine" : " are fine")
-            : $"it accepts connections on port {f.Port}";
+        string what2 = http == null && f.Tls == null ? $"it accepts connections on port {f.Port}"
+            : fine.Count == 1 ? $"{fine[0]} is fine"
+            : string.Join(", ", fine.Take(fine.Count - 1)) + " and " + fine[^1] + (fine.Count > 2 ? " are all fine" : " are fine");
         // the other scheme, in a few words
         string note = "";
         if (other != null && !Works(other) && (other.Answered || other.Error != null))
@@ -261,6 +315,8 @@ public static class DoctorVerdicts
             advice = "Your system's DNS is fine, but plain DNS to outside resolvers is tampered with on the way: keep the current DNS, or use encrypted DNS.";
         if (f.Quic is { Ran: true, Open: false })
             advice += " (QUIC / UDP 443 is blocked here, so HTTP/3 and Hysteria2 / TUIC won't work — TCP-based tools still do.)";
+        if (at != null && f.OverrideDns == DoctorOverrideDns.Other)
+            advice = "To test the address DNS gives, clear the IP field and run again.";
         if (http != null && http.Status >= 400)
             return Problem($"{h} is reachable, but answers HTTP {http.Status} {http.Reason}.".Replace("  ", " "),
                            http.Status == 403

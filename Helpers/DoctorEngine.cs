@@ -47,9 +47,21 @@ public sealed class DoctorFacts
     public bool DnsDropped => Sys is { Answered: false } && Plain.All(p => !p.Answered) && (PlainControlOk || InternetDns == true);
     /// <summary>The system's (differing) address doesn't serve the site, while the trusted one does: DNS points elsewhere.</summary>
     public bool SysPointsElsewhere { get; set; }
-    /// <summary>The addresses the next checks use, and where they came from.</summary>
+    /// <summary>The addresses the next checks use, and where they came from (<see cref="FromDoh"/>, <see cref="FromOverride"/>,
+    /// a resolver's name …).</summary>
     public List<IPAddress> Trusted { get; set; } = new();
     public string TrustedFrom { get; set; } = "";
+    public const string FromDoh = "encrypted DNS";
+    public const string FromOverride = "the override IP";
+    /// <summary>The best address DNS gave, and where from (what <see cref="Trusted"/> held before the override IP replaced it).</summary>
+    public List<IPAddress> DnsTrusted { get; set; } = new();
+    public string DnsTrustedFrom { get; set; } = "";
+
+    /// <summary>The address the user gave to connect to instead of the DNS answer (curl --resolve, a hosts-file line); the
+    /// name still goes in the SNI and the Host header. Null: the DNS answer is used.</summary>
+    public IPAddress? Override { get; set; }
+    /// <summary>This device has no IPv6 route (an IPv6 override IP can't be reached from here).</summary>
+    public bool NoIpv6 { get; set; }
 
     /// <summary>Which ports the web checks use (HTTPS and HTTP together unless the input pins one).</summary>
     public DoctorPorts Plan { get; set; } = new(443, 80, null, true, true);
@@ -71,6 +83,24 @@ public sealed class DoctorFacts
     public DoctorProxy? Proxy { get; set; }
     public DoctorViaProxy? Via { get; set; }
 
+    /// <summary>How DNS relates to <see cref="Override"/> (read when needed: the check of a differing system answer may
+    /// still find it points elsewhere).</summary>
+    public DoctorOverrideDns OverrideDns
+    {
+        get
+        {
+            if (Override is not { } ov || Target.IsIp) return DoctorOverrideDns.NotLooked;
+            // a DNS64 answer counts as the IPv4 address it carries
+            bool Has(IEnumerable<IPAddress> list) => list.Any(a => (DoctorIp.FromNat64(a, Nat64) ?? DoctorIp.Normal(a)).Equals(ov));
+            if (Sys is { Answered: true } s && Has(s.Addresses)) return DoctorOverrideDns.Same;
+            if (SysTampered) return DoctorOverrideDns.Forged;
+            if (Sys is not { Answered: true } sys) return DoctorOverrideDns.NoAnswer;
+            if (sys.NoSuchName || sys.Addresses.Count == 0) return DoctorOverrideDns.Missing;
+            if (Doh.Any(a => a.Good && Has(a.Addresses))) return DoctorOverrideDns.EncryptedOnly;
+            return DoctorOverrideDns.Other;
+        }
+    }
+
     public bool SysTampered => SysMatch is DoctorDnsMatch.Bogus or DoctorDnsMatch.Missing || SysPointsElsewhere;
     public bool PlainTampered => PlainMatch.Any(m => m is DoctorDnsMatch.Bogus) || Plain.Any(p => p.Injected);
     /// <summary>The first forged address seen ("10.10.34.36").</summary>
@@ -78,6 +108,34 @@ public sealed class DoctorFacts
         (Sys?.Addresses ?? new List<IPAddress>()).Concat(Plain.SelectMany(p => p.Addresses)).FirstOrDefault(a => !DoctorIp.IsPublic(a))
         ?? (SysPointsElsewhere ? Sys?.Addresses.FirstOrDefault() : null);
     public int Port => Connect?.Ok == true ? Connect.Port : Plan.All[0];
+}
+
+/// <summary>What DNS says about the override IP.</summary>
+public enum DoctorOverrideDns
+{
+    /// <summary>Nothing was looked up (the target is an IP address).</summary>
+    NotLooked,
+    /// <summary>This system's resolver gives the override IP too.</summary>
+    Same,
+    /// <summary>Encrypted DNS gives it; this system's resolver gives other, not forged, addresses (another edge).</summary>
+    EncryptedOnly,
+    /// <summary>DNS gives other public addresses: another server of the site, or the override is out of date.</summary>
+    Other,
+    /// <summary>This system's resolver is tampered with (a filter's or private address, or one that isn't the site's).</summary>
+    Forged,
+    /// <summary>This system's resolver says the name doesn't exist, or gives no address.</summary>
+    Missing,
+    /// <summary>This system's resolver doesn't answer for the name.</summary>
+    NoAnswer,
+}
+
+/// <summary>What the user set for one run besides the target.</summary>
+public sealed class DoctorOptions
+{
+    /// <summary>A proxy to run the checks through as well (null: none).</summary>
+    public DoctorProxy? Proxy { get; init; }
+    /// <summary>The address to connect to instead of the DNS answer (null: the DNS answer).</summary>
+    public IPAddress? Override { get; init; }
 }
 
 /// <summary>The same checks through the proxy.</summary>
@@ -153,14 +211,21 @@ public static class DoctorEngine
     /// <summary>What can't be tested through a proxy (shown with the proxy's rows, and in the report).</summary>
     public const string ProxyNote = "Plain DNS, ping and path MTU can't go through a proxy: those rows show the direct path.";
 
-    internal static async Task<DoctorFacts> RunAsync(DoctorTarget t, DoctorEnvironment env, DoctorProxy? proxy, IDoctorSink sink, CancellationToken ct)
+    internal static async Task<DoctorFacts> RunAsync(DoctorTarget t, DoctorEnvironment env, DoctorOptions opt, IDoctorSink sink, CancellationToken ct)
     {
-        var f = new DoctorFacts(t) { Plan = t.Plan(env.DefaultHttpsPort, env.DefaultHttpPort), Proxy = proxy };
+        var f = new DoctorFacts(t)
+        {
+            Plan = t.Plan(env.DefaultHttpsPort, env.DefaultHttpPort),
+            Proxy = opt.Proxy,
+            // an IP target has no DNS answer to stand in for: the override would only be a second target
+            Override = t.IsIp ? null : opt.Override,
+        };
         using var doh = DoctorDns.CreateDohClient();
 
         // an IPv6-only network: no IPv4 address can be dialled there, so 1.1.1.1 and 8.8.8.8 "didn't answer" while everything
         // worked, and DNS64's answers for IPv4-only sites (inside the NAT64 prefix) looked forged
         var (v4, v6) = env.Routes();
+        f.NoIpv6 = !v6;
         if (!v4 && v6)
         {
             f.Ipv6Only = true;
@@ -169,13 +234,29 @@ public static class DoctorEngine
 
         var local = Step(sink, new[] { DoctorCheck.Network, DoctorCheck.Internet }, () => LocalAsync(f, env, sink, ct));
         var proxyRows = new[] { DoctorCheck.ProxyServer, DoctorCheck.ProxyDns, DoctorCheck.ProxyConnect, DoctorCheck.ProxyTls, DoctorCheck.ProxyHttps, DoctorCheck.ProxyHttp };
-        var via = proxy != null ? Step(sink, proxyRows, () => ViaProxyAsync(f, env, proxy, sink, ct)) : Task.CompletedTask;
+        var via = opt.Proxy is { } proxy ? Step(sink, proxyRows, () => ViaProxyAsync(f, env, proxy, sink, ct)) : Task.CompletedTask;
         await Step(sink, new[] { DoctorCheck.DnsSystem, DoctorCheck.DnsPlain, DoctorCheck.DnsEncrypted },
                    () => DnsAsync(f, env, doh, sink, ct)).ConfigureAwait(false);
         ct.ThrowIfCancellationRequested();
 
+        // the override IP stands in for the DNS answer on the path; DNS was still asked, to compare
+        f.DnsTrusted = f.Trusted;
+        f.DnsTrustedFrom = f.TrustedFrom;
+        if (f.Override is { } ov)
+        {
+            f.Trusted = new List<IPAddress> { ov };
+            f.TrustedFrom = DoctorFacts.FromOverride;
+            var rel = f.OverrideDns;
+            Tr(sink, DoctorCheck.DnsSystem, rel is DoctorOverrideDns.Same or DoctorOverrideDns.EncryptedOnly ? DoctorState.Ok
+                                           : rel == DoctorOverrideDns.Forged ? DoctorState.Fail : DoctorState.Warning,
+               "Override IP", $"{ov}: {DoctorVerdicts.OverrideClause(f)}");
+        }
+        else if (opt.Override is { } unused)
+            Tr(sink, DoctorCheck.Connect, DoctorState.Skipped, "Override IP", $"{unused} not used: the target is an address already");
+
         var pathRows = new[] { DoctorCheck.Connect, DoctorCheck.Ping, DoctorCheck.Tls, DoctorCheck.Https, DoctorCheck.Http, DoctorCheck.Mtu };
-        if (f.NameMissing)
+        // with an override IP the path is tested even for a name DNS doesn't know (a server before its DNS is set up)
+        if (f.NameMissing && f.Override == null)
             foreach (var c in pathRows) sink.Report(c, DoctorState.Skipped, $"Skipped: {t.Host} doesn't exist");
         else if (f.Trusted.Count == 0)
         {
@@ -541,12 +622,13 @@ public static class DoctorEngine
             var sys = f.Sys!;
             var other = sys.Addresses.FirstOrDefault(DoctorIp.IsPublic);
             string host = f.Target.AsciiHost;
-            string trustedText = DoctorIp.List(f.Trusted);
-            if (other == null) return;
+            // encrypted DNS's answer, not the override IP: this is about DNS
+            string trustedText = DoctorIp.List(f.DnsTrusted);
+            if (other == null || f.DnsTrusted.Count == 0) return;
             // the site's own HTTPS port (a certificate names the site)
             int port = f.Plan.Https ?? 443;
             var theirs = DoctorTls.ServesAsync(other, port, host, 5000, ct);
-            var ours = DoctorTls.ServesAsync(f.Trusted[0], port, host, 5000, ct);
+            var ours = DoctorTls.ServesAsync(Dial(f, f.DnsTrusted[0]), port, host, 5000, ct);
             bool? sysServes = await theirs.ConfigureAwait(false);
             bool? realServes = await ours.ConfigureAwait(false);
             if (sysServes == true)
@@ -574,6 +656,9 @@ public static class DoctorEngine
         var ports = plan.All;
         sink.Report(DoctorCheck.Connect, DoctorState.Running,
                     $"Connecting to {DoctorIp.List(f.Trusted.Take(3).ToList(), 3)} on port {string.Join(" and ", ports)}…");
+        if (f.Override is { } ov)
+            Tr(sink, DoctorCheck.Connect, DoctorState.Ok, "Override IP",
+               $"{ov} instead of the DNS answer" + (f.DnsTrusted.Count > 0 ? $" ({DoctorIp.List(f.DnsTrusted)}, from {f.DnsTrustedFrom})" : " (DNS gave no usable address)"));
         var c = await DoctorNet.ConnectAllAsync(f.Trusted, ports, 4000, ct).ConfigureAwait(false);
         f.Connect = c;
         // a sub-step per address × port: SYN → SYN/ACK time, or refused (RST) vs dropped (timeout)
@@ -583,7 +668,12 @@ public static class DoctorEngine
             else Tr(sink, DoctorCheck.Connect, a.Code == SocketError.ConnectionRefused ? DoctorState.Warning : DoctorState.Fail,
                     $"TCP {a.Port}", $"{a.Address} → {SaysLong(a)}", a.Ms);
         }
-        string from = f.TrustedFrom == "encrypted DNS" ? " (encrypted DNS's address)" : "";
+        string from = f.TrustedFrom switch
+        {
+            DoctorFacts.FromDoh => " (encrypted DNS's address)",
+            DoctorFacts.FromOverride => " (the override IP)",
+            _ => "",
+        };
         // one part per port: "443 in 120 ms", "80: refused"; the asked-for ports decide the state, an extra one only notes
         var parts = new List<string>();
         bool primaryFailed = false;
@@ -908,6 +998,10 @@ public static class DoctorEngine
         var plan = f.Plan;
         var via = f.Via = new DoctorViaProxy();
         string host = t.AsciiHost;
+        // the tunnels go where the direct path goes: to the override IP when one is set (the name stays in the SNI and
+        // the Host header), else to the name, which the proxy resolves
+        string dial = f.Override?.ToString() ?? host;
+        string Where(int port) => f.Override is { } ov ? $"{DoctorIp.EndPoint(ov, port)} (the override IP)" : t.Display(port);
         var rest = new[] { DoctorCheck.ProxyDns, DoctorCheck.ProxyConnect, DoctorCheck.ProxyTls, DoctorCheck.ProxyHttps, DoctorCheck.ProxyHttp };
         sink.Report(DoctorCheck.ProxyServer, DoctorState.Running, $"Reaching {proxy.Display}…");
         foreach (var r in rest) sink.Report(r, DoctorState.Running, "Waiting for the proxy…");
@@ -915,7 +1009,7 @@ public static class DoctorEngine
         int first = plan.All[0];
         try
         {
-            using var probe = await proxy.OpenAsync(host, first, 8000, ct).ConfigureAwait(false);
+            using var probe = await proxy.OpenAsync(dial, first, 8000, ct).ConfigureAwait(false);
             via.ReachMs = probe.ReachMs;
             via.LoginUsed = probe.LoginUsed;
             via.Tunnels[first] = (probe.TotalMs, null);
@@ -951,7 +1045,7 @@ public static class DoctorEngine
             (double, DoctorProxyException?) result;
             try
             {
-                using var tn = await proxy.OpenAsync(host, port, 8000, ct).ConfigureAwait(false);
+                using var tn = await proxy.OpenAsync(dial, port, 8000, ct).ConfigureAwait(false);
                 result = (tn.TotalMs, null);
             }
             catch (DoctorProxyException e) { result = (0, e); }
@@ -962,7 +1056,7 @@ public static class DoctorEngine
             await Task.WhenAll(plan.All.Where(p => !via.Tunnels.ContainsKey(p)).Select(Tunnel)).ConfigureAwait(false);
             foreach (int p in plan.All)
                 Tr(sink, DoctorCheck.ProxyConnect, via.TunnelOk(p) ? DoctorState.Ok : DoctorState.Fail, $"Tunnel {p}",
-                   via.Tunnels[p] is { Error: null } ok2 ? $"{t.Display()} open in {Ms(ok2.Ms)}" : via.Tunnels[p].Error!.Message, via.Tunnels[p].Ms > 0 ? via.Tunnels[p].Ms : null);
+                   via.Tunnels[p] is { Error: null } ok2 ? $"{Where(p)} open in {Ms(ok2.Ms)}" : via.Tunnels[p].Error!.Message, via.Tunnels[p].Ms > 0 ? via.Tunnels[p].Ms : null);
             var parts = plan.All.Select(p => via.Tunnels[p] is { Error: null } ok ? $"{p} in {Ms(ok.Ms)}" : $"{p}: {via.Tunnels[p].Error!.Message}").ToList();
             var okPorts = plan.All.Where(p => via.TunnelOk(p)).ToList();
             double? fastest = okPorts.Count > 0 ? okPorts.Min(p => via.Tunnels[p].Ms) : null;
@@ -1006,7 +1100,7 @@ public static class DoctorEngine
             }
             try
             {
-                using var tn = await proxy.OpenAsync(host, p, 8000, ct).ConfigureAwait(false);
+                using var tn = await proxy.OpenAsync(dial, p, 8000, ct).ConfigureAwait(false);
                 var r = await DoctorTls.OverStreamAsync(tn.Stream, t.IsIp ? null : host, host, env.TrustRoots, 6000, ct).ConfigureAwait(false);
                 via.Tls = r;
                 bool tlsOk = r.Outcome is DoctorTlsOutcome.Ok or DoctorTlsOutcome.CertProblem;
@@ -1032,7 +1126,7 @@ public static class DoctorEngine
             }
             var url = new Uri(t.Url(hs, true, withPath: plan.HttpsPrimary));
             sink.Report(DoctorCheck.ProxyHttps, DoctorState.Running, Cap($"GET {url} through the proxy…"));
-            via.Https = await DoctorHttp.GetViaProxyAsync(url, proxy, ct).ConfigureAwait(false);
+            via.Https = await DoctorHttp.GetViaProxyAsync(url, proxy, f.Override, ct).ConfigureAwait(false);
             ReportHttp(sink, DoctorCheck.ProxyHttps, via.Https);
         }
 
@@ -1046,7 +1140,9 @@ public static class DoctorEngine
             }
             var url = new Uri(t.Url(hp, false, withPath: plan.HttpPrimary));
             sink.Report(DoctorCheck.ProxyHttp, DoctorState.Running, Cap($"GET {url} through the proxy…"));
-            via.Http = await DoctorHttp.GetViaProxyAsync(url, proxy, ct).ConfigureAwait(false);
+            if (f.Override != null && proxy.Kind == DoctorProxyKind.Http)
+                Tr(sink, DoctorCheck.ProxyHttp, DoctorState.Skipped, "Override IP", "not used here: an HTTP proxy connects to the name itself for http://");
+            via.Http = await DoctorHttp.GetViaProxyAsync(url, proxy, f.Override, ct).ConfigureAwait(false);
             ReportHttp(sink, DoctorCheck.ProxyHttp, via.Http);
         }
 

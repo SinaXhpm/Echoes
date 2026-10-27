@@ -291,6 +291,28 @@
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 
+        <!-- the options row: [Proxy] [IP …]; the IP box keeps an address's width on a wide page and fills a phone's row -->
+        <Style Selector="CheckBox#ProxyToggle">
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBox#OverrideBox">
+            <Setter Property="Padding" Value="8,0,12,0"/>
+        </Style>
+        <Style Selector="Grid#DocRoot.wide TextBox#OverrideBox">
+            <Setter Property="Width" Value="250"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <!-- a field's own name inside its left edge ("IP"), so a filled-in value still says what it is -->
+        <Style Selector="TextBlock.inLabel">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="LetterSpacing" Value="0.3"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+        </Style>
+
         <!-- the proxy row: address | user | password on a wide page; address over user | password on a phone -->
         <Style Selector="Grid#DocRoot.wide Grid#ProxyRow > :is(Control).proxyAddr"><Setter Property="Grid.ColumnSpan" Value="2"/></Style>
         <Style Selector="Grid#DocRoot.wide Grid#ProxyRow > :is(Control).proxyUser"><Setter Property="Grid.Column" Value="2"/></Style>
@@ -302,13 +324,6 @@
         <Style Selector="Grid#DocRoot.narrow Grid#ProxyRow > :is(Control).proxyPass">
             <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/>
             <Setter Property="Margin" Value="0,8,0,0"/>
-        </Style>
-        <!-- desktop: the check box sits in the label line without making it taller (phones keep their touch height) -->
-        <Style Selector="Grid#DocRoot.wide CheckBox#ProxyToggle">
-            <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="Height" Value="22"/>
-            <Setter Property="Padding" Value="6,0,0,0"/>
-            <Setter Property="Margin" Value="0,-5,0,2"/>
         </Style>
 
         <!-- wide: glyph · title · detail · time on one line; narrow (a phone): the detail goes under the title -->
@@ -328,16 +343,11 @@
 
     <Grid x:Name="DocRoot" helpers:Responsive.BreakWidth="560" RowDefinitions="Auto, Auto, *" RowSpacing="12">
 
-        <!-- ===== the target ===== -->
+        <!-- ===== the target, and its options in one row under it ===== -->
         <Border Grid.Row="0" Classes="card" Padding="12">
             <StackPanel Spacing="8">
                 <StackPanel>
-                    <Grid ColumnDefinitions="*, Auto">
-                        <TextBlock Classes="fieldLabel" Text="Site or server" VerticalAlignment="Bottom"/>
-                        <CheckBox Grid.Column="1" x:Name="ProxyToggle" Content="Use a proxy" IsChecked="{Binding UseProxy}"
-                                  VerticalAlignment="Center"
-                                  ToolTip.Tip="Also test through a proxy: http://, https://, socks4:// or socks5://"/>
-                    </Grid>
+                    <TextBlock Classes="fieldLabel" Text="Site or server"/>
                     <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
                         <AutoCompleteBox x:Name="TargetBox" Classes="field"
                                          helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Endpoint"
@@ -361,13 +371,31 @@
                     </Grid>
                 </StackPanel>
 
+                <!-- the options: a proxy to test through as well, an IP to connect to instead of the DNS answer -->
+                <Grid x:Name="OptionsRow" ColumnDefinitions="Auto, *" ColumnSpacing="12">
+                    <CheckBox x:Name="ProxyToggle" Content="Proxy" IsChecked="{Binding UseProxy}"
+                              ToolTip.Tip="Also run the checks through a proxy: http://, https://, socks4:// or socks5://"/>
+                    <TextBox Grid.Column="1" x:Name="OverrideBox" Classes="field" Text="{Binding OverrideIp}"
+                             helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Ip"
+                             PlaceholderText="from DNS"
+                             ToolTip.Tip="Connect to this IP instead of the DNS answer (like curl --resolve); TLS and HTTP still use the site's name"
+                             AutomationProperties.Name="IP to connect to">
+                        <TextBox.InnerLeftContent>
+                            <TextBlock Classes="inLabel" Text="IP"/>
+                        </TextBox.InnerLeftContent>
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding ToggleRunCommand}"/>
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                </Grid>
+
                 <!-- the proxy: address, user, password side by side (stacked on a phone) -->
                 <Grid x:Name="ProxyRow" IsVisible="{Binding UseProxy}" ColumnDefinitions="*, *, *, *" RowDefinitions="Auto, Auto"
                       ColumnSpacing="8">
                     <AutoCompleteBox x:Name="ProxyBox" Classes="field proxyAddr"
                                      helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Endpoint"
                                      Text="{Binding ProxyAddress}" ItemsSource="{Binding ProxyHistory}"
-                                     FilterMode="ContainsOrdinal" MinimumPrefixLength="0" FontFamily="{StaticResource MonoFont}"
+                                     FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                      PlaceholderText="Proxy, e.g. socks5://127.0.0.1:1080"
                                      ToolTip.Tip="http://, https://, socks4:// or socks5:// — host:port alone is detected"
                                      AutomationProperties.Name="Proxy address"/>

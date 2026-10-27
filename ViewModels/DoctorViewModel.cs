@@ -16,8 +16,8 @@ public enum DoctorCard { Idle, Running, Works, Problem, Down, Unknown, Stopped, 
 
 /// <summary>
 /// The Doctor ("why doesn't this site work for me"): one input, one button, a verdict card with one sentence and what to
-/// do, and the checks behind it, live. The only choice is an optional proxy to test through as well; everything else
-/// follows from the target (see <see cref="DoctorEngine"/>).
+/// do, and the checks behind it, live. The options are a proxy to test through as well and an IP to connect to instead
+/// of the DNS answer; everything else follows from the target (see <see cref="DoctorEngine"/>).
 /// </summary>
 public partial class DoctorViewModel : ObservableObject
 {
@@ -44,6 +44,9 @@ public partial class DoctorViewModel : ObservableObject
     [ObservableProperty] private string _proxyAddress = string.Empty;
     [ObservableProperty] private string _proxyUser = string.Empty;
     [ObservableProperty] private string _proxyPass = string.Empty;
+
+    /// <summary>An IP to connect to instead of the DNS answer (like curl --resolve); empty: the DNS answer. Persisted.</summary>
+    [ObservableProperty] private string _overrideIp = string.Empty;
 
     /// <summary>Expand every check's sub-steps (off: only the ones with a problem open automatically). Persisted.</summary>
     [ObservableProperty] private bool _showDetails;
@@ -83,6 +86,7 @@ public partial class DoctorViewModel : ObservableObject
     private int _run;
     private string? _reportTarget;
     private string? _reportProxy;
+    private string? _reportOverride;
     private DoctorVerdict? _verdict;
     private DateTime _ranAt;
     private bool _withProxy;   // the rows on show include the proxy's
@@ -100,6 +104,7 @@ public partial class DoctorViewModel : ObservableObject
         string rawPass = ps.GetSetting("doctor.proxyPass") ?? string.Empty;
         ProxyPass = SecretProtector.Unprotect(rawPass);
         if (rawPass.Length > 0 && ProxyPass.Length == 0) _unreadablePass = rawPass;
+        OverrideIp = ps.GetSetting("doctor.overrideIp") ?? string.Empty;
         ShowDetails = ps.GetBool("doctor.showDetails");
         _withProxy = UseProxy;
         RebuildItems();
@@ -119,7 +124,8 @@ public partial class DoctorViewModel : ObservableObject
         base.OnPropertyChanged(e);
         if (!_loaded) return;
         if (e.PropertyName == nameof(ProxyPass)) _unreadablePass = null;
-        if (e.PropertyName is nameof(UseProxy) or nameof(ProxyAddress) or nameof(ProxyUser) or nameof(ProxyPass) or nameof(ShowDetails)) SchedulePersist();
+        if (e.PropertyName is nameof(UseProxy) or nameof(ProxyAddress) or nameof(ProxyUser) or nameof(ProxyPass) or nameof(OverrideIp)
+                              or nameof(ShowDetails)) SchedulePersist();
     }
 
     partial void OnShowDetailsChanged(bool value)
@@ -172,6 +178,12 @@ public partial class DoctorViewModel : ObservableObject
             if (ProxyTrustRoots != null) proxy!.TrustRoots = ProxyTrustRoots;
             HistoryService.Instance.Add(ProxyHistoryKey, CheckHostProxy.Clean(ProxyAddress));
         }
+        System.Net.IPAddress? overrideIp = null;
+        if (OverrideIp.Trim().Length > 0 && !DoctorIp.TryParseOverride(OverrideIp, out overrideIp, out string oerr))
+        {
+            ShowInputError("Check the IP", oerr);
+            return;
+        }
         FlushPendingSave();
 
         // the box and the history keep the clean target: no user info, no query string (it may carry a token)
@@ -195,6 +207,8 @@ public partial class DoctorViewModel : ObservableObject
         _verdict = null;
         _reportTarget = t.Display();
         _reportProxy = proxy?.Display;
+        // an IP target has no DNS answer for the override to stand in for: the engine leaves it out, and so does the report
+        _reportOverride = t.IsIp ? null : overrideIp?.ToString();
         _ranAt = DateTime.Now;
         IsRunning = true;
         Card = DoctorCard.Running;
@@ -204,7 +218,8 @@ public partial class DoctorViewModel : ObservableObject
 
         var token = _cts.Token;
         var env = Env;
-        RunTask = Task.Run(() => RunAsync(t, env, proxy, run, token));
+        var options = new DoctorOptions { Proxy = proxy, Override = overrideIp };
+        RunTask = Task.Run(() => RunAsync(t, env, options, run, token));
     }
 
     private void ShowInputError(string title, string text)
@@ -238,11 +253,11 @@ public partial class DoctorViewModel : ObservableObject
         }
     }
 
-    private async Task RunAsync(DoctorTarget t, DoctorEnvironment env, DoctorProxy? proxy, int run, CancellationToken ct)
+    private async Task RunAsync(DoctorTarget t, DoctorEnvironment env, DoctorOptions options, int run, CancellationToken ct)
     {
         try
         {
-            var facts = await DoctorEngine.RunAsync(t, env, proxy, new Sink(this, run), ct).ConfigureAwait(false);
+            var facts = await DoctorEngine.RunAsync(t, env, options, new Sink(this, run), ct).ConfigureAwait(false);
             var verdict = DoctorVerdicts.Decide(facts);
             Dispatcher.UIThread.Post(() => { if (_run == run) Finish(verdict); });
         }
@@ -320,10 +335,11 @@ public partial class DoctorViewModel : ObservableObject
     }
 
     /// <summary>The plain-text report of the last run (what Copy report puts on the clipboard). With a proxy: its address
-    /// (never the login), its rows, and what can't go through it.</summary>
+    /// (never the login), its rows, and what can't go through it; with an override IP, that address.</summary>
     public string BuildReport()
     {
         string target = _reportTarget ?? "";
+        if (_reportOverride != null) target += $" at {_reportOverride} (the override IP)";
         if (_reportProxy != null) target += $" (also through {_reportProxy})";
         string text = DoctorVerdicts.Report(target, _verdict,
             Visible.Select(s => new DoctorVerdicts.Block(
@@ -385,6 +401,7 @@ public partial class DoctorViewModel : ObservableObject
             ("doctor.proxyAddr", CheckHostProxy.Clean(ProxyAddress)),
             ("doctor.proxyUser", ProxyUser),
             ("doctor.proxyPass", _unreadablePass ?? SecretProtector.Protect(ProxyPass)),
+            ("doctor.overrideIp", OverrideIp.Trim()),
             ("doctor.showDetails", ShowDetails ? "true" : "false"));
     }
 
