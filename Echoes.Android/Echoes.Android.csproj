@@ -59,4 +59,15 @@
     <!-- Same as the desktop head: build-time / unused assets are not embedded (~7 MB off the APK). -->
     <AvaloniaResource Remove="..\Assets\logo.png;..\Assets\logo.icns;..\Assets\echoes.mp4;..\Assets\avalonia-logo.ico" />
   </ItemGroup>
+
+  <!-- Startup profile: the methods a cold start and a first visit to every tool run, recorded on a phone. Release builds
+       compile them ahead of time instead of at every launch: a cold start went from 5.4 s to 2.5 s on the Realme test
+       phone, for about 2.5 MB more per ABI (compiling everything ahead of time gave 3.5 s for 10 MB). Methods are
+       matched by name, so the profile stays useful as the code changes; record it again after a big Avalonia upgrade:
+       add the Mono.AotProfiler.Android package, run dotnet build -t:BuildAndStartAotProfiling -c Release
+       -p:RunAOTCompilation=false -p:AndroidEnableAotProfiler=true, open every tool once, run -t:FinishAotProfiling with
+       the same options, copy custom.aprof over this file, and clear the phone's debug.mono.profile property. -->
+  <ItemGroup>
+    <AndroidAotProfile Include="startup.aprof" />
+  </ItemGroup>
 </Project>

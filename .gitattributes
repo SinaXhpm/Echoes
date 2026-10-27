@@ -63,7 +63,7 @@
 #*.RTF   diff=astextplain
 
 ###############################################################################
-# Shell scripts keep LF endings: a CRLF script fails on macOS / Linux ("bash: No such file").
+# Shell scripts keep LF endings: a CRLF script fails on macOS / Linux ("bash\r: No such file").
 ###############################################################################
 *.sh text eol=lf
 
@@ -71,3 +71,8 @@
 # The portable zip's note keeps CRLF endings: it is read in Notepad on Windows.
 ###############################################################################
 packaging/windows/portable.txt text eol=crlf
+
+###############################################################################
+# Recorded AOT startup profiles (Echoes.Android/startup.aprof) are binary.
+###############################################################################
+*.aprof binary
