@@ -44,9 +44,10 @@
 		</Style>
 		<Style Selector="TabControl.bands > TabItem">
 			<Setter Property="MinHeight" Value="24"/>
-			<Setter Property="Padding" Value="9,0"/>
-			<Setter Property="Margin" Value="0,0,4,0"/>
 			<Setter Property="FontSize" Value="11.5"/>
+		</Style>
+		<Style Selector="TabControl.bands > TabItem /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Padding" Value="9,0"/>
 		</Style>
 		<Style Selector="TextBlock.reco">
 			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>

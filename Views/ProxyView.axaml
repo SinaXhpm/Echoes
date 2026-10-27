@@ -256,7 +256,7 @@
             <Setter Property="Width" Value="NaN"/><Setter Property="Margin" Value="0,3,0,0"/>
         </Style>
         <!-- ===== CHECK PROXIES ===== -->
-        <Style Selector="TabControl#PxTabs > TabItem">
+        <Style Selector="TabControl#PxTabs > TabItem /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Padding" Value="14,0"/>
         </Style>
         <Style Selector="TextBox#PcInput">

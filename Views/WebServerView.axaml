@@ -205,9 +205,6 @@
         </Style>
 
         <!-- the lower card: sub-tabs Chat | Files | Log -->
-        <Style Selector="TabControl.subtabs > TabItem">
-            <Setter Property="Padding" Value="11,0"/>
-        </Style>
         <Style Selector="Border.badge.unread">
             <Setter Property="Padding" Value="5,0"/>
             <Setter Property="MinWidth" Value="18"/>
@@ -671,7 +668,7 @@
             <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
-        <Style Selector="TabControl.detailTabs > TabItem">
+        <Style Selector="TabControl.detailTabs > TabItem /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Padding" Value="10,0"/>
         </Style>
         <Style Selector="TextBlock.bodyLabel">

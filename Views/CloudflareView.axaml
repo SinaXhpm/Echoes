@@ -958,8 +958,11 @@
         </Style>
         <!-- the tab strip: "DNS records" reads "DNS" on phones so the five tabs fit one line -->
         <Style Selector="Grid#CfMain.narrow TabControl#CfTabs > TabItem">
-            <Setter Property="Padding" Value="11,0"/>
             <Setter Property="Margin" Value="0,0,4,0"/>
+        </Style>
+        <!-- wrapped onto rows: each tab a rounded piece of track of its own (the shared style rounds only a row's ends) -->
+        <Style Selector="Grid#CfMain.narrow TabControl#CfTabs > TabItem:nth-child(n) /template/ Border#PART_LayoutRoot">
+            <Setter Property="CornerRadius" Value="7"/>
         </Style>
 
         <!-- ===== Record editor: EdForm gets narrow/wide from its own width ===== -->

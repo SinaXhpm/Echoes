@@ -215,7 +215,7 @@
         </Style>
 
         <!-- ===== sub-tabs ===== -->
-        <Style Selector="TabControl#SshTabs > TabItem">
+        <Style Selector="TabControl#SshTabs > TabItem /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Padding" Value="14,0"/>
         </Style>
 

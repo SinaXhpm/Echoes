@@ -193,7 +193,7 @@
         <Style Selector="Grid#SkTx.wide TextBlock.traffic">
             <Setter Property="Margin" Value="14,0,0,0"/>
         </Style>
-        <Style Selector="TabControl.view > TabItem">
+        <Style Selector="TabControl.view > TabItem /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Padding" Value="10,0"/>
         </Style>
         <Style Selector="Button.icon Path.glyph">
@@ -464,7 +464,7 @@
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="Margin" Value="0,8,0,0"/>
         </Style>
-        <Style Selector="TabControl.inmode > TabItem">
+        <Style Selector="TabControl.inmode > TabItem /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Padding" Value="10,0"/>
         </Style>
         <Style Selector="TextBlock.inputError">

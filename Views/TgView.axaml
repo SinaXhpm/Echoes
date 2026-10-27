@@ -752,6 +752,8 @@
         <!-- phones: touch-sized rows -->
         <Style Selector="TabControl#PhoneSwitch > TabItem">
             <Setter Property="MinHeight" Value="36"/>
+        </Style>
+        <Style Selector="TabControl#PhoneSwitch > TabItem /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Padding" Value="16,0"/>
         </Style>
         <Style Selector="Grid#TgRoot.narrow ListBox.picker > ListBoxItem, Grid#TgRoot.narrow ListBox.history > ListBoxItem">
