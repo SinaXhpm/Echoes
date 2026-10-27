@@ -484,8 +484,9 @@
         <Style Selector="Grid#CurlRoot.narrow TabItem">
             <Setter Property="Margin" Value="0,0,16,0"/>
         </Style>
+        <!-- the segmented control stays one track (the rule above would space its parts apart) -->
         <Style Selector="Grid#CurlRoot.narrow TabControl.seg > TabItem">
-            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="Margin" Value="0"/>
         </Style>
         <!-- response toolbar: search shares the line when wide, gets its own under the switch when narrow -->
         <Style Selector="Grid#CurlRoot.narrow Border#SearchBox">
