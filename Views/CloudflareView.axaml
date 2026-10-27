@@ -1314,8 +1314,10 @@
           </Border>
       </ScrollViewer>
 
-      <Grid x:Name="CfMain" IsVisible="{Binding !IsLocked}" RowDefinitions="Auto, Auto, *, Auto" helpers:Responsive.BreakWidth="640"
-            Classes.account="{Binding IsAccountExpanded}">
+      <!-- built the first time the vault is open: a locked page (every start) shows only the card above -->
+      <ctl:Deferred IsVisible="{Binding !IsLocked}"><DataTemplate x:DataType="vm:CloudflareViewModel">
+      <Grid x:Name="CfMain" RowDefinitions="Auto, Auto, *, Auto" helpers:Responsive.BreakWidth="640"
+            Classes.account="{Binding IsAccountExpanded}" AttachedToVisualTree="CfMain_Attached">
 
         <!-- ============ ACCOUNT: the account picker with Add account / Edit / Lock; the account form folds out below ============ -->
         <Border Grid.Row="0" Classes="card" Padding="12,8,8,8">
@@ -2232,6 +2234,7 @@
             </Grid>
         </Border>
       </Grid>
+      </DataTemplate></ctl:Deferred>
 
       <!-- ============ RECORD EDITOR — takes over the tool on a solid backdrop (no see-through overlay) ============ -->
       <Border IsVisible="{Binding IsEditorOpen}" Background="{DynamicResource Bg.App}">

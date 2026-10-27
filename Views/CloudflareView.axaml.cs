@@ -28,8 +28,13 @@ public partial class CloudflareView : UserControl
     public CloudflareView()
     {
         InitializeComponent();
-        // phones: a narrow record row drops its Edit / Delete buttons (styles: CfMain.narrow.touch) and opens on a tap
-        if (AppPlatform.IsMobile) CfMain.Classes.Add("touch");
+    }
+
+    // phones: a narrow record row drops its Edit / Delete buttons (styles: CfMain.narrow.touch) and opens on a tap. (The
+    // main grid is built when the vault first opens, Views/Controls/Deferred: it reports itself through this event.)
+    private void CfMain_Attached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        if (sender is Control main) main.Classes.Set("touch", AppPlatform.IsMobile);
     }
 
     // Avalonia.Android turns the filters into MIME types and drops "All" once another type is listed, so a .zone file (no
