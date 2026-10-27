@@ -240,7 +240,7 @@ Type a site or server and press Diagnose. Echoes checks everything between you a
 - **Encrypted DNS:** use plain resolvers (`1.1.1.1`, `8.8.8.8:53`), DNS over HTTPS (`https://1.1.1.1/dns-query`) or DNS over TLS (`tls://1.1.1.1`), picked from a presets menu (Cloudflare, Google, Quad9, OpenDNS, AdGuard, Shecan, Electro) or typed in. Each answer shows which transport answered and how fast.
 - **Compare resolvers:** query one name through many resolvers at once: median speed, success rate and answers, with tampered or filtered answers flagged and the fastest trustworthy resolver recommended.
 - **Email check:** MX, SPF (with the 10-lookup limit), DMARC, DKIM (common selectors), MTA-STS, TLS-RPT and spam blocklists for a domain, each with a one-line fix.
-- Domain registration details through RDAP, the modern WHOIS.
+- Domain registration details through WHOIS, from IANA to the registry and the registrar, with RDAP when port 43 is blocked; it works for country domains without RDAP, such as `.ir`. Addresses and AS numbers go through RDAP first.
 - Paste a full URL and Echoes takes the host name out of it.
 
 ### Port scanner
@@ -281,7 +281,7 @@ Keep an eye on your servers and websites, and hear when something changes.
 - Live uptime, response-time graphs and an event log.
 - **No false alarms:** a target counts as down only after several failed checks in a row, and as up again after several successes (you choose how many).
 - **Telegram alerts:** get "down", "back up" and warnings from your own Telegram bot on your phone. "Find my chat" sets it up, a test message checks it, and alerts can go through a proxy where Telegram is blocked. The bot token is stored encrypted.
-- **Expiry warnings, automatic:** HTTPS certificates expiring within 14 days, and domains expiring within 30 days (via RDAP).
+- **Expiry warnings, automatic:** HTTPS certificates expiring within 14 days, and domains expiring within 30 days (via RDAP, or WHOIS where RDAP is missing or blocked).
 - **Optional checks per target:** alert when DNS answers change (spot hijacking), or when a page does or doesn't contain a text.
 - Warnings are a third state next to up and down, and don't count as downtime.
 - **Alert sounds on every platform:** distinct chimes for "went down", "back up" and warnings, each with its own switch, a volume slider and a Test button. On Android they follow the phone's notification volume and Do not disturb.
@@ -509,7 +509,7 @@ Not available on Android: the system curl engine (the built-in engine is used in
 
 ## Privacy and security
 
-- **No account, no ads, no telemetry.** Echoes only contacts the hosts you test and the services a tool is built on (for example check-host.net, the speed test's servers (Cloudflare, or the server you pick), public DNS-over-HTTPS resolvers, the IP-info providers, rdap.org / rdap.verisign.com, and RIPEstat (stat.ripe.net) for who holds an address the DNS tool shows; the uptime monitor looks up its domains' expiry there; the Doctor checks internet access with connectivitycheck.gstatic.com; Dynamic DNS reads your public IP from Cloudflare, ipify, ident.me and icanhazip), plus GitHub to check for updates (not in the App Store versions, which update through the App Store).
+- **No account, no ads, no telemetry.** Echoes only contacts the hosts you test and the services a tool is built on (for example check-host.net, the speed test's servers (Cloudflare, or the server you pick), public DNS-over-HTTPS resolvers, the IP-info providers, the WHOIS servers of IANA, the registries and registrars, rdap.org / rdap.verisign.com, and RIPEstat (stat.ripe.net) for who holds an address the DNS tool shows; the uptime monitor looks up its domains' expiry there; the Doctor checks internet access with connectivitycheck.gstatic.com; Dynamic DNS reads your public IP from Cloudflare, ipify, ident.me and icanhazip), plus GitHub to check for updates (not in the App Store versions, which update through the App Store).
 - **Your data stays on your device:** `%APPDATA%\Echoes` on Windows, `~/Library/Application Support/Echoes` on macOS and `~/.config/Echoes` on Linux (the app's private storage on Android, iPhone and iPad, and the sandbox container with the Mac App Store version). The portable Windows zip keeps it in the `Echoes Data` folder next to `Echoes.exe`, readable by your Windows account only, with the key to its secrets locked to that account, so a copied folder opens nothing on another PC.
 - **Secrets are encrypted:** notes and the Cloudflare vault use AES-256-GCM with a key made from your master password; saved requests, SSH passwords, the Telegram alert token and other secrets are encrypted on disk with a per-install key. Dynamic DNS keeps such a device-encrypted copy of its account's token so it can run while the vault is locked; removing the record or the account deletes it. In memory, keys and decrypted data are wiped after use, on lock and on exit.
 - **Servers are opt-in and guarded:** nothing listens until you press Start. File sharing runs over HTTPS (TLS 1.2 and 1.3) behind an 8-digit PIN, wrong PINs are slowed down per device, and uploads respect a size cap and the free disk space. The proxy refuses other networks' private ranges and mail ports while it has no password, and the request catcher listens on this device only until you choose another interface.

@@ -350,20 +350,53 @@ public partial class DnsViewModel : ObservableObject
             return;
         }
 
+        // Classic WHOIS (port 43) goes first for a domain: many country domains have no RDAP (.ir among them), and the
+        // registry RDAP that rdap.org forwards to can be out of reach (Verisign's, for .com / .net, from Iran). Last for an
+        // address or AS number, whose registries' RDAP mostly answers. A port 43 that didn't answer this session puts it
+        // after RDAP.
+        const string ClassicWhois = "whois";
         var providers = new List<string> { $"https://rdap.org/{kind}/{key}" };
         if (kind == "domain")
-            providers.Add($"https://rdap.verisign.com/com/v1/domain/{key}");   // .com/.net fallback
+        {
+            if (key.EndsWith(".com", StringComparison.OrdinalIgnoreCase) || key.EndsWith(".net", StringComparison.OrdinalIgnoreCase))
+                providers.Add($"https://rdap.verisign.com/com/v1/domain/{key}");   // if rdap.org itself is down
+            providers.Insert(Whois43.Unreachable ? providers.Count : 0, ClassicWhois);
+        }
         else
         {
             // an address or AS number: RIPEstat reads its registry's WHOIS when that registry's RDAP is out of reach
             providers.Add(Rdap.RipeStatWhoisUrl(kind == "autnum" ? "AS" + key : key));
             if (Rdap.PreferRipeStat) providers.Reverse();
+            providers.Add(ClassicWhois);
         }
 
         // every provider's reason: when none answers, the one error names them all
         var errors = new List<string>();
+        Whois43.Answer? ianaOnly = null;
         foreach (var url in providers)
         {
+            if (url == ClassicWhois)
+            {
+                try
+                {
+                    var answer = await Whois43.LookUpAsync(query, kind switch { "ip" => Whois43.Kind.Ip, "autnum" => Whois43.Kind.Asn, _ => Whois43.Kind.Domain },
+                                                           token, TimeSpan.FromSeconds(20));
+                    // Only IANA answered (the server it named didn't): its record names the registry, not the holder, so
+                    // another source goes first; shown only when none answers.
+                    if (answer.Servers.Count == 1 && answer.Note != null)
+                    {
+                        errors.Add("WHOIS (port 43): " + answer.Note);
+                        ianaOnly = answer;
+                        continue;
+                    }
+                    ShowClassicWhois(answer, errors);
+                    return;
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested) { LogText = "cancelled."; IsWorking = false; return; }
+                catch (OperationCanceledException) { errors.Add("WHOIS (port 43): timed out"); }
+                catch (Exception ex) { errors.Add("WHOIS (port 43): " + Whois43.Reason(ex)); }
+                continue;
+            }
             string source = new Uri(url).Host;
             bool ripe = Rdap.IsRipeStat(url);
             try
@@ -410,14 +443,25 @@ public partial class DnsViewModel : ObservableObject
                 if (!ripe && kind != "domain") Rdap.RdapFailed(ex);
             }
         }
-        LogText = "No RDAP data — " + (errors.Count > 0 ? string.Join("; ", errors) : "request failed / timed out") + ".";
+        if (ianaOnly != null) { ShowClassicWhois(ianaOnly, errors.Where(e => !e.StartsWith("WHOIS (port 43)", StringComparison.Ordinal)).ToList()); return; }
+        LogText = "No WHOIS data — " + (errors.Count > 0 ? string.Join("; ", errors) : "request failed / timed out") + ".";
         IsWorking = false;
+
+        // the servers asked, once at the top, and what failed before, if anything
+        void ShowClassicWhois(Whois43.Answer answer, List<string> failed)
+        {
+            var heading = new List<string> { "% WHOIS " + string.Join(" → ", answer.Servers) };
+            if (answer.Note != null) heading.Add(answer.Note);
+            heading.AddRange(failed);
+            LogText = string.Join("; ", heading) + Environment.NewLine + Environment.NewLine + answer.Text;
+            IsWorking = false;
+        }
     }
 
     // A WHOIS handed over while a run goes on: it runs once that run has stopped.
     private string? _pendingWhois;
 
-    /// <summary>WHOIS (RDAP) for <paramref name="query"/> in Lookup mode, as if it were typed and run: what an address in
+    /// <summary>WHOIS for <paramref name="query"/> in Lookup mode, as if it were typed and run: what an address in
     /// these results, or another tool, hands over. A run in progress is stopped first.</summary>
     public void Whois(string query)
     {

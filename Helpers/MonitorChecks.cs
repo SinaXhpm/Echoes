@@ -226,7 +226,8 @@ public static class MonitorChecks
     /// <summary>
     /// The registration expiry of <paramref name="domain"/> (a registrable name, see <see cref="RegistrableDomain"/>)
     /// over RDAP: the rdap.org bootstrap (it redirects to the registry's server), a capped body, a short deadline, no
-    /// credentials. Never throws (except the caller's cancellation): anything that goes wrong is
+    /// credentials; else the registry's classic WHOIS (<see cref="Whois43"/>). Never throws (except the caller's
+    /// cancellation): anything that goes wrong is
     /// <see cref="MonitorRdapOutcome.Failed"/>, which callers keep silent.
     /// </summary>
     public static async Task<MonitorRdapResult> FetchDomainExpiryAsync(string domain, CancellationToken ct)
@@ -237,19 +238,70 @@ public static class MonitorChecks
         if (RdapBaseUrl == DefaultRdapBase && (domain.EndsWith(".com", StringComparison.Ordinal) || domain.EndsWith(".net", StringComparison.Ordinal)))
             urls.Add($"https://rdap.verisign.com/{domain[(domain.LastIndexOf('.') + 1)..]}/v1/domain/{domain}");
 
+        var outcome = MonitorRdapOutcome.Failed;
         foreach (var url in urls)
         {
             try
             {
                 var (status, body) = await FetchRdapAsync(url, ct).ConfigureAwait(false);
-                if (status == 404) return new(MonitorRdapOutcome.NoData, null);
+                if (status == 404) { outcome = MonitorRdapOutcome.NoData; break; }
                 if (status is >= 200 and < 300 && body.TrimStart().StartsWith('{'))
-                    return ParseRdap(body) is { } parsed ? parsed : new(MonitorRdapOutcome.Failed, null);
+                {
+                    if (ParseRdap(body) is { } parsed) return parsed;
+                    break;
+                }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception) { /* next provider; silent */ }
         }
-        return new(MonitorRdapOutcome.Failed, null);
+
+        // No RDAP answer, or no RDAP for the domain (.ir and many other country domains have none): the registry's classic
+        // WHOIS, which some networks leave open when they block the RDAP servers (Verisign's, from Iran). Not with a test
+        // server standing in for rdap.org.
+        if (RdapBaseUrl != DefaultRdapBase) return new(outcome, null);
+        try
+        {
+            var answer = await Whois43.LookUpAsync(domain, Whois43.Kind.Domain, ct, RdapTimeout * 2).ConfigureAwait(false);
+            if (answer.Servers.Count > 1)   // the registry answered (IANA alone only names it)
+            {
+                var expiry = WhoisExpiry(answer.Text);
+                if (expiry == null && WhoisNotFound.IsMatch(answer.Text)) return new(MonitorRdapOutcome.NoData, null);
+                return new(MonitorRdapOutcome.Found, expiry);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception) { /* silent */ }
+        return new(outcome, null);
+    }
+
+    // Registries write the expiry their own way: "Registry Expiry Date: 2027-08-13T04:00:00Z" (gTLDs), "Registrar
+    // Registration Expiration Date:", "expire-date: 2027-03-22" (.ir), "Expiry date: 02-Aug-2027" (.uk), "paid-till:".
+    private static readonly System.Text.RegularExpressions.Regex WhoisExpiryLine = new(
+        @"^[ \t]*(Registry Expiry Date|Registrar Registration Expiration Date|Expiration Date|Expiry Date|Expiration Time|expire-date|expires|paid-till|Valid Until|renewal date)[ \t]*:[ \t]*(?<date>[^\r\n]+)",
+        System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    // how registries say a name isn't registered
+    private static readonly System.Text.RegularExpressions.Regex WhoisNotFound = new(
+        @"^[ \t]*(No match|NOT FOUND|No entries found|No Data Found|%ERROR:101|Domain not found|The queried object does not exist)",
+        System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>The expiry in a classic WHOIS answer (UTC), or null when it names none or one that doesn't parse.</summary>
+    internal static DateTime? WhoisExpiry(string text)
+    {
+        foreach (System.Text.RegularExpressions.Match m in WhoisExpiryLine.Matches(text))
+        {
+            string value = m.Groups["date"].Value.Trim();
+            // a trailing time zone name or comment ("2027-08-13 (YYYY-MM-DD)", "... UTC") is left out
+            int space = value.IndexOf(" (", StringComparison.Ordinal);
+            if (space > 0) value = value[..space];
+            value = value.Replace(" UTC", "", StringComparison.OrdinalIgnoreCase).Trim();
+            if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var when))
+                return when.UtcDateTime;
+            string[] formats = { "dd-MMM-yyyy", "yyyy.MM.dd", "dd.MM.yyyy", "yyyy/MM/dd", "yyyy-MM-dd HH:mm:ss", "yyyyMMdd" };
+            if (DateTime.TryParseExact(value, formats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var exact))
+                return exact;
+        }
+        return null;
     }
 
     private static async Task<(int Status, string Body)> FetchRdapAsync(string url, CancellationToken ct)

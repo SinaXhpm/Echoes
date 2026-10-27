@@ -172,7 +172,8 @@ public static class Rdap
 
     /// <summary>
     /// Who holds <paramref name="ip"/>: its registry's RDAP through rdap.org, else RIPEstat's copy of the registry's WHOIS
-    /// (the other way round once rdap.org didn't answer, see <see cref="PreferRipeStat"/>), and the AS it is announced
+    /// (the other way round once rdap.org didn't answer, see <see cref="PreferRipeStat"/>), else the registry's classic
+    /// WHOIS (<see cref="Whois43"/>), and the AS it is announced
     /// from, asked of RIPEstat alongside (RDAP rarely has it). Never throws for a network failure: that is
     /// <see cref="IpWhois.Error"/>, naming each source's reason. Throws <see cref="OperationCanceledException"/> only
     /// when <paramref name="ct"/> is cancelled.
@@ -210,6 +211,19 @@ public static class Rdap
                     errors.Add($"{source}: {Reason(ex)}");
                     if (!ripe) RdapFailed(ex);
                 }
+            }
+            // neither: the registry's classic WHOIS on port 43, which some networks leave open when they block the others
+            if (found == null)
+            {
+                try
+                {
+                    var answer = await Whois43.LookUpAsync(key, Whois43.Kind.Ip, ct, InlineTimeout * 2).ConfigureAwait(false);
+                    // IANA's record alone is the registry's whole block, not the holder's
+                    if (answer.Servers.Count > 1) found = FromGroups(Whois43.Objects(answer.Text));
+                    if (found == null) errors.Add("WHOIS (port 43): " + (answer.Note ?? "no record"));
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                catch (Exception ex) { errors.Add("WHOIS (port 43): " + Reason(ex)); }
             }
             string asn = await announced.ConfigureAwait(false);
             if (found == null) return new IpWhois { Asn = asn, Error = "No WHOIS: " + string.Join("; ", errors) };
@@ -341,12 +355,13 @@ public static class Rdap
             ? "AS" + a[0].GetRawText()
             : "";
 
-    // RIPEstat's whois in each registry's own words: ARIN's NetName / OrgName / OrgAbuseEmail, the others' netname /
-    // descr / country; route objects add the block and the AS that announces it. An answer that is only IANA's
-    // catch-all block (an unallocated or special address) is no answer.
-    private static IpWhois? FromRipeStat(JsonElement root)
+    private static IpWhois? FromRipeStat(JsonElement root) => FromGroups(RipeStatGroups(root));
+
+    // A registry's whois objects in its own words (RIPEstat's copy, or port 43's text): ARIN's NetName / OrgName /
+    // OrgAbuseEmail, the others' netname / descr / country; route objects add the block and the AS that announces it. An
+    // answer that is only IANA's catch-all block (an unallocated or special address) is no answer.
+    private static IpWhois? FromGroups(List<List<(string key, string value)>> groups)
     {
-        var groups = RipeStatGroups(root);
         if (groups.Count == 0) return null;
         string Find(params string[] keys)
         {
