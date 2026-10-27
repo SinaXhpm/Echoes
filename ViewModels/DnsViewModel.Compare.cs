@@ -19,7 +19,7 @@ public partial class DnsViewModel
 
     partial void OnCompareServersTextChanged(string value)
     {
-        if (IsCompareMode) { OnPropertyChanged(nameof(ResolverText)); RefreshPresetMarks(); }
+        if (IsCompareMode) { OnPropertyChanged(nameof(ResolverText)); RefreshPresetMarks(); RebuildResolverRows(); }
         if (_loaded) ProfileService.Instance.SetSetting("dns.compare", value);
     }
 
@@ -41,6 +41,8 @@ public partial class DnsViewModel
     /// <summary>"12 of 51 queries" while running; "17 resolvers · 3 rounds" after.</summary>
     [ObservableProperty] private string _compareProgress = "";
     [ObservableProperty] private bool _hasCompareRows;
+    /// <summary>A resolver's answers hold addresses: the table gets the column for their toggle.</summary>
+    [ObservableProperty] private bool _compareHasIps;
 
     private List<CompareStats>? _compareStats;
     private string _compareName = "";
@@ -62,7 +64,7 @@ public partial class DnsViewModel
         var specs = ResolverSpec.ParseList(CompareServersText, skipped);
         if (specs.Count == 0)
         {
-            ShowCompareMessage("No valid resolver in the list — add some from Presets, or one per line (1.1.1.1, https://…/dns-query, tls://…).", bad: true);
+            ShowCompareMessage("No valid resolver in the list — add some from Presets, or type one in (1.1.1.1, https://…/dns-query, tls://…).", bad: true);
             return;
         }
         bool cut = specs.Count > DnsCompare.MaxResolvers;
@@ -83,6 +85,7 @@ public partial class DnsViewModel
         var rows = specs.Select(s => new CompareRow(s)).ToList();
         foreach (var r in rows) CompareRows.Add(r);
         HasCompareRows = true;
+        CompareHasIps = false;
         CompareSummary = "";
         CompareSummaryGood = CompareSummaryBad = false;
         int total = specs.Count * DnsCompare.Rounds, done = 0;
@@ -111,8 +114,10 @@ public partial class DnsViewModel
             {
                 var row = rows[specs.IndexOf(st.Spec)];
                 row.Update(st, final: true);
+                row.Ips = IpsIn(type, st.Values);   // the run is over: no round adds to Values any more
                 CompareRows.Add(row);
             }
+            CompareHasIps = rows.Any(r => r.HasIps);
             CompareSummary = DnsCompare.Recommendation(stats) + (skipped.Count > 0 ? $" ({skipped.Count} line(s) skipped: {skipped[0].reason})" : "")
                              + (cut ? $" Only the first {DnsCompare.MaxResolvers} resolvers were compared." : "");
             CompareSummaryGood = stats.Any(s => s.IsBest);
@@ -135,6 +140,7 @@ public partial class DnsViewModel
     {
         CompareRows.Clear();
         HasCompareRows = false;
+        CompareHasIps = false;
         _compareStats = null;
         CompareSummary = text;
         CompareSummaryBad = bad;

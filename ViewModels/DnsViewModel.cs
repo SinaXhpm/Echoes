@@ -44,6 +44,7 @@ public partial class DnsViewModel : ObservableObject
     partial void OnModeIndexChanged(int value)
     {
         RefreshPresetMarks();
+        RebuildResolverRows();
         if (_loaded) ProfileService.Instance.SetSetting("dns.mode", value.ToString(CultureInfo.InvariantCulture));
     }
 
@@ -55,8 +56,8 @@ public partial class DnsViewModel : ObservableObject
         _ => "Query the record types through every resolver in the list",
     };
 
-    /// <summary>The resolver box: the lookup list in Lookup / Email check (the email check asks the first that answers),
-    /// its own list in Compare.</summary>
+    /// <summary>The resolver list as text, one per line: the lookup list in Lookup / Email check (the email check asks the
+    /// first that answers), its own list in Compare. The list editor's rows are made from it.</summary>
     public string ResolverText
     {
         get => IsCompareMode ? CompareServersText : DnsServersText;
@@ -69,14 +70,20 @@ public partial class DnsViewModel : ObservableObject
 
     public string ResolverHint => ModeIndex switch
     {
-        ModeCompare => "Resolvers to compare, one per line: an IP, https://host/dns-query (DoH), tls://host (DoT) or system",
-        ModeEmail => "Resolvers, one per line — the check uses the first that answers. Spamhaus refuses big public resolvers: put system first to check it.",
-        _ => "Resolvers, one per line: an IP or IP:port (plain DNS), https://host/dns-query (DoH), tls://host or host:853 (DoT), or system",
+        ModeCompare => $"The resolvers to compare: each is asked {DnsCompare.Rounds} times",
+        ModeEmail => "The check uses the first that answers. Spamhaus refuses big public resolvers: put system first to check it.",
+        _ => $"Each is asked for every record type (the first {MaxLookupResolvers} of a longer list)",
     };
 
     // DNS lookups render as record rows (Records); WHOIS renders as freeform text (LogText).
     public ObservableCollection<DnsRecordRow> Records { get; } = new();
     [ObservableProperty] private bool _showRecords;
+    /// <summary>A row of this lookup holds an address: every row keeps a slot for the address toggle, so the resolver
+    /// column stays aligned.</summary>
+    [ObservableProperty] private bool _lookupHasIps;
+
+    // The addresses in the results (WHOIS here or in full, IP Info): where they are handed to, and their lookups in flight.
+    private readonly IpLinkScope _ips;
 
     // Wrap the WHOIS text pane by default so long lines stay visible.
     [ObservableProperty] private bool _wrapResult = true;
@@ -146,8 +153,10 @@ public partial class DnsViewModel : ObservableObject
         TypePTR = on.Contains("PTR");
     }
 
-    public DnsViewModel()
+    /// <param name="links">Where an address in the results is handed to (WHOIS, IP Info): MainViewModel.</param>
+    public DnsViewModel(IToolLinks? links = null)
     {
+        _ips = new IpLinkScope(links);
         PresetGroups = BuildPresets();
         LoadServers();
         if (HistoryService.Instance.Last("dns.domain") is { } last) DomainName = last;
@@ -158,6 +167,8 @@ public partial class DnsViewModel : ObservableObject
         int mode = ProfileService.Instance.GetInt("dns.mode", ModeLookup);
         ModeIndex = mode is ModeCompare or ModeEmail ? mode : ModeLookup;
         RefreshPresetMarks();
+        RebuildResolverRows();
+        NewResolverText = ProfileService.Instance.GetSetting(ResolverDraftKey) ?? "";
         _loaded = true;
     }
 
@@ -182,7 +193,7 @@ public partial class DnsViewModel : ObservableObject
     // closing the app was lost. Cheap — the profile coalesces writes in the background.
     partial void OnDnsServersTextChanged(string value)
     {
-        if (!IsCompareMode) { OnPropertyChanged(nameof(ResolverText)); RefreshPresetMarks(); }
+        if (!IsCompareMode) { OnPropertyChanged(nameof(ResolverText)); RefreshPresetMarks(); RebuildResolverRows(); }
         if (_loaded) SaveServers();
     }
 
@@ -194,6 +205,7 @@ public partial class DnsViewModel : ObservableObject
         _cts?.Cancel();
         _cts?.Dispose();
         _cts = new CancellationTokenSource();
+        _ips.CancelLookups();   // the inline WHOIS of the last results' addresses too
         return _cts.Token;
     }
 
@@ -203,11 +215,6 @@ public partial class DnsViewModel : ObservableObject
     private const int MaxAnswersPerQuery = 100;
     // Lookup asks every listed resolver for every type at once: a pasted list of hundreds is cut here.
     private const int MaxLookupResolvers = 20;
-
-    // RDAP answers are a few KB. rdap.org redirects to whichever registry serves the name, so the body is a third
-    // party's: it was buffered whole (100 MB in 1.4 s on loopback took ~350 MB of memory) and then parsed on the UI thread.
-    private const int MaxRdapBytes = 2 * 1024 * 1024;
-    private static readonly TimeSpan RdapTimeout = TimeSpan.FromSeconds(10);
 
     [RelayCommand]
     private void Stop() => _cts?.Cancel();
@@ -235,6 +242,7 @@ public partial class DnsViewModel : ObservableObject
         LogText = string.Empty;
         ShowRecords = true;
         Records.Clear();
+        LookupHasIps = false;
         _rowQueue.Clear();
         _rowBudget = MaxLookupRows;
         _charBudget = MaxShownChars;
@@ -257,7 +265,7 @@ public partial class DnsViewModel : ObservableObject
             AddRow(new DnsRecordRow
             {
                 Type = "ERR", IsStatus = true,
-                Value = specs.Count == 0 ? "No valid resolver — add one per line, e.g. 1.1.1.1 or https://cloudflare-dns.com/dns-query" : "No record type selected — pick one under Record types",
+                Value = specs.Count == 0 ? "No valid resolver — add one, e.g. 1.1.1.1 or https://cloudflare-dns.com/dns-query" : "No record type selected — pick one under Record types",
             });
             IsWorking = false;
             return;
@@ -291,7 +299,8 @@ public partial class DnsViewModel : ObservableObject
                     foreach (var a in r.Answers)
                     {
                         if (shown++ == MaxAnswersPerQuery) break;
-                        AddRow(new DnsRecordRow { Type = a.Type, Value = a.Value, Server = server, Meta = meta, ServerTip = spec.Text });
+                        AddRow(new DnsRecordRow { Type = a.Type, Value = a.Value, Server = server, Meta = meta, ServerTip = spec.Text,
+                                                  Ips = IpsIn(a.Type, new[] { a.Value }) });
                     }
                     if (r.AnswerCount > MaxAnswersPerQuery)
                         AddRow(new DnsRecordRow { Type = type.ToString(), Server = server, Meta = meta, ServerTip = spec.Text, IsStatus = true,
@@ -332,71 +341,116 @@ public partial class DnsViewModel : ObservableObject
             System.Net.IPAddress.TryParse(query, out _) ? "ip" : "domain";
         string key = kind == "autnum" ? query.TrimStart('A', 'S', 'a', 's') : query;
 
+        // a private, loopback or filter address is nobody's: no registry has it (RDAP answers 404, RIPEstat its catch-all block)
+        if (kind == "ip" && IPAddress.TryParse(query, out var address) && Rdap.SpecialPurpose(address) is { } note)
+        {
+            LogText = $"# whois {query}" + Environment.NewLine + Environment.NewLine + note + "." + Environment.NewLine
+                      + "Special-purpose addresses aren't registered to anyone, so no registry has a record of it.";
+            IsWorking = false;
+            return;
+        }
+
         var providers = new List<string> { $"https://rdap.org/{kind}/{key}" };
         if (kind == "domain")
             providers.Add($"https://rdap.verisign.com/com/v1/domain/{key}");   // .com/.net fallback
+        else
+        {
+            // an address or AS number: RIPEstat reads its registry's WHOIS when that registry's RDAP is out of reach
+            providers.Add(Rdap.RipeStatWhoisUrl(kind == "autnum" ? "AS" + key : key));
+            if (Rdap.PreferRipeStat) providers.Reverse();
+        }
 
-        string? lastError = null;
+        // every provider's reason: when none answers, the one error names them all
+        var errors = new List<string>();
         foreach (var url in providers)
         {
+            string source = new Uri(url).Host;
+            bool ripe = Rdap.IsRipeStat(url);
             try
             {
-                var (body, status) = await FetchRdap(url, token);
+                var (body, status) = await Rdap.FetchAsync(url, token);
 
                 // Map the common RDAP HTTP statuses to a clear message instead of dumping the body.
-                if (status == 404) { lastError = "no registry record (HTTP 404)"; continue; }
-                if (status == 429) { lastError = "rate limited (HTTP 429) — try again shortly"; continue; }
+                if (status == 404) { errors.Add($"{source}: no registry record (HTTP 404)"); continue; }
+                if (status == 429) { errors.Add($"{source}: rate limited (HTTP 429) — try again shortly"); continue; }
 
                 if (status is >= 200 and < 300 && body.TrimStart().StartsWith('{'))
                 {
                     // Up to 2 MB of JSON flattens into a lot of lines: parse and flatten off the UI thread.
-                    string text = await Task.Run(() =>
+                    string? text = await Task.Run(() =>
                     {
+                        if (ripe) return Rdap.RipeStatText(body) is { } whois ? TextLimit.Cap(whois) : null;
                         using var doc = JsonDocument.Parse(body);
                         var sb = new StringBuilder();
                         ParseElement(doc.RootElement, sb);
                         return TextLimit.Cap(sb.ToString());
                     }, token);
+                    if (text == null) { errors.Add($"{source}: no record"); continue; }
+                    // where it came from, once at the top, when that isn't the registry's own RDAP
+                    if (ripe)
+                        text = "% via RIPEstat (the registry's WHOIS)" + (errors.Count > 0 ? "; " + string.Join("; ", errors) : "")
+                               + Environment.NewLine + Environment.NewLine + text;
                     LogText = text;
                     IsWorking = false;
                     return;
                 }
-                lastError = $"HTTP {status}";
+                errors.Add($"{source}: HTTP {status}");
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { LogText = "cancelled."; IsWorking = false; return; }
             // HttpClient.Timeout also surfaces as a cancellation: a slow / filtered rdap.org is a failed provider
             // (try the next one), not a Stop — it used to end the whole WHOIS with "cancelled.".
-            catch (OperationCanceledException) { lastError = "timed out"; }
-            catch (Exception ex) { lastError = ex.Message; }
+            catch (OperationCanceledException ex)
+            {
+                errors.Add($"{source}: timed out");
+                if (!ripe && kind != "domain") Rdap.RdapFailed(ex);
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{source}: {ex.Message}");
+                if (!ripe && kind != "domain") Rdap.RdapFailed(ex);
+            }
         }
-        LogText = "No RDAP data — " + (lastError ?? "request failed / timed out") + ".";
+        LogText = "No RDAP data — " + (errors.Count > 0 ? string.Join("; ", errors) : "request failed / timed out") + ".";
         IsWorking = false;
     }
 
-    private static async Task<(string body, int status)> FetchRdap(string url, CancellationToken token)
-    {
-        using var client = HttpHelper.Create(timeout: RdapTimeout);
-        client.DefaultRequestHeaders.Accept.ParseAdd("application/rdap+json");
-        client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+    // A WHOIS handed over while a run goes on: it runs once that run has stopped.
+    private string? _pendingWhois;
 
-        // Headers first, then the body read with a ceiling (decompressed bytes, so a gzip bomb stops there too). The
-        // client's Timeout ends with the headers, so the body gets the same deadline; it surfaces as "timed out".
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
-        deadline.CancelAfter(RdapTimeout);
-        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
-        await using var stream = await response.Content.ReadAsStreamAsync(deadline.Token);
-        using var ms = new MemoryStream();
-        byte[] buf = new byte[16 * 1024];
-        int n;
-        while ((n = await stream.ReadAsync(buf, deadline.Token)) > 0)
+    /// <summary>WHOIS (RDAP) for <paramref name="query"/> in Lookup mode, as if it were typed and run: what an address in
+    /// these results, or another tool, hands over. A run in progress is stopped first.</summary>
+    public void Whois(string query)
+    {
+        if (IsWorking)
         {
-            if (ms.Length + n > MaxRdapBytes) throw new InvalidDataException($"the answer is larger than {MaxRdapBytes / (1024 * 1024)} MB");
-            ms.Write(buf, 0, n);
+            _pendingWhois = query;
+            Stop();
+            return;
         }
-        // RDAP is JSON, so UTF-8 (RFC 8259); a BOM is skipped as ReadAsStringAsync did.
-        int skip = ms.Length >= 3 && ms.GetBuffer()[0] == 0xEF && ms.GetBuffer()[1] == 0xBB && ms.GetBuffer()[2] == 0xBF ? 3 : 0;
-        return (Encoding.UTF8.GetString(ms.GetBuffer(), skip, (int)ms.Length - skip), (int)response.StatusCode);
+        ModeIndex = ModeLookup;
+        DomainName = query;
+        RunWhoisCommand.Execute(null);
     }
+
+    partial void OnIsWorkingChanged(bool value)
+    {
+        if (value || _pendingWhois is not { } query) return;
+        _pendingWhois = null;
+        // posted: the run that just ended is still unwinding its command
+        Dispatcher.UIThread.Post(() => Whois(query));
+    }
+
+    // The addresses a DNS value holds: an A / AAAA answer is one, any other value (an SPF record's ip4: / ip6: terms) is
+    // searched for them.
+    private IpPanel? IpsIn(string type, IEnumerable<string> values)
+        => _ips.For(type is "A" or "AAAA" ? values : values.SelectMany(AddressesIn));
+
+    // The addresses written in a text. A loopback or unspecified one there is a code, not a host (a blocklist answers
+    // 127.0.0.2 for "listed").
+    private static IEnumerable<string> AddressesIn(string text)
+        => HostExtractor.FindAddresses(text).Where(a =>
+            !IPAddress.TryParse(a.Split('/')[0], out var ip)
+            || !(IPAddress.IsLoopback(ip) || ip.Equals(IPAddress.Any) || ip.Equals(IPAddress.IPv6Any)));
 
     private static void ParseElement(JsonElement element, StringBuilder sb)
     {
@@ -484,7 +538,11 @@ public partial class DnsViewModel : ObservableObject
     private void DrainRows()
     {
         Interlocked.Exchange(ref _rowPosted, 0);
-        while (_rowQueue.TryDequeue(out var row)) Records.Add(row);
+        while (_rowQueue.TryDequeue(out var row))
+        {
+            Records.Add(row);
+            if (row.HasIps) LookupHasIps = true;
+        }
     }
 
     // ---------------------------------------------------------------- presets

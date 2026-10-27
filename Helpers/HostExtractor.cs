@@ -172,6 +172,33 @@ public static class HostExtractor
     }
 
     /// <summary>
+    /// The IP addresses in a text (a DNS answer, a mail-check finding), in reading order, each once: IPv4 / IPv6 addresses
+    /// and CIDR ranges ("192.0.2.0/24"), SPF's "ip4:" / "ip6:" terms included. Names and ports are left out.
+    /// </summary>
+    public static List<string> FindAddresses(string? raw)
+    {
+        var found = new List<string>();
+        if (string.IsNullOrWhiteSpace(raw)) return found;
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (tok, _) in Tokenize(raw))
+        {
+            // an SPF term, [+-~?]ip4:192.0.2.0/24: the prefix off first (TrimToken would cut "ip6:2001:db8::" at its colons)
+            string t = tok.Trim();
+            int q = t.Length > 0 && t[0] is '+' or '-' or '~' or '?' ? 1 : 0;
+            if (t.Length > q + 4 && (t.AsSpan(q, 4).Equals("ip4:", StringComparison.OrdinalIgnoreCase)
+                                     || t.AsSpan(q, 4).Equals("ip6:", StringComparison.OrdinalIgnoreCase)))
+                t = t[(q + 4)..];
+            t = TrimToken(t);
+            if (t.StartsWith('[') && t.EndsWith(']')) t = t[1..^1];
+            int slash = t.IndexOf('/');
+            string address = slash > 0 ? t[..slash] : t;
+            if (slash > 0 ? !IsCidrOrRange(t) : !IsStrictIPv4(address) && !IsIPv6(address)) continue;
+            if (seen.Add(t)) found.Add(t);
+        }
+        return found;
+    }
+
+    /// <summary>
     /// The URL to request: the first scheme://… in the text (a pasted <c>curl …</c> command yields its URL
     /// argument), or the whole input when it is a single schemeless token like "example.com/api".
     /// Null when nothing usable is found.

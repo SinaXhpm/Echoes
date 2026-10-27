@@ -38,6 +38,17 @@ public partial class DnsViewModel
 
     private readonly List<MailCheckItem>?[] _mailAreas = new List<MailCheckItem>?[MailCheck.Areas.Length];
 
+    // A finding's addresses (the mail servers', SPF's ranges, the blocklisted ones), made once: the list is built again as
+    // each area comes in, and a panel opened meanwhile stays open.
+    private readonly Dictionary<MailCheckItem, IpPanel?> _mailIps = new(ReferenceEqualityComparer.Instance);
+
+    private IpPanel? MailIps(MailCheckItem item)
+    {
+        if (!_mailIps.TryGetValue(item, out var panel))
+            _mailIps[item] = panel = _ips.For(AddressesIn(item.Summary + "\n" + item.Detail));
+        return panel;
+    }
+
     private async Task RunEmail()
     {
         DomainName = HostExtractor.Extract(DomainName);
@@ -118,6 +129,7 @@ public partial class DnsViewModel
             {
                 MailError = "No resolver answered: " + string.Join("; ", failures.Select(f => $"{f.Key} — {f.Value}")) + ".";
                 Array.Clear(_mailAreas);
+                _mailIps.Clear();
                 MailItems.Clear();
                 HasMailItems = false;
                 MailSummary = "";
@@ -139,6 +151,7 @@ public partial class DnsViewModel
     private void ClearMail()
     {
         Array.Clear(_mailAreas);
+        _mailIps.Clear();
         MailItems.Clear();
         HasMailItems = false;
         MailError = "";
@@ -156,7 +169,8 @@ public partial class DnsViewModel
         foreach (var area in _mailAreas)
         {
             if (area == null) continue;
-            for (int i = 0; i < area.Count; i++) MailItems.Add(new MailRow(area[i]) { IsAreaStart = i == 0 && MailItems.Count > 0 });
+            for (int i = 0; i < area.Count; i++)
+                MailItems.Add(new MailRow(area[i]) { IsAreaStart = i == 0 && MailItems.Count > 0, Ips = MailIps(area[i]) });
         }
         HasMailItems = MailItems.Count > 0;
         var all = AllMailItems().ToList();

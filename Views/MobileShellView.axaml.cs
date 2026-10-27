@@ -226,14 +226,27 @@ public partial class MobileShellView : UserControl
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
-        if (_vm is not null) _vm.PropertyChanged -= OnVmPropertyChanged;
+        if (_vm is not null)
+        {
+            _vm.PropertyChanged -= OnVmPropertyChanged;
+            _vm.ToolRequested -= SelectTool;
+        }
         _vm = DataContext as MainViewModel;
         if (_vm is not null)
         {
             _vm.PropertyChanged += OnVmPropertyChanged;
+            _vm.ToolRequested += SelectTool;
             EnsureSelectedToolView(_vm);
         }
         UpdateOverlay();
+    }
+
+    // A tool handed another one something (an address to look up): that tool's page is shown, built on a first visit as
+    // a tap in the drawer does.
+    private void SelectTool(string tag)
+    {
+        for (int i = 0; i < Nav.ItemCount; i++)
+            if (Nav.Items[i] is ListBoxItem { Tag: string t } && t == tag) { Nav.SelectedIndex = i; return; }
     }
 
     private void TogglePane(object? sender, RoutedEventArgs e)

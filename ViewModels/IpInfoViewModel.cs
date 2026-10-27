@@ -286,6 +286,27 @@ public partial class IpInfoViewModel : ObservableObject
         await FetchIpInfo(TargetIp);
     }
 
+    // An address handed over while a fetch runs (the entry points bail then): looked up as soon as that one ends.
+    private bool _lookUpPending;
+
+    /// <summary>Looks <paramref name="ip"/> up as if it were typed and run: what another tool hands over (an address in
+    /// the DNS results). A fetch already running finishes first.</summary>
+    public void LookUp(string ip)
+    {
+        TabIndex = 0;   // the Lookup tab, not Subnet / CIDR
+        TargetIp = ip;
+        if (IsWorking) { _lookUpPending = true; return; }
+        LookupIpCommand.Execute(null);
+    }
+
+    partial void OnIsWorkingChanged(bool value)
+    {
+        if (value || !_lookUpPending) return;
+        _lookUpPending = false;
+        // posted: the fetch that just ended is still unwinding its command
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => LookupIpCommand.Execute(null));
+    }
+
     // ---- multi-source fetch + merge ----
 
     private sealed record IpSource(int Priority, string Name, string Url, Func<JsonElement, IpGeoResult?> Parse);

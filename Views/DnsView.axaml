@@ -9,6 +9,56 @@
     <UserControl.Resources>
         <!-- copy glyph (two overlapping pages), stroked like the nav icons; drawn in a 24x24 box -->
         <StreamGeometry x:Key="DnsCopyGlyph">M10 8 H20 A2 2 0 0 1 22 10 V20 A2 2 0 0 1 20 22 H10 A2 2 0 0 1 8 20 V10 A2 2 0 0 1 10 8 Z M4 16 A2 2 0 0 1 2 14 V4 A2 2 0 0 1 4 2 H14 A2 2 0 0 1 16 4</StreamGeometry>
+        <!-- the resolver list's move up / remove / add, in the same 24x24 box -->
+        <StreamGeometry x:Key="DnsUpGlyph">M12 19 V5 M5.5 11.5 L12 5 L18.5 11.5</StreamGeometry>
+        <StreamGeometry x:Key="DnsCrossGlyph">M6 6 L18 18 M18 6 L6 18</StreamGeometry>
+        <StreamGeometry x:Key="DnsPlusGlyph">M12 5 V19 M5 12 H19</StreamGeometry>
+
+        <!-- The addresses of a result row (a lookup answer, a compared resolver's answers, an email finding), opened
+             under it by its toggle: for each, who holds it (the inline WHOIS, asked as it opens), then WHOIS in full and
+             IP Info for it. -->
+        <DataTemplate x:Key="IpPanelTemplate" x:DataType="vm:IpPanel">
+            <Border Classes="ipPanel" IsVisible="{Binding IsOpen}">
+                <StackPanel Spacing="10">
+                    <ItemsControl ItemsSource="{Binding Items}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Spacing="10"/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:IpItem">
+                                <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto, Auto, Auto" ColumnSpacing="8">
+                                    <SelectableTextBlock Classes="ipAddr" Text="{Binding Label}"/>
+                                    <!-- beside the address (wide) or under the facts (phone): placed by the styles -->
+                                    <StackPanel Classes="ipSendBar" Orientation="Horizontal" Spacing="6" IsVisible="{Binding CanSend}">
+                                        <Button x:Name="IpWhoisBtn" Classes="ghost ipSend" Content="WHOIS" Command="{Binding WhoisCommand}"
+                                                ToolTip.Tip="WHOIS (RDAP) for this address in full, here: it takes the results' place"/>
+                                        <Button x:Name="IpInfoBtn" Classes="ghost ipSend" Content="IP Info" Command="{Binding IpInfoCommand}"
+                                                ToolTip.Tip="Look this address up in IP Info: location, ISP, proxy / hosting flags"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Classes="ipStatus" Classes.error="{Binding IsError}"
+                                               Text="{Binding Status}" IsVisible="{Binding HasStatus}"/>
+                                    <ItemsControl Grid.Row="2" Grid.ColumnSpan="2" ItemsSource="{Binding Facts}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><WrapPanel ItemSpacing="16" LineSpacing="2"/></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:IpFact">
+                                                <SelectableTextBlock Classes="ipFact">
+                                                    <Run Text="{Binding Key}" Foreground="{DynamicResource Text.Muted}"/>
+                                                    <Run Text=" "/>
+                                                    <Run Text="{Binding Value}" FontFamily="{StaticResource MonoFont}"/>
+                                                </SelectableTextBlock>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Classes="ipMore" Text="{Binding MoreText}" IsVisible="{Binding HasMore}"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -52,8 +102,10 @@
         <Style Selector="Grid#DnsForm.wide Panel#DnsResHead">
             <Setter Property="MinHeight" Value="{DynamicResource Control.Height}"/>
         </Style>
-        <Style Selector="Grid#DnsForm.narrow TextBox#DnsResolverBox">
-            <Setter Property="Height" Value="88"/>
+        <!-- stacked (phone): the list shows about three rows and scrolls past that -->
+        <Style Selector="Grid#DnsForm.narrow Border#ResolverListBox">
+            <Setter Property="MinHeight" Value="40"/>
+            <Setter Property="MaxHeight" Value="112"/>
         </Style>
 
         <!-- domain + record type(s): side by side, or stacked when the query column gets narrow -->
@@ -239,6 +291,97 @@
             <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
         </Style>
 
+        <!-- ===== the resolver list: dressed like the input it replaced, a compact row per resolver ===== -->
+        <Style Selector="Border.resList">
+            <Setter Property="Background" Value="{DynamicResource Bg.Input}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Padding" Value="0,1"/>
+        </Style>
+        <!-- 20 high: beside the form (wide) three rows fit above the add box without scrolling -->
+        <Style Selector="Grid.resRow">
+            <Setter Property="MinHeight" Value="20"/>
+            <Setter Property="Margin" Value="10,0,4,0"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="TextBlock.resText">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.resText.invalid">
+            <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="Grid.resRow > Border.viaBadge">
+            <Setter Property="Margin" Value="6,0,2,0"/>
+        </Style>
+        <!-- move up / remove: small, quiet until pointed at; the move-up slot is kept on the first row (no button) so
+             the remove buttons line up -->
+        <Style Selector="Button.resBtn">
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.resBtn > Path">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Height" Value="10"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="StrokeThickness" Value="1.8"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+        </Style>
+        <Style Selector="Button.resBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+        </Style>
+        <Style Selector="Button.resBtn:pointerover > Path">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Button.resBtn.remove:pointerover > Path">
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Panel.resSlot">
+            <Setter Property="Width" Value="20"/>
+        </Style>
+        <!-- stacked (phone): rows and buttons at finger size -->
+        <Style Selector="Grid#DnsForm.narrow Grid.resRow">
+            <Setter Property="MinHeight" Value="36"/>
+        </Style>
+        <Style Selector="Grid#DnsForm.narrow Button.resBtn, Grid#DnsForm.narrow Panel.resSlot">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
+        </Style>
+        <Style Selector="Grid#DnsForm.narrow Button.resBtn > Path">
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="12"/>
+        </Style>
+        <Style Selector="TextBlock.resEmpty">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="Margin" Value="10,4"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <!-- why the add box's text wasn't added: one line, the whole reason in its tooltip -->
+        <Style Selector="TextBlock.resError">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="2,4,0,0"/>
+        </Style>
+
         <!-- ===== results: shared bits ===== -->
         <Style Selector="TextBlock.emptyText">
             <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
@@ -334,6 +477,13 @@
             <Setter Property="MinHeight" Value="{DynamicResource Control.Height}"/>
             <Setter Property="Margin" Value="8,0,0,0"/>
         </Style>
+        <!-- a lookup row's addresses open under its value (wide) or across the row (phone) -->
+        <Style Selector="Grid#DnsRoot.wide ContentControl.ipHost">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+        </Style>
+        <Style Selector="Grid#DnsRoot.narrow ContentControl.ipHost">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/>
+        </Style>
 
         <!-- WHOIS text: a read-only text area on the inset surface; no input fill / focus ring in any state -->
         <Style Selector="TextBox.readout">
@@ -392,6 +542,11 @@
         <Style Selector="Grid.cmp > :is(Control).cRate"><Setter Property="Width" Value="40"/></Style>
         <Style Selector="Grid.cmp > :is(Control).cAns"><Setter Property="Margin" Value="14,0,8,0"/></Style>
         <Style Selector="Grid.cmp > :is(Control).cVerdict"><Setter Property="Width" Value="72"/></Style>
+        <!-- the address toggle's column, in the header too so the columns stay over each other -->
+        <Style Selector="Grid.cmp > Panel.cmpIpSlot">
+            <Setter Property="MinWidth" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
         <Style Selector="Border.viaBadge">
             <Setter Property="Padding" Value="5,0"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
@@ -482,6 +637,88 @@
         <Style Selector="Grid#DnsRoot.narrow TextBlock.wideInfo, Grid#DnsRoot.wide TextBlock.narrowInfo">
             <Setter Property="IsVisible" Value="False"/>
         </Style>
+
+        <!-- ===== an address's toggle and panel (lookup, compare and email rows). Last in the list on purpose: they win over
+             the result tables' own text styles (Grid.cmp TextBlock) inside a row. ===== -->
+        <Style Selector="Button.ipToggle > Path">
+            <Setter Property="Width" Value="15"/>
+            <Setter Property="Height" Value="15"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+        </Style>
+        <!-- open: marked in the accent, like a preset that is on -->
+        <Style Selector="Button.ipToggle.on">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        </Style>
+        <Style Selector="Button.ipToggle.on > Path">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Button.ipToggle.on:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent.SoftHover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        </Style>
+        <Style Selector="Border.ipPanel">
+            <Setter Property="Margin" Value="0,8,0,2"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.ipAddr">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.ipStatus">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+        </Style>
+        <Style Selector="TextBlock.ipStatus.error">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.ipFact">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+        </Style>
+        <Style Selector="TextBlock.ipMore">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <!-- WHOIS / IP Info: small beside the address; finger-sized on a phone -->
+        <Style Selector="Button.ghost.ipSend">
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style Selector="Grid#DnsRoot.narrow Button.ghost.ipSend">
+            <Setter Property="Height" Value="36"/>
+        </Style>
+        <Style Selector="Grid#DnsRoot.wide StackPanel.ipSendBar">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        </Style>
+        <Style Selector="Grid#DnsRoot.narrow StackPanel.ipSendBar">
+            <Setter Property="Grid.Row" Value="3"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <!-- an email finding's addresses open under its text (wide) or across the row (phone) -->
+        <Style Selector="Grid#DnsRoot.wide ContentControl.mailIpHost">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#DnsRoot.narrow ContentControl.mailIpHost">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+        </Style>
     </UserControl.Styles>
 
     <Grid x:Name="DnsRoot" helpers:Responsive.BreakWidth="560" RowDefinitions="Auto, *" RowSpacing="12">
@@ -564,10 +801,11 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- resolvers. MaxHeight = the bottom edge of the action row: when wide (this column spans the
-                     mode + input + action rows) the box ends exactly level with the buttons and can never make those
-                     rows taller; when stacked (actions below) the cap is far below and has no effect. -->
-                <Grid x:Name="DnsResolvers" RowDefinitions="Auto, *" MaxHeight="{Binding #DnsActions.Bounds.Bottom}">
+                <!-- resolvers: a row each, in the order they are asked, and a box that adds one. MaxHeight = the bottom
+                     edge of the action row: when wide (this column spans the mode + input + action rows) the add box ends
+                     exactly level with the buttons and can never make those rows taller (the list scrolls instead); when
+                     stacked (actions below) the cap is far below and has no effect. -->
+                <Grid x:Name="DnsResolvers" RowDefinitions="Auto, *, Auto, Auto" MaxHeight="{Binding #DnsActions.Bounds.Bottom}">
                     <Panel x:Name="DnsResHead" Grid.Row="0">
                         <TextBlock Classes="fieldLabel" Text="Resolvers" VerticalAlignment="Bottom"/>
                         <DropDownButton x:Name="PresetsButton" Classes="presets" Content="Presets" IsEnabled="{Binding !IsWorking}"
@@ -612,10 +850,60 @@
                             </DropDownButton.Flyout>
                         </DropDownButton>
                     </Panel>
-                    <TextBox x:Name="DnsResolverBox" Grid.Row="1" Classes="field multiline" Text="{Binding ResolverText}" TextInputOptions.ContentType="Url" AcceptsReturn="True"
-                             VerticalAlignment="Stretch" FontFamily="{StaticResource MonoFont}"
-                             PlaceholderText="One per line, e.g. 1.1.1.1"
-                             ToolTip.Tip="{Binding ResolverHint}"/>
+                    <!-- locked while a run goes on, as the presets are -->
+                    <Border x:Name="ResolverListBox" Grid.Row="1" Classes="resList" IsEnabled="{Binding !IsWorking}"
+                            ToolTip.Tip="{Binding ResolverHint}">
+                        <Panel>
+                            <ScrollViewer x:Name="ResolverScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding ResolverRows}" AutomationProperties.Name="Resolvers">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ResolverRow">
+                                            <Grid Classes="resRow" ColumnDefinitions="*, Auto, Auto, Auto" ToolTip.Tip="{Binding Tip}">
+                                                <TextBlock Classes="resText" Classes.invalid="{Binding !IsValid}" Text="{Binding Text}"/>
+                                                <Border Grid.Column="1" Classes="badge viaBadge" Classes.accent="{Binding IsEncrypted}"
+                                                        Classes.warning="{Binding !IsValid}">
+                                                    <TextBlock Text="{Binding Kind}"/>
+                                                </Border>
+                                                <Panel Grid.Column="2" Classes="resSlot">
+                                                    <Button Classes="resBtn" IsVisible="{Binding !IsFirst}"
+                                                            Command="{Binding $parent[ItemsControl].((vm:DnsViewModel)DataContext).MoveResolverUpCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            ToolTip.Tip="Ask it earlier (the email check uses the first that answers)"
+                                                            AutomationProperties.Name="Move up">
+                                                        <Path Data="{StaticResource DnsUpGlyph}"/>
+                                                    </Button>
+                                                </Panel>
+                                                <Button Grid.Column="3" Classes="resBtn remove"
+                                                        Command="{Binding $parent[ItemsControl].((vm:DnsViewModel)DataContext).RemoveResolverCommand}"
+                                                        CommandParameter="{Binding}" ToolTip.Tip="Remove it" AutomationProperties.Name="Remove">
+                                                    <Path Data="{StaticResource DnsCrossGlyph}"/>
+                                                </Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                            <TextBlock Classes="resEmpty" IsVisible="{Binding !HasResolverRows}" Text="None: add one, or pick Presets"/>
+                        </Panel>
+                    </Border>
+                    <TextBlock Grid.Row="2" Classes="resError" Text="{Binding NewResolverError}"
+                               ToolTip.Tip="{Binding NewResolverError}" IsVisible="{Binding HasNewResolverError}"/>
+                    <!-- add: Enter or + (several at once, separated by spaces or commas) -->
+                    <Grid Grid.Row="3" ColumnDefinitions="*, Auto" ColumnSpacing="6" Margin="0,6,0,0" IsEnabled="{Binding !IsWorking}">
+                        <TextBox x:Name="ResolverAddBox" Classes="field mono" Text="{Binding NewResolverText}" TextInputOptions.ContentType="Url"
+                                 PlaceholderText="Add: 9.9.9.9, https://…"
+                                 ToolTip.Tip="An IP or IP:port (plain DNS), https://host/dns-query (DoH), tls://host or host:853 (DoT), or system"
+                                 AutomationProperties.Name="Add a resolver">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Command="{Binding AddResolverCommand}" Gesture="Enter"/>
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                        <Button x:Name="ResolverAddBtn" Grid.Column="1" Classes="icon" Command="{Binding AddResolverCommand}"
+                                ToolTip.Tip="Add it to the list" AutomationProperties.Name="Add resolver">
+                            <Path Data="{StaticResource DnsPlusGlyph}" Width="13" Height="13" Stretch="Uniform"
+                                  StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round"/>
+                        </Button>
+                    </Grid>
                 </Grid>
 
                 <!-- WHOIS + the mode's action (Look up / Compare / Check), equal width; one full-width action in
@@ -678,7 +966,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:DnsRecordRow">
                                 <Border Classes="recRow">
-                                    <Grid ColumnDefinitions="Auto, *, Auto">
+                                    <Grid ColumnDefinitions="Auto, *, Auto, Auto" RowDefinitions="Auto, Auto">
                                         <Border Grid.Column="0" Classes="badge recType"
                                                 Classes.accent="{Binding IsRecord}" Classes.warning="{Binding IsStatus}">
                                             <TextBlock Text="{Binding Type}"/>
@@ -691,8 +979,20 @@
                                             <!-- row / column come from the wide / narrow styles above -->
                                             <TextBlock Classes="recServer" Text="{Binding ServerLine}" ToolTip.Tip="{Binding ServerTip}"/>
                                         </Grid>
+                                        <!-- who holds the address (an A / AAAA answer, an SPF record's ranges): opens under the
+                                             row. Every row keeps the slot once any row has one, so the resolvers line up. -->
+                                        <Panel Grid.Column="2" Classes="recCopy"
+                                               IsVisible="{Binding $parent[ItemsControl].((vm:DnsViewModel)DataContext).LookupHasIps}">
+                                            <Button x:Name="IpToggle" Classes="icon ipToggle" Classes.on="{Binding Ips.IsOpen, FallbackValue=False}"
+                                                    HorizontalAlignment="Right" VerticalAlignment="Center" IsVisible="{Binding HasIps}"
+                                                    Command="{Binding Ips.ToggleCommand, FallbackValue={x:Null}}"
+                                                    ToolTip.Tip="Who holds this address (WHOIS), with WHOIS in full and IP Info for it"
+                                                    AutomationProperties.Name="Address details">
+                                                <Path Data="{StaticResource IcoAbout}"/>
+                                            </Button>
+                                        </Panel>
                                         <!-- copy this record -->
-                                        <Panel Grid.Column="2" Classes="recCopy">
+                                        <Panel Grid.Column="3" Classes="recCopy">
                                             <Button Classes="icon" HorizontalAlignment="Right" VerticalAlignment="Center"
                                                     IsVisible="{Binding IsRecord}"
                                                     Command="{Binding $parent[ItemsControl].((vm:DnsViewModel)DataContext).CopyRowCommand}"
@@ -702,6 +1002,8 @@
                                                       StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"/>
                                             </Button>
                                         </Panel>
+                                        <!-- place from the wide / narrow styles above -->
+                                        <ContentControl Classes="ipHost" Content="{Binding Ips}" ContentTemplate="{StaticResource IpPanelTemplate}"/>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -745,13 +1047,15 @@
 
                 <!-- column captions (the one-line table only: the phone styles hide the inner grid + rule) -->
                 <StackPanel Grid.Row="3" IsVisible="{Binding HasCompareRows}">
-                    <Grid x:Name="CmpHead" Classes="cmp" Margin="16,8,12,4" ColumnDefinitions="Auto, Auto, Auto, Auto, *, Auto">
+                    <Grid x:Name="CmpHead" Classes="cmp" Margin="16,8,12,4" ColumnDefinitions="Auto, Auto, Auto, Auto, *, Auto, Auto">
                         <TextBlock Classes="head cNameCol" Text="Resolver"/>
                         <TextBlock Classes="head cVia" Text="Via"/>
                         <TextBlock Classes="head num cMed" Text="Median" ToolTip.Tip="Median round trip of the rounds that answered (the first also connects)"/>
                         <TextBlock Classes="head num cRate" Text="OK" ToolTip.Tip="Rounds that got a usable answer"/>
                         <TextBlock Classes="head cAns" Text="Answers"/>
                         <TextBlock Classes="head cVerdict" Text="Result" TextAlignment="Right"/>
+                        <!-- above the rows' address toggles -->
+                        <Panel Grid.Column="6" Classes="cmpIpSlot" IsVisible="{Binding CompareHasIps}"/>
                     </Grid>
                     <Border x:Name="CmpHeadRule" Classes="divider"/>
                 </StackPanel>
@@ -762,7 +1066,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:CompareRow">
                                     <Border Classes="cmpRow" Classes.best="{Binding IsBest}" ToolTip.Tip="{Binding Note}">
-                                        <Grid Classes="cmp" ColumnDefinitions="Auto, Auto, Auto, Auto, *, Auto" RowDefinitions="Auto, Auto">
+                                        <Grid Classes="cmp" ColumnDefinitions="Auto, Auto, Auto, Auto, *, Auto, Auto" RowDefinitions="Auto, Auto, Auto">
                                             <StackPanel Classes="cNameCol" ToolTip.Tip="{Binding Tip}" Background="Transparent">
                                                 <TextBlock Classes="cName" Text="{Binding Label}"/>
                                                 <TextBlock Classes="cSpec" Text="{Binding SpecText}" IsVisible="{Binding HasSpecText}"/>
@@ -782,6 +1086,19 @@
                                                 </Border>
                                             </Panel>
                                             <TextBlock Classes="cLine" Text="{Binding SummaryLine}" ToolTip.Tip="{Binding AnswersTip}"/>
+                                            <!-- who holds the addresses it answered: they open under the row -->
+                                            <Panel Grid.Column="6" Classes="cmpIpSlot"
+                                                   IsVisible="{Binding $parent[ItemsControl].((vm:DnsViewModel)DataContext).CompareHasIps}">
+                                                <Button x:Name="CmpIpToggle" Classes="icon ipToggle" Classes.on="{Binding Ips.IsOpen, FallbackValue=False}"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Center" IsVisible="{Binding HasIps}"
+                                                        Command="{Binding Ips.ToggleCommand, FallbackValue={x:Null}}"
+                                                        ToolTip.Tip="Who holds the addresses it answered (WHOIS), with WHOIS in full and IP Info"
+                                                        AutomationProperties.Name="Address details">
+                                                    <Path Data="{StaticResource IcoAbout}"/>
+                                                </Button>
+                                            </Panel>
+                                            <ContentControl Grid.Row="2" Grid.ColumnSpan="7" Content="{Binding Ips}"
+                                                            ContentTemplate="{StaticResource IpPanelTemplate}"/>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
@@ -834,7 +1151,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:MailRow">
                                     <Border Classes="mailRow" Classes.areaStart="{Binding IsAreaStart}">
-                                        <Grid ColumnDefinitions="Auto, *">
+                                        <Grid ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto, Auto">
                                             <Border Classes="badge mailBadge" Classes.success="{Binding IsOk}" Classes.info="{Binding IsInfo}"
                                                     Classes.warning="{Binding IsWarn}" Classes.danger="{Binding IsFail}">
                                                 <TextBlock Text="{Binding StatusText}"/>
@@ -852,6 +1169,16 @@
                                                     <Run Text="{Binding FixText}"/>
                                                 </TextBlock>
                                             </StackPanel>
+                                            <!-- who holds the addresses it names (the mail servers', SPF's ranges, a listed one) -->
+                                            <Button x:Name="MailIpToggle" Grid.Column="2" Classes="icon ipToggle" Classes.on="{Binding Ips.IsOpen, FallbackValue=False}"
+                                                    Margin="8,0,0,0" VerticalAlignment="Top" IsVisible="{Binding HasIps}"
+                                                    Command="{Binding Ips.ToggleCommand, FallbackValue={x:Null}}"
+                                                    ToolTip.Tip="Who holds the addresses it names (WHOIS), with WHOIS in full and IP Info"
+                                                    AutomationProperties.Name="Address details">
+                                                <Path Data="{StaticResource IcoAbout}"/>
+                                            </Button>
+                                            <!-- place from the wide / narrow styles above -->
+                                            <ContentControl Classes="mailIpHost" Content="{Binding Ips}" ContentTemplate="{StaticResource IpPanelTemplate}"/>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>

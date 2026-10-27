@@ -40,6 +40,50 @@ public sealed class DnsRecordRow
     public bool IsStatus { get; init; }            // "no records" / "timeout" — not a real, copyable record
     public bool IsRecord => !IsStatus;
     public string ServerLine => Meta.Length == 0 ? Server : Server.Length == 0 ? Meta : $"{Server} · {Meta}";
+    /// <summary>The addresses the answer holds (an A / AAAA record, an SPF record's ranges), opened under the row.</summary>
+    public IpPanel? Ips { get; init; }
+    public bool HasIps => Ips != null;
+}
+
+/// <summary>One line of the resolver list: the resolver and how it is reached, or why the line isn't one.</summary>
+public sealed class ResolverRow
+{
+    public ResolverRow(string line, bool isFirst)
+    {
+        Line = line;
+        IsFirst = isFirst;
+        if (ResolverSpec.TryParse(line, out var spec, out string why))
+        {
+            Text = spec.Short;
+            Kind = spec.TransportLabel;
+            IsEncrypted = spec.IsEncrypted;
+            IsValid = true;
+            Canonical = spec.Text;
+            Tip = spec.Label == spec.Short ? spec.Text : $"{spec.Label}: {spec.Text}";
+        }
+        else
+        {
+            // kept as typed (an older list may hold one), so it can be seen and removed; the runs skip it with this reason
+            Text = line;
+            Kind = "invalid";
+            Canonical = line;
+            Tip = why;
+        }
+    }
+
+    /// <summary>The line as stored.</summary>
+    public string Line { get; }
+    /// <summary>What the row shows: the host or address ("cloudflare-dns.com", "1.1.1.1", "system").</summary>
+    public string Text { get; }
+    /// <summary>"plain", "DoH", "DoT", "system", or "invalid".</summary>
+    public string Kind { get; }
+    public bool IsEncrypted { get; }
+    public bool IsValid { get; }
+    /// <summary>The first row has no "move up".</summary>
+    public bool IsFirst { get; }
+    public string Canonical { get; }
+    /// <summary>The resolver in full, or why the line isn't one.</summary>
+    public string Tip { get; }
 }
 
 /// <summary>One resolver in the presets menu (a toggle: on when its line is in the list).</summary>
@@ -103,6 +147,11 @@ public sealed partial class CompareRow : ObservableObject
     [ObservableProperty] private bool _isBad;
     /// <summary>The phone layout's second line: transport · median · rounds · answers.</summary>
     [ObservableProperty] private string _summaryLine = "";
+    /// <summary>The addresses among its answers, opened under the row (set once the run is over).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasIps))]
+    private IpPanel? _ips;
+    public bool HasIps => Ips != null;
 
     /// <summary>The run was stopped before this row's verdict: no "…" is left as if it were still running.</summary>
     public void MarkStopped()
@@ -160,4 +209,7 @@ public sealed class MailRow
     public bool IsFail => Item.Status == MailStatus.Fail;
     /// <summary>The first finding of its area (a rule above it separates the areas).</summary>
     public bool IsAreaStart { get; init; }
+    /// <summary>The addresses it names (the mail servers', SPF's ranges, a blocklisted one), opened under the row.</summary>
+    public IpPanel? Ips { get; init; }
+    public bool HasIps => Ips != null;
 }

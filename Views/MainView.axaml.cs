@@ -40,12 +40,26 @@ public partial class MainView : UserControl
         }
     }
 
+    private MainViewModel? _vm;
+
     // The MainViewModel arrives after InitializeComponent (App sets it on the window), so the tab
     // auto-selected during load had no view-model to build its tool from yet — build it now.
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
-        if (DataContext is MainViewModel vm) EnsureSelectedToolView(vm);
+        if (_vm is not null) _vm.ToolRequested -= SelectTool;
+        _vm = DataContext as MainViewModel;
+        if (_vm is null) return;
+        _vm.ToolRequested += SelectTool;
+        EnsureSelectedToolView(_vm);
+    }
+
+    // A tool handed another one something (an address to look up): that tool's tab is selected, which builds its page on
+    // a first visit as a click does.
+    private void SelectTool(string tag)
+    {
+        foreach (var item in MainTabs.Items)
+            if (item is TabItem { Tag: string t } tab && t == tag) { MainTabs.SelectedItem = tab; return; }
     }
 
     // Build the tool on first visit, then refresh per-tab live data when the user switches in.

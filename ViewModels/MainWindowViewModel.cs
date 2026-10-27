@@ -29,7 +29,7 @@ public partial class MainViewModel : ObservableObject
     private ProxyViewModel? _proxyVM;
     private DoctorViewModel? _doctorVM;
     public PingViewModel PingVM => _pingVM ??= new();
-    public DnsViewModel DnsVM => _dnsVM ??= new();
+    public DnsViewModel DnsVM => _dnsVM ??= new(this);
     public CurlViewModel CurlVM => _curlVM ??= new();
     public PortScannerViewModel PortScannerVM => _portScannerVM ??= new();
     public IpInfoViewModel IpInfoVM => _ipInfoVM ??= new();
