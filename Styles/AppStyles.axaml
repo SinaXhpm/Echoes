@@ -418,8 +418,10 @@
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="{DynamicResource Seg.Text}"/>
-        <!-- the thumb (the header presenter) fills the tab's height; its own alignment centers the label -->
+        <!-- the thumb (the header presenter) fills the tab, also an equal cell a view makes wider than its label; the
+             presenter's own alignment centers the label -->
         <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
     </Style>
     <Style Selector="TabControl.seg > TabItem /template/ Border#PART_LayoutRoot">
         <Setter Property="CornerRadius" Value="0"/>
@@ -443,6 +445,7 @@
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="VerticalAlignment" Value="Stretch"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
     </Style>
     <Style Selector="TabControl.seg > TabItem:pointerover">
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>

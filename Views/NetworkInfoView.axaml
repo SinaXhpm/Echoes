@@ -17,7 +17,7 @@
 		<Style Selector="TabControl#NetTabs.seg.narrow">
 			<Setter Property="ItemsPanel">
 				<ItemsPanelTemplate>
-					<UniformGrid Rows="1" ColumnSpacing="4"/>
+					<UniformGrid Rows="1"/>
 				</ItemsPanelTemplate>
 			</Setter>
 		</Style>
@@ -28,10 +28,12 @@
 		</Style>
 		<Style Selector="TabControl#NetTabs.seg.narrow > TabItem">
 			<Setter Property="Margin" Value="0"/>
-			<Setter Property="Padding" Value="2,0"/>
 			<Setter Property="FontSize" Value="11.5"/>
 			<Setter Property="HorizontalAlignment" Value="Stretch"/>
-			<Setter Property="HorizontalContentAlignment" Value="Center"/>
+		</Style>
+		<!-- five equal cells: the thumb keeps only a small inset around its label -->
+		<Style Selector="TabControl#NetTabs.seg.narrow > TabItem /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Padding" Value="3,0"/>
 		</Style>
 
 		<!-- ===== Wi-Fi ===== -->

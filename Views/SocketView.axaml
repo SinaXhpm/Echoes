@@ -50,7 +50,11 @@
         <Style Selector="TabControl.modes > TabItem">
             <Setter Property="Margin" Value="0"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <!-- a grid of modes, not one row: each cell is a rounded piece of track of its own (the shared segmented style
+             rounds only the two ends of a row) -->
+        <Style Selector="TabControl.modes > TabItem:nth-child(n) /template/ Border#PART_LayoutRoot">
+            <Setter Property="CornerRadius" Value="7"/>
         </Style>
         <Style Selector="Panel#SkModesWrap.narrow TabControl.modes">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
