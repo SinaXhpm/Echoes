@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Reactive;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Echoes.Helpers;
 using Echoes.ViewModels;
 
@@ -24,6 +27,10 @@ public partial class MonitorView : UserControl
 
     // Ticks only while the view is on screen: the "8s ago" ages and the detail panel's durations.
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1) };
+    // The phone shell hides the page it leaves (IsVisible on the page's host) instead of taking it out of the visual tree,
+    // so detaching alone left the clock ticking behind every other page for the rest of the session: it follows the
+    // visibility of the view and of its ancestors too.
+    private readonly List<IDisposable> _visibilityWatch = new();
     private MonitorViewModel? _vm;
 
     public MonitorView()
@@ -64,23 +71,29 @@ public partial class MonitorView : UserControl
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        AppPlatform.ForegroundChanged += OnForegroundChanged;
-        OnForegroundChanged();
+        AppPlatform.ForegroundChanged += UpdateClock;
+        for (Visual? v = this; v is not null; v = v.GetVisualParent())
+            _visibilityWatch.Add(v.GetPropertyChangedObservable(IsVisibleProperty)
+                                  .Subscribe(new AnonymousObserver<AvaloniaPropertyChangedEventArgs>(_ => UpdateClock())));
+        UpdateClock();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        AppPlatform.ForegroundChanged -= OnForegroundChanged;
+        AppPlatform.ForegroundChanged -= UpdateClock;
+        foreach (var watch in _visibilityWatch) watch.Dispose();
+        _visibilityWatch.Clear();
         _clock.Stop();
         base.OnDetachedFromVisualTree(e);
     }
 
-    // The window hidden in the tray (monitoring goes on there) or minimized, or the phone app in the background (its
-    // views stay "visible" there), keeps this view attached: the per-second refresh of every row's age stops then, and
-    // coming back brings the ages up to date at once.
-    private void OnForegroundChanged()
+    // The window hidden in the tray (monitoring goes on there) or minimized, the phone app in the background (its views
+    // stay "visible" there) or another page shown over this one on a phone keep this view attached: the per-second refresh
+    // of every row's age stops then, and coming back brings the ages up to date at once.
+    private void UpdateClock()
     {
-        if (!AppPlatform.IsInForeground) { _clock.Stop(); return; }
+        if (!OnScreen()) { _clock.Stop(); return; }
+        if (_clock.IsEnabled) return;
         _vm?.Tick();
         _clock.Start();
     }
