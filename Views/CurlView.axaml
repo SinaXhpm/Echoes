@@ -240,8 +240,9 @@
             <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <!-- the shared segmented colors (Styles/AppStyles.axaml): a track with a raised thumb -->
+            <Setter Property="Background" Value="{DynamicResource Seg.Track}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Seg.Track}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
@@ -259,25 +260,26 @@
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Foreground" Value="{DynamicResource Seg.Text}"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
         <Style Selector="ListBox.switch > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
         </Style>
         <Style Selector="ListBox.switch > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
         </Style>
         <Style Selector="ListBox.switch > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
                          ListBox.switch > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
                          ListBox.switch > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
                          ListBox.switch > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="Background" Value="{DynamicResource Seg.Thumb}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Seg.ThumbBorder}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Seg.TextSelected}"/>
         </Style>
 
         <!-- ===== inputs ===== -->
