@@ -355,6 +355,23 @@ internal static class SelfTest
             return $"{opened.Count} of {count} opened: {string.Join(", ", opened)}";
         }, seconds: 300);
 
+        // Avalonia 12.1.4's display link fires 60 times a second whether anything draws or not; IdleRenderTimer pauses it.
+        // Counted with every tool opened and nothing moving (a caret blinking still draws now and then).
+        await Check("the renderer rests while nothing moves", async ct =>
+        {
+            if (IdleRenderTimer.Current is not { } timer)
+            {
+                if (IdleRenderTimer.State.StartsWith("not needed", StringComparison.Ordinal)) return IdleRenderTimer.State;
+                throw new InvalidOperationException(IdleRenderTimer.State);
+            }
+            await Task.Delay(1500, ct).ConfigureAwait(false);
+            long before = timer.Callbacks;
+            await Task.Delay(3000, ct).ConfigureAwait(false);
+            long callbacks = timer.Callbacks - before;
+            if (callbacks > 60) throw new InvalidOperationException($"{callbacks} display-link callbacks in 3 s with nothing moving");
+            return $"{callbacks} display-link callbacks in 3 s with nothing moving (Avalonia's own timer: about 180)";
+        });
+
         Line($"SELFTEST DONE failures={failures}");
         return failures;
     }

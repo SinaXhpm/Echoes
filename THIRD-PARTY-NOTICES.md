@@ -6,7 +6,7 @@ following third-party components. Each keeps its own license; the full license t
 | Component | Used for | License |
 | :--- | :--- | :--- |
 | [.NET runtime and libraries](https://github.com/dotnet/runtime) | runtime (Native AOT on desktop, .NET for Android) | [MIT](https://github.com/dotnet/runtime/blob/main/LICENSE.TXT) |
-| [Avalonia](https://github.com/AvaloniaUI/Avalonia) (Avalonia, Avalonia.Desktop, Avalonia.Android, Avalonia.Themes.Fluent) | user interface | [MIT](https://github.com/AvaloniaUI/Avalonia/blob/master/licence.md) |
+| [Avalonia](https://github.com/AvaloniaUI/Avalonia) (Avalonia, Avalonia.Desktop, Avalonia.Android, Avalonia.iOS, Avalonia.Themes.Fluent; the iOS render timer is adapted from Avalonia's) | user interface | [MIT](https://github.com/AvaloniaUI/Avalonia/blob/master/licence.md) |
 | [Avalonia.Controls.WebView](https://github.com/AvaloniaUI/Avalonia.Controls.WebView) | cURL's web preview | [MIT](https://github.com/AvaloniaUI/Avalonia.Controls.WebView/blob/main/LICENSE) |
 | [SkiaSharp](https://github.com/mono/SkiaSharp) and [HarfBuzzSharp](https://github.com/mono/SkiaSharp) (via Avalonia) | drawing and text shaping | [MIT](https://github.com/mono/SkiaSharp/blob/main/LICENSE.md) |
 | [Inter font](https://github.com/rsms/inter) (via Avalonia.Fonts.Inter) | the app's typeface | [SIL Open Font License 1.1](https://github.com/rsms/inter/blob/master/LICENSE.txt) |

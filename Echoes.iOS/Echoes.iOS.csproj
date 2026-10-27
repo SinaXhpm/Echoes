@@ -54,6 +54,21 @@
     <TrimmerRootAssembly Include="DnsClient" />
   </ItemGroup>
 
+  <!-- IdleRenderTimer.cs implements Avalonia's render-timer interface, whose members Avalonia's reference assemblies hide
+       from apps ([PrivateApi] members are internal there, plus a member nothing outside Avalonia can implement). The
+       implementation assembly in the same package has them public, so the compiler gets that one for Avalonia.Base. Run
+       time is unchanged: it is the assembly the app runs with anyway. -->
+  <Target Name="EchoesCompileAgainstAvaloniaBase" AfterTargets="FindReferenceAssembliesForReferences" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <_EchoesAvaloniaBaseRef>@(ReferencePathWithRefAssemblies->WithMetadataValue('Filename', 'Avalonia.Base')->'%(FullPath)')</_EchoesAvaloniaBaseRef>
+      <_EchoesAvaloniaBaseLib>$(_EchoesAvaloniaBaseRef.Replace('/ref/', '/lib/').Replace('\ref\', '\lib\'))</_EchoesAvaloniaBaseLib>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(_EchoesAvaloniaBaseRef)' != '$(_EchoesAvaloniaBaseLib)' and Exists('$(_EchoesAvaloniaBaseLib)')">
+      <ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" Condition="'%(Filename)' == 'Avalonia.Base'" />
+      <ReferencePathWithRefAssemblies Include="$(_EchoesAvaloniaBaseLib)" />
+    </ItemGroup>
+  </Target>
+
   <!-- The iOS SDK's implicit global usings (Foundation, UIKit, CoreGraphics, ObjCRuntime) can collide with Avalonia names in
        the shared sources, like the Android ones do. This head's own files import the Apple namespaces they use explicitly. -->
   <ItemGroup>

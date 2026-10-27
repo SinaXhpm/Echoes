@@ -26,6 +26,7 @@ public class AppDelegate : AvaloniaAppDelegate<global::Echoes.App>
         // App Store screenshots (ios-screenshots.yml): only in a build made with -p:StoreShots=true.
         if (StoreShots.Requested) _ = Task.Run(async () => { await Task.Delay(8000).ConfigureAwait(false); await StoreShots.RunAsync().ConfigureAwait(false); });
 #endif
-        return base.CustomizeAppBuilder(builder).WithInterFont();
+        // A render timer that rests while nothing draws (Avalonia 12.1.4's fires 60 times a second regardless).
+        return IdleRenderTimer.Use(base.CustomizeAppBuilder(builder).WithInterFont());
     }
 }
