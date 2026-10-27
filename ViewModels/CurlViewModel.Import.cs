@@ -140,6 +140,11 @@ public partial class CurlViewModel
         string v = value.Trim();
         int bang = v.IndexOf('!');
         if (bang >= 0) v = v[(bang + 1)..];
+        if (!CanChooseInterface && !_listForImport)
+        {
+            _listForImport = true;   // Android lists no adapters until a command names one (LoadInterfaces)
+            LoadInterfaces();
+        }
         var byIp = Interfaces.FirstOrDefault(n => n.Ip != null && n.Ip.Equals(v, StringComparison.OrdinalIgnoreCase));
         if (byIp != null) return byIp;
         return Interfaces.FirstOrDefault(n => n.Ip != null && n.Display.StartsWith(v + " — ", StringComparison.OrdinalIgnoreCase));

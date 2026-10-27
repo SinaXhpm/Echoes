@@ -89,6 +89,10 @@ public partial class CurlViewModel : ObservableObject
     // own pick changes it.
     private string? _preferredNicIp;
     private bool _applyingNics;
+    private long _listedAtConstruction;
+    // Android: the picker is hidden and the OS routes (CanChooseInterface), so the adapters are only read when an imported
+    // command names one (MatchInterface), not at every visit.
+    private bool _listForImport;
 
     partial void OnSelectedInterfaceChanged(NicOption? value)
     {
@@ -102,27 +106,38 @@ public partial class CurlViewModel : ObservableObject
 
     /// <summary>Re-enumerate NICs (the cURL tab became visible) so interfaces that came up / went down show; keeps the
     /// selection while it still exists.</summary>
-    public void RefreshInterfaces() => LoadInterfaces();
+    public void RefreshInterfaces()
+    {
+        // A first visit always asks, right after the page's first frame: the constructor listed them a moment before (on
+        // the UI thread, 10-20 ms with many virtual adapters), so that one refresh is skipped.
+        bool justListed = _listedAtConstruction != 0 && Environment.TickCount64 - _listedAtConstruction < 2000;
+        _listedAtConstruction = 0;
+        if (!justListed) LoadInterfaces();
+    }
 
     private void LoadInterfaces()
     {
         var list = new List<NicOption> { new("Auto (default route)", null) };
-        try
+        if (CanChooseInterface || _listForImport)
         {
-            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            try
             {
-                if (ni.OperationalStatus != OperationalStatus.Up) continue;
-                if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
-                foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+                foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
                 {
-                    var a = ua.Address;
-                    if (a.AddressFamily != AddressFamily.InterNetwork && a.AddressFamily != AddressFamily.InterNetworkV6) continue;
-                    if (a.IsIPv6LinkLocal || a.IsIPv6Multicast) continue;   // skip fe80::/link-local noise
-                    list.Add(new NicOption($"{ni.Name} — {a}", a.ToString()));
+                    if (ni.OperationalStatus != OperationalStatus.Up) continue;
+                    if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+                    foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+                    {
+                        var a = ua.Address;
+                        if (a.AddressFamily != AddressFamily.InterNetwork && a.AddressFamily != AddressFamily.InterNetworkV6) continue;
+                        if (a.IsIPv6LinkLocal || a.IsIPv6Multicast) continue;   // skip fe80::/link-local noise
+                        list.Add(new NicOption($"{ni.Name} — {a}", a.ToString()));
+                    }
                 }
             }
+            catch { }
         }
-        catch { }
+        if (!_loaded) _listedAtConstruction = Environment.TickCount64;
 
         // (Android: never a saved adapter, see CanChooseInterface)
         if (!_loaded) _preferredNicIp = CanChooseInterface ? ProfileService.Instance.GetSetting("curl.nicIp") : null;
