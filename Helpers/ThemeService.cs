@@ -5,8 +5,9 @@ namespace Echoes.Helpers;
 
 /// <summary>
 /// Light / dark theme. Every color token lives in Styles/Tokens.axaml's theme dictionaries and views read them with
-/// DynamicResource, so switching <see cref="Application.RequestedThemeVariant"/> re-colors the whole app live. The
-/// choice persists in the profile; dark is the default (what Echoes always was).
+/// DynamicResource, so switching <see cref="Application.RequestedThemeVariant"/> re-colors the whole app live. Until
+/// the user picks one, Echoes follows the system's light / dark setting (and its changes, live), as a macOS app does;
+/// the switch then pins the choice in the profile.
 /// </summary>
 public static class ThemeService
 {
@@ -19,7 +20,12 @@ public static class ThemeService
     public static void ApplySaved()
     {
         if (Application.Current is not { } app) return;
-        app.RequestedThemeVariant = ProfileService.Instance.GetSetting(Key) == "light" ? ThemeVariant.Light : ThemeVariant.Dark;
+        app.RequestedThemeVariant = ProfileService.Instance.GetSetting(Key) switch
+        {
+            "light" => ThemeVariant.Light,
+            "dark" => ThemeVariant.Dark,
+            _ => ThemeVariant.Default,   // the system's
+        };
     }
 
     public static void Toggle()
