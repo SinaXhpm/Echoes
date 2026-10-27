@@ -10,8 +10,8 @@ namespace Echoes.Helpers;
 /// <summary>
 /// Turns what the checks found into ONE sentence and one "what to do" line. The rules go from the device outwards:
 /// no network, a captive portal, no internet, a name that doesn't exist, DNS tampering, SNI filtering, a blocked
-/// address, a filter page, the server's own failures, certificate problems — and the outside view decides between
-/// "your network" and "down for everyone".
+/// address, a filter page, the server's own failures, certificate problems. A proxy, when one is given, is the
+/// comparison: what fails directly but works through it is this network's doing.
 /// </summary>
 public static class DoctorVerdicts
 {
@@ -59,11 +59,6 @@ public static class DoctorVerdicts
         string hp = t.Display(f.Port);
         var plan = f.Plan;
         var c = f.Connect;
-        var o = f.Outside;
-        bool outsideWorks = o?.WorksOutside == true;
-        bool outsideDown = o?.DownEverywhere == true;
-        bool outsideErrors = o?.ErrorsEverywhere == true;
-        string outsidePlaces = o?.Ran == true ? DoctorOutside.Places(o.Nodes.Where(n => n.Good)) : "";
 
         // ---- this device and its network
         if (f.Local?.HasNetwork == false && f.InternetTcp != true)
@@ -114,8 +109,8 @@ public static class DoctorVerdicts
                 ? $"DNS answers for {h} are tampered with on your network{forged}"
                 : $"DNS lookups for {h} go unanswered on your network, while other names resolve";
             string clause = f.SysTampered ? "its DNS answers are tampered with" : "its DNS lookups go unanswered";
-            // a real address to test the path with: from encrypted DNS, or (that blocked too) from check-host.net's nodes
-            bool realAddress = f.Trusted.Count > 0 && f.TrustedFrom is "encrypted DNS" or "check-host.net";
+            // a real address to test the path with: from encrypted DNS
+            bool realAddress = f.Trusted.Count > 0 && f.TrustedFrom == "encrypted DNS";
             // name a resolver that actually answered from this network (1.1.1.1 / 8.8.8.8 are often the blocked ones)
             string dohHint = f.WorkingDoh.FirstOrDefault() is { } w
                 ? $"{(w.Provider.Length > 0 ? w.Provider : w.Name)}, which answered here: {w.Uri}"
@@ -126,8 +121,8 @@ public static class DoctorVerdicts
             if (!realAddress)
                 return f.DohAnswered
                     ? Problem(what + ".", dnsFix)
-                    : Problem(what + ", and encrypted DNS is blocked too, so its real address can't be checked" +
-                              (outsideWorks ? $" (it works from {outsidePlaces})." : "."), "Use a VPN or a proxy for this site.");
+                    : Problem(what + ", and encrypted DNS is blocked too, so its real address can't be checked.",
+                              "Use a VPN or a proxy for this site.");
             if (tls?.Outcome == DoctorTlsOutcome.SniFiltered)
                 return Problem($"{h} is filtered on your network: {clause}, and connections that name the site are cut (SNI filtering){OtherClause()}.{FragClause(f)}", SniAdvice(f));
             if (!connected)
@@ -137,9 +132,7 @@ public static class DoctorVerdicts
             if (filterPage != null && !Works(http))
                 return Problem($"{h} is blocked on your network: {clause}, and its pages are replaced by the filter's block page.", UseVpn);
             if (pathWorks)
-                return Problem(what + (f.TrustedFrom == "encrypted DNS"
-                                   ? "; it works over encrypted DNS."
-                                   : "; its real address works from here, but encrypted DNS is blocked too."), dnsFix);
+                return Problem(what + "; it works over encrypted DNS.", dnsFix);
             return Problem(what + ".", dnsFix);
         }
 
@@ -167,26 +160,16 @@ public static class DoctorVerdicts
                         ? $"{hp} refuses connections: the service isn't running on that port, or a firewall rejects it."
                         : $"{hp} doesn't answer on your local network: the device may be off, or the port closed.",
                     "Check that the device is on and the service runs on that port.");
-            if (outsideDown)
-                return Down($"{h} is down from everywhere, not just you: nothing answers on port {ports}.",
-                            "Wait and try again later, or tell the site's owner.");
-            if (outsideWorks)
-                return Problem(refused
-                        ? $"{h} works from outside ({outsidePlaces}), but connections from your network are refused: a firewall on the way rejects them."
-                        : $"{h} works from outside ({outsidePlaces}), but your network can't reach its address: the IP is blocked or unroutable from here.",
-                    UseVpn);
             if (refused)
                 return Problem($"{h} refuses connections on port {ports}: the service isn't running, or a firewall rejects it.",
                                "Check the port number; try again later.");
-            return Unknown($"{h} doesn't answer on port {ports} from here, and the outside check couldn't tell whether it's down for everyone.",
-                           "Try again later, or check the site through a VPN.");
+            return Unknown($"{h} doesn't answer on port {ports} from here: the site may be down, or its address is blocked on your network.",
+                           "Run it again with a proxy (or through a VPN): if it works there, your network blocks it.");
         }
 
         if (tls?.Outcome == DoctorTlsOutcome.AllCut)
-            return outsideDown || outsideErrors
-                ? Down($"{h} is broken for everyone: TLS connections to it fail everywhere.", "Wait, or tell the site's owner.")
-                : Problem($"TLS connections to {h} are cut whatever the name: its address is blocked for HTTPS on your network{OtherClause()}" +
-                          (outsideWorks ? $" (it works from {outsidePlaces})." : "."), UseVpn + QuicNote(f));
+            return Problem($"TLS connections to {h} are cut whatever the name: its address is blocked for HTTPS on your network{OtherClause()}.",
+                           UseVpn + QuicNote(f));
         if (tls?.Outcome == DoctorTlsOutcome.HandshakeCut)
             return Problem($"The secure connection to {h} is cut on your network, though simple probes get through: a filter likely recognizes it{OtherClause()}.{FragClause(f)}", SniAdvice(f));
 
@@ -213,10 +196,8 @@ public static class DoctorVerdicts
 
         // ---- the server's own failures
         if (tls?.Outcome == DoctorTlsOutcome.ServerRefused)
-            return outsideDown || outsideErrors
-                ? Down($"{h} refuses secure connections from everywhere: {Lower(tls.Error)}", "It's the site's problem; only its owner can fix it.")
-                : Problem($"{h} refuses the secure connection: {Lower(tls.Error)}",
-                          "Try another browser or device; if it fails everywhere, the site is misconfigured.");
+            return Problem($"{h} refuses the secure connection: {Lower(tls.Error)}",
+                           "Try another browser or device; if it fails everywhere, the site is misconfigured.");
         if (tls?.Outcome == DoctorTlsOutcome.NotTls && f.UsesTls == true)
             return Problem($"{hp} doesn't speak TLS: {Lower(tls.Error)}", "Use http:// instead, or check the port.");
 
@@ -234,25 +215,16 @@ public static class DoctorVerdicts
             if (f.Mtu?.Mtu is int mtu && mtu < DoctorMtu.Small)
                 return Problem($"{who} {what}. Large packets may be getting lost: the path only carries {mtu} bytes.",
                                $"Lower the MTU of your VPN or connection to {mtu - 40} or less, then try again.");
-            if (outsideDown || outsideErrors)
-                return Down($"{who} {what}, from everywhere: the site itself is broken right now.", "Wait, or tell the site's owner.");
-            if (outsideWorks)
-                return Problem($"{who} {what} from here, while {h} works from outside: the traffic may be throttled or filtered.", UseVpn);
-            return Unknown($"{who} {what}.", "Try again later, or through a VPN.");
+            return Unknown($"{who} {what}.", "Try again later; if it works through a proxy or VPN, your network throttles or filters it.");
         }
 
         if (http != null && http.Status >= 500)
-            return outsideWorks
-                ? Problem($"{h} answers your network with an error (HTTP {http.Status}), but works from outside ({outsidePlaces}).",
-                          "Try later or through a VPN; the site treats your network differently.")
-                : Down($"{h} answers with an error (HTTP {http.Status} {http.Reason}) — the site itself is broken right now" +
-                       (o?.Ran == true ? ", from everywhere." : "."), "Wait, or tell the site's owner.");
+            return Down($"{h} answers with an error ({$"HTTP {http.Status} {http.Reason}".TrimEnd()}) — the site itself is broken right now.",
+                        "Wait, or tell the site's owner.");
 
-        if (http != null && http.Status is 403 or 451 && outsideWorks)
-            return Problem(http.Status == 451
-                    ? $"{h} refuses your network for legal reasons (HTTP 451), but works from elsewhere: it blocks your country."
-                    : $"{h} refuses visitors from your network (HTTP 403), but works from elsewhere ({outsidePlaces}): it blocks your country or network.",
-                "Use a VPN or a proxy in another country.");
+        if (http != null && http.Status == 451)
+            return Problem($"{h} refuses your network for legal reasons (HTTP 451): it blocks your country or network.",
+                           "Use a VPN or a proxy in another country.");
 
         // ---- the certificate
         if (tls?.Outcome == DoctorTlsOutcome.CertProblem)
@@ -291,7 +263,9 @@ public static class DoctorVerdicts
             advice += " (QUIC / UDP 443 is blocked here, so HTTP/3 and Hysteria2 / TUIC won't work — TCP-based tools still do.)";
         if (http != null && http.Status >= 400)
             return Problem($"{h} is reachable, but answers HTTP {http.Status} {http.Reason}.".Replace("  ", " "),
-                           o?.Ran == true && !outsideWorks ? "It answers the same way from outside: the page may not exist or needs a login." : "Check the address (path) of the page.");
+                           http.Status == 403
+                               ? "The page may need a login, or the site refuses your network or country: try it through a proxy in another country."
+                               : "Check the address (path) of the page.");
         return new DoctorVerdict(DoctorVerdictKind.Works, $"{h} works from here: {what2}{note}.", advice);
     }
 

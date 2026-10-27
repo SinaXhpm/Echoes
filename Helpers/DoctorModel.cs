@@ -11,7 +11,7 @@ namespace Echoes.Helpers;
 /// <summary>The Doctor's checks, in the order they are listed: the direct path, then (with a proxy) the same through it.</summary>
 public enum DoctorCheck
 {
-    Network, Internet, DnsSystem, DnsPlain, DnsEncrypted, Connect, Ping, Tls, Https, Http, Mtu, Outside,
+    Network, Internet, DnsSystem, DnsPlain, DnsEncrypted, Connect, Ping, Tls, Https, Http, Mtu,
     ProxyServer, ProxyDns, ProxyConnect, ProxyTls, ProxyHttps, ProxyHttp,
 }
 
@@ -93,7 +93,7 @@ public sealed class DoctorTarget
     /// <summary>The path + query to request ("/" by default).</summary>
     public string Path { get; private init; } = "/";
     /// <summary>A name only the local network knows ("nas", "printer.local", "router.lan") or a private IP: public
-    /// resolvers and check-host.net can't help with it.</summary>
+    /// resolvers can't help with it.</summary>
     public bool IsLocal { get; private init; }
 
     /// <summary>The ports to try, in order: the given one, the scheme's, or HTTPS then HTTP.</summary>
@@ -311,9 +311,6 @@ internal sealed class DoctorEnvironment
 
     /// <summary>A name no filter blocks, sent as SNI to tell SNI filtering from a blocked address.</summary>
     public string HarmlessSni { get; init; } = "www.microsoft.com";
-
-    /// <summary>check-host.net's API (a loopback mock in tests).</summary>
-    public Uri? CheckHostBase { get; init; }
 
     /// <summary>Trust exactly these roots for the TLS check (tests: the harness's own CA).</summary>
     public X509Certificate2Collection? TrustRoots { get; init; }

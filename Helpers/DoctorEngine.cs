@@ -62,7 +62,6 @@ public sealed class DoctorFacts
     public DoctorHttpResult? Https { get; set; }
     public DoctorHttpResult? PlainHttp { get; set; }
     public DoctorMtuResult? Mtu { get; set; }
-    public DoctorOutsideResult? Outside { get; set; }
     /// <summary>The anti-DPI retries, run only when the handshake with the name is cut but the address answers otherwise.</summary>
     public DoctorDpiResult? Dpi { get; set; }
     /// <summary>Whether UDP/443 (QUIC / HTTP-3) is open, for a web target on the default port.</summary>
@@ -103,8 +102,8 @@ public sealed class DoctorViaProxy
 /// <summary>
 /// The Doctor: runs every check (independent ones in parallel, each with its own deadline) and reports each row as it
 /// goes. Order: the local network and DNS at once; then, with the address encrypted DNS gave (never the system resolver's,
-/// which may be the filter's), the connection, ping and path MTU; then TLS and HTTP over the connection that worked, and
-/// the outside view from check-host.net. No options: what to check follows from the target.
+/// which may be the filter's), the connection, ping and path MTU; then TLS and HTTP over the connection that worked. No
+/// options: what to check follows from the target.
 /// </summary>
 public static class DoctorEngine
 {
@@ -121,8 +120,7 @@ public static class DoctorEngine
         DoctorCheck.Https or DoctorCheck.ProxyHttps => "HTTPS",
         DoctorCheck.Http or DoctorCheck.ProxyHttp => "HTTP",
         DoctorCheck.Mtu => "Path MTU",
-        DoctorCheck.ProxyServer => "Proxy",
-        _ => "Outside view",
+        _ => "Proxy",
     };
 
     /// <summary>The row's name in the copied report (the proxy's rows say so).</summary>
@@ -144,7 +142,6 @@ public static class DoctorEngine
         DoctorCheck.Https => "A request over HTTPS",
         DoctorCheck.Http => "A request over plain HTTP",
         DoctorCheck.Mtu => "Largest packet that passes",
-        DoctorCheck.Outside => "The site from other countries",
         DoctorCheck.ProxyServer => "Reach, protocol, login",
         DoctorCheck.ProxyDns => "DoH through the proxy",
         DoctorCheck.ProxyConnect => "TCP through the proxy",
@@ -179,41 +176,23 @@ public static class DoctorEngine
 
         var pathRows = new[] { DoctorCheck.Connect, DoctorCheck.Ping, DoctorCheck.Tls, DoctorCheck.Https, DoctorCheck.Http, DoctorCheck.Mtu };
         if (f.NameMissing)
-        {
             foreach (var c in pathRows) sink.Report(c, DoctorState.Skipped, $"Skipped: {t.Host} doesn't exist");
-            sink.Report(DoctorCheck.Outside, DoctorState.Skipped, $"Skipped: {t.Host} doesn't exist");
-        }
         else if (f.Trusted.Count == 0)
         {
-            // No answer this network's DNS gives can be trusted, and encrypted DNS is out of reach: check-host.net's nodes
-            // resolve the name abroad — their addresses are the second-best source for testing the path from here.
-            foreach (var c in pathRows) sink.Report(c, DoctorState.Running, "Waiting for the real address from the outside view…");
-            await Step(sink, new[] { DoctorCheck.Outside }, () => OutsideAsync(f, env, sink, ct)).ConfigureAwait(false);
-            ct.ThrowIfCancellationRequested();
-            var abroad = DoctorIp.Ordered((f.Outside?.Nodes ?? new List<DoctorNodeView>())
-                .Select(n => IPAddress.TryParse(n.Address, out var a) ? a : null)
-                .Where(a => a != null && DoctorIp.IsPublic(a)).Select(a => a!));
-            if (abroad.Count > 0)
-            {
-                f.Trusted = abroad;
-                f.TrustedFrom = "check-host.net";
-                await PathAsync(f, env, doh, sink, runOutside: false, ct).ConfigureAwait(false);
-            }
-            else
-            {
-                string why = t.IsIp ? "no address" : $"no trustworthy address for {t.Host}";
-                foreach (var c in pathRows) sink.Report(c, DoctorState.Skipped, $"Skipped: {why}");
-            }
+            // no answer this network's DNS gives can be trusted, and encrypted DNS is out of reach: nothing to test the
+            // path with (an address guessed from a tampered answer would only test the filter)
+            string why = t.IsIp ? "no address" : $"no trustworthy address for {t.Host}";
+            foreach (var c in pathRows) sink.Report(c, DoctorState.Skipped, $"Skipped: {why}");
         }
-        else await PathAsync(f, env, doh, sink, runOutside: true, ct).ConfigureAwait(false);
+        else await PathAsync(f, env, doh, sink, ct).ConfigureAwait(false);
         await local.ConfigureAwait(false);
         await via.ConfigureAwait(false);
         ct.ThrowIfCancellationRequested();
         return f;
     }
 
-    // The path to the trusted address: connection, ping, path MTU, TLS, HTTP (and the outside view once the port is known).
-    private static async Task PathAsync(DoctorFacts f, DoctorEnvironment env, HttpClient doh, IDoctorSink sink, bool runOutside, CancellationToken ct)
+    // The path to the trusted address: connection, ping, path MTU, TLS, HTTP.
+    private static async Task PathAsync(DoctorFacts f, DoctorEnvironment env, HttpClient doh, IDoctorSink sink, CancellationToken ct)
     {
         // IPv6-only: the site's IPv6 addresses first, then its IPv4 ones as NAT64 reaches them
         if (f.Ipv6Only)
@@ -227,7 +206,6 @@ public static class DoctorEngine
             ? Step(sink, new[] { DoctorCheck.Connect }, () => QuicAsync(f, target0, qp, sink, ct)) : Task.CompletedTask;
         await Step(sink, new[] { DoctorCheck.Connect }, () => ConnectAsync(f, sink, ct)).ConfigureAwait(false);
         ct.ThrowIfCancellationRequested();
-        var outside = runOutside ? Step(sink, new[] { DoctorCheck.Outside }, () => OutsideAsync(f, env, sink, ct)) : Task.CompletedTask;
         var verify = f.SysMatch == DoctorDnsMatch.Differs ? VerifySystemAsync(f, sink, ct) : Task.CompletedTask;
 
         if (f.Connect?.Ok == true)
@@ -248,7 +226,6 @@ public static class DoctorEngine
         await ping.ConfigureAwait(false);
         await mtu.ConfigureAwait(false);
         await quic.ConfigureAwait(false);
-        await outside.ConfigureAwait(false);
     }
 
     // UDP/443: one greased QUIC Initial; a Version Negotiation back = open (HTTP-3 / Hysteria2 / TUIC can work here).
@@ -606,12 +583,7 @@ public static class DoctorEngine
             else Tr(sink, DoctorCheck.Connect, a.Code == SocketError.ConnectionRefused ? DoctorState.Warning : DoctorState.Fail,
                     $"TCP {a.Port}", $"{a.Address} → {SaysLong(a)}", a.Ms);
         }
-        string from = f.TrustedFrom switch
-        {
-            "encrypted DNS" => " (encrypted DNS's address)",
-            "check-host.net" => " (check-host.net's address)",
-            _ => "",
-        };
+        string from = f.TrustedFrom == "encrypted DNS" ? " (encrypted DNS's address)" : "";
         // one part per port: "443 in 120 ms", "80: refused"; the asked-for ports decide the state, an extra one only notes
         var parts = new List<string>();
         bool primaryFailed = false;
@@ -1087,72 +1059,12 @@ public static class DoctorEngine
 
     private static string Sentence(string s) => s.Length > 0 && char.IsLower(s[0]) ? char.ToUpperInvariant(s[0]) + s[1..] : s;
 
-    // ------------------------------------------------------------------ outside view
-
-    private static async Task OutsideAsync(DoctorFacts f, DoctorEnvironment env, IDoctorSink sink, CancellationToken ct)
-    {
-        var t = f.Target;
-        if (t.IsLocal && !DoctorIp.LoopbackIsPublic)
-        {
-            sink.Report(DoctorCheck.Outside, DoctorState.Skipped, "A local address: check-host.net can't reach it");
-            return;
-        }
-        // an HTTP check of the scheme that connected here (HTTPS first), else a TCP check of the asked-for port;
-        // never with the query string (it may carry a token)
-        var plan = f.Plan;
-        var c = f.Connect;
-        int? webPort = c?.OkOn(plan.Https) == true ? plan.Https : c?.OkOn(plan.Http) == true ? plan.Http : null;
-        bool web = webPort != null;
-        int port = webPort ?? plan.All[0];
-        CheckHostKind kind = web ? CheckHostKind.Http : CheckHostKind.Tcp;
-        string target = web ? NoQuery(t.Url(port, port == plan.Https, withPath: port == plan.Https ? plan.HttpsPrimary : plan.HttpPrimary)) : t.Display(port);
-        sink.Report(DoctorCheck.Outside, DoctorState.Running, $"Asking check-host.net ({kind.Label()} check of {DoctorNet.Trim(target, 50)})…");
-        var sw = Stopwatch.StartNew();
-        var o = await DoctorOutside.RunAsync(env.CheckHostBase, kind, target, ct).ConfigureAwait(false);
-        f.Outside = o;
-        double ms = sw.Elapsed.TotalMilliseconds;
-        if (!o.Ran)
-        {
-            sink.Report(DoctorCheck.Outside, DoctorState.Warning, Cap("Couldn't check from outside: " + (o.Error ?? "no result").TrimEnd('.')), ms);
-            return;
-        }
-        int total = o.Nodes.Count;
-        var bad = o.Nodes.Where(n => !n.Good).ToList();
-        var good = o.Nodes.Where(n => n.Good).ToList();
-        string failNote = "";
-        if (bad.Count > 0 && good.Count > 0)
-        {
-            failNote = $" · fails from {DoctorOutside.Places(bad, 2)}";
-        }
-        if (o.WorksOutside)
-            sink.Report(DoctorCheck.Outside, bad.Count == 0 ? DoctorState.Ok : DoctorState.Warning,
-                        Cap($"Works from {good.Count} of {total} places ({DoctorOutside.Places(good)}){failNote}"), ms);
-        else if (o.DownEverywhere)
-            sink.Report(DoctorCheck.Outside, DoctorState.Fail,
-                        Cap($"Down from all {total} places ({DoctorOutside.Places(o.Nodes)}): {CommonError(o.Nodes)}"), ms);
-        else if (o.ErrorsEverywhere)
-            sink.Report(DoctorCheck.Outside, DoctorState.Fail,
-                        Cap($"Answers with errors from all {total} places ({CommonError(o.Nodes)})"), ms);
-        else
-            sink.Report(DoctorCheck.Outside, DoctorState.Warning,
-                        Cap($"Works from only {good.Count} of {total} places ({(good.Count > 0 ? DoctorOutside.Places(good) : "none")}){failNote}"), ms);
-    }
-
-    private static string CommonError(IEnumerable<DoctorNodeView> nodes)
-    {
-        var top = nodes.Select(n => n.HttpCode is int code ? $"HTTP {code}" : CheckHostResult.ShortError(n.Why))
-                       .GroupBy(s => s).OrderByDescending(g => g.Count()).FirstOrDefault();
-        return top?.Key ?? "no answer";
-    }
-
     // ------------------------------------------------------------------ bits
-
-    private static string NoQuery(string url) => url.IndexOf('?') is int q and >= 0 ? url[..q] : url;
 
     internal static string Ms(double ms) => ms < 10 ? $"{ms.ToString("0.#", CultureInfo.InvariantCulture)} ms" : $"{Math.Round(ms).ToString(CultureInfo.InvariantCulture)} ms";
 
-    // details quote what servers said (a status line, a Server header, a certificate's issuer, check-host.net's
-    // answers): control / bidi characters replaced, and capped
+    // details quote what servers said (a status line, a Server header, a certificate's issuer): control / bidi
+    // characters replaced, and capped
     private static string Cap(string s) => RemoteText.Clean(s, 240);
 
     // ------------------------------------------------------------------ the granular trace (sub-steps under each check)
