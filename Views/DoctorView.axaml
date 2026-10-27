@@ -274,52 +274,8 @@
             <Setter Property="Margin" Value="0,0,0,2"/>
         </Style>
 
-        <!-- ===== the lower card's switch [Checks | Log] (as the DNS tool's mode switch), and the log ===== -->
-        <Style Selector="ListBox.viewSwitch">
-            <!-- a segmented switch always has one segment on -->
-            <Setter Property="SelectionMode" Value="AlwaysSelected"/>
-            <Setter Property="Padding" Value="2"/>
-            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
-            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
-            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled"/>
-            <Setter Property="ItemsPanel">
-                <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
-            </Setter>
-        </Style>
-        <Style Selector="ListBox.viewSwitch > ListBoxItem">
-            <Setter Property="Padding" Value="12,0"/>
-            <Setter Property="Margin" Value="0"/>
-            <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="MinWidth" Value="0"/>
-            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style Selector="ListBox.viewSwitch > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
-        </Style>
-        <Style Selector="ListBox.viewSwitch > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
-        </Style>
-        <Style Selector="ListBox.viewSwitch > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
-                         ListBox.viewSwitch > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
-                         ListBox.viewSwitch > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
-                         ListBox.viewSwitch > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
-        </Style>
+        <!-- ===== the lower card's switch [Checks | Log] (the shared ListBox.modeSwitch, Styles/AppStyles.axaml, with
+             two equal parts set on the control), and the log ===== -->
         <Style Selector="SelectableTextBlock.logText">
             <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
             <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
@@ -583,7 +539,10 @@
         <Border Grid.Row="2" Classes="card output">
             <Grid RowDefinitions="Auto, Auto, *">
                 <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto, Auto" Margin="12,6,8,6" ColumnSpacing="8">
-                    <ListBox x:Name="ViewSwitch" Classes="viewSwitch" SelectedIndex="{Binding ViewIndex}" AutomationProperties.Name="Show">
+                    <ListBox x:Name="ViewSwitch" Classes="modeSwitch" SelectedIndex="{Binding ViewIndex}" AutomationProperties.Name="Show">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
                         <ListBoxItem ToolTip.Tip="Every check, its finding and its steps">Checks</ListBoxItem>
                         <ListBoxItem ToolTip.Tip="Every step of the last run with its time, as text you can select and copy">Log</ListBoxItem>
                     </ListBox>
