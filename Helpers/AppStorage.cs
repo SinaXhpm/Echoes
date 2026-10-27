@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.Versioning;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Echoes.Helpers;
@@ -48,6 +49,7 @@ public static class AppStorage
     /// </summary>
     public static string UserDir()
     {
+        if (PortableDir.Value is { } portable) return portable;
         string dir = Path.Combine(AppDataRoot(), "Echoes");
         try
         {
@@ -63,6 +65,70 @@ public static class AppStorage
         }
         catch { }
         return dir;
+    }
+
+    // ---------------------------------------------------------------- portable copy (Windows)
+
+    /// <summary>With this file next to Echoes.exe a Windows copy is portable: its settings, history, vaults and keys live in
+    /// <see cref="PortableFolder"/> beside it, not in the user profile. The zip release ships it; the installer doesn't.</summary>
+    public const string PortableMarker = "portable.txt";
+    public const string PortableFolder = "Echoes Data";
+
+    private static readonly Lazy<string?> PortableDir = new(FindPortableDir, LazyThreadSafetyMode.ExecutionAndPublication);
+
+    /// <summary>True for a portable Windows copy (<see cref="PortableMarker"/> next to it, its folder writable).</summary>
+    public static bool IsPortable => PortableDir.Value is not null;
+
+    // The folder travels (a stick, a synced or shared folder), so it is protected as such: owner-only permissions, and the
+    // key that opens the saved secrets sealed to the Windows account (SecretProtector). On a read-only medium the copy
+    // falls back to the user profile. The first run takes over what an installed copy already had, so moving to the
+    // portable build loses nothing.
+    private static string? FindPortableDir()
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        try
+        {
+            string baseDir = AppContext.BaseDirectory;
+            if (!File.Exists(Path.Combine(baseDir, PortableMarker))) return null;
+            string dir = Path.Combine(baseDir, PortableFolder);
+            bool fresh = !Directory.Exists(dir);
+            Directory.CreateDirectory(dir);
+            string probe = Path.Combine(dir, ".write_probe");
+            File.WriteAllText(probe, "");
+            File.Delete(probe);
+            WindowsSecret.OwnerOnly(dir);
+            if (fresh) TakeOverInstalledData(dir);
+            return dir;
+        }
+        catch { return null; }
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static void TakeOverInstalledData(string portableDir)
+    {
+        try
+        {
+            string installed = Path.Combine(AppDataRoot(), "Echoes");
+            if (!Directory.Exists(installed)) return;
+            foreach (string file in Directory.EnumerateFiles(installed))
+            {
+                string name = Path.GetFileName(file);
+                if (name.StartsWith(".instance", StringComparison.Ordinal) || name.EndsWith(".log", StringComparison.OrdinalIgnoreCase)
+                    || name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".bad", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string target = Path.Combine(portableDir, name);
+                if (File.Exists(target)) continue;
+                if (name == ".secret.key")
+                {
+                    // never written in the clear next to a travelling copy: sealed to this account on the way
+                    byte[] key = File.ReadAllBytes(file);
+                    try { if (key.Length == 32) CreateNewFileAtomic(target, WindowsSecret.Seal(key)); }
+                    finally { SecureMemory.Zero(key); }
+                }
+                else File.Copy(file, target);
+            }
+        }
+        catch { }   // an incomplete take-over only means some settings start fresh
     }
 
     // On Linux / macOS, GetFolderPath returns "" when the folder doesn't exist yet (a fresh account without ~/.config or

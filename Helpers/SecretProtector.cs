@@ -142,7 +142,24 @@ public static class SecretProtector
                             if (read.Length == KeyLength)
                             {
                                 KeepOutOfBackups(path);   // also a key made by a build that didn't do this yet
-                                return SecureMemory.Copy(read);
+                                var key = SecureMemory.Copy(read);
+                                // a portable copy's folder travels: its key doesn't stay there in the clear
+                                if (OperatingSystem.IsWindows() && AppStorage.IsPortable && OnDisk(key) is { } sealedKey && sealedKey != key)
+                                {
+                                    try { AppStorage.WriteAllBytesAtomic(path, sealedKey); }
+                                    catch (Exception ex) { CrashLog.Write("SecretProtector.SealKey", ex); }
+                                }
+                                return key;
+                            }
+                            if (OperatingSystem.IsWindows() && WindowsSecret.IsSealed(read))
+                            {
+                                // sealed to a Windows account (a portable copy): it opens for that user on that PC only.
+                                // Elsewhere there is no key this run (saved secrets read empty and are never written
+                                // over), and the file stays as it is for when the copy is back home.
+                                byte[]? open = WindowsSecret.Unseal(read);
+                                if (open is not { Length: KeyLength }) { SecureMemory.Zero(open); return null; }
+                                try { return SecureMemory.Copy(open); }
+                                finally { SecureMemory.Zero(open); }
                             }
                         }
                         finally { SecureMemory.Zero(read); }
@@ -152,7 +169,8 @@ public static class SecretProtector
                     }
                     byte[] fresh = SecureMemory.Alloc(KeyLength);
                     RandomNumberGenerator.Fill(fresh);
-                    try { AppStorage.CreateNewFileAtomic(path, fresh); }   // IOException if another process created it first
+                    // IOException if another process created it first
+                    try { AppStorage.CreateNewFileAtomic(path, OnDisk(fresh)); }
                     catch { SecureMemory.Zero(fresh); throw; }
                     KeepOutOfBackups(path);
                     return fresh;
@@ -171,6 +189,15 @@ public static class SecretProtector
         {
             return null;
         }
+    }
+
+    // What goes into the key file: a portable Windows copy's key sealed to the Windows account (DPAPI); anywhere else, and
+    // should Windows refuse to seal, the key itself (the data folder's permissions protect it, as before).
+    private static byte[] OnDisk(byte[] key)
+    {
+        if (!OperatingSystem.IsWindows() || !AppStorage.IsPortable) return key;
+        try { return WindowsSecret.Seal(key); }
+        catch (Exception ex) { CrashLog.Write("SecretProtector.SealKey", ex); return key; }
     }
 
     // iOS: the key must not go into a backup next to the profile it opens (a restored phone asks for the secrets again,
