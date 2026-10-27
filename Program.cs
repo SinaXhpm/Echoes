@@ -109,6 +109,13 @@ class Program
             // Inter on every OS (the Android head already registers it): Fluent prefers it when present, so the
             // UI renders with the same metrics everywhere instead of Segoe / SF / whatever the distro ships.
             .WithInterFont()
+            // Windows: DirectComposition rather than Avalonia's first choice, WinUI composition, whose extras (blur,
+            // Mica) Echoes' solid colors never use: the window's first frame showed about 120 ms sooner (Native AOT
+            // build, 6 starts each), with the same memory.
+            .With(new Win32PlatformOptions
+            {
+                CompositionMode = new[] { Win32CompositionMode.DirectComposition, Win32CompositionMode.RedirectionSurface }
+            })
             .LogToTrace();
     }
 
