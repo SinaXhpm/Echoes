@@ -135,66 +135,14 @@
             <Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
         </Style>
 
-        <!-- ===== mode switch: one segmented control [Lookup | Compare | Email check] (as Ping's) ===== -->
-        <Style Selector="ListBox.modeSwitch">
-            <!-- a segmented switch always has one segment on: Ctrl+click otherwise cleared it, and the mode went to -1 -->
-            <Setter Property="SelectionMode" Value="AlwaysSelected"/>
-            <Setter Property="Padding" Value="2"/>
-            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
-            <Setter Property="HorizontalAlignment" Value="Left"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
-            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
-            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled"/>
-            <Setter Property="ItemsPanel">
-                <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
-            </Setter>
-        </Style>
-        <Style Selector="ListBox.modeSwitch > ListBoxItem">
-            <Setter Property="Padding" Value="14,0"/>
-            <Setter Property="Margin" Value="0"/>
-            <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="MinWidth" Value="0"/>
-            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
+        <!-- ===== mode switch: one segmented control [Lookup | Compare | Email check], the shared ListBox.modeSwitch
+             (Styles/AppStyles.axaml) with three equal parts (its panel is set on the control) ===== -->
         <!-- a phone: the switch fills the row, its three parts share it -->
         <Style Selector="Grid#DnsForm.narrow > ListBox#DnsMode">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
         </Style>
         <Style Selector="Grid#DnsForm.narrow > ListBox#DnsMode > ListBoxItem">
             <Setter Property="Padding" Value="6,0"/>
-        </Style>
-        <Style Selector="ListBox.modeSwitch > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
-        </Style>
-        <Style Selector="ListBox.modeSwitch > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
-        </Style>
-        <Style Selector="ListBox.modeSwitch > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
-                         ListBox.modeSwitch > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
-                         ListBox.modeSwitch > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
-                         ListBox.modeSwitch > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
-        </Style>
-        <!-- locked while a run goes on: the chosen mode stays marked, the others read as unavailable -->
-        <Style Selector="ListBox.modeSwitch:disabled > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Foreground" Value="{DynamicResource Text.Disabled}"/>
-        </Style>
-        <Style Selector="ListBox.modeSwitch:disabled > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
         </Style>
 
         <!-- record-type picker: a DropDownButton dressed like the inputs next to it -->
@@ -740,6 +688,9 @@
                 <!-- the mode is picked before a run; locked while one goes on -->
                 <ListBox x:Name="DnsMode" Classes="modeSwitch" SelectedIndex="{Binding ModeIndex}" IsEnabled="{Binding !IsWorking}"
                          AutomationProperties.Name="Mode">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
                     <ListBoxItem ToolTip.Tip="Any record types through your resolvers (plain, DoH or DoT), plus WHOIS">Lookup</ListBoxItem>
                     <ListBoxItem ToolTip.Tip="One name against many resolvers: speed, reliability, and tampering / filtering">Compare</ListBoxItem>
                     <ListBoxItem ToolTip.Tip="A domain's mail setup: MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT, blocklists">Email check</ListBoxItem>

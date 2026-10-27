@@ -138,7 +138,13 @@ public partial class MobileShellView : UserControl
         if (Split is { IsPaneOpen: true }) { Split.IsPaneOpen = false; e.Handled = true; return; }
         if (_vm is { IsAboutOpen: true }) return;
         if (TopPopup() is { } popup) { popup.IsOpen = false; e.Handled = true; return; }
-        e.Handled = EscapeOnPage();
+        if (EscapeOnPage()) { e.Handled = true; return; }
+        // after a hand-off from another tool (DNS → IP Info): back to that tool
+        if (_returnTo is int back && back >= 0 && back < Nav.ItemCount)
+        {
+            Nav.SelectedIndex = back;   // clears _returnTo (a selection made here, not by a hand-off)
+            e.Handled = true;
+        }
     }
 
     // An Escape press where the keyboard focus is (on the page itself when nothing there has focus).
@@ -242,11 +248,23 @@ public partial class MobileShellView : UserControl
     }
 
     // A tool handed another one something (an address to look up): that tool's page is shown, built on a first visit as
-    // a tap in the drawer does.
+    // a tap in the drawer does. Back then returns to the page it came from (as a phone's Back should, instead of leaving
+    // the app); a page picked in the drawer forgets that.
+    private int? _returnTo;
+    private bool _jumping;
+
     private void SelectTool(string tag)
     {
         for (int i = 0; i < Nav.ItemCount; i++)
-            if (Nav.Items[i] is ListBoxItem { Tag: string t } && t == tag) { Nav.SelectedIndex = i; return; }
+        {
+            if (Nav.Items[i] is not ListBoxItem { Tag: string t } || t != tag) continue;
+            if (Nav.SelectedIndex == i) return;
+            _returnTo = Nav.SelectedIndex;
+            _jumping = true;
+            try { Nav.SelectedIndex = i; }
+            finally { _jumping = false; }
+            return;
+        }
     }
 
     private void TogglePane(object? sender, RoutedEventArgs e)
@@ -263,6 +281,7 @@ public partial class MobileShellView : UserControl
         // Split are assigned — guard against the null to avoid a startup crash.
         if (Split is not null)
             Split.IsPaneOpen = false; // close the drawer after picking a tool
+        if (!_jumping) _returnTo = null;
         UpdatePageHeader();
 
         // Build the tool on first visit, then mirror the desktop shell's per-tab refresh so live data
