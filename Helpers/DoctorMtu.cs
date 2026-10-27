@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
@@ -10,8 +11,13 @@ using System.Threading.Tasks;
 
 namespace Echoes.Helpers;
 
-/// <summary>The path MTU result: the largest packet that got through unfragmented, or why it couldn't be measured.</summary>
-public sealed record DoctorMtuResult(int? Mtu, bool Exact, string? Skipped);
+/// <summary>The path MTU result: the largest packet that got through unfragmented, or why it couldn't be measured, and
+/// every probe on the way (the search, step by step).</summary>
+public sealed record DoctorMtuResult(int? Mtu, bool Exact, string? Skipped, IReadOnlyList<DoctorMtuProbe>? Probes = null);
+
+/// <summary>One probe of the search: a packet of <paramref name="Size"/> bytes with Don't-Fragment, and what became of it
+/// ("passes", "too big", "lost", "not permitted").</summary>
+public sealed record DoctorMtuProbe(int Size, string Result);
 
 /// <summary>
 /// Path MTU to the target: the largest IPv4 packet that passes with Don't-Fragment set, by binary search with ping.
@@ -37,26 +43,33 @@ public static class DoctorMtu
 
         var clock = Stopwatch.StartNew();
         int timeout = 1000;
+        var probes = new List<DoctorMtuProbe>();
+        async Task<Probe> Try(int size, bool twice)
+        {
+            var r = twice ? await SendTwiceAsync(addr, size, timeout, ct).ConfigureAwait(false) : await SendAsync(addr, size, timeout, ct).ConfigureAwait(false);
+            probes.Add(new DoctorMtuProbe(size, r switch { Probe.Fits => "passes", Probe.TooBig => "too big", Probe.Lost => "lost", _ => "not permitted" }));
+            return r;
+        }
 
         // does the target answer ping at all (twice: one loss shouldn't decide)
-        var first = await SendAsync(addr, 128, timeout, ct).ConfigureAwait(false);
-        if (first == Probe.Lost) first = await SendAsync(addr, 128, timeout, ct).ConfigureAwait(false);
-        if (first == Probe.Denied) return new(null, false, "ICMP isn't permitted for this app here");
-        if (first != Probe.Fits) return new(null, false, "the target doesn't answer ping, so it can't be measured");
+        var first = await Try(128, twice: false).ConfigureAwait(false);
+        if (first == Probe.Lost) first = await Try(128, twice: false).ConfigureAwait(false);
+        if (first == Probe.Denied) return new(null, false, "ICMP isn't permitted for this app here", probes);
+        if (first != Probe.Fits) return new(null, false, "the target doesn't answer ping, so it can't be measured", probes);
 
-        if (await SendTwiceAsync(addr, Full, timeout, ct).ConfigureAwait(false) == Probe.Fits) return new(Full, true, null);
+        if (await Try(Full, twice: true).ConfigureAwait(false) == Probe.Fits) return new(Full, true, null, probes);
 
         int lo = 128, hi = Full;
         while (hi - lo > 1)
         {
-            if (clock.ElapsedMilliseconds > budgetMs) return new(lo, false, null);
+            if (clock.ElapsedMilliseconds > budgetMs) return new(lo, false, null, probes);
             int mid = (lo + hi) / 2;
-            var r = await SendTwiceAsync(addr, mid, timeout, ct).ConfigureAwait(false);
-            if (r == Probe.Denied) return new(null, false, "ICMP isn't permitted for this app here");
+            var r = await Try(mid, twice: true).ConfigureAwait(false);
+            if (r == Probe.Denied) return new(null, false, "ICMP isn't permitted for this app here", probes);
             if (r == Probe.Fits) lo = mid;
             else hi = mid;   // too big, or silently dropped twice (a black hole)
         }
-        return new(lo, true, null);
+        return new(lo, true, null, probes);
     }
 
     // a lost probe is tried once more before it counts as "too big"

@@ -58,6 +58,10 @@ public interface IDoctorSink
     /// <paramref name="step"/> label, a one-line <paramref name="detail"/>, its state and time. Shown indented under the
     /// check so the user sees exactly where a connection gets stuck. Default: ignored.</summary>
     void Trace(DoctorCheck check, DoctorState state, string step, string detail, double? ms = null) { }
+
+    /// <summary>A line for the run log only (what a row would be too long for: every header sent, every probe), already
+    /// free of secrets. Default: ignored.</summary>
+    void Log(DoctorCheck check, string text) { }
 }
 
 /// <summary>The one-sentence answer: what is wrong (or that nothing is), and what to do about it.</summary>

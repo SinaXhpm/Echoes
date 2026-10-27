@@ -46,7 +46,9 @@ public sealed class DoctorConnect
     public DoctorConnectAttempt? FailureOn(int? port) => port is int p ? Attempts.FirstOrDefault(a => a.Port == p && !a.Ok) : null;
 }
 
-public sealed record DoctorPing(int Sent, int Received, double? Avg, double? Min, double? Max, bool Denied, bool ViaUdp, string? Error);
+/// <summary>The ping check; <paramref name="Replies"/> holds each probe's round trip in order (null: no reply).</summary>
+public sealed record DoctorPing(int Sent, int Received, double? Avg, double? Min, double? Max, bool Denied, bool ViaUdp, string? Error,
+                                IReadOnlyList<double?>? Replies = null);
 
 /// <summary>Local network facts, quick TCP connects and ping for the Doctor.</summary>
 public static class DoctorNet
@@ -235,6 +237,7 @@ public static class DoctorNet
     public static async Task<DoctorPing> PingAsync(IPAddress addr, int count, CancellationToken ct)
     {
         var rtts = new List<double>();
+        var replies = new List<double?>();
         int sent = 0;
         bool udp = false;
         string? error = null;
@@ -242,15 +245,16 @@ public static class DoctorNet
         {
             if (i > 0) await Task.Delay(200, ct).ConfigureAwait(false);
             var r = await IcmpPinger.SendAsync(addr, 1200, ct).ConfigureAwait(false);
-            if (r.PermissionDenied) return new DoctorPing(sent, 0, null, null, null, true, false, r.Error);
+            if (r.PermissionDenied) return new DoctorPing(sent, 0, null, null, null, true, false, r.Error, replies);
             sent++;
             udp |= r.Method == PingMethod.Udp;
             if (r.Success) rtts.Add(Math.Max(r.RoundtripMs, 0));
             else error ??= r.Error;
+            replies.Add(r.Success ? Math.Max(r.RoundtripMs, 0) : null);
         }
         return rtts.Count == 0
-            ? new DoctorPing(sent, 0, null, null, null, false, udp, error)
-            : new DoctorPing(sent, rtts.Count, rtts.Average(), rtts.Min(), rtts.Max(), false, udp, error);
+            ? new DoctorPing(sent, 0, null, null, null, false, udp, error, replies)
+            : new DoctorPing(sent, rtts.Count, rtts.Average(), rtts.Min(), rtts.Max(), false, udp, error, replies);
     }
 
     // ------------------------------------------------------------------ captive portal

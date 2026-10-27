@@ -21,10 +21,12 @@ public static class DoctorVerdicts
     public static DoctorVerdict Decide(DoctorFacts f)
     {
         var direct = DecideDirect(f);
-        // with an override IP the path went there: the verdict says so, and how DNS compares (unless it did already)
-        if (f.Override is { } ov && !direct.Sentence.Contains(OverrideTag, StringComparison.Ordinal))
-            direct = direct with { Sentence = $"{direct.Sentence} Tested at {ov}{OverrideTag}; {OverrideClause(f)}." };
-        return f.Proxy != null && f.Via != null ? WithProxy(f, direct) : direct;
+        var v = f.Proxy != null && f.Via != null ? WithProxy(f, direct) : direct;
+        // with an override IP the paths went there (the proxy's tunnels too): the verdict says so, and how DNS compares
+        // (unless it did already)
+        if (f.Override is { } ov && !v.Sentence.Contains(OverrideTag, StringComparison.Ordinal))
+            v = v with { Sentence = $"{v.Sentence} Tested at {ov}{OverrideTag}; {OverrideClause(f)}." };
+        return v;
     }
 
     /// <summary>What DNS says about the override IP, as a clause: "DNS gives the same address", "your DNS gives
@@ -399,6 +401,17 @@ public static class DoctorVerdicts
 
     public readonly record struct Line(string Title, DoctorState State, string Detail, string Time);
 
+    /// <summary>A state as the report and the run log write it: OK, WARN, FAIL, SKIP, "..." (running), "-" (a finding).</summary>
+    public static string Tag(DoctorState s) => s switch
+    {
+        DoctorState.Ok => "OK",
+        DoctorState.Warning => "WARN",
+        DoctorState.Fail => "FAIL",
+        DoctorState.Skipped => "SKIP",
+        DoctorState.Running => "...",
+        _ => "-",
+    };
+
     /// <summary>One check and its granular sub-steps, for the copied report's full trace.</summary>
     public readonly record struct Block(Line Head, IReadOnlyList<Line> Steps);
 
@@ -419,15 +432,6 @@ public static class DoctorVerdicts
             sb.Append(verdict.Title).Append(": ").Append(verdict.Sentence).Append('\n');
             sb.Append("What to do: ").Append(verdict.Advice).Append("\n\n");
         }
-        static string Tag(DoctorState s) => s switch
-        {
-            DoctorState.Ok => "OK",
-            DoctorState.Warning => "WARN",
-            DoctorState.Fail => "FAIL",
-            DoctorState.Skipped => "SKIP",
-            DoctorState.Running => "...",
-            _ => "-",
-        };
         foreach (var b in blocks)
         {
             var l = b.Head;

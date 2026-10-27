@@ -239,6 +239,16 @@ public static class DoctorEngine
             f.Nat64 = await DoctorNet.Nat64PrefixAsync(env.SystemResolve, ct).ConfigureAwait(false);
         }
 
+        // the run log's head: what is checked, how, and with what
+        var plan = f.Plan;
+        sink.Log(DoctorCheck.Network, $"Target {t.Display()}: " + (plan.Raw is int rp ? $"port {rp}"
+            : string.Join(", ", new[] { plan.Https is int hs ? $"HTTPS on {hs}" : null, plan.Http is int hp ? $"HTTP on {hp}" : null }.Where(x => x != null))));
+        sink.Log(DoctorCheck.Network, $"Routes: IPv4 {(v4 ? "yes" : "no")}, IPv6 {(v6 ? "yes" : "no")}"
+                                      + (f.Ipv6Only ? f.Nat64 is { } n64 ? $" (IPv6 only, NAT64 {n64}/96)" : " (IPv6 only)" : ""));
+        if (opt.Proxy is { } px) sink.Log(DoctorCheck.Network, $"Also through the proxy {px.Display} ({px.KindName}{(px.HasLogin ? ", with a login" : "")})");
+        if (f.Override is { } oip) sink.Log(DoctorCheck.Network, $"Override IP: {oip} (the path goes there; SNI and Host stay {t.AsciiHost})");
+        if (opt.Request is { } rq) sink.Log(DoctorCheck.Network, $"Imported request ({rq.Source}): {rq.Method} {DoctorSecrets.Url(rq.Url.AbsoluteUri)}");
+
         var local = Step(sink, new[] { DoctorCheck.Network, DoctorCheck.Internet }, () => LocalAsync(f, env, sink, ct));
         var proxyRows = new[] { DoctorCheck.ProxyServer, DoctorCheck.ProxyDns, DoctorCheck.ProxyConnect, DoctorCheck.ProxyTls, DoctorCheck.ProxyHttps, DoctorCheck.ProxyHttp };
         var via = opt.Proxy is { } proxy ? Step(sink, proxyRows, () => ViaProxyAsync(f, env, proxy, sink, ct)) : Task.CompletedTask;
@@ -467,7 +477,8 @@ public static class DoctorEngine
         var dohList = await DoctorDns.DohAllAsync(doh, dohEndpoints, t.AsciiHost, 4500, ct).ConfigureAwait(false);
         var sys = await sysT.ConfigureAwait(false);
         var plain = await plainT.ConfigureAwait(false);
-        f.PlainControlOk = (await controlT.ConfigureAwait(false)).Addresses.Count > 0;
+        var control = await controlT.ConfigureAwait(false);
+        f.PlainControlOk = control.Addresses.Count > 0;
         f.Sys = sys;
         f.Plain = plain;
         f.Doh = dohList;
@@ -484,6 +495,12 @@ public static class DoctorEngine
         f.NameMissing = nx ? (sys.NoSuchName || sys.Addresses.Count == 0 || !sys.Answered)
                            : !known && sys.NoSuchName && plain.Any(p => p.NoSuchName) && plain.All(p => p.NoSuchName || !p.Answered);
         TraceDns(sink, f);
+        // a name nobody blocks, asked the same way: tells "this name is dropped" from "port 53 is closed"
+        if (plainDns.Count > 0 && env.WellKnownNames.Count > 0)
+            Tr(sink, DoctorCheck.DnsPlain, f.PlainControlOk ? DoctorState.Ok : DoctorState.Warning, "Control",
+               f.PlainControlOk ? $"{control.Source} answers {env.WellKnownNames[0]}: port 53 itself works"
+                                : $"{control.Source} doesn't answer {env.WellKnownNames[0]} either ({control.Error ?? "no address"})",
+               control.Answered ? control.Ms : null);
 
         // ---- the addresses the next checks use
         var publicTrusted = trustedSet.Where(DoctorIp.IsPublic).ToList();
@@ -675,6 +692,13 @@ public static class DoctorEngine
             else Tr(sink, DoctorCheck.Connect, a.Code == SocketError.ConnectionRefused ? DoctorState.Warning : DoctorState.Fail,
                     $"TCP {a.Port}", $"{a.Address} → {SaysLong(a)}", a.Ms);
         }
+        // the address the next checks use: per port, the fastest that answered
+        foreach (int p in ports)
+            if (c.Best(p) is { } best)
+            {
+                int tried = c.Attempts.Count(a => a.Port == p);
+                Tr(sink, DoctorCheck.Connect, DoctorState.Ok, $"Uses {p}", $"{best.Address}" + (tried > 1 ? $" (the fastest of {tried})" : ""));
+            }
         string from = f.TrustedFrom switch
         {
             DoctorFacts.FromDoh => " (encrypted DNS's address)",
@@ -730,6 +754,9 @@ public static class DoctorEngine
         else if (p.Received == 0) Tr(sink, DoctorCheck.Ping, DoctorState.Warning, p.ViaUdp ? "UDP probe" : "ICMP echo", $"{addr} → no reply (0/{p.Sent}) — many hosts ignore ping");
         else Tr(sink, DoctorCheck.Ping, p.Received < p.Sent ? DoctorState.Warning : DoctorState.Ok, p.ViaUdp ? "UDP probe" : "ICMP echo",
                 $"{addr} → {p.Received}/{p.Sent} replies, avg {Ms(p.Avg!.Value)}", p.Avg);
+        // each probe in order: "84 ms · 83 ms · lost · 85 ms"
+        if (p.Replies is { Count: > 0 } replies)
+            Tr(sink, DoctorCheck.Ping, DoctorState.Pending, "Probes", string.Join(" · ", replies.Select(r => r is double rtt ? Ms(rtt) : "lost")));
         string via = p.ViaUdp ? " (UDP probes: ICMP isn't permitted here)" : "";
         if (p.Denied)
             sink.Report(DoctorCheck.Ping, DoctorState.Skipped, Cap("Ping isn't permitted here" + (p.Error is { } e ? $" ({e})" : "")));
@@ -751,6 +778,12 @@ public static class DoctorEngine
         var m = await DoctorMtu.MeasureAsync(addr, 7000, ct).ConfigureAwait(false);
         f.Mtu = m;
         double ms = sw.Elapsed.TotalMilliseconds;
+        // the search, probe by probe: "128 ✓ · 1500 ✗ · 814 ✓ …" (✗: too big or lost twice), each in the log
+        if (m.Probes is { Count: > 0 } probes)
+        {
+            Tr(sink, DoctorCheck.Mtu, DoctorState.Pending, "Probes", string.Join(" · ", probes.Select(pr => $"{pr.Size} {(pr.Result == "passes" ? "✓" : "✗")}")));
+            foreach (var pr in probes) sink.Log(DoctorCheck.Mtu, $"{pr.Size} bytes with Don't-Fragment to {addr}: {pr.Result}");
+        }
         if (m.Mtu is int mv)
             Tr(sink, DoctorCheck.Mtu, mv >= DoctorMtu.Small ? DoctorState.Ok : DoctorState.Warning, "Largest packet",
                (m.Exact ? $"{mv} bytes pass" : $"at least {mv} bytes pass") + (mv >= DoctorMtu.Full ? " (full size)" : mv >= DoctorMtu.Small ? " (DSL / PPPoE)" : " — a PMTU black hole: bigger packets vanish"), ms);
@@ -844,14 +877,8 @@ public static class DoctorEngine
         {
             case DoctorTlsOutcome.Ok:
             case DoctorTlsOutcome.CertProblem:
-                Tr(sink, DoctorCheck.Tls, DoctorState.Ok, "ServerHello", $"received ({r.Protocol})", r.HandshakeMs);
-                if (r.CertSubject != null)
-                {
-                    bool certBad = r.Outcome == DoctorTlsOutcome.CertProblem;
-                    Tr(sink, DoctorCheck.Tls, certBad ? DoctorState.Fail : r.CoversName == false ? DoctorState.Warning : DoctorState.Ok, "Certificate",
-                       $"{r.CertSubject}, issuer {r.CertIssuer}" + (r.CoversName == true ? $" — names {name}" : r.CoversName == false ? $" — does NOT name {name}" : "")
-                       + (certBad ? " — a browser would refuse it" : ""));
-                }
+                Tr(sink, DoctorCheck.Tls, DoctorState.Ok, "ServerHello", $"received ({Negotiated(r)})", r.HandshakeMs);
+                TraceCertificate(sink, DoctorCheck.Tls, r, name);
                 Tr(sink, DoctorCheck.Tls, r.Outcome == DoctorTlsOutcome.CertProblem ? DoctorState.Warning : DoctorState.Ok, "Handshake", $"done in {Ms(r.HandshakeMs)}", r.HandshakeMs);
                 break;
             case DoctorTlsOutcome.SniFiltered:
@@ -886,6 +913,35 @@ public static class DoctorEngine
             if (dpi.Working is { } w)
                 Tr(sink, DoctorCheck.Tls, DoctorState.Ok, "Workaround", $"the ClientHello {DoctorDpiResult.Name(w)} gets through → turn on 'fragment' in your client");
         }
+    }
+
+    // "TLS 1.3, TLS_AES_256_GCM_SHA384, ALPN h2" — what this system reports of the agreed connection
+    private static string Negotiated(DoctorTlsResult r)
+        => string.Join(", ", new[] { r.Protocol, r.Cipher, r.Alpn != null ? "ALPN " + r.Alpn : null }.Where(x => !string.IsNullOrEmpty(x)));
+
+    // The certificate the server showed: subject and issuer and whether it names the site, how long it is valid, the
+    // names it covers and its key, and what a browser would make of it.
+    private static void TraceCertificate(IDoctorSink sink, DoctorCheck row, DoctorTlsResult r, string name)
+    {
+        if (r.CertSubject == null) return;
+        bool certBad = r.Outcome == DoctorTlsOutcome.CertProblem;
+        Tr(sink, row, certBad ? DoctorState.Fail : r.CoversName == false ? DoctorState.Warning : DoctorState.Ok, "Certificate",
+           $"{r.CertSubject}, issuer {r.CertIssuer}" + (r.CoversName == true ? $" — names {name}" : r.CoversName == false ? $" — does NOT name {name}" : "")
+           + (certBad ? " — a browser would refuse it" : ""));
+        if (r.CertNotAfter is { } until)
+        {
+            var now = DateTime.UtcNow;
+            bool expired = until.ToUniversalTime() < now || r.CertNotBefore?.ToUniversalTime() > now;
+            bool soon = !expired && (until.ToUniversalTime() - now).TotalDays < TlsCertificates.ExpiryWarningDays;
+            Tr(sink, row, expired ? DoctorState.Fail : soon ? DoctorState.Warning : DoctorState.Ok, "Valid",
+               (r.CertNotBefore is { } from ? $"{TlsCertificates.Date(from)} to " : "until ") + TlsCertificates.Date(until)
+               + (r.CertText is { } text ? $" ({text.Split(" · ")[0]})" : ""));
+        }
+        if (r.CertNames != null)
+            Tr(sink, row, DoctorState.Pending, "Names", r.CertNames + (r.CertKey is { Length: > 0 } key ? $" · {key}" : "")
+                                                  + (r.ChainLength > 1 ? $" · chain of {r.ChainLength}" : ""));
+        foreach (var p in r.Problems.Where(p => p.Severity >= TlsSeverity.Warning))
+            Tr(sink, row, p.Severity == TlsSeverity.Error ? DoctorState.Fail : DoctorState.Warning, "Problem", p.Text.TrimEnd('.'));
     }
 
     // A good handshake, or one with a certificate browsers would refuse (direct or through the proxy).
@@ -989,6 +1045,9 @@ public static class DoctorEngine
             sent += $" · your request, {r.Sent.Count} header{(r.Sent.Count == 1 ? "" : "s")}"
                     + (r.SentBody > 0 ? $", {r.SentBody.ToString("N0", CultureInfo.InvariantCulture)}-byte body" : "");
         Tr(sink, row, DoctorState.Ok, "Request", sent);
+        // what went on the wire, in the log (a secret's value masked)
+        foreach (var (name, value) in r.Sent) sink.Log(row, $"> {name}: {DoctorSecrets.Header(name, value)}");
+        if (r.SentBody > 0) sink.Log(row, $"> ({r.SentBody.ToString("N0", CultureInfo.InvariantCulture)}-byte body)");
         foreach (var hop in r.Chain) Tr(sink, row, DoctorState.Warning, "Redirect", hop);
         foreach (var note in r.Notes) Tr(sink, row, DoctorState.Warning, "Note", note);
         if (r.FilterPage != null) Tr(sink, row, DoctorState.Fail, "Block page", r.FilterPage);
@@ -1049,21 +1108,28 @@ public static class DoctorEngine
         foreach (var r in rest) sink.Report(r, DoctorState.Running, "Waiting for the proxy…");
 
         int first = plan.All[0];
+        // the handshake, stage by stage: reaching the proxy, its TLS, the protocol's greeting and login, the tunnel
+        IReadOnlyList<(string Stage, string Detail)> steps;
         try
         {
             using var probe = await proxy.OpenAsync(dial, first, 8000, ct).ConfigureAwait(false);
             via.ReachMs = probe.ReachMs;
             via.LoginUsed = probe.LoginUsed;
             via.Tunnels[first] = (probe.TotalMs, null);
+            steps = probe.Steps;
         }
         catch (DoctorProxyException e) when (e.Stage == DoctorProxyStage.Tunnel)
         {
             via.Tunnels[first] = (0, e);   // the proxy works; it just can't reach this target
             via.LoginUsed = proxy.HasLogin;   // the login comes before the tunnel: it got past it
+            steps = e.Steps.Append(("Tunnel", e.Message)).ToList();
         }
         catch (DoctorProxyException e)
         {
             via.Failure = e;
+            // how far it got, then where it stopped
+            foreach (var (stage, detail) in e.Steps) Tr(sink, DoctorCheck.ProxyServer, DoctorState.Ok, stage, detail);
+            Tr(sink, DoctorCheck.ProxyServer, DoctorState.Fail, e.Stage == DoctorProxyStage.Tls ? "TLS" : e.Stage.ToString(), e.Message);
             sink.Report(DoctorCheck.ProxyServer, DoctorState.Fail, Cap($"{proxy.Display}: {e.Message}"));
             string why = e.Stage switch
             {
@@ -1078,7 +1144,9 @@ public static class DoctorEngine
         string login = via.LoginUsed ? "login accepted" : proxy.HasLogin ? "no login asked" : "no login";
         sink.Report(DoctorCheck.ProxyServer, DoctorState.Ok, $"{where} · {proxy.KindName}{(proxy.Guessed ? " (detected)" : "")} · {login}",
                     via.ReachMs > 0 ? via.ReachMs : null);
-        Tr(sink, DoctorCheck.ProxyServer, DoctorState.Ok, "Reach", $"{where} answered in {Ms(via.ReachMs)} · {proxy.KindName}", via.ReachMs > 0 ? via.ReachMs : null);
+        foreach (var (stage, detail) in steps)
+            Tr(sink, DoctorCheck.ProxyServer, stage == "Tunnel" && via.Tunnels[first].Error != null ? DoctorState.Warning : DoctorState.Ok, stage, detail,
+               stage == "Reach" && via.ReachMs > 0 ? via.ReachMs : null);
         Tr(sink, DoctorCheck.ProxyServer, DoctorState.Ok, "Login", login);
 
         // ---- a tunnel to every port
@@ -1147,7 +1215,8 @@ public static class DoctorEngine
                 via.Tls = r;
                 bool tlsOk = r.Outcome is DoctorTlsOutcome.Ok or DoctorTlsOutcome.CertProblem;
                 Tr(sink, DoctorCheck.ProxyTls, tlsOk ? DoctorState.Ok : DoctorState.Fail, "Handshake",
-                   tlsOk ? $"ServerHello {r.Protocol}, {(r.CoversName == true ? "certificate names the site" : r.CertSubject ?? "certificate received")}" : (r.Error ?? "the handshake failed"), r.HandshakeMs);
+                   tlsOk ? $"ServerHello ({Negotiated(r)}) through the tunnel to {Where(p)}" : (r.Error ?? "the handshake failed"), r.HandshakeMs);
+                if (tlsOk) TraceCertificate(sink, DoctorCheck.ProxyTls, r, host);
                 if (tlsOk) ReportTlsOk(sink, DoctorCheck.ProxyTls, r);
                 else sink.Report(DoctorCheck.ProxyTls, DoctorState.Fail, Cap(Sentence(r.Error ?? "the handshake failed") + " (through the proxy)"));
             }
@@ -1216,12 +1285,24 @@ public static class DoctorEngine
     // DNS: every resolver's records, named and classed (a filter / private answer, a forged reply, NXDOMAIN, a timeout).
     private static void TraceDns(IDoctorSink sink, DoctorFacts f)
     {
+        // every answer whole, in the log: the rows show a few addresses each (a resolver that didn't answer says so there)
+        void LogAnswer(DoctorCheck row, string kind, DoctorDnsAnswer a)
+        {
+            if (!a.Answered) return;
+            sink.Log(row, $"{kind} {a.Source}: {(a.Rcode == 0 ? "NOERROR" : a.Rcode == 3 ? "NXDOMAIN" : RcodeName(a.Rcode))}"
+                          + (a.Addresses.Count > 0 ? " · " + string.Join(", ", a.Addresses) : "")
+                          + (a.Later.Count > 0 ? " · then " + string.Join(", ", a.Later) : "") + (a.Ms > 0 ? $" ({Ms(a.Ms)})" : ""));
+        }
         foreach (var a in f.Doh)
         {
-            if (a.Good && a.Addresses.Count > 0) Tr(sink, DoctorCheck.DnsEncrypted, DoctorState.Ok, a.Source, DoctorIp.List(a.Addresses, 4), a.Ms);
+            LogAnswer(DoctorCheck.DnsEncrypted, "DoH", a);
+            if (a.Good && a.Addresses.Count > 0) Tr(sink, DoctorCheck.DnsEncrypted, DoctorState.Ok, a.Source, DoctorIp.List(a.Addresses, 6), a.Ms);
             else if (a.NoSuchName) Tr(sink, DoctorCheck.DnsEncrypted, DoctorState.Warning, a.Source, "no such name", a.Ms);
+            else if (a.Answered && a.Rcode is not (0 or 3)) Tr(sink, DoctorCheck.DnsEncrypted, DoctorState.Warning, a.Source, $"error {RcodeName(a.Rcode)}", a.Ms);
             else Tr(sink, DoctorCheck.DnsEncrypted, DoctorState.Warning, a.Source, a.Error ?? "no answer", a.Ms);
         }
+        if (f.Sys is { } s0) LogAnswer(DoctorCheck.DnsSystem, "System resolver", s0);
+        foreach (var p in f.Plain) LogAnswer(DoctorCheck.DnsPlain, "UDP", p);
         if (f.Sys is { } sys)
         {
             if (!sys.Answered) Tr(sink, DoctorCheck.DnsSystem, DoctorState.Fail, "query", sys.Error ?? "no answer", sys.Ms);
@@ -1241,10 +1322,11 @@ public static class DoctorEngine
             if (p.Injected) Tr(sink, DoctorCheck.DnsPlain, DoctorState.Fail, p.Source, $"forged {DoctorIp.List(p.Addresses)} first, then the real {DoctorIp.List(p.Later)} — injected on the way", p.Ms);
             else if (!p.Answered) Tr(sink, DoctorCheck.DnsPlain, DoctorState.Warning, p.Source, p.Error ?? "no reply", p.Ms);
             else if (p.NoSuchName) Tr(sink, DoctorCheck.DnsPlain, DoctorState.Warning, p.Source, "no such name", p.Ms);
+            else if (p.Rcode is not (0 or 3)) Tr(sink, DoctorCheck.DnsPlain, DoctorState.Warning, p.Source, $"error {RcodeName(p.Rcode)}", p.Ms);
             else
             {
                 bool bad = p.Addresses.Any(a => !DoctorIp.IsPublic(a));
-                Tr(sink, DoctorCheck.DnsPlain, bad ? DoctorState.Fail : DoctorState.Ok, p.Source, DoctorIp.List(p.Addresses, 4) + (bad ? " — forged" : ""), p.Ms);
+                Tr(sink, DoctorCheck.DnsPlain, bad ? DoctorState.Fail : DoctorState.Ok, p.Source, DoctorIp.List(p.Addresses, 6) + (bad ? " — forged" : ""), p.Ms);
             }
         }
     }

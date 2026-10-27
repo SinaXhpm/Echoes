@@ -56,6 +56,16 @@ public sealed class DoctorTlsResult
     public string? CutHow { get; set; }
     /// <summary>A hello without the site's name (or with a harmless one) got a TLS answer: the address speaks TLS.</summary>
     public bool? BaselineAnswered { get; set; }
+    /// <summary>The cipher suite and the protocol agreed by ALPN ("h2"), where this system reports them.</summary>
+    public string? Cipher { get; set; }
+    public string? Alpn { get; set; }
+    /// <summary>The leaf certificate's validity, the names it covers ("example.com, www.example.com +2") and its key.</summary>
+    public DateTime? CertNotBefore { get; set; }
+    public DateTime? CertNotAfter { get; set; }
+    public string? CertNames { get; set; }
+    public string? CertKey { get; set; }
+    /// <summary>The certificates in the chain as built (the leaf first).</summary>
+    public int ChainLength { get; set; }
 }
 
 /// <summary>Which way a raw ClientHello went.</summary>
@@ -195,6 +205,8 @@ public static class DoctorTls
             await ssl.AuthenticateAsClientAsync(options, ct).ConfigureAwait(false);
             res.HandshakeMs = sw.Elapsed.TotalMilliseconds;
             res.Protocol = TlsCertificates.ProtocolName(ssl.SslProtocol);
+            try { res.Cipher = ssl.NegotiatedCipherSuite.ToString(); } catch { /* not reported on this platform */ }
+            try { res.Alpn = ssl.NegotiatedApplicationProtocol.Protocol.Length > 0 ? ssl.NegotiatedApplicationProtocol.ToString() : null; } catch { }
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception e) { return e; }
@@ -209,6 +221,11 @@ public static class DoctorTls
             res.CertText = TlsCertificates.ExpiryPhrase(leaf, DateTime.UtcNow) + (issuer.Length > 0 ? $" · {issuer}" : "");
             res.CertSubject = TlsCertificates.ShortName(leaf);
             res.CertIssuer = issuer;
+            res.CertNotBefore = leaf.NotBefore;
+            res.CertNotAfter = leaf.NotAfter;
+            res.CertNames = TlsCertificates.NamesText(leaf, 4);
+            try { res.CertKey = TlsCertificates.KeyText(leaf); } catch { }
+            res.ChainLength = snap.Count;
             if (!IPAddress.TryParse(checkName.Trim('[', ']'), out _)) res.CoversName = TlsCertificates.Covers(leaf, checkName);
         }
         res.Outcome = res.Problems.Any(p => p.Severity == TlsSeverity.Error) ? DoctorTlsOutcome.CertProblem : DoctorTlsOutcome.Ok;

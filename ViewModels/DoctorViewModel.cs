@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -109,6 +110,7 @@ public partial class DoctorViewModel : ObservableObject
         LoadRequest(ps.GetSetting("doctor.request"));
         UpdateRequestApplies();
         ShowDetails = ps.GetBool("doctor.showDetails");
+        ViewIndex = ps.GetSetting("doctor.view") == "log" ? 1 : 0;
         _withProxy = UseProxy;
         RebuildItems();
         _loaded = true;
@@ -128,7 +130,7 @@ public partial class DoctorViewModel : ObservableObject
         if (!_loaded) return;
         if (e.PropertyName == nameof(ProxyPass)) _unreadablePass = null;
         if (e.PropertyName is nameof(UseProxy) or nameof(ProxyAddress) or nameof(ProxyUser) or nameof(ProxyPass) or nameof(OverrideIp)
-                              or nameof(ShowDetails)) SchedulePersist();
+                              or nameof(ShowDetails) or nameof(ViewIndex)) SchedulePersist();
     }
 
     partial void OnShowDetailsChanged(bool value)
@@ -221,11 +223,14 @@ public partial class DoctorViewModel : ObservableObject
         CardTitle = $"Diagnosing {t.Display()}…";
         CardAdvice = "";
         UpdateProgress();
+        var sink = new Sink(this, run);
+        ClearLog();
+        AddLog(0, null, "", $"Echoes Doctor, run started {_ranAt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)} (times from the start)");
 
         var token = _cts.Token;
         var env = Env;
         var options = new DoctorOptions { Proxy = proxy, Override = overrideIp, Request = request };
-        RunTask = Task.Run(() => RunAsync(t, env, options, run, token));
+        RunTask = Task.Run(() => RunAsync(t, env, options, sink, run, token));
     }
 
     private void ShowInputError(string title, string text)
@@ -241,6 +246,7 @@ public partial class DoctorViewModel : ObservableObject
         _cts?.Cancel();
         _run++;   // late reports of the stopped run are dropped
         IsRunning = false;
+        AddLog((DateTime.Now - _ranAt).TotalMilliseconds, null, "", "Stopped before the diagnosis finished");
         foreach (var row in Visible)
             if (!row.IsDone)
             {
@@ -259,11 +265,11 @@ public partial class DoctorViewModel : ObservableObject
         }
     }
 
-    private async Task RunAsync(DoctorTarget t, DoctorEnvironment env, DoctorOptions options, int run, CancellationToken ct)
+    private async Task RunAsync(DoctorTarget t, DoctorEnvironment env, DoctorOptions options, Sink sink, int run, CancellationToken ct)
     {
         try
         {
-            var facts = await DoctorEngine.RunAsync(t, env, options, new Sink(this, run), ct).ConfigureAwait(false);
+            var facts = await DoctorEngine.RunAsync(t, env, options, sink, ct).ConfigureAwait(false);
             var verdict = DoctorVerdicts.Decide(facts);
             Dispatcher.UIThread.Post(() => { if (_run == run) Finish(verdict); });
         }
@@ -291,6 +297,7 @@ public partial class DoctorViewModel : ObservableObject
             }
         _verdict = v;
         IsRunning = false;
+        AddLog((DateTime.Now - _ranAt).TotalMilliseconds, null, "", $"{v.Title}: {v.Sentence} What to do: {v.Advice}");
         Card = v.Kind switch
         {
             DoctorVerdictKind.Works => DoctorCard.Works,
@@ -354,6 +361,8 @@ public partial class DoctorViewModel : ObservableObject
                 new DoctorVerdicts.Line(DoctorEngine.ReportTitle(s.Check), s.State, s.Detail, s.Time),
                 s.Trace.Select(tr => new DoctorVerdicts.Line(tr.Step, tr.State, tr.Detail, tr.Time)).ToList())), _ranAt, about);
         if (_reportProxy != null) text += "Note: " + DoctorEngine.ProxyNote + "\n";
+        // the run log closes it: every step with its time, and what only the log carries
+        if (_log.Length > 0) text += "\nRun log\n" + _log;
         if (_verdict != null || Card != DoctorCard.Stopped) return text;
         int body = text.IndexOf("\n\n", StringComparison.Ordinal);   // after the target + time lines
         return body < 0 ? text : text[..(body + 2)] + "Stopped before the diagnosis finished.\n\n" + text[(body + 2)..];
@@ -411,13 +420,16 @@ public partial class DoctorViewModel : ObservableObject
             ("doctor.proxyPass", _unreadablePass ?? SecretProtector.Protect(ProxyPass)),
             ("doctor.overrideIp", OverrideIp.Trim()),
             ("doctor.request", StoredRequest()),
-            ("doctor.showDetails", ShowDetails ? "true" : "false"));
+            ("doctor.showDetails", ShowDetails ? "true" : "false"),
+            ("doctor.view", ViewIndex == 1 ? "log" : "checks"));
     }
 
+    // Hands each report to the UI thread, with the time it was made (the log's clock, from the start of the run).
     private sealed class Sink : IDoctorSink
     {
         private readonly DoctorViewModel _vm;
         private readonly int _run;
+        private readonly System.Diagnostics.Stopwatch _clock = System.Diagnostics.Stopwatch.StartNew();
 
         public Sink(DoctorViewModel vm, int run)
         {
@@ -426,10 +438,32 @@ public partial class DoctorViewModel : ObservableObject
         }
 
         public void Report(DoctorCheck check, DoctorState state, string detail, double? ms = null)
-            => Dispatcher.UIThread.Post(() => { if (_vm._run == _run) _vm.Apply(check, state, detail, ms); });
+        {
+            double at = _clock.Elapsed.TotalMilliseconds;
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (_vm._run != _run) return;
+                _vm.Apply(check, state, detail, ms);
+                _vm.LogReport(at, check, state, detail, ms);
+            });
+        }
 
         public void Trace(DoctorCheck check, DoctorState state, string step, string detail, double? ms = null)
-            => Dispatcher.UIThread.Post(() => { if (_vm._run == _run) _vm.ApplyTrace(check, state, step, detail, ms); });
+        {
+            double at = _clock.Elapsed.TotalMilliseconds;
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (_vm._run != _run) return;
+                _vm.ApplyTrace(check, state, step, detail, ms);
+                _vm.LogTrace(at, check, state, step, detail, ms);
+            });
+        }
+
+        public void Log(DoctorCheck check, string text)
+        {
+            double at = _clock.Elapsed.TotalMilliseconds;
+            Dispatcher.UIThread.Post(() => { if (_vm._run == _run) _vm.AddLog(at, check, "", "  " + text); });
+        }
     }
 }
 

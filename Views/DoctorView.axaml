@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
              xmlns:helpers="using:Echoes.Helpers"
+             xmlns:ctl="using:Echoes.Views.Controls"
              x:Class="Echoes.Views.DoctorView"
              x:DataType="vm:DoctorViewModel"
              x:CompileBindings="True">
@@ -244,6 +245,8 @@
             <Setter Property="Margin" Value="0,2,8,0"/>
             <Setter Property="VerticalAlignment" Value="Top"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <!-- a long header name (access-control-allow-credentials) keeps room for its value -->
+            <Setter Property="MaxWidth" Value="200"/>
         </Style>
         <Style Selector="TextBlock.subDetail">
             <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
@@ -269,6 +272,72 @@
             <Setter Property="Grid.Column" Value="1"/>
             <Setter Property="Grid.ColumnSpan" Value="3"/>
             <Setter Property="Margin" Value="0,0,0,2"/>
+        </Style>
+
+        <!-- ===== the lower card's switch [Checks | Log] (as the DNS tool's mode switch), and the log ===== -->
+        <Style Selector="ListBox.viewSwitch">
+            <!-- a segmented switch always has one segment on -->
+            <Setter Property="SelectionMode" Value="AlwaysSelected"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ItemsPanel">
+                <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="ListBox.viewSwitch > ListBoxItem">
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="ListBox.viewSwitch > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+        </Style>
+        <Style Selector="ListBox.viewSwitch > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="ListBox.viewSwitch > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.viewSwitch > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.viewSwitch > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.viewSwitch > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.logText">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <!-- labels that shorten on a narrow page (a phone): set here, not on the control, so the narrow one can win -->
+        <Style Selector="TextBlock.importLabel"><Setter Property="Text" Value="Import request"/></Style>
+        <Style Selector="Grid#DocRoot.narrow TextBlock.importLabel"><Setter Property="Text" Value="Import"/></Style>
+        <Style Selector="TextBox#ImportBox">
+            <Setter Property="PlaceholderText" Value="Paste a request: Copy as cURL, Copy as fetch, Copy as PowerShell or a HAR entry"/>
+        </Style>
+        <Style Selector="Grid#DocRoot.narrow TextBox#ImportBox">
+            <Setter Property="PlaceholderText" Value="Paste a request (cURL, fetch, PowerShell, HAR)"/>
+        </Style>
+        <!-- a phone's row has room for the buttons only (the hint is the box's tooltip there) -->
+        <Style Selector="Grid#DocRoot.narrow Panel.importAbout > TextBlock">
+            <Setter Property="IsVisible" Value="False"/>
         </Style>
 
         <!-- the group header in the list ("Through the proxy") -->
@@ -431,7 +500,7 @@
                     <Button Grid.Column="2" x:Name="ImportButton" Classes="ghost" Command="{Binding OpenImportCommand}"
                             ToolTip.Tip="Send a request copied from the browser (developer tools › Network › Copy as cURL, fetch, PowerShell or HAR) with all its headers"
                             AutomationProperties.Name="Import a request">
-                        <TextBlock x:Name="ImportLabel" Text="Import request"/>
+                        <TextBlock Classes="importLabel"/>
                     </Button>
                 </Grid>
 
@@ -440,7 +509,6 @@
                     <TextBox x:Name="ImportBox" Classes="field multiline mono" Classes.invalid="{Binding HasImportError}"
                              Text="{Binding ImportText}" AcceptsReturn="True" TextWrapping="Wrap" Height="104"
                              FontSize="{StaticResource Font.Small}"
-                             PlaceholderText="Paste a request: Copy as cURL, Copy as fetch, Copy as PowerShell or a HAR entry"
                              ToolTip.Tip="In the browser: developer tools (F12) › Network › right-click the request › Copy. Its cookies stay on this device, sealed"
                              AutomationProperties.Name="Request to import">
                         <TextBox.KeyBindings>
@@ -450,8 +518,10 @@
                     </TextBox>
                     <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8">
                         <TextBlock Classes="hint error" Text="{Binding ImportError}" IsVisible="{Binding HasImportError}"/>
-                        <TextBlock Classes="hint" IsVisible="{Binding !HasImportError}" Text="HTTPS / HTTP sends it as it is."
-                                   ToolTip.Tip="Its method, path and query, every header (cookies too) and its body, to the site's address (or the IP above)"/>
+                        <Panel Classes="importAbout" IsVisible="{Binding !HasImportError}">
+                            <TextBlock Classes="hint" Text="HTTPS / HTTP sends it as it is."
+                                       ToolTip.Tip="Its method, path and query, every header (cookies too) and its body, to the site's address (or the IP above)"/>
+                        </Panel>
                         <Button Grid.Column="1" Classes="ghost" Content="Cancel" Command="{Binding CloseImportCommand}"/>
                         <Button Grid.Column="2" Classes="primary" Content="Import" Command="{Binding ImportRequestCommand}"/>
                     </Grid>
@@ -509,20 +579,34 @@
             </Grid>
         </Border>
 
-        <!-- ===== the checks behind it ===== -->
+        <!-- ===== the checks behind it, or the run log ===== -->
         <Border Grid.Row="2" Classes="card output">
             <Grid RowDefinitions="Auto, Auto, *">
-                <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto" Margin="16,6,8,6" ColumnSpacing="8">
-                    <TextBlock Classes="cardHeader" Text="Checks" Margin="0" VerticalAlignment="Center"/>
-                    <CheckBox Grid.Column="1" x:Name="DetailsToggle" Content="Details" IsChecked="{Binding ShowDetails}"
-                              VerticalAlignment="Center" MinHeight="0"
+                <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto, Auto" Margin="12,6,8,6" ColumnSpacing="8">
+                    <ListBox x:Name="ViewSwitch" Classes="viewSwitch" SelectedIndex="{Binding ViewIndex}" AutomationProperties.Name="Show">
+                        <ListBoxItem ToolTip.Tip="Every check, its finding and its steps">Checks</ListBoxItem>
+                        <ListBoxItem ToolTip.Tip="Every step of the last run with its time, as text you can select and copy">Log</ListBoxItem>
+                    </ListBox>
+                    <CheckBox Grid.Column="2" x:Name="DetailsToggle" Content="Details" IsChecked="{Binding ShowDetails}"
+                              VerticalAlignment="Center" MinHeight="0" IsVisible="{Binding !ShowLog}"
                               ToolTip.Tip="Show every step of every check (a problem check opens on its own)"/>
-                    <Button Grid.Column="2" x:Name="CopyButton" Classes="ghost" Content="Copy report"
-                            Command="{Binding CopyReportCommand}" IsEnabled="{Binding CanCopy}"
-                            ToolTip.Tip="Copy the verdict and every check (with its steps) as plain text"/>
+                    <Button Grid.Column="3" x:Name="CopyButton" Classes="ghost" Content="{Binding CopyText}"
+                            Command="{Binding CopyCommand}" IsEnabled="{Binding CanCopy}" ToolTip.Tip="{Binding CopyTip}"/>
                 </Grid>
                 <Border Grid.Row="1" Classes="divider"/>
-                <ScrollViewer Grid.Row="2" x:Name="StepScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <!-- the run log: built the first time it is shown -->
+                <ScrollViewer Grid.Row="2" x:Name="LogScroll" IsVisible="{Binding ShowLog}"
+                              HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                    <ctl:Deferred><DataTemplate x:DataType="vm:DoctorViewModel">
+                        <Panel Margin="14,10,12,12">
+                            <SelectableTextBlock Classes="logText" Text="{Binding LogText}" IsVisible="{Binding HasLog}"/>
+                            <TextBlock Classes="hint" IsVisible="{Binding !HasLog}"
+                                       Text="Run a diagnosis: every step is logged here with its time."/>
+                        </Panel>
+                    </DataTemplate></ctl:Deferred>
+                </ScrollViewer>
+                <ScrollViewer Grid.Row="2" x:Name="StepScroll" IsVisible="{Binding !ShowLog}"
+                              HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <ItemsControl ItemsSource="{Binding Items}" Margin="0,4,0,6">
                         <ItemsControl.DataTemplates>
                             <DataTemplate DataType="vm:DoctorStepRow">
@@ -549,7 +633,7 @@
                                                     <Path Classes="sub" Classes.ok="{Binding IsOk}" Classes.warn="{Binding IsWarning}"
                                                           Classes.fail="{Binding IsFail}" Classes.skip="{Binding IsSkipped}"/>
                                                     <TextBlock Grid.Column="1" Classes="subStep" Text="{Binding Step}"/>
-                                                    <TextBlock Grid.Column="2" Classes="subDetail" Text="{Binding Detail}"/>
+                                                    <TextBlock Grid.Column="2" Classes="subDetail" Text="{Binding Detail}" ToolTip.Tip="{Binding Detail}"/>
                                                     <TextBlock Grid.Column="3" Classes="subTime" Text="{Binding Time}"/>
                                                 </Grid>
                                             </DataTemplate>

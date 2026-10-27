@@ -224,10 +224,11 @@ Type a site or server and press Diagnose. Echoes checks everything between you a
 - **Override IP (optional):** connect to an address you give instead of the DNS answer, like `curl --resolve` or a hosts-file line. TCP, ping, path MTU, TLS (with the site's name) and HTTP all go there, DNS is still asked, and the verdict says how they compare: "your DNS gives 10.10.34.35, the override works: DNS is the problem".
 - **Import a browser request (optional):** paste a request copied from the browser's developer tools (Copy as cURL in bash or cmd, Copy as fetch, Copy as PowerShell, or a HAR entry). The HTTPS (or HTTP) check sends it exactly, with its method, path and query, every header and cookie, and its body, through the proxy and to the override IP when set. Its cookies are stored encrypted and masked in the report.
 - **Response details:** each HTTP and HTTPS check shows the request it sent, the redirects, the status line and HTTP version, connect / TLS / first-byte timing, the body's size and type, every response header (cookie and token values masked) and the start of the body.
-- **Step-by-step trace:** expand any check (or turn on **Details**) to see exactly where it stops, with timings: each DNS record and resolver, every TCP connect per address and port (answered, refused or dropped), the TLS handshake stage by stage (ClientHello → ServerHello → certificate → done), and each HTTP stage.
+- **Step-by-step trace:** expand any check (or turn on **Details**) to see exactly where it stops, with timings: each resolver's addresses, every TCP connect per address and port (answered, refused or dropped) and the one used, the TLS handshake stage by stage (version, cipher and ALPN, the certificate's names, issuer and validity), each HTTP stage, every path MTU probe, and a proxy's handshake (reach, TLS, login, tunnel).
+- **Run log:** the **Log** view lists every step of the run with its time from the start, including every request header sent and every probe. Copy it on its own, or as the end of the report.
 - **Anti-DPI test:** when SNI filtering cuts a site, Doctor retries with the ClientHello split across TCP segments or TLS records and with mixed-case names, and tells you when **fragment** in your client (v2rayNG, Hiddify, Xray) would get through.
 - **QUIC / UDP 443:** shows whether UDP-based protocols (HTTP/3, Hysteria2, TUIC) can work on your network.
-- Every check appears live with its evidence; copy the whole report, trace included, with one click.
+- Every check appears live with its evidence; copy the whole report, trace and log included, with one click. Cookie, Authorization and token values are masked in it.
 
 ### DNS lookup and WHOIS
 

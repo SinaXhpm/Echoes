@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -35,6 +36,8 @@ public sealed class DoctorProxyException : Exception
 {
     public DoctorProxyException(DoctorProxyStage stage, string message, Exception? inner = null) : base(message, inner) => Stage = stage;
     public DoctorProxyStage Stage { get; }
+    /// <summary>The handshake's stages that went through before this one failed.</summary>
+    public IReadOnlyList<(string Stage, string Detail)> Steps { get; internal set; } = Array.Empty<(string, string)>();
 }
 
 /// <summary>
@@ -132,15 +135,16 @@ public sealed class DoctorProxy
 
     // ------------------------------------------------------------------ the tunnel
 
-    /// <summary>An open tunnel through the proxy, and how long its stages took.</summary>
+    /// <summary>An open tunnel through the proxy, how long its stages took, and what each said.</summary>
     public sealed class Tunnel : IDisposable
     {
-        internal Tunnel(Stream stream, double reachMs, double totalMs, bool loginUsed)
+        internal Tunnel(Stream stream, double reachMs, double totalMs, bool loginUsed, IReadOnlyList<(string Stage, string Detail)> steps)
         {
             Stream = stream;
             ReachMs = reachMs;
             TotalMs = totalMs;
             LoginUsed = loginUsed;
+            Steps = steps;
         }
 
         public Stream Stream { get; }
@@ -150,6 +154,8 @@ public sealed class DoctorProxy
         public double TotalMs { get; }
         /// <summary>The proxy asked for the login and accepted it.</summary>
         public bool LoginUsed { get; }
+        /// <summary>The handshake, stage by stage ("Reach", "TLS", "SOCKS5", "Tunnel") with what the proxy answered.</summary>
+        public IReadOnlyList<(string Stage, string Detail)> Steps { get; }
         public void Dispose() => Stream.Dispose();
     }
 
@@ -162,51 +168,57 @@ public sealed class DoctorProxy
         // Set once the proxy itself has been reached (TCP, plus TLS for an HTTPS proxy): a timeout before that is the
         // proxy not answering, not a tunnel it couldn't open (a firewall that drops packets outlasts any deadline).
         var reached = new System.Runtime.CompilerServices.StrongBox<bool>();
+        var steps = new List<(string, string)>();
         try
         {
-            try { return await OpenOnceAsync(host, port, sw, reached, cts.Token).ConfigureAwait(false); }
+            try { return await OpenOnceAsync(host, port, sw, reached, steps, cts.Token).ConfigureAwait(false); }
             catch (DoctorProxyException e) when (!_detected && e.Stage == DoctorProxyStage.Protocol && Kind is DoctorProxyKind.Http or DoctorProxyKind.Socks5)
             {
                 // a scheme-less address guessed wrong: the other common protocol, on a fresh connection
                 var first = Kind;
+                steps.Add(("Detect", $"not {KindName} ({e.Message}): trying {(first == DoctorProxyKind.Http ? "SOCKS5" : "HTTP")}"));
                 Kind = first == DoctorProxyKind.Http ? DoctorProxyKind.Socks5 : DoctorProxyKind.Http;
-                try { return await OpenOnceAsync(host, port, sw, reached, cts.Token).ConfigureAwait(false); }
+                try { return await OpenOnceAsync(host, port, sw, reached, steps, cts.Token).ConfigureAwait(false); }
                 catch (DoctorProxyException e2) when (e2.Stage == DoctorProxyStage.Protocol)
                 {
                     Kind = first;
-                    throw new DoctorProxyException(DoctorProxyStage.Protocol, $"it speaks neither HTTP nor SOCKS5 ({e.Message})", e);
+                    throw new DoctorProxyException(DoctorProxyStage.Protocol, $"it speaks neither HTTP nor SOCKS5 ({e.Message})", e) { Steps = steps };
                 }
             }
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             throw reached.Value
-                ? new DoctorProxyException(DoctorProxyStage.Tunnel, $"the proxy didn't open the tunnel to {Target(host, port)} within {timeoutMs / 1000} s")
-                : new DoctorProxyException(DoctorProxyStage.Reach, $"the proxy {Display} doesn't answer (nothing within {timeoutMs / 1000} s)");
+                ? new DoctorProxyException(DoctorProxyStage.Tunnel, $"the proxy didn't open the tunnel to {Target(host, port)} within {timeoutMs / 1000} s") { Steps = steps }
+                : new DoctorProxyException(DoctorProxyStage.Reach, $"the proxy {Display} doesn't answer (nothing within {timeoutMs / 1000} s)") { Steps = steps };
         }
-        catch (DoctorProxyException) { throw; }
+        catch (DoctorProxyException e)
+        {
+            if (e.Steps.Count == 0) e.Steps = steps;
+            throw;
+        }
         catch (OperationCanceledException) { throw; }
         catch (Exception e)
         {
-            throw new DoctorProxyException(DoctorProxyStage.Protocol, "the proxy broke off the handshake (" + DoctorDns.Short(e) + ")", e);
+            throw new DoctorProxyException(DoctorProxyStage.Protocol, "the proxy broke off the handshake (" + DoctorDns.Short(e) + ")", e) { Steps = steps };
         }
     }
 
     private async Task<Tunnel> OpenOnceAsync(string host, int port, Stopwatch sw, System.Runtime.CompilerServices.StrongBox<bool> reached,
-                                             CancellationToken ct)
+                                             List<(string, string)> steps, CancellationToken ct)
     {
-        var (stream, reachMs) = await ReachAsync(ct).ConfigureAwait(false);
+        var (stream, reachMs) = await ReachAsync(steps, ct).ConfigureAwait(false);
         reached.Value = true;
         try
         {
             bool login = Kind switch
             {
-                DoctorProxyKind.Socks5 => await Socks5Async(stream, host, port, ct).ConfigureAwait(false),
-                DoctorProxyKind.Socks4 => await Socks4Async(stream, host, port, ct).ConfigureAwait(false),
-                _ => await ConnectVerbAsync(stream, host, port, ct).ConfigureAwait(false),
+                DoctorProxyKind.Socks5 => await Socks5Async(stream, host, port, steps, ct).ConfigureAwait(false),
+                DoctorProxyKind.Socks4 => await Socks4Async(stream, host, port, steps, ct).ConfigureAwait(false),
+                _ => await ConnectVerbAsync(stream, host, port, steps, ct).ConfigureAwait(false),
             };
             _detected = true;
-            return new Tunnel(stream, reachMs, sw.Elapsed.TotalMilliseconds, login);
+            return new Tunnel(stream, reachMs, sw.Elapsed.TotalMilliseconds, login, steps);
         }
         catch (DoctorProxyException e) when (e.Stage is DoctorProxyStage.Login or DoctorProxyStage.Tunnel)
         {
@@ -227,7 +239,7 @@ public sealed class DoctorProxy
         }
     }
 
-    private async Task<(Stream Stream, double Ms)> ReachAsync(CancellationToken ct)
+    private async Task<(Stream Stream, double Ms)> ReachAsync(List<(string, string)> steps, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
         IPAddress[] addrs;
@@ -247,8 +259,14 @@ public sealed class DoctorProxy
             {
                 await sock.ConnectAsync(new IPEndPoint(a, Port), ct).ConfigureAwait(false);
                 double ms = sw.Elapsed.TotalMilliseconds;
+                steps.Add(("Reach", $"{DoctorIp.EndPoint(a, Port)} answered in {DoctorEngine.Ms(ms)}"));
                 Stream s = new NetworkStream(sock, ownsSocket: true);
-                if (Kind == DoctorProxyKind.Https) s = await ProxyTlsAsync(s, ct).ConfigureAwait(false);
+                if (Kind == DoctorProxyKind.Https)
+                {
+                    var ssl = await ProxyTlsAsync(s, ct).ConfigureAwait(false);
+                    steps.Add(("TLS", $"{TlsCertificates.ProtocolName(ssl.SslProtocol)} with the proxy ({Host})"));
+                    s = ssl;
+                }
                 return (s, ms);
             }
             catch (OperationCanceledException) { sock.Dispose(); throw; }
@@ -258,7 +276,7 @@ public sealed class DoctorProxy
         throw new DoctorProxyException(DoctorProxyStage.Reach, $"the proxy {Display} doesn't answer ({DoctorDns.Short(last!)})", last);
     }
 
-    private async Task<Stream> ProxyTlsAsync(Stream s, CancellationToken ct)
+    private async Task<SslStream> ProxyTlsAsync(Stream s, CancellationToken ct)
     {
         var ssl = new SslStream(s, false);
         try
@@ -290,7 +308,7 @@ public sealed class DoctorProxy
 
     // ---- HTTP CONNECT (http:// and https:// proxies)
 
-    private async Task<bool> ConnectVerbAsync(Stream s, string host, int port, CancellationToken ct)
+    private async Task<bool> ConnectVerbAsync(Stream s, string host, int port, List<(string, string)> steps, CancellationToken ct)
     {
         string target = Target(host, port);
         var sb = new StringBuilder().Append("CONNECT ").Append(target).Append(" HTTP/1.1\r\nHost: ").Append(target).Append("\r\n");
@@ -331,12 +349,13 @@ public sealed class DoctorProxy
                 : $"the proxy refused the tunnel to {target} (HTTP {code} {reason})".Replace(" )", ")"));
         int extra = len - (end + 4);
         if (extra > 0) throw new DoctorProxyException(DoctorProxyStage.Protocol, "the proxy sent data before the tunnel was used");
+        steps.Add(("Tunnel", $"CONNECT {target}{(HasLogin ? " with the login" : "")} → {RemoteText.Clean(status, 60)}"));
         return HasLogin;
     }
 
     // ---- SOCKS5 (RFC 1928 / 1929)
 
-    private async Task<bool> Socks5Async(Stream s, string host, int port, CancellationToken ct)
+    private async Task<bool> Socks5Async(Stream s, string host, int port, List<(string, string)> steps, CancellationToken ct)
     {
         await s.WriteAsync(HasLogin ? new byte[] { 5, 2, 0, 2 } : new byte[] { 5, 1, 0 }, ct).ConfigureAwait(false);
         var b = new byte[2];
@@ -348,7 +367,9 @@ public sealed class DoctorProxy
         bool loginUsed = false;
         switch (b[1])
         {
-            case 0: break;
+            case 0:
+                steps.Add(("SOCKS5", HasLogin ? "no login asked (the one given isn't used)" : "no login asked"));
+                break;
             case 2 when HasLogin:
                 byte[] u = Encoding.UTF8.GetBytes(_user!), p = Encoding.UTF8.GetBytes(_pass ?? "");
                 var auth = new byte[3 + u.Length + p.Length];
@@ -360,6 +381,7 @@ public sealed class DoctorProxy
                 await s.WriteAsync(auth, ct).ConfigureAwait(false);
                 await ReadExactAsync(s, b, "the proxy closed the connection during the login", ct).ConfigureAwait(false);
                 if (b[1] != 0) throw new DoctorProxyException(DoctorProxyStage.Login, "the proxy refused the login — check the user name and password");
+                steps.Add(("SOCKS5", "user name and password accepted"));
                 loginUsed = true;
                 break;
             case 2:
@@ -416,13 +438,22 @@ public sealed class DoctorProxy
             await ReadExactAsync(s, l, "the proxy's SOCKS5 reply was cut short", ct).ConfigureAwait(false);
             rest = l[0];
         }
-        await ReadExactAsync(s, new byte[rest + 2], "the proxy's SOCKS5 reply was cut short", ct).ConfigureAwait(false);
+        var bound = new byte[rest + 2];
+        await ReadExactAsync(s, bound, "the proxy's SOCKS5 reply was cut short", ct).ConfigureAwait(false);
+        // the address the proxy dialled out from (often 0.0.0.0: many proxies don't say)
+        string from = head[3] switch
+        {
+            1 or 4 => DoctorIp.EndPoint(new IPAddress(bound.AsSpan(0, rest)), BinaryPrimitives.ReadUInt16BigEndian(bound.AsSpan(rest))),
+            3 => Encoding.ASCII.GetString(bound, 0, rest) + ":" + BinaryPrimitives.ReadUInt16BigEndian(bound.AsSpan(rest)),
+            _ => "",
+        };
+        steps.Add(("Tunnel", $"CONNECT {Target(host, port)} → granted" + (from.Length > 0 ? $", bound {RemoteText.Clean(from, 60)}" : "")));
         return loginUsed;
     }
 
     // ---- SOCKS4 / 4a (a name as 4a; IPv4 only)
 
-    private async Task<bool> Socks4Async(Stream s, string host, int port, CancellationToken ct)
+    private async Task<bool> Socks4Async(Stream s, string host, int port, List<(string, string)> steps, CancellationToken ct)
     {
         byte[] user = Encoding.UTF8.GetBytes(_user ?? "");
         bool isIp = IPAddress.TryParse(host.Trim('[', ']'), out var ip);
@@ -441,7 +472,11 @@ public sealed class DoctorProxy
         var r = new byte[8];
         await ReadExactAsync(s, r, "the proxy closed the connection instead of answering SOCKS4", ct).ConfigureAwait(false);
         if (r[0] != 0) throw new DoctorProxyException(DoctorProxyStage.Protocol, "it doesn't speak SOCKS4");
-        if (r[1] == 0x5A) return HasLogin;
+        if (r[1] == 0x5A)
+        {
+            steps.Add(("Tunnel", $"SOCKS4{(isIp ? "" : "a")} CONNECT {Target(host, port)} → granted"));
+            return HasLogin;
+        }
         throw new DoctorProxyException(r[1] is 0x5C or 0x5D ? DoctorProxyStage.Login : DoctorProxyStage.Tunnel, r[1] switch
         {
             0x5C or 0x5D => "the proxy refused the user id (identd check)",
