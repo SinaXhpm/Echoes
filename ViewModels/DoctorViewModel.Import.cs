@@ -86,13 +86,15 @@ public partial class DoctorViewModel
     [RelayCommand]
     private void DropRequest() => SetRequest(null);
 
-    // The target becomes the request's site and path (not its query: that may carry a token), and an address the cURL
-    // command pinned it to (--resolve) the override IP.
+    // The target becomes the request's site and path (not its query: that may carry a token), kept in the history the box
+    // comes back from (the request is restored with it), and an address the cURL command pinned it to (--resolve) the
+    // override IP.
     private void UseRequest(DoctorRequest request)
     {
         var u = request.Url;
         string page = u.GetComponents(UriComponents.SchemeAndServer | UriComponents.Path, UriFormat.UriEscaped);
         Target = page.EndsWith('/') && u.AbsolutePath == "/" ? page[..^1] : page;
+        HistoryService.Instance.Add(HistoryKey, Target);
         if (request.ResolveTo is { } pin && DoctorIp.TryParseOverride(pin, out var ip, out _)) OverrideIp = ip!.ToString();
         SetRequest(request);
     }

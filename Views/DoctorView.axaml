@@ -504,6 +504,23 @@
                     </Button>
                 </Grid>
 
+                <!-- the proxy, right under its switch: address, user, password side by side (stacked on a phone) -->
+                <Grid x:Name="ProxyRow" IsVisible="{Binding UseProxy}" ColumnDefinitions="*, *, *, *" RowDefinitions="Auto, Auto"
+                      ColumnSpacing="8">
+                    <AutoCompleteBox x:Name="ProxyBox" Classes="field proxyAddr"
+                                     helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Endpoint"
+                                     Text="{Binding ProxyAddress}" ItemsSource="{Binding ProxyHistory}"
+                                     FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                     PlaceholderText="Proxy, e.g. socks5://127.0.0.1:1080"
+                                     ToolTip.Tip="http://, https://, socks4:// or socks5:// — host:port alone is detected"
+                                     AutomationProperties.Name="Proxy address"/>
+                    <TextBox x:Name="ProxyUserBox" Classes="field proxyUser" Text="{Binding ProxyUser}" PlaceholderText="User"
+                             ToolTip.Tip="Only if the proxy wants a login" AutomationProperties.Name="Proxy user"/>
+                    <TextBox x:Name="ProxyPassBox" Classes="field proxyPass" Text="{Binding ProxyPass}" PlaceholderText="Password"
+                             PasswordChar="•" IsUndoEnabled="False" ToolTip.Tip="Stored encrypted on this device"
+                             AutomationProperties.Name="Proxy password"/>
+                </Grid>
+
                 <!-- a request copied from the browser: pasted here, kept sealed on this device -->
                 <StackPanel IsVisible="{Binding IsImportOpen}" Spacing="8">
                     <TextBox x:Name="ImportBox" Classes="field multiline mono" Classes.invalid="{Binding HasImportError}"
@@ -539,23 +556,6 @@
                         </Button>
                     </Grid>
                 </Border>
-
-                <!-- the proxy: address, user, password side by side (stacked on a phone) -->
-                <Grid x:Name="ProxyRow" IsVisible="{Binding UseProxy}" ColumnDefinitions="*, *, *, *" RowDefinitions="Auto, Auto"
-                      ColumnSpacing="8">
-                    <AutoCompleteBox x:Name="ProxyBox" Classes="field proxyAddr"
-                                     helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Endpoint"
-                                     Text="{Binding ProxyAddress}" ItemsSource="{Binding ProxyHistory}"
-                                     FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                                     PlaceholderText="Proxy, e.g. socks5://127.0.0.1:1080"
-                                     ToolTip.Tip="http://, https://, socks4:// or socks5:// — host:port alone is detected"
-                                     AutomationProperties.Name="Proxy address"/>
-                    <TextBox x:Name="ProxyUserBox" Classes="field proxyUser" Text="{Binding ProxyUser}" PlaceholderText="User"
-                             ToolTip.Tip="Only if the proxy wants a login" AutomationProperties.Name="Proxy user"/>
-                    <TextBox x:Name="ProxyPassBox" Classes="field proxyPass" Text="{Binding ProxyPass}" PlaceholderText="Password"
-                             PasswordChar="•" IsUndoEnabled="False" ToolTip.Tip="Stored encrypted on this device"
-                             AutomationProperties.Name="Proxy password"/>
-                </Grid>
             </StackPanel>
         </Border>
 
@@ -600,7 +600,7 @@
                     <ctl:Deferred><DataTemplate x:DataType="vm:DoctorViewModel">
                         <Panel Margin="14,10,12,12">
                             <SelectableTextBlock Classes="logText" Text="{Binding LogText}" IsVisible="{Binding HasLog}"/>
-                            <TextBlock Classes="hint" IsVisible="{Binding !HasLog}"
+                            <TextBlock Classes="hint" IsVisible="{Binding !HasLog}" VerticalAlignment="Top"
                                        Text="Run a diagnosis: every step is logged here with its time."/>
                         </Panel>
                     </DataTemplate></ctl:Deferred>

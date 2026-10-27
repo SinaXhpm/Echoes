@@ -494,17 +494,22 @@ public static class DoctorHttp
         catch { return (buf, 0, false, null); }
     }
 
-    // Reads into buf until it is full or the stream ends; Cut: there was more.
+    // Reads into buf until it is full or the stream ends; Cut: there was more. A stream that breaks off (a reset, or a
+    // compressed body cut at the wire cap) keeps what was read.
     private static async Task<(int Length, bool Cut)> FillAsync(Stream s, byte[] buf, CancellationToken ct)
     {
         int n = 0;
-        while (n < buf.Length)
+        try
         {
-            int got = await s.ReadAsync(buf.AsMemory(n), ct).ConfigureAwait(false);
-            if (got == 0) return (n, false);
-            n += got;
+            while (n < buf.Length)
+            {
+                int got = await s.ReadAsync(buf.AsMemory(n), ct).ConfigureAwait(false);
+                if (got == 0) return (n, false);
+                n += got;
+            }
+            return (n, await s.ReadAsync(new byte[1], ct).ConfigureAwait(false) > 0);
         }
-        return (n, await s.ReadAsync(new byte[1], ct).ConfigureAwait(false) > 0);
+        catch (Exception e) when (e is IOException or InvalidDataException or HttpRequestException) { return (n, true); }
     }
 
     // The start of a text body on one line: its charset (UTF-8 unless it names a Latin one), runs of white space folded,
