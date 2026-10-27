@@ -96,7 +96,28 @@ jobs:
         # Native debug symbols (libSkiaSharp.pdb ~80MB, libHarfBuzzSharp.pdb ~20MB) are never
         # loaded at runtime — dropping them cuts the download from ~160MB to ~60MB.
         Remove-Item ./publish/*.pdb -Force -ErrorAction SilentlyContinue
-        Compress-Archive -Path ./publish/* -DestinationPath ./Echoes-Windows-x64.zip
+        # The zip is the portable copy: portable.txt next to Echoes.exe keeps its settings in an "Echoes Data" folder
+        # beside it (Helpers/AppStorage.cs). It goes into the zip only, not into ./publish, which the installer is made of.
+        Compress-Archive -Path ./publish/*, packaging/windows/portable.txt -DestinationPath ./Echoes-Windows-x64.zip
+
+    # The installer next to the zip (packaging/windows/Echoes.iss): per-user by default, no admin prompt, data left in
+    # %APPDATA%\Echoes. Inno Setup 6 comes with the windows-latest image (6.7.1 in October 2026); should a later image drop
+    # it, the pinned version is installed from Chocolatey. The script stops on anything older than 6.7.
+    - name: Package Windows installer
+      if: matrix.os == 'windows-latest'
+      env:
+        VERSION: ${{ steps.get_version.outputs.VERSION }}
+      run: |
+        $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+        if (-not (Test-Path $iscc)) {
+          choco install innosetup --version 6.7.1 -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Installing Inno Setup failed (exit $LASTEXITCODE)" }
+        }
+        if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
+        $images = Join-Path $env:RUNNER_TEMP 'wizard-images'
+        ./packaging/windows/make-wizard-images.ps1 -OutDir $images
+        & $iscc /Qp "/DAppVersion=$env:VERSION" "/DPublishDir=$PWD\publish" "/DImageDir=$images" "/O$PWD" packaging/windows/Echoes.iss
+        if ($LASTEXITCODE -ne 0) { throw "ISCC failed (exit $LASTEXITCODE)" }
 
     - name: Package Linux
       if: runner.os == 'Linux'
@@ -165,6 +186,7 @@ jobs:
         name: Echoes-${{ matrix.rid }}
         path: |
           *.zip
+          Echoes-Windows-x64-Setup.exe
           Echoes-Linux-x64.AppImage
           *.deb
           *.rpm

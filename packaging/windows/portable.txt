@@ -1,0 +1,7 @@
+Portable Echoes
+
+This copy keeps its settings and saved data in the "Echoes Data" folder next to
+Echoes.exe, so you can keep it on a USB stick or in any folder you like.
+Saved passwords in it open only for the Windows account that saved them, on that PC.
+
+Delete this file to keep the settings in your user profile (%APPDATA%\Echoes) instead.

@@ -60,7 +60,7 @@ On **iPhone, iPad and Mac**, get Echoes from the **[App Store](https://apps.appl
 | :--- | :--- | :--- |
 | **iPhone and iPad** (iOS / iPadOS 15+) | [App Store](https://apps.apple.com/app/id6824582968) | Install it from the App Store. |
 | **Mac** (macOS 12+, Intel and Apple Silicon) | [Mac App Store](https://apps.apple.com/app/id6824582968?platform=mac) | Install it from the Mac App Store, or use a .dmg below. |
-| **Windows 10 / 11** (x64) | `Echoes-Windows-x64.zip` | Extract the zip and run `Echoes.exe`. |
+| **Windows 10 / 11** (x64) | `Echoes-Windows-x64-Setup.exe` (recommended) or `Echoes-Windows-x64.zip` (portable) | Run the installer (no admin rights needed). Or, for the portable version, extract the zip and run `Echoes.exe`: it keeps its settings in the `Echoes Data` folder next to it. |
 | **macOS** (Intel) | `Echoes-osx-x64.dmg` | Open the .dmg and drag `Echoes.app` to Applications. |
 | **macOS** (Apple Silicon M1 / M2 / M3 / M4) | `Echoes-osx-arm64.dmg` | Open the .dmg and drag `Echoes.app` to Applications. |
 | **Linux** (x64) | `Echoes-Linux-x64.AppImage` | `chmod +x Echoes-Linux-x64.AppImage`, then run it. If it says FUSE is missing: `sudo apt install libfuse2t64` (`libfuse2` on older releases), or run it with `--appimage-extract-and-run`. |
