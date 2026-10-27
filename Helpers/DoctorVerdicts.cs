@@ -405,12 +405,15 @@ public static class DoctorVerdicts
     public static string Report(string target, DoctorVerdict? verdict, IEnumerable<Line> lines, DateTime when)
         => Report(target, verdict, lines.Select(l => new Block(l, Array.Empty<Line>())), when);
 
-    /// <summary>The full plain-text report: the verdict, then every check with its sub-steps indented beneath it.</summary>
-    public static string Report(string target, DoctorVerdict? verdict, IEnumerable<Block> blocks, DateTime when)
+    /// <summary>The full plain-text report: the verdict, then every check with its sub-steps indented beneath it.
+    /// <paramref name="about"/>: more lines about the run (the imported request), under the date.</summary>
+    public static string Report(string target, DoctorVerdict? verdict, IEnumerable<Block> blocks, DateTime when, string? about = null)
     {
         var sb = new StringBuilder();
         sb.Append("Echoes Doctor: ").Append(target).Append('\n');
-        sb.Append(when.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)).Append("\n\n");
+        sb.Append(when.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)).Append('\n');
+        if (about != null) sb.Append(about).Append('\n');
+        sb.Append('\n');
         if (verdict != null)
         {
             sb.Append(verdict.Title).Append(": ").Append(verdict.Sentence).Append('\n');

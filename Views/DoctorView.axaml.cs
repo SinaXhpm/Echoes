@@ -16,6 +16,8 @@ public partial class DoctorView : UserControl
         {
             TargetBox.PlaceholderText = "Site, URL or host:port";
             ProxyBox.PlaceholderText = "socks5://host:port";
+            ImportLabel.Text = "Import";
+            ImportBox.PlaceholderText = "Paste a request (cURL, fetch, PowerShell, HAR)";
         }
     }
 

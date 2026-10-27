@@ -83,6 +83,9 @@ public sealed class DoctorFacts
     public DoctorProxy? Proxy { get; set; }
     public DoctorViaProxy? Via { get; set; }
 
+    /// <summary>The request imported from the browser (null: none): sent by the web check of its scheme and port.</summary>
+    public DoctorRequest? Request { get; set; }
+
     /// <summary>How DNS relates to <see cref="Override"/> (read when needed: the check of a differing system answer may
     /// still find it points elsewhere).</summary>
     public DoctorOverrideDns OverrideDns
@@ -136,6 +139,9 @@ public sealed class DoctorOptions
     public DoctorProxy? Proxy { get; init; }
     /// <summary>The address to connect to instead of the DNS answer (null: the DNS answer).</summary>
     public IPAddress? Override { get; init; }
+    /// <summary>A request copied from the browser, for the target's host: the web check of its scheme and port sends it as
+    /// it is (null: the Doctor's own GET).</summary>
+    public DoctorRequest? Request { get; init; }
 }
 
 /// <summary>The same checks through the proxy.</summary>
@@ -219,6 +225,7 @@ public static class DoctorEngine
             Proxy = opt.Proxy,
             // an IP target has no DNS answer to stand in for: the override would only be a second target
             Override = t.IsIp ? null : opt.Override,
+            Request = opt.Request,
         };
         using var doh = DoctorDns.CreateDohClient();
 
@@ -919,8 +926,9 @@ public static class DoctorEngine
             sink.Report(row, DoctorState.Skipped, "Skipped: the TLS handshake fails");
             return;
         }
-        var url = new Uri(t.Url(p, tls, withPath: tls ? plan.HttpsPrimary : plan.HttpPrimary));
-        sink.Report(row, DoctorState.Running, Cap($"GET {url}…"));
+        var imported = RequestFor(f, tls, p);
+        var url = imported?.Url ?? new Uri(t.Url(p, tls, withPath: tls ? plan.HttpsPrimary : plan.HttpPrimary));
+        sink.Report(row, DoctorState.Running, Cap($"{imported?.Method ?? "GET"} {DoctorSecrets.Url(url.AbsoluteUri)}…"));
 
         // a redirect's host: through the encrypted resolvers that answered in this run (blocked ones would only burn
         // time), else this system's resolver
@@ -937,10 +945,15 @@ public static class DoctorEngine
             return s.Addresses.FirstOrDefault(DoctorIp.IsPublic) ?? s.Addresses.FirstOrDefault();
         }
 
-        var r = await DoctorHttp.GetAsync(url, conn.Address, ResolveOther, ct).ConfigureAwait(false);
+        var r = await DoctorHttp.GetAsync(url, conn.Address, ResolveOther, imported, ct).ConfigureAwait(false);
         if (tls) f.Https = r; else f.PlainHttp = r;
         ReportHttp(sink, row, r);
     }
+
+    // The imported request when it is for this scheme and port: its own check sends it, and the other scheme's check
+    // keeps the Doctor's plain GET (its cookies never go out over the other one).
+    private static DoctorRequest? RequestFor(DoctorFacts f, bool tls, int port)
+        => f.Request is { } r && r.Url.Scheme == (tls ? Uri.UriSchemeHttps : Uri.UriSchemeHttp) && r.Url.Port == port ? r : null;
 
     // One request's row: blocked / captive / failed, or the status, server, first byte and the redirect chain.
     private static void ReportHttp(IDoctorSink sink, DoctorCheck row, DoctorHttpResult r)
@@ -959,7 +972,7 @@ public static class DoctorEngine
         else
         {
             // the redirects first, then where they ended: "301 → https://example.com/ · 200 OK · nginx · first byte 90 ms"
-            string head = (r.Chain.Count > 0 ? string.Join(" · ", r.Chain) + " · " : "")
+            string head = (r.Imported ? "Your request: " : "") + (r.Chain.Count > 0 ? string.Join(" · ", r.Chain) + " · " : "")
                           + $"{r.Status} {r.Reason}".Trim() + (r.Server is { Length: > 0 } sv ? $" · {DoctorNet.Trim(sv, 30)}" : "")
                           + $" · first byte {Ms(r.FirstByteMs)}";
             var state = r.Status >= 500 ? DoctorState.Fail : r.Status >= 400 ? DoctorState.Warning : DoctorState.Ok;
@@ -967,25 +980,54 @@ public static class DoctorEngine
         }
     }
 
-    // HTTP, stage by stage: request sent → redirects → status line → server → first byte, or a block / captive page.
+    // HTTP, stage by stage: the request (imported, or the Doctor's GET) and where it went, the redirects, the status line,
+    // the timing, the body, every response header (secrets masked) and the start of the body — or where it stopped.
     private static void TraceHttp(IDoctorSink sink, DoctorCheck row, DoctorHttpResult r)
     {
-        Tr(sink, row, DoctorState.Ok, "Request", "GET sent");
+        string sent = $"{r.Method} {DoctorSecrets.Url(r.Target)}" + (r.Remote != null ? $" → {r.Remote}" : "");
+        if (r.Imported)
+            sent += $" · your request, {r.Sent.Count} header{(r.Sent.Count == 1 ? "" : "s")}"
+                    + (r.SentBody > 0 ? $", {r.SentBody.ToString("N0", CultureInfo.InvariantCulture)}-byte body" : "");
+        Tr(sink, row, DoctorState.Ok, "Request", sent);
         foreach (var hop in r.Chain) Tr(sink, row, DoctorState.Warning, "Redirect", hop);
-        if (r.FilterPage != null) { Tr(sink, row, DoctorState.Fail, "Block page", r.FilterPage); return; }
-        if (r.CaptivePage != null) { Tr(sink, row, DoctorState.Fail, "Captive", r.CaptivePage); return; }
-        if (r.Answered && r.Error == null)
+        foreach (var note in r.Notes) Tr(sink, row, DoctorState.Warning, "Note", note);
+        if (r.FilterPage != null) Tr(sink, row, DoctorState.Fail, "Block page", r.FilterPage);
+        else if (r.CaptivePage != null) Tr(sink, row, DoctorState.Fail, "Captive", r.CaptivePage);
+        if (r.Answered)
         {
-            Tr(sink, row, r.Status >= 500 ? DoctorState.Fail : r.Status >= 400 ? DoctorState.Warning : DoctorState.Ok, "Status", $"{r.Status} {r.Reason}".Trim(), r.FirstByteMs);
-            if (r.Server is { Length: > 0 } sv) Tr(sink, row, DoctorState.Ok, "Server", DoctorNet.Trim(sv, 40));
-            Tr(sink, row, DoctorState.Ok, "First byte", Ms(r.FirstByteMs), r.FirstByteMs);
+            bool fine = r.Error == null && r.FilterPage == null && r.CaptivePage == null;
+            Tr(sink, row, !fine || r.Status >= 500 ? DoctorState.Fail : r.Status >= 400 ? DoctorState.Warning : DoctorState.Ok,
+               "Status", $"{r.Version} {r.Status} {r.Reason}".Trim(), r.FirstByteMs);
+            Tr(sink, row, DoctorState.Ok, "Timing", Timing(r), r.TotalMs > 0 ? r.TotalMs : null);
+            // the body was read only at the end of the chain (a redirect's isn't)
+            if (r.Error == null && (r.BodyBytes > 0 || r.ContentType != null)) Tr(sink, row, DoctorState.Ok, "Body", BodyText(r));
+            // every header as it came; a cookie's or a token's value masked
+            foreach (var (name, value) in r.Headers) Tr(sink, row, DoctorState.Pending, name, DoctorSecrets.Header(name, value));
+            if (r.Preview != null) sink.Trace(row, DoctorState.Pending, "Preview", r.Preview);
         }
-        else
-        {
-            if (r.Answered) Tr(sink, row, DoctorState.Warning, "Status", $"{r.Status} {r.Reason}".Trim(), r.FirstByteMs);
+        if (!r.Answered || r.Error != null)
             Tr(sink, row, DoctorState.Fail, r.TimedOut ? "No answer" : r.ProxyLogin ? "Proxy login" : "Failed",
                r.TimedOut ? "no answer within 8 s" : (r.FailedHost != null ? r.FailedHost + ": " : "") + (r.Error ?? "failed"));
-        }
+    }
+
+    // "connect 12 ms · TLS 31 ms · first byte 95 ms · done 120 ms"
+    private static string Timing(DoctorHttpResult r)
+    {
+        var parts = new List<string>();
+        if (r.ConnectMs is double c) parts.Add($"connect {Ms(c)}");
+        if (r.TlsMs is double s) parts.Add($"TLS {Ms(s)}");
+        parts.Add($"first byte {Ms(r.FirstByteMs)}");
+        if (r.TotalMs > 0) parts.Add($"done {Ms(r.TotalMs)}");
+        return string.Join(" · ", parts);
+    }
+
+    // "1,256 bytes · text/html; charset=UTF-8" — "64 KB read of more" when it was longer, the encoding it still has
+    private static string BodyText(DoctorHttpResult r)
+    {
+        string size = r.BodyBytes == 0 ? "empty"
+                    : r.BodyCut ? $"the first {r.BodyBytes / 1024} KB read (there is more)"
+                    : $"{r.BodyBytes.ToString("N0", CultureInfo.InvariantCulture)} byte{(r.BodyBytes == 1 ? "" : "s")}";
+        return size + (r.ContentType is { Length: > 0 } ct ? " · " + ct : "") + (r.Undecoded != null ? $" · {r.Undecoded}-encoded (not decoded here)" : "");
     }
 
     // ------------------------------------------------------------------ through the proxy
@@ -1124,9 +1166,10 @@ public static class DoctorEngine
                 sink.Report(DoctorCheck.ProxyHttps, DoctorState.Skipped, "Skipped: the TLS handshake fails");
                 return;
             }
-            var url = new Uri(t.Url(hs, true, withPath: plan.HttpsPrimary));
-            sink.Report(DoctorCheck.ProxyHttps, DoctorState.Running, Cap($"GET {url} through the proxy…"));
-            via.Https = await DoctorHttp.GetViaProxyAsync(url, proxy, f.Override, ct).ConfigureAwait(false);
+            var imported = RequestFor(f, true, hs);
+            var url = imported?.Url ?? new Uri(t.Url(hs, true, withPath: plan.HttpsPrimary));
+            sink.Report(DoctorCheck.ProxyHttps, DoctorState.Running, Cap($"{imported?.Method ?? "GET"} {DoctorSecrets.Url(url.AbsoluteUri)} through the proxy…"));
+            via.Https = await DoctorHttp.GetViaProxyAsync(url, proxy, f.Override, imported, ct).ConfigureAwait(false);
             ReportHttp(sink, DoctorCheck.ProxyHttps, via.Https);
         }
 
@@ -1138,11 +1181,12 @@ public static class DoctorEngine
                 sink.Report(DoctorCheck.ProxyHttp, DoctorState.Skipped, plan.Raw is int r2 ? $"Port {r2} isn't a web port" : "Not tested");
                 return;
             }
-            var url = new Uri(t.Url(hp, false, withPath: plan.HttpPrimary));
-            sink.Report(DoctorCheck.ProxyHttp, DoctorState.Running, Cap($"GET {url} through the proxy…"));
+            var imported = RequestFor(f, false, hp);
+            var url = imported?.Url ?? new Uri(t.Url(hp, false, withPath: plan.HttpPrimary));
+            sink.Report(DoctorCheck.ProxyHttp, DoctorState.Running, Cap($"{imported?.Method ?? "GET"} {DoctorSecrets.Url(url.AbsoluteUri)} through the proxy…"));
             if (f.Override != null && proxy.Kind == DoctorProxyKind.Http)
                 Tr(sink, DoctorCheck.ProxyHttp, DoctorState.Skipped, "Override IP", "not used here: an HTTP proxy connects to the name itself for http://");
-            via.Http = await DoctorHttp.GetViaProxyAsync(url, proxy, f.Override, ct).ConfigureAwait(false);
+            via.Http = await DoctorHttp.GetViaProxyAsync(url, proxy, f.Override, imported, ct).ConfigureAwait(false);
             ReportHttp(sink, DoctorCheck.ProxyHttp, via.Http);
         }
 

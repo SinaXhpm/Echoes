@@ -22,6 +22,8 @@
         <StreamGeometry x:Key="DocStSkip">M4.5 8 H11.5</StreamGeometry>
         <StreamGeometry x:Key="DocStRunning">M4 8 V8.01 M8 8 V8.01 M12 8 V8.01</StreamGeometry>
         <StreamGeometry x:Key="DocStPending">M8 5.5 A2.5 2.5 0 1 0 8 10.5 A2.5 2.5 0 1 0 8 5.5 Z</StreamGeometry>
+        <!-- the imported request's drop button -->
+        <StreamGeometry x:Key="DocGlyphClose">M3.5 3.5 L10.5 10.5 M10.5 3.5 L3.5 10.5</StreamGeometry>
         <!-- chevron for the expand/collapse of a check's sub-steps -->
         <StreamGeometry x:Key="DocChevRight">M5 3 L9.5 7.5 L5 12</StreamGeometry>
         <StreamGeometry x:Key="DocChevDown">M3 5 L7.5 9.5 L12 5</StreamGeometry>
@@ -313,6 +315,44 @@
             <Setter Property="Margin" Value="12,0,0,0"/>
         </Style>
 
+        <!-- the Import panel and the imported request's line -->
+        <Style Selector="TextBox.invalid /template/ Border#PART_BorderElement,
+                         TextBox.invalid:pointerover /template/ Border#PART_BorderElement,
+                         TextBox.invalid:focus /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="TextBlock.hint">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.hint.error"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="Border.reqLine">
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Padding" Value="8,3,3,3"/>
+        </Style>
+        <Style Selector="TextBlock.reqText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.reqText.idle"><Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/></Style>
+        <Style Selector="Button.icon.drop">
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.icon.drop > Path">
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+        </Style>
+
         <!-- the proxy row: address | user | password on a wide page; address over user | password on a phone -->
         <Style Selector="Grid#DocRoot.wide Grid#ProxyRow > :is(Control).proxyAddr"><Setter Property="Grid.ColumnSpan" Value="2"/></Style>
         <Style Selector="Grid#DocRoot.wide Grid#ProxyRow > :is(Control).proxyUser"><Setter Property="Grid.Column" Value="2"/></Style>
@@ -371,8 +411,9 @@
                     </Grid>
                 </StackPanel>
 
-                <!-- the options: a proxy to test through as well, an IP to connect to instead of the DNS answer -->
-                <Grid x:Name="OptionsRow" ColumnDefinitions="Auto, *" ColumnSpacing="12">
+                <!-- the options: a proxy to test through as well, an IP to connect to instead of the DNS answer, a request
+                     copied from the browser -->
+                <Grid x:Name="OptionsRow" ColumnDefinitions="Auto, *, Auto" ColumnSpacing="12">
                     <CheckBox x:Name="ProxyToggle" Content="Proxy" IsChecked="{Binding UseProxy}"
                               ToolTip.Tip="Also run the checks through a proxy: http://, https://, socks4:// or socks5://"/>
                     <TextBox Grid.Column="1" x:Name="OverrideBox" Classes="field" Text="{Binding OverrideIp}"
@@ -387,7 +428,47 @@
                             <KeyBinding Gesture="Enter" Command="{Binding ToggleRunCommand}"/>
                         </TextBox.KeyBindings>
                     </TextBox>
+                    <Button Grid.Column="2" x:Name="ImportButton" Classes="ghost" Command="{Binding OpenImportCommand}"
+                            ToolTip.Tip="Send a request copied from the browser (developer tools › Network › Copy as cURL, fetch, PowerShell or HAR) with all its headers"
+                            AutomationProperties.Name="Import a request">
+                        <TextBlock x:Name="ImportLabel" Text="Import request"/>
+                    </Button>
                 </Grid>
+
+                <!-- a request copied from the browser: pasted here, kept sealed on this device -->
+                <StackPanel IsVisible="{Binding IsImportOpen}" Spacing="8">
+                    <TextBox x:Name="ImportBox" Classes="field multiline mono" Classes.invalid="{Binding HasImportError}"
+                             Text="{Binding ImportText}" AcceptsReturn="True" TextWrapping="Wrap" Height="104"
+                             FontSize="{StaticResource Font.Small}"
+                             PlaceholderText="Paste a request: Copy as cURL, Copy as fetch, Copy as PowerShell or a HAR entry"
+                             ToolTip.Tip="In the browser: developer tools (F12) › Network › right-click the request › Copy. Its cookies stay on this device, sealed"
+                             AutomationProperties.Name="Request to import">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Escape" Command="{Binding CloseImportCommand}"/>
+                            <KeyBinding Gesture="Ctrl+Enter" Command="{Binding ImportRequestCommand}"/>
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                    <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="8">
+                        <TextBlock Classes="hint error" Text="{Binding ImportError}" IsVisible="{Binding HasImportError}"/>
+                        <TextBlock Classes="hint" IsVisible="{Binding !HasImportError}" Text="HTTPS / HTTP sends it as it is."
+                                   ToolTip.Tip="Its method, path and query, every header (cookies too) and its body, to the site's address (or the IP above)"/>
+                        <Button Grid.Column="1" Classes="ghost" Content="Cancel" Command="{Binding CloseImportCommand}"/>
+                        <Button Grid.Column="2" Classes="primary" Content="Import" Command="{Binding ImportRequestCommand}"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- the imported request: what it is (all of it, masked, in the tooltip), and a way to drop it -->
+                <Border x:Name="RequestLine" Classes="reqLine" IsVisible="{Binding ShowRequestLine}">
+                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="8">
+                        <Border Classes="badge accent" Padding="6,1"><TextBlock Text="Request"/></Border>
+                        <TextBlock Grid.Column="1" Classes="reqText" Classes.idle="{Binding !RequestApplies}"
+                                   Text="{Binding RequestLineText}" ToolTip.Tip="{Binding RequestTip}"/>
+                        <Button Grid.Column="2" Classes="icon drop" Command="{Binding DropRequestCommand}"
+                                ToolTip.Tip="Drop the imported request" AutomationProperties.Name="Drop the imported request">
+                            <Path Data="{StaticResource DocGlyphClose}" Width="14" Height="14" Stretch="None"/>
+                        </Button>
+                    </Grid>
+                </Border>
 
                 <!-- the proxy: address, user, password side by side (stacked on a phone) -->
                 <Grid x:Name="ProxyRow" IsVisible="{Binding UseProxy}" ColumnDefinitions="*, *, *, *" RowDefinitions="Auto, Auto"

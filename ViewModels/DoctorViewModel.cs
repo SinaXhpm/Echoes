@@ -87,6 +87,7 @@ public partial class DoctorViewModel : ObservableObject
     private string? _reportTarget;
     private string? _reportProxy;
     private string? _reportOverride;
+    private string? _reportRequest;
     private DoctorVerdict? _verdict;
     private DateTime _ranAt;
     private bool _withProxy;   // the rows on show include the proxy's
@@ -105,6 +106,8 @@ public partial class DoctorViewModel : ObservableObject
         ProxyPass = SecretProtector.Unprotect(rawPass);
         if (rawPass.Length > 0 && ProxyPass.Length == 0) _unreadablePass = rawPass;
         OverrideIp = ps.GetSetting("doctor.overrideIp") ?? string.Empty;
+        LoadRequest(ps.GetSetting("doctor.request"));
+        UpdateRequestApplies();
         ShowDetails = ps.GetBool("doctor.showDetails");
         _withProxy = UseProxy;
         RebuildItems();
@@ -209,6 +212,9 @@ public partial class DoctorViewModel : ObservableObject
         _reportProxy = proxy?.Display;
         // an IP target has no DNS answer for the override to stand in for: the engine leaves it out, and so does the report
         _reportOverride = t.IsIp ? null : overrideIp?.ToString();
+        // the imported request goes only to its own site
+        var request = RequestApplies ? _request : null;
+        _reportRequest = request?.Describe();
         _ranAt = DateTime.Now;
         IsRunning = true;
         Card = DoctorCard.Running;
@@ -218,7 +224,7 @@ public partial class DoctorViewModel : ObservableObject
 
         var token = _cts.Token;
         var env = Env;
-        var options = new DoctorOptions { Proxy = proxy, Override = overrideIp };
+        var options = new DoctorOptions { Proxy = proxy, Override = overrideIp, Request = request };
         RunTask = Task.Run(() => RunAsync(t, env, options, run, token));
     }
 
@@ -335,16 +341,18 @@ public partial class DoctorViewModel : ObservableObject
     }
 
     /// <summary>The plain-text report of the last run (what Copy report puts on the clipboard). With a proxy: its address
-    /// (never the login), its rows, and what can't go through it; with an override IP, that address.</summary>
+    /// (never the login), its rows, and what can't go through it; with an override IP, that address; with an imported
+    /// request, the request (masked).</summary>
     public string BuildReport()
     {
         string target = _reportTarget ?? "";
         if (_reportOverride != null) target += $" at {_reportOverride} (the override IP)";
         if (_reportProxy != null) target += $" (also through {_reportProxy})";
+        string? about = _reportRequest != null ? "Imported request: " + _reportRequest.Replace("\n", "\n  ") : null;
         string text = DoctorVerdicts.Report(target, _verdict,
             Visible.Select(s => new DoctorVerdicts.Block(
                 new DoctorVerdicts.Line(DoctorEngine.ReportTitle(s.Check), s.State, s.Detail, s.Time),
-                s.Trace.Select(tr => new DoctorVerdicts.Line(tr.Step, tr.State, tr.Detail, tr.Time)).ToList())), _ranAt);
+                s.Trace.Select(tr => new DoctorVerdicts.Line(tr.Step, tr.State, tr.Detail, tr.Time)).ToList())), _ranAt, about);
         if (_reportProxy != null) text += "Note: " + DoctorEngine.ProxyNote + "\n";
         if (_verdict != null || Card != DoctorCard.Stopped) return text;
         int body = text.IndexOf("\n\n", StringComparison.Ordinal);   // after the target + time lines
@@ -402,6 +410,7 @@ public partial class DoctorViewModel : ObservableObject
             ("doctor.proxyUser", ProxyUser),
             ("doctor.proxyPass", _unreadablePass ?? SecretProtector.Protect(ProxyPass)),
             ("doctor.overrideIp", OverrideIp.Trim()),
+            ("doctor.request", StoredRequest()),
             ("doctor.showDetails", ShowDetails ? "true" : "false"));
     }
 
