@@ -58,16 +58,17 @@ DisableReadyPage=yes
 CloseApplications=yes
 RestartApplications=no
 
-; Light or dark with Windows, in Echoes' own colors (Styles/Tokens.axaml): pages in Bg.App, the last page's logo panel
-; in Bg.Sidebar. The images are the logo on a transparent ground, one per display scale (make-wizard-images.ps1). The
-; DynamicDark lines repeat them on purpose: left out, the dark appearance would show Inno Setup's own images.
+; Light or dark with Windows, in the app's colors (Styles/Tokens.axaml, the v4 graphite / light grey palette): pages in
+; Bg.App, the last page's logo panel in Bg.Sidebar. The images are the logo on a transparent ground, one per display
+; scale (make-wizard-images.ps1). The DynamicDark lines repeat them on purpose: left out, the dark appearance would
+; show Inno Setup's own images.
 WizardStyle=modern dynamic windows11 hidebevels
-WizardBackColor=#F4F6FA
-WizardBackColorDynamicDark=#0B0E14
+WizardBackColor=#F5F5F7
+WizardBackColorDynamicDark=#1C1C1E
 WizardImageFile={#ImageDir}\wizard-*.png
 WizardImageFileDynamicDark={#ImageDir}\wizard-*.png
-WizardImageBackColor=#EDF0F5
-WizardImageBackColorDynamicDark=#0E1219
+WizardImageBackColor=#EAEAEE
+WizardImageBackColorDynamicDark=#252527
 WizardSmallImageFile={#ImageDir}\small-*.png
 WizardSmallImageFileDynamicDark={#ImageDir}\small-*.png
 WizardSmallImageBackColor=none
