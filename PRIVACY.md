@@ -1,6 +1,6 @@
 # Echoes privacy policy
 
-Last updated: 27 October 2026
+Last updated: 28 October 2026
 
 Echoes is a free, open-source network toolkit (ping, traceroute, port scanner, DNS, SSH, speed test, file-sharing web server and more). This page says what it does with your data. The short version: **it collects none.**
 
@@ -22,7 +22,7 @@ Your settings, the hosts and URLs you typed (history), notes, saved requests, SS
 Echoes is a network tool, so it makes network requests: the ones you start, to the hosts you ask about, plus a few public services some tools are built on. Those services receive the request itself and so, as with any website you visit, your public IP address. Echoes doesn't control them; each has its own privacy policy.
 
 - **The hosts, ports and URLs you test** (ping, traceroute, port scan, cURL, DNS, TLS, SSH, sockets, Doctor).
-- **check-host.net**, to test a host from servers around the world.
+- **check-host.net**, to test a host from servers around the world, and **Globalping** (api.globalping.io), which runs the same check when check-host.net can't be reached.
 - **Speed test servers:** speed.cloudflare.com, or the file host you choose (Cloudflare, Tele2, Leaseweb, Linode, Selectel, DataPacket and similar).
 - **Public DNS-over-HTTPS resolvers** (Cloudflare, Google, Quad9, OpenDNS, AdGuard) when you use the DNS tool. The same resolvers, and DNS.SB, are also asked for the name of a service Echoes itself uses (such as rdap.org or api.github.com), but only when your network's own resolver doesn't answer for it or answers with a filter's address. The hosts you test are always looked up the way your system looks them up.
 - **IP-information providers** (ipinfo.io, ipwho.is, ipapi.co, ip-api.com, geojs.io, freeipapi.com, iplocation.net) to look up the IP address you enter, or your own.
