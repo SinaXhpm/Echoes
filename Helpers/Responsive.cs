@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Reactive;
+using Avalonia.VisualTree;
 
 namespace Echoes.Helpers;
 
@@ -30,6 +32,8 @@ public static class Responsive
             // in a constructor we don't own) keeps this a zero-touch attached behaviour.
             control.GetObservable(Visual.BoundsProperty)
                    .Subscribe(new AnonymousObserver<Rect>(_ => Apply(control)));
+            // Entering the tree, before its first layout: guessed from where it sits (see AncestorWidth).
+            control.AttachedToVisualTree += (_, _) => Apply(control);
             Apply(control);
         });
     }
@@ -40,12 +44,25 @@ public static class Responsive
         if (breakWidth <= 0) return;
 
         double width = control.Bounds.Width;
-        // Width 0 == not laid out yet: default to "wide" so the desktop layout is correct on
-        // the very first frame (the mobile shell narrows on its first real measure pass).
+        // Width 0 == not laid out yet. A control is never wider than the nearest ancestor already laid out, so below the
+        // break there it starts narrow: on a phone every page used to be laid out wide first and then again narrow, part by
+        // part. Otherwise "wide", so the desktop layout is right on the very first frame; the real width corrects either.
+        if (width <= 0) width = AncestorWidth(control);
         bool narrow = width > 0 && width < breakWidth;
 
         SetClass(control, "narrow", narrow);
         SetClass(control, "wide", !narrow);
+    }
+
+    // The width of the nearest laid-out ancestor; 0 (unknown) inside a sideways scroller, whose content may be wider.
+    private static double AncestorWidth(Control control)
+    {
+        for (var v = control.GetVisualParent(); v is not null; v = v.GetVisualParent())
+        {
+            if (v is ScrollContentPresenter { CanHorizontallyScroll: true }) return 0;
+            if (v.Bounds.Width > 0) return v.Bounds.Width;
+        }
+        return 0;
     }
 
     private static void SetClass(Control control, string name, bool on)
