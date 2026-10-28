@@ -23,7 +23,8 @@
                      Accent.Soft (+ Accent.Border) for tinted chips/selection
            status    Success / Warning / Danger / Info / Violet, each with
                      .Soft (tinted solid background) and .Border
-           segmented Seg.Track · Seg.Thumb (+ .ThumbBorder) · Seg.Text · Seg.TextSelected
+           segmented Seg.Track · Seg.Thumb (+ .ThumbBorder) · Seg.Text · Seg.TextSelected · Seg.Hover · Seg.Pressed
+           nav       Nav.Hover · Nav.Pressed · Nav.Selected (+ .SelectedHover) · Nav.Indicator
          ============================================================ -->
 
     <ResourceDictionary.ThemeDictionaries>
@@ -102,9 +103,17 @@
             <SolidColorBrush x:Key="Seg.ThumbBorder" Color="#5A5A5E"/>
             <SolidColorBrush x:Key="Seg.Text" Color="#AEAEB4"/>
             <SolidColorBrush x:Key="Seg.TextSelected" Color="#FFFFFF"/>
+            <!-- a segment under the pointer / pressed: between the track and the thumb -->
+            <SolidColorBrush x:Key="Seg.Hover" Color="#3E3E41"/>
+            <SolidColorBrush x:Key="Seg.Pressed" Color="#48484B"/>
 
-            <!-- sidebar rows on hover (the sidebar is greyer than the page, so the page hover would vanish on it) -->
+            <!-- sidebar rows on hover (the sidebar is greyer than the page, so the page hover would vanish on it); the
+                 chosen row is tinted with the accent and marked by a bar at its start -->
             <SolidColorBrush x:Key="Nav.Hover" Color="#303033"/>
+            <SolidColorBrush x:Key="Nav.Pressed" Color="#3A3A3D"/>
+            <SolidColorBrush x:Key="Nav.Selected" Color="#203D3A"/>
+            <SolidColorBrush x:Key="Nav.SelectedHover" Color="#244541"/>
+            <SolidColorBrush x:Key="Nav.Indicator" Color="#4FD1C5"/>
 
             <!-- quiet push button (Button.ghost): a soft grey bezel without a border, quieter than .secondary -->
             <SolidColorBrush x:Key="Btn.Quiet" Color="#343437"/>
@@ -339,9 +348,17 @@
             <SolidColorBrush x:Key="Seg.ThumbBorder" Color="#D2D2D7"/>
             <SolidColorBrush x:Key="Seg.Text" Color="#4A4A4F"/>
             <SolidColorBrush x:Key="Seg.TextSelected" Color="#1D1D1F"/>
+            <!-- a segment under the pointer / pressed: between the track and the thumb -->
+            <SolidColorBrush x:Key="Seg.Hover" Color="#ECECEF"/>
+            <SolidColorBrush x:Key="Seg.Pressed" Color="#D7D7DD"/>
 
-            <!-- sidebar rows on hover (the sidebar is greyer than the page, so the page hover would vanish on it) -->
+            <!-- sidebar rows on hover (the sidebar is greyer than the page, so the page hover would vanish on it); the
+                 chosen row is tinted with the accent and marked by a bar at its start -->
             <SolidColorBrush x:Key="Nav.Hover" Color="#DCDCE1"/>
+            <SolidColorBrush x:Key="Nav.Pressed" Color="#D2D2D8"/>
+            <SolidColorBrush x:Key="Nav.Selected" Color="#D3EAE6"/>
+            <SolidColorBrush x:Key="Nav.SelectedHover" Color="#C8E4DF"/>
+            <SolidColorBrush x:Key="Nav.Indicator" Color="#0E7C72"/>
 
             <!-- quiet push button (Button.ghost): a soft grey bezel without a border, quieter than .secondary -->
             <SolidColorBrush x:Key="Btn.Quiet" Color="#EBEBEF"/>
@@ -504,8 +521,8 @@
     <x:Double x:Key="Font.Title">13.5</x:Double>
     <x:Double x:Key="Font.Page">18</x:Double>
     <!-- Control.Height / Font.Input are read with DynamicResource by the input and button styles, so a
-         shell can re-size every control below it: the phone shell sets 44 / 14 for touch. -->
-    <x:Double x:Key="Control.Height">30</x:Double>
+         shell can re-size every control below it: the phone shell sets 40 / 14 for touch. -->
+    <x:Double x:Key="Control.Height">28</x:Double>
     <x:Double x:Key="Font.Input">12.5</x:Double>
     <!-- Fluent's base text size for controls without one of our classes (default 14): one step denser -->
     <x:Double x:Key="ControlContentThemeFontSize">12.5</x:Double>

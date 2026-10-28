@@ -720,8 +720,11 @@
             <Setter Property="BorderBrush" Value="Transparent"/>
         </Style>
         <Style Selector="ListBox.segPick > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Background" Value="{DynamicResource Seg.Hover}"/>
             <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="ListBox.segPick > ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Seg.Pressed}"/>
         </Style>
         <Style Selector="ListBox.segPick > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
                          ListBox.segPick > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,

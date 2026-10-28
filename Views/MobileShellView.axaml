@@ -9,37 +9,37 @@
 
 	<!-- Touch sizing for the embedded tool views (the desktop sizes are mouse-sized). The shared input and
 	     button classes (.field, .primary, .icon, …) read these two with DynamicResource, so every control
-	     under this shell grows to a 44px touch height. -->
+	     under this shell grows to a 40px touch height. -->
 	<UserControl.Resources>
-		<x:Double x:Key="Control.Height">44</x:Double>
+		<x:Double x:Key="Control.Height">40</x:Double>
 		<x:Double x:Key="Font.Input">14</x:Double>
 	</UserControl.Resources>
 
 	<UserControl.Styles>
 		<!-- the same for controls without a design class (these plain type styles rank below class styles) -->
 		<Style Selector="AutoCompleteBox">
-			<Setter Property="MinHeight" Value="44"/>
+			<Setter Property="MinHeight" Value="40"/>
 			<Setter Property="FontSize" Value="14"/>
 		</Style>
 		<Style Selector="TextBox">
-			<Setter Property="MinHeight" Value="44"/>
+			<Setter Property="MinHeight" Value="40"/>
 			<Setter Property="FontSize" Value="14"/>
 		</Style>
 		<Style Selector="Button">
-			<Setter Property="MinHeight" Value="44"/>
+			<Setter Property="MinHeight" Value="40"/>
 			<Setter Property="HorizontalContentAlignment" Value="Center"/>
 			<Setter Property="VerticalContentAlignment" Value="Center"/>
 		</Style>
 		<Style Selector="ComboBox">
-			<Setter Property="MinHeight" Value="44"/>
+			<Setter Property="MinHeight" Value="40"/>
 		</Style>
 		<Style Selector="CheckBox">
 			<Setter Property="MinHeight" Value="36"/>
 		</Style>
 		<!-- the paste icon inside a field and the sub-tabs, at finger size (class styles: these outrank the app's) -->
 		<Style Selector="Button.pasteBtn">
-			<Setter Property="Width" Value="40"/>
-			<Setter Property="Height" Value="40"/>
+			<Setter Property="Width" Value="36"/>
+			<Setter Property="Height" Value="36"/>
 			<Setter Property="Margin" Value="0,0,2,0"/>
 		</Style>
 		<Style Selector="TabItem">
@@ -49,8 +49,8 @@
 			<Setter Property="MinHeight" Value="40"/>
 		</Style>
 
-		<!-- ===== Drawer nav item, as on desktop: [section label] + a row with a teal glyph; the chosen row is filled
-		     with the accent, its label and glyph white ===== -->
+		<!-- ===== Drawer nav item, as on desktop: [section label] + a row with a teal glyph; the chosen row is tinted
+		     with the accent, marked by a short accent bar at its start, its label bold ===== -->
 		<Style Selector="ListBox#Nav > ListBoxItem">
 			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
 			<Setter Property="FontSize" Value="15"/>
@@ -63,11 +63,16 @@
 					<StackPanel>
 						<TextBlock Classes="navgroup" Text="{TemplateBinding Group}" IsHitTestVisible="False"
 								   IsVisible="{TemplateBinding Group, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-						<Border Name="PART_Pill" Height="46" CornerRadius="10" Padding="14,0"
+						<Border Name="PART_Pill" Height="46" CornerRadius="10"
 								Background="{DynamicResource Bg.Sidebar}">
-							<ContentPresenter VerticalAlignment="Center" Content="{TemplateBinding Content}"
-											  ContentTemplate="{TemplateBinding ContentTemplate}"
-											  Foreground="{TemplateBinding Foreground}"/>
+							<Panel>
+								<Border Name="PART_Indicator" Width="4" Height="18" CornerRadius="2" Margin="4,0,0,0"
+										HorizontalAlignment="Left" VerticalAlignment="Center"
+										Background="{DynamicResource Nav.Indicator}" IsVisible="False"/>
+								<ContentPresenter Margin="14,0" VerticalAlignment="Center" Content="{TemplateBinding Content}"
+												  ContentTemplate="{TemplateBinding ContentTemplate}"
+												  Foreground="{TemplateBinding Foreground}"/>
+							</Panel>
 						</Border>
 					</StackPanel>
 				</ControlTemplate>
@@ -76,20 +81,27 @@
 		<Style Selector="ListBox#Nav > ListBoxItem:pointerover /template/ Border#PART_Pill">
 			<Setter Property="Background" Value="{DynamicResource Nav.Hover}"/>
 		</Style>
+		<Style Selector="ListBox#Nav > ListBoxItem:pressed /template/ Border#PART_Pill">
+			<Setter Property="Background" Value="{DynamicResource Nav.Pressed}"/>
+		</Style>
 		<Style Selector="ListBox#Nav > ListBoxItem:selected /template/ Border#PART_Pill">
-			<Setter Property="Background" Value="{DynamicResource Accent}"/>
+			<Setter Property="Background" Value="{DynamicResource Nav.Selected}"/>
+		</Style>
+		<Style Selector="ListBox#Nav > ListBoxItem:selected:pressed /template/ Border#PART_Pill">
+			<Setter Property="Background" Value="{DynamicResource Nav.SelectedHover}"/>
+		</Style>
+		<Style Selector="ListBox#Nav > ListBoxItem:selected /template/ Border#PART_Indicator">
+			<Setter Property="IsVisible" Value="True"/>
 		</Style>
 		<Style Selector="ListBox#Nav > ListBoxItem:selected">
-			<Setter Property="Foreground" Value="{DynamicResource Text.OnAccent}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Bright}"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
 		</Style>
 		<Style Selector="ListBox#Nav > ListBoxItem:nth-child(1) /template/ TextBlock.navgroup">
 			<Setter Property="Margin" Value="14,4,0,7"/>
 		</Style>
 		<Style Selector="ListBox#Nav Path.ico">
 			<Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
-		</Style>
-		<Style Selector="ListBox#Nav > ListBoxItem:selected Path.ico">
-			<Setter Property="Stroke" Value="{DynamicResource Text.OnAccent}"/>
 		</Style>
 		<Style Selector="TextBlock.navgroup">
 			<Setter Property="Margin" Value="14,18,0,7"/>

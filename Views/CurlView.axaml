@@ -270,8 +270,11 @@
             <Setter Property="BorderBrush" Value="Transparent"/>
         </Style>
         <Style Selector="ListBox.switch > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Background" Value="{DynamicResource Seg.Hover}"/>
             <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="ListBox.switch > ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Seg.Pressed}"/>
         </Style>
         <Style Selector="ListBox.switch > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
                          ListBox.switch > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,

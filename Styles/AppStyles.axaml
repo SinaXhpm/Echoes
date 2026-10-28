@@ -150,6 +150,17 @@
         <Setter Property="FontSize" Value="{DynamicResource Font.Input}"/>
     </Style>
 
+    <!-- dropdown and menu rows: the hover / selection is a rounded pill inset from the popup's edges, with a hairline
+         between rows (colors: the ComboBoxItem* / MenuFlyoutItem* tokens) -->
+    <Style Selector="ComboBoxItem">
+        <Setter Property="Margin" Value="4,1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+    </Style>
+    <Style Selector="MenuItem">
+        <Setter Property="Margin" Value="4,1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+    </Style>
+
     <!-- Paste icon inside an input's right edge (helpers:InputAssist.PasteButton). Not focusable, so the
          caret stays where the user left it; "top" pins it to the corner of a tall multi-line box. -->
     <Style Selector="Button.pasteBtn">
@@ -408,6 +419,11 @@
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Margin" Value="0,0,24,0"/>
     </Style>
+    <!-- hover: a quiet pipe under the tab the pointer is on, where the chosen one has the accent pipe -->
+    <Style Selector="TabItem:pointerover:not(:selected) /template/ Border#PART_SelectedPipe">
+        <Setter Property="IsVisible" Value="True"/>
+        <Setter Property="Background" Value="{DynamicResource Border.Strong}"/>
+    </Style>
     <!-- segmented variant: <TabControl Classes="seg">, a macOS segmented control. The tabs sit edge to edge on one
          track (each tab's outer border is a piece of it, rounded at the two ends); the chosen one gets a raised thumb. -->
     <Style Selector="TabControl.seg > TabItem">
@@ -449,6 +465,10 @@
     </Style>
     <Style Selector="TabControl.seg > TabItem:pointerover">
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+    </Style>
+    <!-- a segment under the pointer is lifted halfway to the thumb (the chosen one keeps the thumb: its style follows) -->
+    <Style Selector="TabControl.seg > TabItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Seg.Hover}"/>
     </Style>
     <Style Selector="TabControl.seg > TabItem:selected /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource Seg.Thumb}"/>
@@ -500,8 +520,11 @@
         <Setter Property="Background" Value="Transparent"/>
     </Style>
     <Style Selector="ListBox.modeSwitch > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Background" Value="{DynamicResource Seg.Hover}"/>
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+    </Style>
+    <Style Selector="ListBox.modeSwitch > ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Seg.Pressed}"/>
     </Style>
     <Style Selector="ListBox.modeSwitch > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
                      ListBox.modeSwitch > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
