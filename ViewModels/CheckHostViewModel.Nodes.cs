@@ -71,12 +71,14 @@ public sealed partial class CheckHostPickNode : ObservableObject
 }
 
 // The node choice: Automatic (check-host.net picks up to "max nodes"), regions, or nodes ticked one by one — with the
-// picker that edits it. The node list comes from /nodes/hosts, loaded once per session when it is first needed.
+// picker that edits it. The node list comes from /nodes/hosts, loaded once per session when it is first needed; while it
+// can't be loaded, the picker shows the saved copy (CheckHostSnapshot) and the next look tries the live list again.
 public partial class CheckHostViewModel
 {
     private CheckHostNodeChoice _nodeChoice = CheckHostNodeChoice.Automatic;
     private IReadOnlyList<CheckHostNode>? _catalog;
-    private Task<(IReadOnlyList<CheckHostNode>?, string)>? _catalogLoad;
+    private bool _catalogIsSnapshot;
+    private Task<(IReadOnlyList<CheckHostNode>?, CheckHostException?)>? _catalogLoad;
 
     public ObservableCollection<CheckHostPickRegion> PickRegions { get; } = new();
     /// <summary>Headings (<see cref="CheckHostPickHeader"/>) and nodes (<see cref="CheckHostPickNode"/>), filtered.</summary>
@@ -85,7 +87,8 @@ public partial class CheckHostViewModel
 
     [ObservableProperty] private string _pickFilter = "";
     [ObservableProperty] private bool _pickLoading;
-    [ObservableProperty] private string _pickError = "";
+    /// <summary>Why the picker shows the saved list ("" when it shows check-host.net's own).</summary>
+    [ObservableProperty] private string _pickNote = "";
 
     public CheckHostNodeChoice NodeChoice
     {
@@ -105,7 +108,7 @@ public partial class CheckHostViewModel
     /// <summary>The node button's label: "Automatic", "Europe", "Germany · 3 nodes", "5 nodes".</summary>
     public string NodeChoiceText => _nodeChoice.Label(_catalog);
     public bool PickIsAuto => _nodeChoice.IsAutomatic;
-    public bool HasPickError => PickError.Length > 0;
+    public bool HasPickNote => PickNote.Length > 0;
     public bool PickReady => _catalog is not null;
 
     /// <summary>What a run with the current choice will do.</summary>
@@ -124,54 +127,68 @@ public partial class CheckHostViewModel
         }
     }
 
-    partial void OnPickErrorChanged(string value) => OnPropertyChanged(nameof(HasPickError));
+    partial void OnPickNoteChanged(string value) => OnPropertyChanged(nameof(HasPickNote));
     partial void OnPickFilterChanged(string value) => RebuildPickItems();
     partial void OnMaxNodesChanged(int value) => OnPropertyChanged(nameof(PickSummary));
 
     /// <summary>The picker opened: make sure the node list is there (loaded through the proxy when one is set).</summary>
     public async Task EnsureCatalogAsync()
     {
-        if (_catalog is not null) { SyncPickChecks(); return; }
+        if (_catalog is not null && !_catalogIsSnapshot) { SyncPickChecks(); return; }
         MoveProxyCredentials(whileTyping: false);   // the list loads through the proxy: its credentials belong in the fields
         PickLoading = true;
-        PickError = "";
         try
         {
-            var (_, error) = await LoadCatalogAsync(CancellationToken.None);
-            PickError = error;
+            var (live, failure) = await LoadCatalogAsync(CancellationToken.None);
+            PickNote = live is null ? $"Saved list · check-host.net: {CheckHostErrors.Short(failure!)}" : "";
         }
         finally { PickLoading = false; }
     }
 
-    /// <summary>The node list, loaded once per session; callers at the same time share the request, and a failed load is
-    /// tried again by the next caller. Returns it, or null and why not. UI thread.</summary>
-    private async Task<(IReadOnlyList<CheckHostNode>?, string)> LoadCatalogAsync(CancellationToken ct)
+    /// <summary>check-host.net's live node list, loaded once per session; callers at the same time share the request, and a
+    /// failed load is tried again by the next caller. Returns it, or null and why not — the picker then has the saved copy.
+    /// <paramref name="wait"/>: the longest this caller waits (the load itself goes on for the next one). UI thread.</summary>
+    private async Task<(IReadOnlyList<CheckHostNode>? Live, CheckHostException? Failure)> LoadCatalogAsync(CancellationToken ct, TimeSpan? wait = null)
     {
-        if (_catalog is not null) return (_catalog, "");
+        if (_catalog is not null && !_catalogIsSnapshot) return (_catalog, null);
         if (_catalogLoad is null || (_catalogLoad.IsCompleted && _catalogLoad.Result.Item1 is null))
             _catalogLoad = Fetch(ProxyOrNull, ProxyUser, ProxyPass);
-        var (list, error) = await _catalogLoad.WaitAsync(ct);
-        if (list is not null && _catalog is null) SetCatalog(list);
-        return (_catalog, error);
+        IReadOnlyList<CheckHostNode>? list;
+        CheckHostException? failure;
+        try { (list, failure) = wait is { } w ? await _catalogLoad.WaitAsync(w, ct) : await _catalogLoad.WaitAsync(ct); }
+        catch (TimeoutException ex)
+        {
+            (list, failure) = (null, new CheckHostException($"check-host.net's node list didn't load within {CheckHostErrors.Seconds(wait!.Value)}"
+                                                            + " — it may be slow or blocked on this network.", ex));
+        }
+        if (list is not null)
+        {
+            if (_catalog is null || _catalogIsSnapshot) SetCatalog(list, snapshot: false);
+            return (_catalog, null);
+        }
+        if (_catalog is null) SetCatalog(CheckHostSnapshot.Nodes, snapshot: true);
+        return (null, failure);
 
         // its own client (proxy settings as they are now), so a stopped run can't pull it out from under a shared load
-        static async Task<(IReadOnlyList<CheckHostNode>?, string)> Fetch(string? proxy, string user, string pass)
+        static async Task<(IReadOnlyList<CheckHostNode>?, CheckHostException?)> Fetch(string? proxy, string user, string pass)
         {
             try
             {
-                using var http = HttpHelper.Create(proxy, user, pass, timeout: RequestTimeout);
+                using var http = HttpHelper.Create(proxy, user, pass, timeout: RequestTimeout, serviceDns: true);
                 var client = new CheckHostClient(http, ApiBase, viaProxy: proxy is not null);
-                return (await client.NodesAsync(CancellationToken.None).ConfigureAwait(false), "");
+                return (await client.NodesAsync(CancellationToken.None).ConfigureAwait(false), null);
             }
-            catch (CheckHostException ex) { return (null, ex.Message); }
-            catch (ArgumentException ex) { return (null, ex.Message); }   // an invalid proxy address: already one sentence
-            catch (Exception ex) { return (null, "Couldn't load the node list: " + ex.Message); }
+            catch (CheckHostException ex) { return (null, ex); }
+            catch (ArgumentException ex) { return (null, new CheckHostException(ex.Message, ex)); }   // an invalid proxy address: already one sentence
+            catch (Exception ex) { return (null, new CheckHostException("Couldn't load the node list: " + ex.Message, ex)); }
         }
     }
 
-    private void SetCatalog(IReadOnlyList<CheckHostNode> list)
+    private void SetCatalog(IReadOnlyList<CheckHostNode> list, bool snapshot)
     {
         _catalog = list;
+        _catalogIsSnapshot = snapshot;
+        if (!snapshot) PickNote = "";
         PickRegions.Clear();
         foreach (var g in list.GroupBy(n => n.Region).OrderBy(g => CheckHostRegions.Rank(g.Key)))
             PickRegions.Add(new CheckHostPickRegion(g.Key, g.Count(), PickRegion));
@@ -192,7 +209,7 @@ public partial class CheckHostViewModel
     private void MergeCatalog(IReadOnlyList<CheckHostNode> nodes)
     {
         if (_catalog is null || nodes.All(n => _catalog.Any(c => c.Id == n.Id))) return;
-        SetCatalog(_catalog.Concat(nodes.Where(n => _catalog.All(c => c.Id != n.Id))).ToList());
+        SetCatalog(_catalog.Concat(nodes.Where(n => _catalog.All(c => c.Id != n.Id))).ToList(), _catalogIsSnapshot);
     }
 
     private void RebuildPickItems()

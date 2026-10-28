@@ -24,6 +24,11 @@ public sealed class CheckHostPolling
     /// <summary>The extra wait after check-host.net said "too many requests".</summary>
     public TimeSpan RateLimitBackoff { get; init; } = TimeSpan.FromSeconds(5);
 
+    /// <summary>Globalping: the wait after each answer while its measurement runs (its docs: 500 ms after the response,
+    /// never more than two requests a second), and after <see cref="SlowAfter"/>.</summary>
+    public TimeSpan GlobalpingInterval { get; init; } = TimeSpan.FromMilliseconds(500);
+    public TimeSpan GlobalpingSlowInterval { get; init; } = TimeSpan.FromSeconds(1);
+
     public static readonly CheckHostPolling Default = new();
 }
 
@@ -52,12 +57,13 @@ public enum CheckHostEnd
 /// </summary>
 public static class CheckHostRun
 {
+    /// <param name="startTimeout">The longest the start may take (shorter than a poll's, when Globalping can take over).</param>
     public static async Task<CheckHostEnd> RunAsync(CheckHostClient client, CheckHostKind kind, string target, int maxNodes,
                                                     IReadOnlyList<string> nodes, ICheckHostSink sink, CheckHostPolling polling,
-                                                    CancellationToken ct)
+                                                    CancellationToken ct, TimeSpan? startTimeout = null)
     {
         var clock = Stopwatch.StartNew();
-        var start = await client.StartAsync(kind, target, maxNodes, nodes, ct).ConfigureAwait(false);
+        var start = await client.StartAsync(kind, target, maxNodes, nodes, ct, startTimeout).ConfigureAwait(false);
         sink.Started(start);
 
         var waiting = new HashSet<string>(start.Nodes.Select(n => n.Id), StringComparer.Ordinal);

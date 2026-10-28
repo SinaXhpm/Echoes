@@ -28,6 +28,10 @@ public partial class CheckHostViewModel
     private DateTimeOffset _runStarted;
     private TimeSpan? _runDuration;
     private bool _runStopped;
+    private CheckHostService _runService;
+    private string _runFallback = "";         // why check-host.net didn't run it ("timed out"), when Globalping does
+    private string _runFallbackDetail = "";   // ... in check-host.net's whole sentence, for the status tooltip
+    private string _runNote = "";             // what the Globalping run does differently ("A records only")
     private CheckHostSummary _summary = CheckHostSummary.Compute(Array.Empty<CheckHostEntry>());
 
     [ObservableProperty] private string _requestId = "";
@@ -41,6 +45,18 @@ public partial class CheckHostViewModel
     public CheckHostSort Sort => CheckHostOrder.All[Math.Clamp(SortIndex, 0, CheckHostOrder.All.Length - 1)];
     public bool HasPermalink => Permalink.Length > 0;
     public bool CanExport => _all.Count > 0;
+
+    // ---- which service runs it: check-host.net, or Globalping when check-host.net couldn't ----
+
+    /// <summary>" via Globalping (check-host.net: timed out)" after the run's time; "" on check-host.net.</summary>
+    private string ViaText => _runService != CheckHostService.Globalping ? ""
+        : " via Globalping" + (_runFallback.Length > 0 ? $" (check-host.net: {_runFallback})" : "");
+    /// <summary>" · via Globalping" while it runs there.</summary>
+    private string ViaShort => _runService == CheckHostService.Globalping ? " · via Globalping" : "";
+    /// <summary>The status line's tooltip: the line, and check-host.net's reason in full when Globalping ran the check.</summary>
+    public string StatusTip => _runFallbackDetail.Length > 0 ? $"{StatusMessage}\ncheck-host.net: {_runFallbackDetail}" : StatusMessage;
+    public string PermalinkCopyText => $"Copy {_runService.Label()} link";
+    public string PermalinkOpenText => $"Open on {_runService.Label()}";
 
     partial void OnPermalinkChanged(string value) => OnPropertyChanged(nameof(HasPermalink));
     partial void OnFilterTextChanged(string value) => RebuildView();
@@ -156,7 +172,7 @@ public partial class CheckHostViewModel
     // ---- the empty list explains itself ----
 
     public bool ShowEmpty => Rows.Count == 0;
-    public string EmptyTitle => IsWorking && _all.Count == 0 ? "Contacting check-host.net…"
+    public string EmptyTitle => IsWorking && _all.Count == 0 ? $"Contacting {_runService.Label()}…"
         : _all.Count > 0 ? "No nodes match"
         : "Check a host from around the world";
     public string EmptyText => IsWorking && _all.Count == 0 ? "Results appear as each node reports."
@@ -172,14 +188,23 @@ public partial class CheckHostViewModel
 
     // ---- the run's life cycle (UI thread) ----
 
-    private void BeginRun(CheckHostKind kind, string target, CheckHostNodeChoice choice)
+    /// <param name="fallback">Globalping runs it: why check-host.net didn't, in a few words and in its own sentence.</param>
+    private void BeginRun(CheckHostKind kind, string target, CheckHostNodeChoice choice,
+                          CheckHostService service = CheckHostService.CheckHost, string fallback = "", string fallbackDetail = "")
     {
         _runKind = kind;
         _runTarget = target;
         _runChoice = choice.Label(_catalog);
-        _runStarted = DateTimeOffset.Now;
+        if (service == CheckHostService.CheckHost) _runStarted = DateTimeOffset.Now;   // (a fallback goes on with the same run)
         _runDuration = null;
         _runStopped = false;
+        _runService = service;
+        _runFallback = fallback;
+        _runFallbackDetail = fallbackDetail;
+        _runNote = "";
+        OnPropertyChanged(nameof(PermalinkCopyText));
+        OnPropertyChanged(nameof(PermalinkOpenText));
+        OnPropertyChanged(nameof(StatusTip));
         _all.Clear();
         _byId.Clear();
         _groups.Clear();
@@ -203,9 +228,13 @@ public partial class CheckHostViewModel
             _all.Add(row);
             _byId[node.Id] = row;
         }
-        MergeCatalog(start.Nodes);
+        if (start.Service == CheckHostService.CheckHost)
+        {
+            s_checkHostFailed = false;   // it answers again: its start gets the full wait next time
+            MergeCatalog(start.Nodes);   // (Globalping's probes aren't check-host.net nodes)
+        }
         HasRun = _all.Count > 0;
-        StatusMessage = $"Waiting for {CheckHostFormat.Plural(_all.Count, "node", "nodes")}…";
+        StatusMessage = $"Waiting for {CheckHostFormat.Plural(_all.Count, "node", "nodes")}…{ViaShort}";
         UpdateSummary();
         RebuildView();
         OnPropertyChanged(nameof(CanExport));
@@ -216,7 +245,7 @@ public partial class CheckHostViewModel
         foreach (var (id, result) in batch)
             if (_byId.TryGetValue(id, out var row)) row.SetResult(result);
         int reported = _all.Count(r => r.Entry.IsFinal);
-        if (IsWorking) StatusMessage = reported < _all.Count ? $"{reported} of {_all.Count} nodes reported…" : "All nodes reported";
+        if (IsWorking) StatusMessage = (reported < _all.Count ? $"{reported} of {_all.Count} nodes reported…" : "All nodes reported") + ViaShort;
         UpdateSummary();
         RebuildView();
     }
@@ -361,6 +390,8 @@ public partial class CheckHostViewModel
         Duration = _runDuration,
         NodeChoice = _runChoice,
         Stopped = _runStopped,
+        Service = _runService,
+        FallbackReason = _runFallback,
     };
 
     private List<CheckHostEntry> Entries() => Ordered().Select(r => r.Entry).ToList();

@@ -528,11 +528,6 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Margin" Value="0,0,8,0"/>
         </Style>
-        <Style Selector="TextBlock.pickError">
-            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-        </Style>
     </UserControl.Styles>
 
     <ScrollViewer x:Name="ChScroll" helpers:Responsive.BreakWidth="560" HorizontalScrollBarVisibility="Disabled">
@@ -583,7 +578,7 @@
                     <!-- where the check runs from, the proxy switch, and how the run went -->
                     <Grid x:Name="ChMore" helpers:Responsive.BreakWidth="600" ColumnDefinitions="Auto, Auto, *" RowDefinitions="Auto, Auto">
                         <Button x:Name="ChNodesBtn" Grid.Column="0" Classes="ghost nodes"
-                                ToolTip.Tip="Which check-host.net nodes run the check: picked automatically, by region, or one by one">
+                                ToolTip.Tip="Which check-host.net nodes run the check: picked automatically, by region, or one by one (Globalping probes in the same places when check-host.net can't be reached)">
                             <StackPanel Orientation="Horizontal" Spacing="7">
                                 <Path Classes="btnIco" Data="{StaticResource IcoDns}"/>
                                 <TextBlock x:Name="ChNodesLabel" Text="Nodes" VerticalAlignment="Center" Foreground="{DynamicResource Text.Muted}" FontWeight="Normal"/>
@@ -632,7 +627,7 @@
                                         </Grid>
                                         <StackPanel Grid.Row="3" Margin="2,10,0,0" Spacing="4">
                                             <TextBlock Classes="hint" Text="Loading check-host.net's node list…" IsVisible="{Binding PickLoading}"/>
-                                            <TextBlock Classes="pickError" Text="{Binding PickError}" IsVisible="{Binding HasPickError}"/>
+                                            <TextBlock Classes="hint" Text="{Binding PickNote}" IsVisible="{Binding HasPickNote}"/>
                                         </StackPanel>
                                         <ScrollViewer Grid.Row="4" Height="236" Margin="0,2,0,0" IsVisible="{Binding PickReady}"
                                                       HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
@@ -666,7 +661,7 @@
                         </Button>
 
                         <CheckBox Grid.Column="1" IsChecked="{Binding UseProxy}" Name="ProxyToggle" Content="Use a proxy" Margin="16,0,0,0"
-                                  ToolTip.Tip="Tunnel the check-host.net API calls through a proxy (useful if it's filtered on your network)"/>
+                                  ToolTip.Tip="Tunnel the API calls (check-host.net, and Globalping when it stands in) through a proxy, useful where they're filtered"/>
 
                         <!-- (a DockPanel, so the text trims on a desktop and wraps on a phone; the report link stays whole) -->
                         <Panel x:Name="ChStatus">
@@ -678,7 +673,7 @@
                                         <Path Data="{StaticResource ChIcoLink}"/>
                                     </StackPanel>
                                 </Button>
-                                <TextBlock Classes="status" Text="{Binding StatusMessage}" ToolTip.Tip="{Binding StatusMessage}"/>
+                                <TextBlock Classes="status" Text="{Binding StatusMessage}" ToolTip.Tip="{Binding StatusTip}"/>
                             </DockPanel>
                         </Panel>
                     </Grid>
@@ -841,13 +836,13 @@
                             <MenuItem Header="Copy report — aligned text" Command="{Binding CopyReportCommand}"/>
                             <MenuItem Header="Copy as CSV" Command="{Binding CopyCsvCommand}"/>
                             <MenuItem Header="Copy as JSON" Command="{Binding CopyJsonCommand}"/>
-                            <MenuItem Header="Copy check-host.net link" Command="{Binding CopyPermalinkCommand}" IsEnabled="{Binding HasPermalink}"/>
+                            <MenuItem Header="{Binding PermalinkCopyText}" Command="{Binding CopyPermalinkCommand}" IsEnabled="{Binding HasPermalink}"/>
                             <Separator/>
                             <MenuItem Header="Save report…" Click="SaveText_Click"/>
                             <MenuItem Header="Save CSV…" Click="SaveCsv_Click"/>
                             <MenuItem Header="Save JSON…" Click="SaveJson_Click"/>
                             <Separator/>
-                            <MenuItem Header="Open on check-host.net" Command="{Binding OpenPermalinkCommand}" IsEnabled="{Binding HasPermalink}"/>
+                            <MenuItem Header="{Binding PermalinkOpenText}" Command="{Binding OpenPermalinkCommand}" IsEnabled="{Binding HasPermalink}"/>
                         </MenuFlyout>
                     </Button.Flyout>
                 </Button>
@@ -858,13 +853,13 @@
                             <MenuItem Header="Copy report — aligned text" Command="{Binding CopyReportCommand}"/>
                             <MenuItem Header="Copy as CSV" Command="{Binding CopyCsvCommand}"/>
                             <MenuItem Header="Copy as JSON" Command="{Binding CopyJsonCommand}"/>
-                            <MenuItem Header="Copy check-host.net link" Command="{Binding CopyPermalinkCommand}" IsEnabled="{Binding HasPermalink}"/>
+                            <MenuItem Header="{Binding PermalinkCopyText}" Command="{Binding CopyPermalinkCommand}" IsEnabled="{Binding HasPermalink}"/>
                             <Separator/>
                             <MenuItem Header="Save report…" Click="SaveText_Click"/>
                             <MenuItem Header="Save CSV…" Click="SaveCsv_Click"/>
                             <MenuItem Header="Save JSON…" Click="SaveJson_Click"/>
                             <Separator/>
-                            <MenuItem Header="Open on check-host.net" Command="{Binding OpenPermalinkCommand}" IsEnabled="{Binding HasPermalink}"/>
+                            <MenuItem Header="{Binding PermalinkOpenText}" Command="{Binding OpenPermalinkCommand}" IsEnabled="{Binding HasPermalink}"/>
                         </MenuFlyout>
                     </Button.Flyout>
                 </Button>

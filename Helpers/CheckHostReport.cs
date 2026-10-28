@@ -21,6 +21,10 @@ public sealed class CheckHostRunInfo
     /// <summary>"Automatic", "Europe", "5 nodes" — how the nodes were chosen.</summary>
     public string NodeChoice { get; init; } = "Automatic";
     public bool Stopped { get; init; }
+    /// <summary>Who ran it: check-host.net, or Globalping when check-host.net couldn't.</summary>
+    public CheckHostService Service { get; init; }
+    /// <summary>Why check-host.net didn't run it ("timed out"), when Globalping did.</summary>
+    public string FallbackReason { get; init; } = "";
 }
 
 /// <summary>Numbers and per-node texts, shared by the result rows and the exports so they always agree.</summary>
@@ -184,6 +188,9 @@ public static class CheckHostReport
         if (info.Duration is { } d) sb.Append(info.Stopped ? " · stopped after " : " · took ").Append(CheckHostFormat.Duration(d));
         else sb.Append(" · still running");
         sb.Append('\n');
+        sb.Append(Pad("Service")).Append(info.Service.Label());
+        if (info.FallbackReason.Length > 0) sb.Append(" (check-host.net: ").Append(info.FallbackReason).Append(')');
+        sb.Append('\n');
         sb.Append(Pad("Nodes")).Append(s.Total.ToString(Inv)).Append(" · ").Append(info.NodeChoice).Append('\n');
         if (info.Permalink.Length > 0) sb.Append(Pad("Report")).Append(info.Permalink).Append('\n');
         sb.Append('\n');
@@ -335,6 +342,8 @@ public static class CheckHostReport
             j.WriteStartObject();
             j.WriteString("check", info.Kind.Api());
             j.WriteString("target", info.Target);
+            j.WriteString("service", info.Service.Key());
+            if (info.FallbackReason.Length > 0) j.WriteString("fallbackReason", "check-host.net: " + info.FallbackReason);
             j.WriteString("requestId", info.RequestId);
             j.WriteString("permalink", info.Permalink);
             j.WriteString("started", info.Started.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ", Inv));
@@ -408,6 +417,7 @@ public static class CheckHostReport
         j.WriteString("countryCode", n.CountryCode);
         j.WriteString("region", n.Region);
         j.WriteString("asn", n.Asn);
+        if (n.Network.Length > 0) j.WriteString("network", n.Network);
         j.WriteString("nodeIp", n.Ip);
         j.WriteString("state", CheckHostFormat.StateKey(e.State));
         j.WriteString("result", CheckHostFormat.Status(e));
@@ -459,7 +469,8 @@ public static class CheckHostReport
                     j.WriteEndObject();
                     break;
             }
-            // the node's entry exactly as check-host.net sent it
+            if (r.Output.Length > 0) j.WriteString("output", r.Output);
+            // the node's entry exactly as the service sent it
             if (r.Raw.Length > 0)
             {
                 j.WritePropertyName("raw");

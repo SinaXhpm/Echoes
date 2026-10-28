@@ -50,22 +50,35 @@ public static class CheckHostKinds
     }
 }
 
+/// <summary>Who ran a check: check-host.net, the first choice, or Globalping when check-host.net couldn't.</summary>
+public enum CheckHostService { CheckHost, Globalping }
+
+public static class CheckHostServices
+{
+    public static string Label(this CheckHostService service) => service == CheckHostService.Globalping ? "Globalping" : "check-host.net";
+
+    /// <summary>For the JSON export.</summary>
+    public static string Key(this CheckHostService service) => service == CheckHostService.Globalping ? "globalping" : "check-host.net";
+}
+
 /// <summary>
-/// A check-host.net probe node: its id ("de4.node.check-host.net"), where it is and who hosts it. Built from a check's
-/// node map (<c>["de", "Germany", "Frankfurt", "185.37.147.117", "AS34549"]</c>) or the node list
-/// (<c>{"asn": …, "ip": …, "location": ["de", "Germany", "Frankfurt"]}</c>).
+/// A node that runs a check: a check-host.net node, its id ("de4.node.check-host.net"), where it is and who hosts it, built
+/// from a check's node map (<c>["de", "Germany", "Frankfurt", "185.37.147.117", "AS34549"]</c>) or the node list
+/// (<c>{"asn": …, "ip": …, "location": ["de", "Germany", "Frankfurt"]}</c>); or a Globalping probe ("gp3").
+/// The texts come from the network: they are cleaned and capped here.
 /// </summary>
 public sealed class CheckHostNode
 {
     public CheckHostNode(string id, string countryCode, string country, string city, string ip, string asn)
     {
-        Id = id.Trim();
+        Id = RemoteText.Clean(id.Trim(), 100);
         ShortId = Short(Id);
-        CountryCode = countryCode.Trim().ToLowerInvariant();
-        Country = country.Trim();
-        City = city.Trim();
-        Ip = ip.Trim();
-        Asn = asn.Trim();
+        string cc = countryCode.Trim();
+        CountryCode = cc.Length == 2 && cc.All(char.IsAsciiLetter) ? cc.ToLowerInvariant() : "";
+        Country = RemoteText.Clean(country.Trim(), 60);
+        City = RemoteText.Clean(city.Trim(), 60);
+        Ip = RemoteText.Clean(ip.Trim(), 64);
+        Asn = RemoteText.Clean(asn.Trim(), 16);
         Region = CheckHostRegions.Of(CountryCode);
         Location = City.Length == 0 || string.Equals(City, Country, StringComparison.OrdinalIgnoreCase)
             ? (Country.Length > 0 ? Country : ShortId)
@@ -84,6 +97,9 @@ public sealed class CheckHostNode
     public string Ip { get; }
     /// <summary>"AS34549", or "" when unknown.</summary>
     public string Asn { get; }
+    /// <summary>Who hosts a Globalping probe ("Hetzner Online"); "" for a check-host.net node.</summary>
+    public string Network { get => _network; init => _network = RemoteText.Clean((value ?? "").Trim(), 80); }
+    private readonly string _network = "";
     public string Region { get; }
     /// <summary>"Frankfurt, Germany"; just the country when the city is the same ("Hong Kong", "Singapore").</summary>
     public string Location { get; }
@@ -243,24 +259,31 @@ public sealed class CheckHostException : Exception
     public CheckHostException(string message, Exception? inner = null, bool rateLimited = false) : base(message, inner)
         => RateLimited = rateLimited;
 
-    /// <summary>check-host.net is throttling this address: a poll should back off rather than give up.</summary>
+    /// <summary>The service is throttling this address: a poll should back off rather than give up.</summary>
     public bool RateLimited { get; }
+    /// <summary>How long the service asked to wait (Globalping's Retry-After, or until its hourly limit resets).</summary>
+    public TimeSpan? RetryAfter { get; init; }
+    /// <summary>Globalping: tests this address may still run this hour (its rate-limit headers), when it said.</summary>
+    public int? Remaining { get; init; }
 }
 
-/// <summary>What check-host.net answered to a check request.</summary>
+/// <summary>What a service answered to a check request: its id, the report's page and the nodes that run it.</summary>
 public sealed class CheckHostStart
 {
-    public CheckHostStart(string requestId, string permalink, IReadOnlyList<CheckHostNode> nodes)
+    public CheckHostStart(string requestId, string permalink, IReadOnlyList<CheckHostNode> nodes,
+                          CheckHostService service = CheckHostService.CheckHost)
     {
         RequestId = requestId;
         Permalink = permalink;
         Nodes = nodes;
+        Service = service;
     }
 
     public string RequestId { get; }
-    /// <summary>https://check-host.net/check-report/&lt;request id&gt; — the check's page on the site.</summary>
+    /// <summary>The check's page on the service's site (check-host.net/check-report/…, globalping.io/?measurement=…).</summary>
     public string Permalink { get; }
     public IReadOnlyList<CheckHostNode> Nodes { get; }
+    public CheckHostService Service { get; }
 }
 
 /// <summary>
@@ -336,9 +359,11 @@ public sealed class CheckHostClient
         return sb.ToString();
     }
 
-    public async Task<CheckHostStart> StartAsync(CheckHostKind kind, string target, int maxNodes, IReadOnlyList<string>? nodes, CancellationToken ct)
+    /// <param name="timeout">A shorter wait than the client's own (a run that can move to Globalping doesn't wait long).</param>
+    public async Task<CheckHostStart> StartAsync(CheckHostKind kind, string target, int maxNodes, IReadOnlyList<string>? nodes, CancellationToken ct,
+                                                 TimeSpan? timeout = null)
     {
-        string body = await GetAsync(StartPath(kind, target, maxNodes, nodes), Call.Start, ct).ConfigureAwait(false);
+        string body = await GetAsync(StartPath(kind, target, maxNodes, nodes), Call.Start, ct, timeout).ConfigureAwait(false);
         using var doc = ParseJson(body, Call.Start, target);
         var root = doc.RootElement;
         if (root.ValueKind != JsonValueKind.Object)
@@ -395,13 +420,14 @@ public sealed class CheckHostClient
 
     private static readonly TimeSpan FallbackTimeout = TimeSpan.FromSeconds(15);
 
-    private async Task<string> GetAsync(string path, Call call, CancellationToken ct)
+    private async Task<string> GetAsync(string path, Call call, CancellationToken ct, TimeSpan? limit = null)
     {
         using var req = new HttpRequestMessage(HttpMethod.Get, new Uri(_base, path));
         req.Headers.Accept.ParseAdd("application/json");
         // One deadline for the headers AND the body: with the body streamed (to cap its size), HttpClient.Timeout stops
         // counting once the headers are in, and a server trickling bytes could hold the run forever.
         var timeout = _http.Timeout > TimeSpan.Zero && _http.Timeout != Timeout.InfiniteTimeSpan ? _http.Timeout : FallbackTimeout;
+        if (limit is { } l && l > TimeSpan.Zero && l < timeout) timeout = l;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(timeout);
         HttpResponseMessage resp;
@@ -510,7 +536,7 @@ public sealed class CheckHostClient
         || body.Contains("captcha", StringComparison.OrdinalIgnoreCase);
 }
 
-/// <summary>Why check-host.net couldn't be reached, in one sentence that says what to do.</summary>
+/// <summary>Why check-host.net (or Globalping) couldn't be reached, in one sentence that says what to do.</summary>
 public static class CheckHostErrors
 {
     public const string RateLimited =
@@ -523,11 +549,29 @@ public static class CheckHostErrors
         return secs == 1 ? "1 second" : secs.ToString(CultureInfo.InvariantCulture) + " seconds";
     }
 
-    public static string Network(Exception ex, bool viaProxy, TimeSpan timeout)
+    /// <summary>A few words for a status line: why a service didn't run the check ("timed out", "HTTP 503").</summary>
+    public static string Short(Exception ex)
+    {
+        if (ex is not CheckHostException failure) return Fallback.Reason(ex);
+        if (failure.RateLimited) return "rate limited";
+        if (failure.InnerException is { } inner) return Short(inner);
+        string m = failure.Message;
+        bool Has(string s) => m.Contains(s, StringComparison.OrdinalIgnoreCase);
+        if (Has("bot protection")) return "bot protection";
+        if (Has("web page")) return "sent a web page";
+        int http = m.IndexOf("HTTP ", StringComparison.Ordinal);
+        if (http >= 0 && m.Length >= http + 8 && m.AsSpan(http + 5, 3).ToString().All(char.IsAsciiDigit)) return m.Substring(http, 8);
+        if (Has("within")) return "timed out";
+        if (Has("can't read") || Has("empty answer")) return "unreadable answer";
+        if (Has(" MB")) return "answer too large";
+        return "failed";
+    }
+
+    public static string Network(Exception ex, bool viaProxy, TimeSpan timeout, string service = "check-host.net")
     {
         string via = viaProxy ? " through the proxy" : "";
         if (ex is TaskCanceledException or OperationCanceledException or TimeoutException)
-            return $"check-host.net didn't answer within {Seconds(timeout)}{via} — it may be slow or blocked on this network. Run again, or try a proxy.";
+            return $"{service} didn't answer within {Seconds(timeout)}{via} — it may be slow or blocked on this network. Run again, or try a proxy.";
 
         SocketException? socket = null;
         HttpRequestError httpError = HttpRequestError.Unknown;
@@ -540,32 +584,32 @@ public static class CheckHostErrors
             if (e is AuthenticationException) tls = true;
         }
         if (httpError == HttpRequestError.ProxyTunnelError)
-            return "The proxy refused to connect to check-host.net — check the proxy address and that it allows HTTPS (CONNECT).";
+            return $"The proxy refused to connect to {service} — check the proxy address and that it allows HTTPS (CONNECT).";
         if (httpError == HttpRequestError.SecureConnectionError || tls)
-            return "The secure connection to check-host.net failed — a firewall, antivirus or proxy may be intercepting HTTPS.";
+            return $"The secure connection to {service} failed — a firewall, antivirus or proxy may be intercepting HTTPS.";
         if (httpError == HttpRequestError.NameResolutionError || socket?.SocketErrorCode is SocketError.HostNotFound or SocketError.NoData or SocketError.TryAgain)
             return viaProxy
                 ? "The proxy's address doesn't resolve — check the proxy host name."
-                : "Can't reach check-host.net — its name doesn't resolve on this network (DNS). Check the connection, or use a proxy.";
+                : $"Can't reach {service} — its name doesn't resolve on this network (DNS). Check the connection, or use a proxy.";
         switch (socket?.SocketErrorCode)
         {
             case SocketError.ConnectionRefused:
                 return viaProxy
                     ? "The proxy refused the connection — is it running at that address and port?"
-                    : "check-host.net refused the connection — something on this network may be blocking it. Try a proxy.";
+                    : $"{service} refused the connection — something on this network may be blocking it. Try a proxy.";
             case SocketError.TimedOut:
-                return $"Can't reach check-host.net{via}: the connection timed out — it may be blocked on this network. Try a proxy.";
+                return $"Can't reach {service}{via}: the connection timed out — it may be blocked on this network. Try a proxy.";
             case SocketError.NetworkUnreachable or SocketError.HostUnreachable or SocketError.NetworkDown:
-                return "No network route to check-host.net — check the connection.";
+                return $"No network route to {service} — check the connection.";
             case SocketError.ConnectionReset or SocketError.ConnectionAborted:
-                return $"The connection to check-host.net was cut off{via} — it may be filtered on this network. Try a proxy.";
+                return $"The connection to {service} was cut off{via} — it may be filtered on this network. Try a proxy.";
         }
         if (ex is IOException or HttpRequestException)
         {
             string inner = Innermost(ex);
-            return $"Can't reach check-host.net{via} ({inner.TrimEnd('.')}).";
+            return $"Can't reach {service}{via} ({inner.TrimEnd('.')}).";
         }
-        return "Can't reach check-host.net: " + Innermost(ex).TrimEnd('.') + ".";
+        return $"Can't reach {service}: " + Innermost(ex).TrimEnd('.') + ".";
     }
 
     private static string Innermost(Exception ex)

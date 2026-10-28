@@ -43,8 +43,10 @@ public sealed class CheckHostResult
     public string Status { get; init; } = "";
     /// <summary>The node's own error text ("Connection timed out"), or why there is no result.</summary>
     public string Error { get; init; } = "";
-    /// <summary>The node's entry as check-host.net sent it.</summary>
+    /// <summary>The node's entry as the service sent it (Globalping's without its text output).</summary>
     public string Raw { get; init; } = "";
+    /// <summary>A Globalping probe's own output (the ping, dig or HTTP header lines), cleaned; "" for check-host.net.</summary>
+    public string Output { get; init; } = "";
 
     // ping
     public IReadOnlyList<CheckHostReply> Replies { get; init; } = Array.Empty<CheckHostReply>();
@@ -120,7 +122,8 @@ public sealed class CheckHostResult
     private static double? Seconds(JsonElement e) =>
         e.ValueKind == JsonValueKind.Number && e.TryGetDouble(out double s) && double.IsFinite(s) && s >= 0 ? s * 1000 : null;
 
-    private static string Str(JsonElement e) => e.ValueKind == JsonValueKind.String ? (e.GetString() ?? "").Trim() : "";
+    // every text a node sends is shown: cleaned and capped
+    private static string Str(JsonElement e) => e.ValueKind == JsonValueKind.String ? RemoteText.Clean((e.GetString() ?? "").Trim(), 300) : "";
 
     private static CheckHostResult? Ping(JsonElement p, string raw)
     {
@@ -292,15 +295,16 @@ public sealed class CheckHostResult
                 if (prop.Value.ValueKind == JsonValueKind.Number && prop.Value.TryGetInt64(out long t)) ttl = t;
                 continue;
             }
+            string type = RemoteText.Clean(prop.Name, 16);
             if (prop.Value.ValueKind == JsonValueKind.Array)
             {
-                var values = prop.Value.EnumerateArray()
-                    .Select(v => v.ValueKind == JsonValueKind.String ? (v.GetString() ?? "").Trim() : v.ValueKind is JsonValueKind.Null ? "" : v.GetRawText())
+                var values = prop.Value.EnumerateArray().Take(64)
+                    .Select(v => v.ValueKind == JsonValueKind.String ? Str(v) : v.ValueKind is JsonValueKind.Null ? "" : RemoteText.Clean(v.GetRawText(), 300))
                     .Where(v => v.Length > 0).ToArray();
-                records.Add(new KeyValuePair<string, string[]>(prop.Name, values));
+                records.Add(new KeyValuePair<string, string[]>(type, values));
             }
             else if (prop.Value.ValueKind == JsonValueKind.String && Str(prop.Value) is { Length: > 0 } single)
-                records.Add(new KeyValuePair<string, string[]>(prop.Name, new[] { single }));
+                records.Add(new KeyValuePair<string, string[]>(type, new[] { single }));
         }
         // A and AAAA first (as the site shows them), then any other type in the API's order
         records = records.OrderBy(r => r.Key switch { "A" => 0, "AAAA" => 1, _ => 2 }).ToList();
@@ -324,12 +328,14 @@ public sealed class CheckHostResult
     {
         bool Has(string s) => message.Contains(s, StringComparison.OrdinalIgnoreCase);
         if (message.Length == 0) return "Failed";
-        if (Has("timed out") || Has("timeout")) return "Timeout";
+        if (Has("timed out") || Has("timeout") || Has("ETIMEDOUT")) return "Timeout";
         if (Has("refused")) return "Refused";
+        // (the last three: Node.js resolver codes, as Globalping's probes report them)
         if (Has("No such device or address") || Has("not known") || Has("Unknown host") || Has("nodename nor servname")
-            || Has("No address associated") || Has("name resolution") || Has("resolve") || Has("NXDOMAIN"))
+            || Has("No address associated") || Has("name resolution") || Has("resolve") || Has("NXDOMAIN")
+            || Has("ENOTFOUND") || Has("ENODATA") || Has("EAI_AGAIN"))
             return "Unresolved";
-        if (Has("unreachable") || Has("No route")) return "Unreachable";
+        if (Has("unreachable") || Has("UNREACH") || Has("No route")) return "Unreachable";
         if (Has("reset")) return "Reset";
         if (Has("certificate") || Has("SSL") || Has("TLS")) return "TLS error";
         if (Has("redirect")) return "Redirects";

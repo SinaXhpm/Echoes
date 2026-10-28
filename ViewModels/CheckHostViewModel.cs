@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,13 +18,29 @@ namespace Echoes.ViewModels;
 /// then polls its results (off the UI thread) until every node has reported; rows fill in as they arrive. Nodes are chosen
 /// automatically, by region or one by one. The calls go through the app's <see cref="HttpHelper"/>, so an optional proxy can
 /// tunnel them (useful where check-host.net itself is filtered).
+/// <para>When check-host.net can't run a check (unreachable, refusing, or silent before any node reported), the same run
+/// goes to Globalping, which has probes in the same places: one after the other, not both at once, because a Globalping
+/// measurement spends the address's hourly tests (one per probe) and check-host.net stays the first choice.</para>
 /// </summary>
 public partial class CheckHostViewModel : ObservableObject
 {
-    /// <summary>The API's address and polling schedule; a test harness points them at a stand-in server.</summary>
+    /// <summary>The APIs' addresses and polling schedule; a test harness points them at a stand-in server.</summary>
     internal static Uri ApiBase { get; set; } = CheckHostClient.DefaultBase;
+    internal static Uri GlobalpingBase { get; set; } = GlobalpingClient.DefaultBase;
     internal static CheckHostPolling Polling { get; set; } = CheckHostPolling.Default;
     internal static TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(15);
+    /// <summary>The longest check-host.net's start (and the node list a run needs) may take before the run moves to
+    /// Globalping; it answers within a second or two when it can be reached at all. Shorter once it has failed this
+    /// session, until it answers again.</summary>
+    internal static TimeSpan StartTimeout { get; set; } = TimeSpan.FromSeconds(8);
+    internal static TimeSpan StartTimeoutAfterFailure { get; set; } = TimeSpan.FromSeconds(4);
+
+    // This session's memory of the two services (UI thread): check-host.net has failed since it last answered, so its start
+    // gets the shorter wait; Globalping's hourly limit is used up until this time (UTC), so it isn't asked meanwhile; and
+    // where Globalping has probes (read once, for nodes picked one by one).
+    private static bool s_checkHostFailed;
+    private static DateTime s_globalpingBlockedUntil = DateTime.MinValue;
+    private static GlobalpingProbeIndex? s_probes;
 
     [ObservableProperty] private string _host = string.Empty;
     [ObservableProperty] private int _selectedTypeIndex;          // CheckHostKinds.All: ping · http · tcp · udp · dns
@@ -60,7 +77,11 @@ public partial class CheckHostViewModel : ObservableObject
     };
 
     partial void OnErrorTextChanged(string value) => OnPropertyChanged(nameof(HasError));
-    partial void OnStatusMessageChanged(string value) => OnPropertyChanged(nameof(HasStatus));
+    partial void OnStatusMessageChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasStatus));
+        OnPropertyChanged(nameof(StatusTip));
+    }
     partial void OnSelectedTypeIndexChanged(int value)
     {
         OnPropertyChanged(nameof(Kind));
@@ -204,25 +225,19 @@ public partial class CheckHostViewModel : ObservableObject
 
         try
         {
-            using var http = HttpHelper.Create(proxy, ProxyUser, ProxyPass, timeout: RequestTimeout);
-            var client = new CheckHostClient(http, ApiBase, viaProxy: proxy != null);
-
-            IReadOnlyList<string> nodes = Array.Empty<string>();
-            if (!choice.IsAutomatic)
+            // (serviceDns: the APIs' own names are resolved around a resolver that blocks them; the checked host is resolved
+            // by the services' nodes, never here)
+            using var http = HttpHelper.Create(proxy, ProxyUser, ProxyPass, timeout: RequestTimeout, serviceDns: true);
+            CheckHostEnd end;
+            try
             {
-                StatusMessage = "Loading the node list…";
-                var (catalog, catalogError) = await LoadCatalogAsync(token);
-                if (runId != _runId) return;
-                var resolved = choice.Resolve(catalog, MaxNodes);
-                if (resolved is null)
-                    throw new CheckHostException($"Couldn't load check-host.net's node list to pick the {choice.Label(null)} nodes — {Lower(catalogError)}");
-                if (resolved.Count == 0)
-                    throw new CheckHostException("None of the chosen nodes is on check-host.net's list any more — choose the nodes again, or use Automatic.");
-                nodes = resolved;
+                end = await RunOnCheckHostAsync(http, proxy != null, kind, target, choice, runId, token);
             }
-
-            StatusMessage = "Starting the check…";
-            var end = await CheckHostRun.RunAsync(client, kind, target, MaxNodes, nodes, new Sink(this, runId), Polling, token);
+            catch (CheckHostException ex) when (!token.IsCancellationRequested && runId == _runId)
+            {
+                if (!NoneReported()) throw;   // some nodes reported before contact was lost: their results stay, with the error
+                end = await RunOnGlobalpingAsync(http, proxy != null, kind, target, choice, ex, runId, token);
+            }
             if (runId != _runId) return;
             DrainQueue();
             int silent = 0;
@@ -230,9 +245,10 @@ public partial class CheckHostViewModel : ObservableObject
                 foreach (var row in _all)
                     if (row.Result is null) { row.SetResult(CheckHostResult.NoResult(kind, Polling.Deadline)); silent++; }
             FinishRun(clock.Elapsed, stopped: false);
-            StatusMessage = $"Done in {CheckHostFormat.Duration(clock.Elapsed)}"
+            StatusMessage = $"Done in {CheckHostFormat.Duration(clock.Elapsed)}{ViaText}"
                             + (silent > 0 ? $" · {CheckHostFormat.Plural(silent, "node", "nodes")} didn't report" : "")
-                            + (note.Length > 0 ? $" · {kind.Label()} {note} (no port given)" : "");
+                            + (note.Length > 0 ? $" · {kind.Label()} {note} (no port given)" : "")
+                            + (_runNote.Length > 0 ? " · " + _runNote : "");
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -265,6 +281,93 @@ public partial class CheckHostViewModel : ObservableObject
         {
             if (runId == _runId) IsWorking = false;
         }
+    }
+
+    /// <summary>The run on check-host.net. A <see cref="CheckHostException"/> means it didn't run the check — nothing
+    /// started, or no node reported before contact was lost — and the run may move on.</summary>
+    private async Task<CheckHostEnd> RunOnCheckHostAsync(HttpClient http, bool viaProxy, CheckHostKind kind, string target,
+                                                          CheckHostNodeChoice choice, int runId, CancellationToken token)
+    {
+        var client = new CheckHostClient(http, ApiBase, viaProxy);
+        var wait = s_checkHostFailed ? StartTimeoutAfterFailure : StartTimeout;
+        IReadOnlyList<string> nodes = Array.Empty<string>();
+        if (!choice.IsAutomatic)
+        {
+            StatusMessage = "Loading the node list…";
+            var (live, failure) = await LoadCatalogAsync(token, wait);
+            token.ThrowIfCancellationRequested();
+            if (live is null)
+                throw new CheckHostException($"Couldn't load check-host.net's node list to pick the {choice.Label(null)} nodes — {Lower(failure!.Message)}", failure);
+            var resolved = choice.Resolve(live, MaxNodes) ?? Array.Empty<string>();
+            if (resolved.Count == 0)
+                throw new CheckHostException("None of the chosen nodes is on check-host.net's list any more — choose the nodes again, or use Automatic.");
+            nodes = resolved;
+        }
+
+        StatusMessage = "Starting the check…";
+        var end = await CheckHostRun.RunAsync(client, kind, target, MaxNodes, nodes, new Sink(this, runId), Polling, token, wait);
+        token.ThrowIfCancellationRequested();
+        DrainQueue();
+        if (end == CheckHostEnd.Deadline && NoneReported())
+            throw new CheckHostException($"check-host.net's nodes sent no result within {CheckHostErrors.Seconds(Polling.Deadline)}.");
+        return end;
+    }
+
+    /// <summary>The same run on Globalping, after check-host.net failed with <paramref name="checkHost"/>. When Globalping
+    /// can't run it either, the error names both reasons.</summary>
+    private async Task<CheckHostEnd> RunOnGlobalpingAsync(HttpClient http, bool viaProxy, CheckHostKind kind, string target,
+                                                           CheckHostNodeChoice choice, CheckHostException checkHost, int runId,
+                                                           CancellationToken token)
+    {
+        s_checkHostFailed = true;
+        if (!GlobalpingRequest.Supports(kind))
+            throw new CheckHostException(checkHost.Message + "\nGlobalping, the fallback, has no UDP check: a UDP check needs check-host.net.", checkHost);
+        if (DateTime.UtcNow < s_globalpingBlockedUntil)
+            throw new CheckHostException(checkHost.Message + "\nGlobalping, the fallback, has no tests left for your address this hour (it resets in "
+                                         + $"{Math.Max(1, (int)Math.Ceiling((s_globalpingBlockedUntil - DateTime.UtcNow).TotalMinutes))} min).", checkHost);
+
+        // the run starts over there: the rows check-host.net may have listed (none reported) give way
+        string why = CheckHostErrors.Short(checkHost);
+        BeginRun(kind, target, choice, CheckHostService.Globalping, why, checkHost.Message);
+        StatusMessage = $"check-host.net: {why} · trying Globalping…";
+        try
+        {
+            var client = new GlobalpingClient(http, GlobalpingBase, viaProxy);
+            if (choice.Mode == CheckHostNodeChoice.ChoiceMode.Nodes && s_probes is null)
+            {
+                StatusMessage = "Finding Globalping probes near the chosen nodes…";
+                s_probes = await TryProbesAsync(client, token);   // null: the nodes map to their countries only
+            }
+            var request = GlobalpingRequest.Build(kind, target, choice, MaxNodes, _catalog,
+                                                  choice.Mode == CheckHostNodeChoice.ChoiceMode.Nodes ? s_probes : null);
+            _runNote = request.Note;
+            StatusMessage = "Starting the check on Globalping…";
+            return await GlobalpingRun.RunAsync(client, request, new Sink(this, runId), Polling, token);
+        }
+        catch (CheckHostException ex) when (!token.IsCancellationRequested)
+        {
+            // an hourly limit (minutes away) isn't asked again until it resets; a short "slow down" is waited out in the run
+            if (ex.RateLimited && ex.RetryAfter is { } reset && reset > TimeSpan.FromMinutes(1)) s_globalpingBlockedUntil = DateTime.UtcNow + reset;
+            DrainQueue();
+            if (!NoneReported()) throw;   // results came in before it failed: they stay, with this error
+            throw new CheckHostException($"Neither check-host.net nor Globalping could run the check.\n{checkHost.Message}\n{ex.Message}", ex);
+        }
+    }
+
+    private static async Task<GlobalpingProbeIndex?> TryProbesAsync(GlobalpingClient client, CancellationToken token)
+    {
+        using var wait = CancellationTokenSource.CreateLinkedTokenSource(token);
+        wait.CancelAfter(TimeSpan.FromSeconds(10));
+        try { return await client.ProbesAsync(wait.Token); }
+        catch (CheckHostException) { return null; }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested) { return null; }
+    }
+
+    /// <summary>No node of the current run has a result yet (what's queued is applied first). UI thread.</summary>
+    private bool NoneReported()
+    {
+        DrainQueue();
+        return _all.All(r => r.Result is null);
     }
 
     private static string Lower(string s) => s.Length > 1 && char.IsUpper(s[0]) && !char.IsUpper(s[1]) ? char.ToLowerInvariant(s[0]) + s[1..] : s;

@@ -136,11 +136,11 @@ public sealed partial class CheckHostNodeRow : CheckHostRow
         static bool Has(string? s, string f) => s is { Length: > 0 } && s.Contains(f, StringComparison.OrdinalIgnoreCase);
         var n = Node;
         if (f.Length == 2 && string.Equals(n.CountryCode, f, StringComparison.OrdinalIgnoreCase)) return true;
-        return Has(n.Location, f) || Has(n.Id, f) || Has(n.Region, f) || Has(n.Asn, f) || Has(n.Ip, f)
+        return Has(n.Location, f) || Has(n.Id, f) || Has(n.Region, f) || Has(n.Asn, f) || Has(n.Ip, f) || Has(n.Network, f)
                || Has(StatusText, f) || Has(DetailText, f) || Has(Result?.Error, f);
     }
 
-    /// <summary>The expanded panel's lines: everything check-host.net reported for this node.</summary>
+    /// <summary>The expanded panel's lines: everything the service reported for this node.</summary>
     public IReadOnlyList<CheckHostDetail> Details
     {
         get
@@ -148,7 +148,7 @@ public sealed partial class CheckHostNodeRow : CheckHostRow
             var n = Node;
             var list = new List<CheckHostDetail>(8)
             {
-                new("Node", string.Join("  ·  ", new[] { n.Id, n.Ip, n.Asn }.Where(s => s.Length > 0)), mono: true),
+                new("Node", string.Join("  ·  ", new[] { n.Id, n.Ip, n.Asn, n.Network }.Where(s => s.Length > 0)), mono: true),
                 new("Location", $"{n.Location} · {n.Region}"),
             };
             var r = Result;
@@ -198,7 +198,8 @@ public sealed partial class CheckHostNodeRow : CheckHostRow
                     break;
             }
             if (r.Kind != CheckHostKind.Dns && r.Address.Length > 0) list.Add(new("Address", r.Address, mono: true));
-            if (r.Raw.Length > 0) list.Add(new("Raw", r.Raw, mono: true));
+            if (r.Output.Length > 0) list.Add(new("Output", r.Output, mono: true));
+            if (r.Raw.Length > 0) list.Add(new("Raw", RemoteText.Clean(r.Raw, 4000), mono: true));
             return list;
         }
     }
