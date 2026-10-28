@@ -925,8 +925,9 @@
                             </Border>
                         </Grid>
 
-                        <!-- ===== files: shared by this device / received from browsers ===== -->
-                        <Grid IsVisible="{Binding IsFilesTab}" RowDefinitions="Auto, Auto, Auto, *, Auto" Margin="10,0,10,8">
+                        <!-- ===== files: shared by this device / received from browsers (built when first shown) ===== -->
+                        <ctl:Deferred IsVisible="{Binding IsFilesTab}"><DataTemplate x:DataType="vm:WebServerViewModel">
+                        <Grid RowDefinitions="Auto, Auto, Auto, *, Auto" Margin="10,0,10,8">
                             <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="6" Margin="0,0,0,6">
                                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                     <TextBlock Classes="panelTitle" Text="SHARED"/>
@@ -1076,9 +1077,11 @@
                             <TextBlock Grid.Row="4" Classes="hint error" Margin="2,4,0,0" Text="{Binding FilesError}"
                                        IsVisible="{Binding FilesError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                         </Grid>
+                        </DataTemplate></ctl:Deferred>
 
-                        <!-- ===== log ===== -->
-                        <Grid IsVisible="{Binding IsLogTab}" RowDefinitions="Auto, *" Margin="10,0,10,8">
+                        <!-- ===== log (built when first shown) ===== -->
+                        <ctl:Deferred IsVisible="{Binding IsLogTab}"><DataTemplate x:DataType="vm:WebServerViewModel">
+                        <Grid RowDefinitions="Auto, *" Margin="10,0,10,8">
                             <Grid x:Name="ShLogHead" helpers:Responsive.BreakWidth="460" ColumnDefinitions="*, Auto, Auto" RowDefinitions="Auto, Auto"
                                   ColumnSpacing="6" Margin="0,0,0,6">
                                 <TextBlock x:Name="ShStats" Classes="counts" VerticalAlignment="Center">
@@ -1095,6 +1098,7 @@
                                      ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
                                      PlaceholderText="Logins, downloads and files received show up here."/>
                         </Grid>
+                        </DataTemplate></ctl:Deferred>
                     </Panel>
                 </Grid>
             </Border>
