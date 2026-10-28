@@ -27,6 +27,15 @@
          continuously.
          ============================================================ -->
 
+    <!-- ===== no click sound on a phone tap =====
+         Avalonia 12 gives buttons, list items (combo box items too) and menu items platform feedback: Android plays the
+         key-click sound on every tap (while the system's touch sounds are on), iOS a click sound with a light tap. Taps
+         stay quiet; iOS keeps the light tap. Desktop systems have no such feedback. -->
+    <Style Selector=":is(Button), :is(ListBoxItem), :is(MenuItem)">
+        <Setter Property="PlatformFeedback.FeedbackType"
+                Value="{OnPlatform {x:Static FeedbackType.None}, iOS={x:Static FeedbackType.Haptic}}"/>
+    </Style>
+
     <!-- ===== typography ===== -->
     <Style Selector="TextBlock.pageTitle">
         <Setter Property="FontSize" Value="{StaticResource Font.Page}"/>
