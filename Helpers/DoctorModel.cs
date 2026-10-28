@@ -241,6 +241,10 @@ public sealed class DoctorTarget
 /// <summary>A DNS-over-HTTPS resolver reached by its IP address, so asking it needs no DNS itself.</summary>
 public sealed record DoctorDohEndpoint(string Name, Uri Uri, string Provider = "");
 
+/// <summary>A connectivity check: a plain HTTP URL that answers 204, or a 200 with exactly <paramref name="Expect"/>
+/// (case and surrounding white space aside), when nothing intercepts.</summary>
+public sealed record DoctorCaptiveCheck(Uri Url, string? Expect = null);
+
 /// <summary>
 /// Where the Doctor's checks go. <see cref="Default"/> is the real world; the test harness builds its own (loopback
 /// servers, a fake resolver). Nothing here is a user setting: the Doctor has none.
@@ -306,11 +310,20 @@ internal sealed class DoctorEnvironment
     /// <summary>Names every resolver knows (does the system resolver answer at all).</summary>
     public IReadOnlyList<string> WellKnownNames { get; init; } = new[] { "www.google.com", "www.microsoft.com" };
 
-    /// <summary>Captive-portal checks: plain HTTP URLs that answer 204 with no body when nothing intercepts.</summary>
-    public IReadOnlyList<Uri> CaptiveChecks { get; init; } = new[]
+    /// <summary>Captive-portal checks of different companies and CDNs, asked one after another until one answers (a filtered
+    /// network drops a different one each hour). Left out: edge-http.microsoft.com (502s and time-outs on the test
+    /// network) and www.qualcomm.cn (Cloudflare's country ban, a 403, now and then).</summary>
+    public IReadOnlyList<DoctorCaptiveCheck> CaptiveChecks { get; init; } = new[]
     {
-        new Uri("http://cp.cloudflare.com/generate_204"),
-        new Uri("http://connectivitycheck.gstatic.com/generate_204"),
+        new DoctorCaptiveCheck(new Uri("http://cp.cloudflare.com/generate_204")),
+        new DoctorCaptiveCheck(new Uri("http://connectivitycheck.gstatic.com/generate_204")),
+        new DoctorCaptiveCheck(new Uri("http://www.msftconnecttest.com/connecttest.txt"), "Microsoft Connect Test"),
+        new DoctorCaptiveCheck(new Uri("http://captive.apple.com/hotspot-detect.html"), "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>"),
+        new DoctorCaptiveCheck(new Uri("http://connect.rom.miui.com/generate_204")),
+        new DoctorCaptiveCheck(new Uri("http://connectivitycheck.platform.hicloud.com/generate_204")),
+        new DoctorCaptiveCheck(new Uri("http://connectivity-check.ubuntu.com/")),
+        new DoctorCaptiveCheck(new Uri("http://www.gstatic.com/generate_204")),
+        new DoctorCaptiveCheck(new Uri("http://clients3.google.com/generate_204")),
     };
 
     /// <summary>A name no filter blocks, sent as SNI to tell SNI filtering from a blocked address.</summary>

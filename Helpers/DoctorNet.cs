@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -6,6 +7,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -45,6 +47,10 @@ public sealed class DoctorConnect
     /// <summary>The first failed attempt on <paramref name="port"/> (what to say when none worked).</summary>
     public DoctorConnectAttempt? FailureOn(int? port) => port is int p ? Attempts.FirstOrDefault(a => a.Port == p && !a.Ok) : null;
 }
+
+/// <summary>The captive-portal check: intercepted (true), the internet answers (false) or no check could be fetched (null);
+/// what intercepted it, which check answered as the internet does, and why the ones before it didn't.</summary>
+public sealed record DoctorCaptive(bool? Intercepted, string? Detail, string? Answered, IReadOnlyList<string> Errors);
 
 /// <summary>The ping check; <paramref name="Replies"/> holds each probe's round trip in order (null: no reply).</summary>
 public sealed record DoctorPing(int Sent, int Received, double? Avg, double? Min, double? Max, bool Denied, bool ViaUdp, string? Error,
@@ -260,38 +266,66 @@ public static class DoctorNet
     // ------------------------------------------------------------------ captive portal
 
     /// <summary>
-    /// Fetches the "generate_204" URLs over plain HTTP, without a proxy and without following redirects. A 204 means
-    /// nothing intercepts; any other answer (a redirect to a sign-in page, a 200 with HTML) is a captive portal or a
-    /// transparent proxy speaking for the internet. Null when none could be fetched at all.
+    /// Fetches the connectivity checks over plain HTTP, without a proxy and without following redirects, one after another
+    /// (<see cref="Fallback"/>: the next after a head start, or at once when one fails or is intercepted) until one answers
+    /// as the internet does: a 204, an empty 200 (a transparent proxy that drops the 204) or the check's own text. A
+    /// redirect (to a sign-in page), an HTTP 511 or another page is a captive portal or a transparent proxy speaking for
+    /// the internet. An error status is that check's own failure, as Android reads it: a site down, or refusing this
+    /// country (a 403), says nothing about a portal. Intercepted is null when no check could be fetched at all.
     /// </summary>
-    public static async Task<(bool? Intercepted, string? Detail)> CaptiveAsync(IReadOnlyList<Uri> urls, int timeoutMs, CancellationToken ct)
+    public static async Task<DoctorCaptive> CaptiveAsync(IReadOnlyList<DoctorCaptiveCheck> checks, int timeoutMs, CancellationToken ct)
     {
-        if (urls.Count == 0) return (null, null);
+        if (checks.Count == 0) return new DoctorCaptive(null, null, null, Array.Empty<string>());
         using var handler = new SocketsHttpHandler
         {
             UseProxy = false,
             AllowAutoRedirect = false,
             ConnectTimeout = TimeSpan.FromMilliseconds(timeoutMs),
         };
-        using var http = new HttpClient(handler) { Timeout = TimeSpan.FromMilliseconds(timeoutMs), MaxResponseContentBufferSize = 64 * 1024 };
-        async Task<(bool Ok, string? Detail)> Probe(Uri u)
+        using var http = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };   // each check has its own deadline
+        var caught = new ConcurrentQueue<string>();
+        var sources = checks.Select(c => new Fallback.Source<string>(c.Url.Host, async token =>
         {
-            try
+            using var req = new HttpRequestMessage(HttpMethod.Get, c.Url);
+            using var resp = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
+            int code = (int)resp.StatusCode;
+            if (code == 204) return c.Url.Host;
+            if (code >= 400 && code != 511) throw new HttpRequestException(null, null, resp.StatusCode);
+            if (code == 200)
             {
-                using var req = new HttpRequestMessage(HttpMethod.Get, u);
-                using var resp = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-                int code = (int)resp.StatusCode;
-                if (code == 204) return (true, null);
-                string? loc = resp.Headers.Location?.ToString();
-                return (false, $"{u.Host} answered HTTP {code}" + (loc != null ? $" → {Trim(loc, 60)}" : ""));
+                string body = (await ReadTextAsync(resp.Content, 4096, token).ConfigureAwait(false)).Trim();
+                if (body.Length == 0 || (c.Expect != null && body.Equals(c.Expect, StringComparison.OrdinalIgnoreCase))) return c.Url.Host;
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-            catch { return (false, null); }
+            string? loc = resp.Headers.Location?.ToString();
+            caught.Enqueue($"{c.Url.Host} answered HTTP {code}" + (loc != null ? $" → {Trim(loc, 60)}" : ""));
+            return null;   // the next check: one that answers as itself means the internet does
+        })).ToList();
+
+        // a dead network gets twice the time the checks once had all at once, then what came in decides
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        budget.CancelAfter(2 * timeoutMs);
+        IReadOnlyList<string> errors = Array.Empty<string>();
+        try
+        {
+            var r = await Fallback.FirstAsync("doctor.captive", sources, budget.Token, TimeSpan.FromSeconds(1),
+                                              TimeSpan.FromMilliseconds(timeoutMs)).ConfigureAwait(false);
+            if (r.Value != null) return new DoctorCaptive(false, null, r.Value, r.Errors);
+            errors = r.Errors;
         }
-        var results = await Task.WhenAll(urls.Select(Probe)).ConfigureAwait(false);
-        if (results.Any(r => r.Ok)) return (false, null);
-        var intercepted = results.FirstOrDefault(r => r.Detail != null);
-        return intercepted.Detail != null ? (true, intercepted.Detail) : (null, null);
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { errors = new[] { "no answer in time" }; }
+        return caught.TryPeek(out var first)
+            ? new DoctorCaptive(true, first, null, errors)
+            : new DoctorCaptive(null, null, null, errors);
+    }
+
+    // The start of a small answer as text (a check's page is a few bytes; a portal's page is cut here).
+    private static async Task<string> ReadTextAsync(HttpContent content, int cap, CancellationToken ct)
+    {
+        await using var stream = await content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        var buf = new byte[cap];
+        int total = 0, n;
+        while (total < cap && (n = await stream.ReadAsync(buf.AsMemory(total), ct).ConfigureAwait(false)) > 0) total += n;
+        return Encoding.UTF8.GetString(buf, 0, total);
     }
 
     internal static string Trim(string s, int max) => s.Length > max ? s[..max] + "…" : s;

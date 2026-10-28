@@ -389,11 +389,19 @@ public static class DoctorEngine
 
         var probeRes = await Task.WhenAll(probes).ConfigureAwait(false);
         var nameRes = await Task.WhenAll(names).ConfigureAwait(false);
-        var (intercepted, captiveDetail) = await captive.ConfigureAwait(false);
+        var cap = await captive.ConfigureAwait(false);
+        bool? intercepted = cap.Intercepted;
+        string? captiveDetail = cap.Detail;
         f.InternetTcp = probeRes.Any(p => p.Ok);
         f.InternetDns = nameRes.Any(n => n.Addresses.Count > 0);
         f.Captive = intercepted;
         f.CaptiveDetail = captiveDetail;
+        if (cap.Answered is { } answered)
+            Tr(sink, DoctorCheck.Internet, DoctorState.Ok, "HTTP", $"{answered} answers as itself: nothing intercepts plain HTTP");
+        else if (intercepted == true)
+            Tr(sink, DoctorCheck.Internet, DoctorState.Fail, "HTTP", captiveDetail!);
+        else
+            Tr(sink, DoctorCheck.Internet, DoctorState.Warning, "HTTP", "no connectivity check answered (" + string.Join(", ", cap.Errors.Take(3)) + ")");
 
         var okProbes = probeRes.Where(p => p.Ok).ToList();
         double? ms = okProbes.Count > 0 ? okProbes.Min(p => p.Ms) : null;
