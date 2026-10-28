@@ -2,9 +2,15 @@
 using CommunityToolkit.Mvvm.Input;
 using Echoes.Helpers;
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Echoes.ViewModels;
@@ -102,8 +108,14 @@ public partial class MainViewModel : ObservableObject
     /// <summary>The release API; a test harness points it at a stand-in server.</summary>
     internal static string LatestReleaseApi { get; set; } = "https://api.github.com/repos/SinaXhpm/Echoes/releases/latest";
 
-    // Uses the GitHub Releases API (the latest published release) as the single source
-    // of truth — no hand-maintained version.json to keep in sync.
+    /// <summary>github.com's own page for the latest release, which redirects to that release's tag: the second source. A
+    /// test harness points it at a stand-in server too.</summary>
+    internal static string LatestReleasePage { get; set; } = "https://github.com/SinaXhpm/Echoes/releases/latest";
+
+    // GitHub's latest release (the one marked Latest, never a pre-release: each release starts as one, see release.yml) is
+    // the single source of truth — no hand-maintained version.json to keep in sync. It comes from the Releases API, or
+    // from github.com's release page when the API doesn't answer (Fallback). jsDelivr's resolved version isn't a source:
+    // it follows the git tags, so it would offer a release while it is still a pre-release under test.
     // The request and the JSON parse run on the thread pool, not on the UI thread the shell's Loaded calls this from at
     // startup: starting the request there looked up the system proxy on it (a WPAD discovery can take seconds, see
     // HttpHelper), and an answer of any size used to be read and parsed there whole (it's capped now). Only the results
@@ -141,56 +153,114 @@ public partial class MainViewModel : ObservableObject
 
     private readonly record struct ReleaseCheck(string? Version, string? Url, (string Short, string Full)? Error);
 
+    /// <summary>The latest release as one source names it.</summary>
+    private sealed record LatestRelease(string Version, string? Url);
+
     private static async Task<ReleaseCheck> FetchLatestReleaseAsync()
     {
-        try
+        // every source's failure: the error line says the API's (it says most), the tooltip and the crash log all of them
+        var failures = new ConcurrentQueue<(string Source, Exception Error)>();
+        Fallback.Source<LatestRelease> Source(string name, Func<CancellationToken, Task<LatestRelease?>> fetch) => new(name, async ct =>
         {
-            using var client = HttpHelper.Create(timeout: TimeSpan.FromSeconds(10));
-            client.MaxResponseContentBufferSize = MaxReleaseJsonBytes;   // decompressed bytes: a gzip bomb stops here too
-            client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+            try { return await fetch(ct).ConfigureAwait(false); }
+            catch (Exception ex)
+            {
+                failures.Enqueue((name, ex));
+                throw;
+            }
+        });
+        // the page waits 3 s for the API: an update check is never urgent, and on a healthy network one request is enough
+        var result = await Fallback.FirstAsync("update-check", new[] { Source("api.github.com", FromApiAsync), Source("github.com", FromPageAsync) },
+                                               CancellationToken.None, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        if (result.Value is { } latest) return new ReleaseCheck(latest.Version, latest.Url, null);
 
-            var json = await client.GetStringAsync(LatestReleaseApi).ConfigureAwait(false);
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-            if (root.ValueKind != JsonValueKind.Object) return Unreadable();
-
-            string tag = root.TryGetProperty("tag_name", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() ?? string.Empty : string.Empty;
-            string clean = tag.TrimStart('v', 'V').Trim();
-            if (clean.Length == 0) return Unreadable();
-            if (clean.Length > 40) clean = clean[..40];   // shown in the sidebar pill only when it parses as a version anyway
-
-            // The pill opens this page: only ever a release page on github.com (the API's own answer, but a link handed
-            // to the browser is checked like one).
-            string? url = root.TryGetProperty("html_url", out var u) && u.ValueKind == JsonValueKind.String
-                          && Uri.TryCreate(u.GetString(), UriKind.Absolute, out var link) && link.Scheme == Uri.UriSchemeHttps
-                          && link.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase)
-                ? link.AbsoluteUri : null;
-            return new ReleaseCheck(clean, url, null);
-        }
-        catch (Exception ex)
+        // One line, no stack trace: a check that can't reach GitHub is expected (offline, blocked, rate limited) and
+        // repeats at every launch; the crash log is what people attach to bug reports.
+        var all = failures.ToList();
+        string full = all.Count == 0 ? "Neither GitHub's API nor its release page named a release."
+            : string.Join(" · ", all.Select(f => f.Source + ": " + Chain(f.Error)));
+        CrashLog.Write("UpdateCheck (ignored)", new Exception(full));
+        var main = all.FirstOrDefault(f => f.Source == "api.github.com").Error ?? all.FirstOrDefault().Error;
+        string brief = main switch
         {
-            // One line, no stack trace: a check that can't reach GitHub is expected (offline, blocked, rate limited) and
-            // repeats at every launch; the crash log is what people attach to bug reports.
-            var reason = new System.Text.StringBuilder(ex.GetType().Name).Append(": ").Append(ex.Message);
+            null => "No release published yet",
+            HttpRequestException { StatusCode: System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.TooManyRequests }
+                => "GitHub's rate limit; try again later",
+            HttpRequestException { StatusCode: System.Net.HttpStatusCode.NotFound } => "No release published yet",
+            HttpRequestException { StatusCode: { } code } => $"GitHub answered {(int)code}",
+            TaskCanceledException or TimeoutException => "GitHub didn't answer in 10 s",
+            HttpRequestException => "Can't reach GitHub (offline or blocked?)",
+            JsonException or InvalidDataException => "GitHub's answer couldn't be read",
+            _ => "Couldn't check",
+        };
+        return new ReleaseCheck(null, null, (brief, full));
+
+        static string Chain(Exception ex)
+        {
+            var reason = new StringBuilder(ex.GetType().Name).Append(": ").Append(ex.Message);
             for (var inner = ex.InnerException; inner is not null; inner = inner.InnerException)
                 reason.Append(" → ").Append(inner.GetType().Name).Append(": ").Append(inner.Message);
-            CrashLog.Write("UpdateCheck (ignored)", new Exception(reason.ToString()));
-            string brief = ex switch
-            {
-                System.Net.Http.HttpRequestException { StatusCode: System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.TooManyRequests }
-                    => "GitHub's rate limit; try again later",
-                System.Net.Http.HttpRequestException { StatusCode: System.Net.HttpStatusCode.NotFound } => "No release published yet",
-                System.Net.Http.HttpRequestException { StatusCode: { } code } => $"GitHub answered {(int)code}",
-                TaskCanceledException or TimeoutException => "GitHub didn't answer in 10 s",
-                System.Net.Http.HttpRequestException => "Can't reach GitHub (offline or blocked?)",
-                JsonException => "GitHub's answer couldn't be read",
-                _ => "Couldn't check",
-            };
-            return new ReleaseCheck(null, null, (brief, reason.ToString()));
+            return reason.ToString();
         }
-
-        static ReleaseCheck Unreadable() => new(null, null, ("GitHub's answer couldn't be read", "No tag_name in the latest release."));
     }
+
+    // The Releases API: the latest release's tag_name and html_url.
+    private static async Task<LatestRelease?> FromApiAsync(CancellationToken ct)
+    {
+        using var client = HttpHelper.Create(timeout: TimeSpan.FromSeconds(10), serviceDns: true);
+        client.MaxResponseContentBufferSize = MaxReleaseJsonBytes;   // decompressed bytes: a gzip bomb stops here too
+        client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+
+        var json = await client.GetStringAsync(LatestReleaseApi, ct).ConfigureAwait(false);
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) throw new JsonException("The answer isn't a release.");
+        string tag = root.TryGetProperty("tag_name", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() ?? string.Empty : string.Empty;
+        string version = CleanTag(tag) ?? throw new JsonException("No tag_name in the latest release.");
+        string? url = root.TryGetProperty("html_url", out var u) && u.ValueKind == JsonValueKind.String ? ReleasePage(u.GetString()) : null;
+        return new LatestRelease(version, url);
+    }
+
+    // github.com's latest-release page redirects to the release's tag (…/releases/tag/v1.0.0): the version is read from
+    // the Location, and the page it points to isn't fetched. A redirect to the release list instead: none published yet.
+    private static async Task<LatestRelease?> FromPageAsync(CancellationToken ct)
+    {
+        using var handler = new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            ConnectTimeout = TimeSpan.FromSeconds(10),
+            ConnectCallback = ServiceDns.ConnectAsync,
+        };
+        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Echoes");
+        using var resp = await client.GetAsync(LatestReleasePage, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        int status = (int)resp.StatusCode;
+        if (status >= 400) throw new HttpRequestException($"github.com answered {status}.", null, resp.StatusCode);
+        if (status < 300 || resp.Headers.Location is not { } location)
+            throw new InvalidDataException("github.com's release page didn't redirect to a release.");
+        var target = location.IsAbsoluteUri ? location : new Uri(new Uri(LatestReleasePage), location);
+        string? page = ReleasePage(target.AbsoluteUri) ?? throw new InvalidDataException("github.com's release page redirected away from github.com.");
+        const string TagPath = "/releases/tag/";
+        int at = target.AbsolutePath.IndexOf(TagPath, StringComparison.OrdinalIgnoreCase);
+        if (at < 0) return null;
+        return CleanTag(Uri.UnescapeDataString(target.AbsolutePath[(at + TagPath.Length)..]).TrimEnd('/')) is { } version
+            ? new LatestRelease(version, page) : null;
+    }
+
+    // "v1.0.1" → "1.0.1", null when empty. Shown in the sidebar pill only when it parses as a version anyway; capped and
+    // cleaned, as it is the server's text.
+    private static string? CleanTag(string tag)
+    {
+        string clean = RemoteText.Clean(tag.TrimStart('v', 'V').Trim(), 40);
+        return clean.Length == 0 ? null : clean;
+    }
+
+    // The pill opens this page: only ever a release page on github.com (a source's own answer, but a link handed to the
+    // browser is checked like one).
+    private static string? ReleasePage(string? url)
+        => Uri.TryCreate(url, UriKind.Absolute, out var link) && link.Scheme == Uri.UriSchemeHttps
+           && link.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase)
+            ? link.AbsoluteUri : null;
 
     [RelayCommand]
     private void OpenGitHub() => OpenUrl("https://github.com/SinaXhpm/Echoes");
