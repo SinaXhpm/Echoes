@@ -376,8 +376,8 @@ internal static class SelfTest
         return failures;
     }
 
-    // Selects every tab of every tab strip on the page (and of the strips those tabs show), waiting for each to be laid
-    // out, then puts the first selection back. Returns how many tabs were shown.
+    // Selects every tab of every tab strip on the page (the page itself may be one: History & Backup), and of the strips
+    // those tabs show, waiting for each to be laid out, then puts the first selection back. Returns how many tabs were shown.
     private static async Task<int> VisitTabsAsync(Carousel pages, int index, CancellationToken ct)
     {
         var seen = new HashSet<TabControl>();
@@ -386,7 +386,7 @@ internal static class SelfTest
         {
             var strips = await Dispatcher.UIThread.InvokeAsync(() =>
                 index < pages.ItemCount && pages.Items[index] is Visual host
-                    ? Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(host).OfType<TabControl>()
+                    ? Avalonia.VisualTree.VisualExtensions.GetSelfAndVisualDescendants(host).OfType<TabControl>()
                         .Where(t => t.IsEffectivelyVisible && !seen.Contains(t)).ToList()
                     : new List<TabControl>());
             if (strips.Count == 0) break;
@@ -435,7 +435,7 @@ internal static class SelfTest
             if (needsSize && (child.Bounds.Width < 1 || child.Bounds.Height < 1)) return $"{name} has no size ({child.Bounds.Width:0}x{child.Bounds.Height:0})";
             return null;
         }
-        if (tag == "DATA")   // History and Backup share one entry (two tabs: only the first one is on screen)
+        if (tag == "DATA")   // History and Backup share one entry (two tabs: Backup is built when the tab visit shows it)
             return Page(shell.FindControl<Decorator>("HistoryHost") is { } history ? ToolViews.ViewIn(history) : null, "History", true)
                 ?? Page(shell.FindControl<Decorator>("BackupHost") is { } backup ? ToolViews.ViewIn(backup) : null, "Backup", false);
         return index < pages.ItemCount && pages.Items[index] is Decorator host ? Page(ToolViews.ViewIn(host), tag, true) : $"no page for {tag}";

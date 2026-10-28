@@ -37,6 +37,9 @@ public partial class MobileShellView : UserControl
     {
         InitializeComponent();
         UpdatePageHeader();
+        // History & Backup opens on History: the Backup page is built the first time its tab is shown (only then is its
+        // host in the visual tree)
+        BackupHost.AttachedToVisualTree += (_, _) => { if (_vm is not null) ToolViews.Fill(BackupHost, "BACKUP", _vm); };
         Loaded += async (s, e) =>
         {
             if (DataContext is MainViewModel vm)
@@ -300,8 +303,7 @@ public partial class MobileShellView : UserControl
         if (Pages is null || Nav?.SelectedItem is not ListBoxItem { Tag: string tool }) return;
         if (tool == "DATA")
         {
-            ToolViews.Fill(HistoryHost, "HISTORY", vm);
-            ToolViews.Fill(BackupHost, "BACKUP", vm);
+            ToolViews.Fill(HistoryHost, "HISTORY", vm);   // Backup: when its tab is first shown (the constructor)
         }
         else if (Nav.SelectedIndex < Pages.ItemCount && Pages.Items[Nav.SelectedIndex] is Decorator host)
         {
