@@ -5,10 +5,14 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Echoes.ViewModels;
@@ -93,9 +97,9 @@ public partial class IpInfoViewModel : ObservableObject
     [ObservableProperty] private string _proxyUser = string.Empty;
     [ObservableProperty] private string _proxyPass = string.Empty;
 
-    // Which provider to query. Index 0 = Auto (all sources, merged/cross-checked); otherwise a single one.
-    public ObservableCollection<string> Providers { get; } = new()
-    { "Auto (cross-check)", "ip-api.com", "ipwho.is", "ipapi.co", "ipinfo.io", "freeipapi", "geojs", "iplocation.net" };
+    // Which provider to query. Index 0 = Auto (all sources, merged/cross-checked); otherwise a single one. The index is
+    // what's saved, so new providers go at the end of the table.
+    public ObservableCollection<string> Providers { get; } = new(new[] { "Auto (cross-check)" }.Concat(Table.Select(p => p.Name)));
     [ObservableProperty] private int _selectedProviderIndex;
 
     public ObservableCollection<string> TargetHistory => HistoryService.Instance.Get("ip.target");
@@ -311,6 +315,48 @@ public partial class IpInfoViewModel : ObservableObject
 
     private sealed record IpSource(int Priority, string Name, string Url, Func<JsonElement, IpGeoResult?> Parse);
 
+    /// <summary>A provider: its own-IP URL (null: it has none) and its lookup URL ("{ip}": the address or name).</summary>
+    private sealed record IpProvider(string Name, string? SelfUrl, string LookupUrl, Func<JsonElement, IpGeoResult?> Parse);
+
+    // The picker's order (its index is saved: new providers go at the end) and the merge's: the first that supplies a
+    // field wins. Keyless free endpoints only.
+    private static readonly IpProvider[] Table =
+    {
+        new("ip-api.com", "http://ip-api.com/json/?fields=66846719", "http://ip-api.com/json/{ip}?fields=66846719", ParseIpApi),
+        new("ipwho.is", "https://ipwho.is/", "https://ipwho.is/{ip}", ParseIpWho),
+        new("ipapi.co", "https://ipapi.co/json/", "https://ipapi.co/{ip}/json/", ParseIpApiCo),
+        new("ipinfo.io", "https://ipinfo.io/json", "https://ipinfo.io/{ip}/json", ParseIpInfo),
+        // freeipapi.com/api/json redirects here now
+        new("freeipapi", "https://free.freeipapi.com/api/v1/json", "https://free.freeipapi.com/api/v1/json/{ip}", ParseFreeIpApi),
+        new("geojs", "https://get.geojs.io/v1/ip/geo.json", "https://get.geojs.io/v1/ip/geo/{ip}.json", ParseGeoJs),
+        new("iplocation.net", null, "https://api.iplocation.net/?ip={ip}", ParseIpLocationNet),
+        new("ipwhois.app", "https://ipwhois.app/json/", "https://ipwhois.app/json/{ip}", ParseIpWhoisApp),
+        new("iplocate.io", "https://iplocate.io/api/lookup/", "https://iplocate.io/api/lookup/{ip}", ParseIpLocate),
+        new("ipquery.io", "https://api.ipquery.io/?format=json", "https://api.ipquery.io/{ip}?format=json", ParseIpQuery),
+        new("ip2location.io", "https://api.ip2location.io/", "https://api.ip2location.io/?ip={ip}", ParseIp2Location),
+        new("geoiplookup.io", "https://json.geoiplookup.io/", "https://json.geoiplookup.io/{ip}", ParseGeoIpLookup),
+        new("ifconfig.co", "https://ifconfig.co/json", "https://ifconfig.co/json?ip={ip}", ParseIfconfigCo),
+        new("ipleak.net", "https://ipleak.net/json/", "https://ipleak.net/json/{ip}", ParseIpLeak),
+        new("ip.sb", "https://api.ip.sb/geoip", "https://api.ip.sb/geoip/{ip}", ParseIpSb),
+        new("ip.guide", "https://ip.guide/", "https://ip.guide/{ip}", ParseIpGuide),
+        new("db-ip.com", "https://api.db-ip.com/v2/free/self", "https://api.db-ip.com/v2/free/{ip}", ParseDbIp),
+        new("geolocation-db", "https://geolocation-db.com/json/", "https://geolocation-db.com/json/{ip}", ParseGeolocationDb),
+        new("country.is", "https://api.country.is/", "https://api.country.is/{ip}", ParseCountryIs),
+    };
+
+    // Auto asks the providers in three lanes (every third one), each a Fallback chain: its first provider at once, the
+    // next a head start later or as soon as one fails, two at most at a time. A dead or blocked provider costs a head
+    // start, not a timeout, and no more than six requests are out at once. The first answer from any lane gives the other
+    // two a short grace to answer too, for the cross-check.
+    private const int Lanes = 3;
+    private static readonly TimeSpan Grace = TimeSpan.FromSeconds(2.5);
+    private static readonly TimeSpan PerProvider = TimeSpan.FromSeconds(8);
+    private const int MaxFieldChars = 120;
+
+    /// <summary>Test hook (the harness): answers every provider request (URL → body, or an exception) instead of the
+    /// network. Internal on purpose.</summary>
+    internal static Func<string, CancellationToken, Task<string>>? TestGet { get; set; }
+
     private async Task FetchIpInfo(string ip)
     {
         MoveProxyCredentials(whileTyping: false);   // typing is done: credentials in the address go to the fields this lookup uses
@@ -325,14 +371,31 @@ public partial class IpInfoViewModel : ObservableObject
         // escapes the command — that would crash the app — or leaves IsWorking stuck on.
         try
         {
+            string target = ip.Trim();
+            IPAddress? asked = IPAddress.TryParse(target, out var literal) ? Canonical(literal) : null;
+            // A private or otherwise special address has no location anywhere: nothing to ask.
+            if (asked != null && Rdap.SpecialPurpose(asked) is { } note)
+            {
+                RawResult = $"{note}. There is no location to look up for {asked}.";
+                return;
+            }
+
             string? proxy = UseProxy && !string.IsNullOrWhiteSpace(ProxyAddress) ? ProxyAddress : null;
-            using var client = HttpHelper.Create(proxy, ProxyUser, ProxyPass, timeout: TimeSpan.FromSeconds(8));
+            // Without a proxy the providers' names resolve around a resolver that blocks them (ServiceDns).
+            using var client = HttpHelper.Create(proxy, ProxyUser, ProxyPass, timeout: TimeSpan.FromSeconds(10), serviceDns: true);
             // Every provider answers with a few hundred bytes of JSON; don't let a hostile proxy stream more.
             client.MaxResponseContentBufferSize = 256 * 1024;
             if (proxy != null) HistoryService.Instance.Add("ip.proxy", proxy);   // only once it parsed
+            // Every request goes to the proxy: when it can't be reached, no provider can, so that is said at once
+            // instead of after every provider failed in turn.
+            if (proxy != null && await ProxyUnreachableAsync(proxy) is { } why)
+            {
+                RawResult = why;
+                return;
+            }
 
-            bool self = string.IsNullOrWhiteSpace(ip);
-            var sources = BuildSources(self, ip.Trim());
+            bool self = target.Length == 0;
+            var sources = BuildSources(self, target, asked);
 
             // Restrict to one provider when the user picked a specific one (index 0 = Auto = all sources).
             if (SelectedProviderIndex > 0)
@@ -348,27 +411,14 @@ public partial class IpInfoViewModel : ObservableObject
                 sources = new List<IpSource> { only };
             }
 
-            // Cross-check: query the top sources concurrently (accuracy ↑, latency = the fastest).
-            var hits = new List<(int prio, string name, IpGeoResult res)>();
-            const int parallelCount = 3;
-            var primary = sources.Take(parallelCount).ToArray();
-            var results = await Task.WhenAll(primary.Select(s => FetchOne(client, s)));
-            foreach (var r in results) if (r.res is not null) hits.Add((r.prio, r.name, r.res));
-
-            // Nothing from the fast batch → walk the remaining fallbacks one by one.
-            if (hits.Count == 0)
-            {
-                foreach (var s in sources.Skip(parallelCount))
-                {
-                    var r = await FetchOne(client, s);
-                    if (r.res is not null) { hits.Add((r.prio, r.name, r.res)); break; }
-                }
-            }
-
+            var (hits, errors) = await AskAllAsync(client, sources, asked, self);
             if (hits.Count == 0)
             {
                 Result = null;
-                RawResult = "No source responded. Check the address / your connection" + (proxy != null ? " / proxy." : ".");
+                // one clear line, then every provider's reason, a line per reason
+                RawResult = (sources.Count == 1 ? $"{sources[0].Name} didn't answer." : "No source answered.")
+                            + (proxy != null ? " Check the address, your connection or the proxy." : " Check the address or your connection.")
+                            + (errors.Count > 0 ? "\n" + Reasons(errors) : string.Empty);
                 StatusLine = string.Empty;
                 return;
             }
@@ -379,14 +429,24 @@ public partial class IpInfoViewModel : ObservableObject
             var plain = sources.Where(s => s.Url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
                                .Select(s => s.Name).ToHashSet();
             var ordered = hits.OrderBy(h => plain.Contains(h.name) ? 1 : 0).ThenBy(h => h.prio).ToList();
-            var merged = Merge(ordered);
+            // My IP or a host name: the answers can be for different addresses (an IPv4-only provider beside dual-stack
+            // ones, a name with several addresses). The address most of them report is the result; the others are listed
+            // with their address, not merged.
+            string main = ordered.Where(h => h.res.Ip.Length > 0).GroupBy(h => h.res.Ip)
+                                 .OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault() ?? string.Empty;
+            var same = ordered.Where(h => h.res.Ip.Length == 0 || h.res.Ip == main).ToList();
+            var merged = Merge(same);
             Result = merged;
             foreach (var (_, name, res) in ordered)
-                ProviderResults.Add(new IpProviderResult { Name = plain.Contains(name) ? name + "  (plain HTTP)" : name, Data = res });
+            {
+                string label = plain.Contains(name) ? name + "  (plain HTTP)" : name;
+                ProviderResults.Add(new IpProviderResult { Name = res.Ip.Length > 0 && res.Ip != main ? label + " · " + res.Ip : label, Data = res });
+            }
             RawResult = BuildCopyText(merged);
-            StatusLine = hits.Count > 1
-                ? $"Cross-checked via {merged.Sources}"
-                : $"Source: {merged.Sources}";
+            StatusLine = (same.Count > 1 ? $"Cross-checked via {merged.Sources}" : $"Source: {merged.Sources}")
+                         + (same.Count < ordered.Count
+                             ? $"; {string.Join(", ", ordered.Where(h => !same.Contains(h)).Select(h => h.name))} answered for another address"
+                             : string.Empty);
         }
         catch (Exception ex)
         {
@@ -401,49 +461,133 @@ public partial class IpInfoViewModel : ObservableObject
         }
     }
 
-    private static async Task<(int prio, string name, IpGeoResult? res)> FetchOne(HttpClient client, IpSource s)
+    // Auto: the lanes described above; one picked provider: just it. The answers (with their priority) and every failed
+    // provider's reason ("name: reason").
+    private static async Task<(List<(int prio, string name, IpGeoResult res)> Hits, List<string> Errors)> AskAllAsync(
+        HttpClient client, List<IpSource> sources, IPAddress? asked, bool self)
     {
-        try
+        var lanes = Enumerable.Range(0, Math.Min(Lanes, sources.Count))
+                              .Select(l => sources.Where((_, i) => i % Lanes == l).ToList()).ToList();
+        using var stop = new CancellationTokenSource();
+        var tasks = lanes.Select((lane, l) => Fallback.FirstAsync(
+                sources.Count == 1 ? "ipinfo.one" : $"ipinfo.{(self ? "self" : "lookup")}.{l}",
+                lane.Select(s => new Fallback.Source<IpGeoResult>(s.Name, t => AskAsync(client, s, asked, t))).ToList(),
+                stop.Token, perSource: PerProvider, maxConcurrent: 2))
+            .ToList();
+
+        var pending = new List<Task<Fallback.Result<IpGeoResult>>>(tasks);
+        while (pending.Count > 0)
         {
-            string resp = await client.GetStringAsync(s.Url);
-            int a = resp.IndexOf('{'), b = resp.LastIndexOf('}');
-            if (a < 0 || b < a) return (s.Priority, s.Name, null);
-            using var doc = JsonDocument.Parse(resp.Substring(a, b - a + 1));
-            return (s.Priority, s.Name, s.Parse(doc.RootElement));
+            var done = await Task.WhenAny(pending);
+            pending.Remove(done);
+            if (done.IsCompletedSuccessfully && done.Result.Value != null) break;
         }
-        catch { return (s.Priority, s.Name, null); }
+        if (pending.Count > 0)
+        {
+            // the other lanes get a little longer to cross-check, then stop
+            stop.CancelAfter(Grace);
+            try { await Task.WhenAll(pending); }
+            catch (OperationCanceledException) { }
+        }
+
+        var hits = new List<(int prio, string name, IpGeoResult res)>();
+        var errors = new List<string>();
+        foreach (var t in tasks)
+        {
+            if (!t.IsCompletedSuccessfully) continue;   // stopped after the grace
+            errors.AddRange(t.Result.Errors);
+            if (t.Result.Value is { } value && sources.FirstOrDefault(s => s.Name == t.Result.Source) is { } src)
+                hits.Add((src.Priority, src.Name, value));
+        }
+        return (hits, errors);
     }
 
-    // Providers index (1-based, matching the ComboBox order) → canonical source name.
-    private static string ProviderKey(int idx) => idx switch
+    // One provider's answer, checked: null when it has nothing for the address, an exception with the reason when it fails.
+    private static async Task<IpGeoResult?> AskAsync(HttpClient client, IpSource s, IPAddress? asked, CancellationToken ct)
     {
-        1 => "ip-api.com", 2 => "ipwho.is", 3 => "ipapi.co", 4 => "ipinfo.io",
-        5 => "freeipapi", 6 => "geojs", 7 => "iplocation.net", _ => "",
-    };
+        string resp = TestGet is { } hook ? await hook(s.Url, ct).ConfigureAwait(false)
+                                          : await client.GetStringAsync(s.Url, ct).ConfigureAwait(false);
+        int a = resp.IndexOf('{'), b = resp.LastIndexOf('}');
+        if (a < 0 || b < a) throw new InvalidDataException("unreadable answer");
+        using var doc = JsonDocument.Parse(resp.AsMemory(a, b - a + 1));
+        if (doc.RootElement.ValueKind != JsonValueKind.Object) throw new InvalidDataException("unreadable answer");
+        return s.Parse(doc.RootElement) is { } r ? Checked(r, asked) : null;
+    }
 
-    private static List<IpSource> BuildSources(bool self, string ip)
+    /// <summary>
+    /// An answer is someone else's text (every field cleaned and capped as it's read): the address must be one, and the one
+    /// asked about (a provider that ignores the address answers with the asker's own); a country code is two letters; "-"
+    /// or "Not found" is no value and 0,0 no place; and an answer without a place or a network in it is none.
+    /// </summary>
+    private static IpGeoResult? Checked(IpGeoResult r, IPAddress? asked)
     {
-        string E(string x) => Uri.EscapeDataString(x);
-        if (self)
-            return new()
-            {
-                new(1, "ip-api.com", "http://ip-api.com/json/?fields=66846719", ParseIpApi),
-                new(2, "ipwho.is",   "https://ipwho.is/",                        ParseIpWho),
-                new(3, "ipapi.co",   "https://ipapi.co/json/",                   ParseIpApiCo),
-                new(4, "ipinfo.io",  "https://ipinfo.io/json",                   ParseIpInfo),
-                new(5, "freeipapi",  "https://freeipapi.com/api/json",           ParseFreeIpApi),
-                new(6, "geojs",      "https://get.geojs.io/v1/ip/geo.json",      ParseGeoJs),
-            };
-        return new()
+        static string Real(string s) => s is "-" or "--" or "N/A" or "Not found" ? string.Empty : s;
+        r.Country = Real(r.Country); r.Region = Real(r.Region); r.City = Real(r.City); r.Postal = Real(r.Postal);
+        r.Latitude = Real(r.Latitude); r.Longitude = Real(r.Longitude); r.Timezone = Real(r.Timezone);
+        r.UtcOffset = Real(r.UtcOffset); r.Isp = Real(r.Isp); r.Org = Real(r.Org); r.Asn = Real(r.Asn); r.Hostname = Real(r.Hostname);
+
+        var ip = IPAddress.TryParse(r.Ip, out var parsed) ? Canonical(parsed) : null;
+        if (asked != null && ip != null && !ip.Equals(asked)) throw new InvalidDataException("answered for another address");
+        ip ??= asked;
+        r.Ip = ip?.ToString() ?? string.Empty;
+        if (ip != null) r.Version = ip.AddressFamily == AddressFamily.InterNetworkV6 ? "IPv6" : "IPv4";
+
+        string cc = r.CountryCode.Trim().ToUpperInvariant();
+        r.CountryCode = cc.Length == 2 && char.IsAsciiLetterUpper(cc[0]) && char.IsAsciiLetterUpper(cc[1]) && cc is not ("ZZ" or "XX") ? cc : string.Empty;
+        if (double.TryParse(r.Latitude, NumberStyles.Float, CultureInfo.InvariantCulture, out double lat)
+            && double.TryParse(r.Longitude, NumberStyles.Float, CultureInfo.InvariantCulture, out double lon)
+            && Math.Abs(lat) < 0.1 && Math.Abs(lon) < 0.1)
+            r.Latitude = r.Longitude = string.Empty;
+        return (r.Country + r.CountryCode + r.Region + r.City + r.Isp + r.Org + r.Asn).Length > 0 ? r : null;
+    }
+
+    // As the providers write it back: an IPv4-mapped address as IPv4, no zone (a link-local address has no location).
+    private static IPAddress Canonical(IPAddress ip)
+        => ip.IsIPv4MappedToIPv6 ? ip.MapToIPv4()
+         : ip.AddressFamily == AddressFamily.InterNetworkV6 && ip.ScopeId != 0 ? new IPAddress(ip.GetAddressBytes()) : ip;
+
+    // One TCP connection to the proxy (5 s at most): why it can't be reached, or null when it can.
+    private static async Task<string?> ProxyUnreachableAsync(string proxy)
+    {
+        if (!HttpHelper.TryParseProxy(proxy, out var uri)) return null;   // Create already refused a bad address
+        Socket socket;
+        try { socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true }; }
+        catch (SocketException) { return null; }   // no dual-stack socket here: the requests themselves will tell
+        using (socket)
         {
-            new(1, "ip-api.com",     $"http://ip-api.com/json/{E(ip)}?fields=66846719", ParseIpApi),
-            new(2, "ipwho.is",       $"https://ipwho.is/{E(ip)}",                        ParseIpWho),
-            new(3, "ipapi.co",       $"https://ipapi.co/{E(ip)}/json/",                  ParseIpApiCo),
-            new(4, "ipinfo.io",      $"https://ipinfo.io/{E(ip)}/json",                  ParseIpInfo),
-            new(5, "freeipapi",      $"https://freeipapi.com/api/json/{E(ip)}",          ParseFreeIpApi),
-            new(6, "geojs",          $"https://get.geojs.io/v1/ip/geo/{E(ip)}.json",     ParseGeoJs),
-            new(7, "iplocation.net", $"https://api.iplocation.net/?ip={E(ip)}",          ParseIpLocationNet),
-        };
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await socket.ConnectAsync(uri.Host.Trim('[', ']'), uri.Port, cts.Token);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                return $"Couldn't reach the proxy {uri.Host}:{uri.Port} ({Fallback.Reason(ex)}). Check its address, or turn the proxy off.";
+            }
+        }
+    }
+
+    // "name: reason" → a line per reason: "timed out: ip-api.com, ipinfo.io".
+    private static string Reasons(List<string> errors)
+        => string.Join("\n", errors.Select(e => e.Split(": ", 2)).GroupBy(p => p.Length == 2 ? p[1] : "failed", p => p[0])
+                                   .Select(g => g.Key + ": " + string.Join(", ", g)));
+
+    // Providers index (1-based, matching the ComboBox order) → canonical source name.
+    private static string ProviderKey(int idx) => idx >= 1 && idx <= Table.Length ? Table[idx - 1].Name : "";
+
+    private static List<IpSource> BuildSources(bool self, string target, IPAddress? asked)
+    {
+        // an address goes in as its canonical text (hex digits, dots and colons: nothing to escape), a name escaped
+        string q = asked?.ToString() ?? Uri.EscapeDataString(target);
+        var list = new List<IpSource>();
+        for (int i = 0; i < Table.Length; i++)
+        {
+            var p = Table[i];
+            string? url = self ? p.SelfUrl : p.LookupUrl.Replace("{ip}", q, StringComparison.Ordinal);
+            if (url != null) list.Add(new IpSource(i + 1, p.Name, url, p.Parse));
+        }
+        return list;
     }
 
     // Merge in priority order: the first source that supplies a field wins; flags OR together.
@@ -569,7 +713,7 @@ public partial class IpInfoViewModel : ObservableObject
         };
     }
 
-    private static IpGeoResult ParseFreeIpApi(JsonElement r) // freeipapi.com
+    private static IpGeoResult ParseFreeIpApi(JsonElement r) // freeipapi.com (v1: "timeZones" is the country's list, not used)
     {
         return new IpGeoResult
         {
@@ -578,6 +722,7 @@ public partial class IpInfoViewModel : ObservableObject
             Region = S(r, "regionName"), City = S(r, "cityName"), Postal = S(r, "zipCode"),
             Latitude = S(r, "latitude"), Longitude = S(r, "longitude"),
             UtcOffset = Utc(S(r, "timeZone")),
+            Org = S(r, "asnOrganization"), Asn = NormAsn(S(r, "asn")),
             IsProxy = B(r, "isProxy"),
         };
     }
@@ -607,15 +752,169 @@ public partial class IpInfoViewModel : ObservableObject
         };
     }
 
+    private static IpGeoResult ParseIpWhoisApp(JsonElement r)   // ipwhois.app (asn "AS15169", timezone_gmt "-07:00")
+    {
+        if (r.TryGetProperty("success", out var suc) && suc.ValueKind == JsonValueKind.False) return null!;
+        return new IpGeoResult
+        {
+            Ip = S(r, "ip"), Version = S(r, "type"),
+            Country = S(r, "country"), CountryCode = S(r, "country_code"),
+            Region = S(r, "region"), City = S(r, "city"),
+            Latitude = S(r, "latitude"), Longitude = S(r, "longitude"),
+            Timezone = S(r, "timezone"), UtcOffset = Utc(S(r, "timezone_gmt")),
+            Isp = S(r, "isp"), Org = S(r, "org"), Asn = NormAsn(S(r, "asn")),
+        };
+    }
+
+    private static IpGeoResult ParseIpLocate(JsonElement r)   // iplocate.io (asn object; privacy: proxy / vpn / tor / hosting)
+    {
+        var asn = Obj(r, "asn"); var privacy = Obj(r, "privacy");
+        if (B(privacy, "is_bogon")) return null!;
+        return new IpGeoResult
+        {
+            Ip = S(r, "ip"),
+            Country = S(r, "country"), CountryCode = S(r, "country_code"),
+            Region = S(r, "subdivision"), City = S(r, "city"), Postal = S(r, "postal_code"),
+            Latitude = S(r, "latitude"), Longitude = S(r, "longitude"), Timezone = S(r, "time_zone"),
+            Org = S(asn, "name"), Asn = NormAsn(S(asn, "asn")),
+            IsProxy = B(privacy, "is_proxy") || B(privacy, "is_vpn") || B(privacy, "is_tor"),
+            IsHosting = B(privacy, "is_hosting"),
+        };
+    }
+
+    private static IpGeoResult ParseIpQuery(JsonElement r)   // api.ipquery.io (isp, location, risk; "AS0" when unknown)
+    {
+        var isp = Obj(r, "isp"); var loc = Obj(r, "location"); var risk = Obj(r, "risk");
+        string asn = S(isp, "asn");
+        return new IpGeoResult
+        {
+            Ip = S(r, "ip"),
+            Country = S(loc, "country"), CountryCode = S(loc, "country_code"),
+            Region = S(loc, "state"), City = S(loc, "city"), Postal = S(loc, "zipcode"),
+            Latitude = S(loc, "latitude"), Longitude = S(loc, "longitude"), Timezone = S(loc, "timezone"),
+            Isp = S(isp, "isp"), Org = S(isp, "org"), Asn = asn is "AS0" or "0" ? "" : NormAsn(asn),
+            IsProxy = B(risk, "is_proxy") || B(risk, "is_vpn") || B(risk, "is_tor"),
+            IsHosting = B(risk, "is_datacenter"), IsMobile = B(risk, "is_mobile"),
+        };
+    }
+
+    private static IpGeoResult ParseIp2Location(JsonElement r)   // api.ip2location.io, keyless (asn "24940", time_zone "+02:00")
+    {
+        if (Obj(r, "error") is { } error) throw new InvalidDataException(S(error, "error_message") is { Length: > 0 } m ? m : "refused");
+        return new IpGeoResult
+        {
+            Ip = S(r, "ip"),
+            Country = S(r, "country_name"), CountryCode = S(r, "country_code"),
+            Region = S(r, "region_name"), City = S(r, "city_name"), Postal = S(r, "zip_code"),
+            Latitude = S(r, "latitude"), Longitude = S(r, "longitude"), UtcOffset = Utc(S(r, "time_zone")),
+            Org = S(r, "as"), Asn = NormAsn(S(r, "asn")),
+            IsProxy = B(r, "is_proxy"),
+        };
+    }
+
+    private static IpGeoResult ParseGeoIpLookup(JsonElement r)   // json.geoiplookup.io ("success": false when unknown)
+    {
+        if (r.TryGetProperty("success", out var suc) && suc.ValueKind == JsonValueKind.False) return null!;
+        string asn = S(r, "asn_number");
+        return new IpGeoResult
+        {
+            Ip = S(r, "ip"),
+            Country = S(r, "country_name"), CountryCode = S(r, "country_code"),
+            Region = S(r, "region"), City = S(r, "city"), Postal = S(r, "postal_code"),
+            Latitude = S(r, "latitude"), Longitude = S(r, "longitude"), Timezone = S(r, "timezone_name"),
+            Isp = S(r, "isp"), Org = S(r, "org"), Asn = asn is "" or "0" ? "" : NormAsn(asn),
+            Hostname = S(r, "hostname"),
+        };
+    }
+
+    private static IpGeoResult ParseIfconfigCo(JsonElement r)   // ifconfig.co (country_iso, asn "AS15169", asn_org)
+    {
+        return new IpGeoResult
+        {
+            Ip = S(r, "ip"),
+            Country = S(r, "country"), CountryCode = S(r, "country_iso"),
+            Region = S(r, "region_name"), City = S(r, "city"), Postal = S(r, "zip_code"),
+            Latitude = S(r, "latitude"), Longitude = S(r, "longitude"), Timezone = S(r, "time_zone"),
+            Org = S(r, "asn_org"), Asn = NormAsn(S(r, "asn")), Hostname = S(r, "hostname"),
+        };
+    }
+
+    private static IpGeoResult ParseIpLeak(JsonElement r)   // ipleak.net (as_number, isp_name; no country for a reserved range)
+    {
+        string asn = S(r, "as_number");
+        return new IpGeoResult
+        {
+            Ip = S(r, "ip"),
+            Country = S(r, "country_name"), CountryCode = S(r, "country_code"),
+            Region = S(r, "region_name"), City = S(r, "city_name"), Postal = S(r, "postal_code"),
+            Latitude = S(r, "latitude"), Longitude = S(r, "longitude"), Timezone = S(r, "time_zone"),
+            Isp = S(r, "isp_name"), Asn = asn is "" or "0" ? "" : NormAsn(asn), Hostname = S(r, "reverse"),
+        };
+    }
+
+    // api.ip.sb geoip (asn a number). Its "offset" isn't used: it read standard time while daylight saving was on.
+    private static IpGeoResult ParseIpSb(JsonElement r)
+    {
+        string asn = S(r, "asn");
+        return new IpGeoResult
+        {
+            Ip = S(r, "ip"),
+            Country = S(r, "country"), CountryCode = S(r, "country_code"),
+            Region = S(r, "region"), City = S(r, "city"), Postal = S(r, "postal_code"),
+            Latitude = S(r, "latitude"), Longitude = S(r, "longitude"), Timezone = S(r, "timezone"),
+            Isp = S(r, "isp"), Org = S(r, "asn_organization") is { Length: > 0 } org ? org : S(r, "organization"),
+            Asn = asn is "" or "0" ? "" : NormAsn(asn),
+        };
+    }
+
+    private static IpGeoResult ParseIpGuide(JsonElement r)   // ip.guide (network.autonomous_system, location: a country name only)
+    {
+        var system = Obj(Obj(r, "network"), "autonomous_system"); var loc = Obj(r, "location");
+        string asn = S(system, "asn");
+        return new IpGeoResult
+        {
+            Ip = S(r, "ip"),
+            Country = S(loc, "country"), City = S(loc, "city"),
+            Latitude = S(loc, "latitude"), Longitude = S(loc, "longitude"), Timezone = S(loc, "timezone"),
+            Org = S(system, "organization"), Asn = asn is "" or "0" ? "" : NormAsn(asn),
+        };
+    }
+
+    private static IpGeoResult ParseDbIp(JsonElement r)   // api.db-ip.com free (country, region, city; "ZZ" when unknown)
+    {
+        if (S(r, "errorCode") is { Length: > 0 } code) throw new InvalidDataException("refused (" + RemoteText.Clean(code, 40) + ")");
+        return new IpGeoResult
+        {
+            Ip = S(r, "ipAddress"),
+            Country = S(r, "countryName"), CountryCode = S(r, "countryCode"),
+            Region = S(r, "stateProv"), City = S(r, "city"),
+        };
+    }
+
+    private static IpGeoResult ParseGeolocationDb(JsonElement r)   // geolocation-db.com ("Not found" when unknown; "IPv4" holds either family)
+    {
+        return new IpGeoResult
+        {
+            Ip = S(r, "IPv4"),
+            Country = S(r, "country_name"), CountryCode = S(r, "country_code"),
+            Region = S(r, "state"), City = S(r, "city"), Postal = S(r, "postal"),
+            Latitude = S(r, "latitude"), Longitude = S(r, "longitude"),
+        };
+    }
+
+    private static IpGeoResult ParseCountryIs(JsonElement r)   // api.country.is (the country only)
+        => new() { Ip = S(r, "ip"), CountryCode = S(r, "country") };
+
     // ---- json + formatting helpers ----
 
+    // Provider text, made safe to show and capped: a field is a name or a number, never a page.
     private static string S(JsonElement e, string name)
     {
         if (e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v))
             return v.ValueKind switch
             {
-                JsonValueKind.String => v.GetString() ?? "",
-                JsonValueKind.Number => v.ToString(),
+                JsonValueKind.String => RemoteText.Clean(v.GetString(), MaxFieldChars).Trim(),
+                JsonValueKind.Number => RemoteText.Clean(v.GetRawText(), MaxFieldChars),
                 JsonValueKind.True => "true",
                 JsonValueKind.False => "false",
                 _ => "",
@@ -623,13 +922,19 @@ public partial class IpInfoViewModel : ObservableObject
         return "";
     }
 
+    private static string S(JsonElement? e, string name) => e is { } x ? S(x, name) : "";
+
     private static bool B(JsonElement e, string name)
         => e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v)
            && (v.ValueKind == JsonValueKind.True
                || (v.ValueKind == JsonValueKind.String && string.Equals(v.GetString(), "true", StringComparison.OrdinalIgnoreCase)));
 
+    private static bool B(JsonElement? e, string name) => e is { } x && B(x, name);
+
     private static JsonElement? Obj(JsonElement e, string name)
         => e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Object ? v : null;
+
+    private static JsonElement? Obj(JsonElement? e, string name) => e is { } x ? Obj(x, name) : null;
 
     private static string NormVersion(string v)
         => v.Length == 0 ? "" : v.Equals("6") || v.Contains('6') ? "IPv6" : v.Equals("4") || v.Contains('4') ? "IPv4" : v;
