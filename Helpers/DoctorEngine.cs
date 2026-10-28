@@ -463,7 +463,7 @@ public static class DoctorEngine
         var plainDns = PlainDnsFor(f, env);
         var dohEndpoints = DohFor(f, env);
         sink.Report(DoctorCheck.DnsPlain, DoctorState.Running, "Asking " + string.Join(" and ", plainDns.Select(s => s.Address)) + " over UDP…");
-        sink.Report(DoctorCheck.DnsEncrypted, DoctorState.Running, "Asking " + string.Join(", ", dohEndpoints.Take(3).Select(d => d.Name)) + " over HTTPS…");
+        sink.Report(DoctorCheck.DnsEncrypted, DoctorState.Running, "Asking " + string.Join(" and ", dohEndpoints.Take(2).Select(d => d.Name)) + " over HTTPS…");
 
         async Task<DoctorDnsAnswer> SystemTask()
         {

@@ -375,33 +375,61 @@ public static class DoctorDns
         return r;
     }
 
+    // Asked at once at the start, the head start of each next one, the most running at a time, and the grace the ones
+    // still running get once one has answered.
+    private const int DohFirstWave = 2, DohMaxRunning = 8;
+    private static readonly TimeSpan DohHeadStart = TimeSpan.FromMilliseconds(300), DohGrace = TimeSpan.FromMilliseconds(700);
+
     /// <summary>
-    /// Asks every DoH endpoint at once. Once one has answered, the others get a short grace period (so their answers
-    /// can join the trusted set) and are then left behind — a filtered endpoint never holds the run up.
+    /// Asks the DoH endpoints in their order, a few at a time: the first two at once, then the next whenever one fails, or
+    /// after a head start without an answer. Once one has answered, no other is asked; those already asked get a short
+    /// grace period (so their answers can join the trusted set) and are then left behind — a filtered endpoint never
+    /// holds the run up. Each endpoint asked learns the name, so the order is also who learns it: one further down only
+    /// when those before it don't answer. None starts later than <paramref name="timeoutMs"/> plus 1.5 s after the first.
+    /// The result holds the endpoints that were asked, in their order.
     /// </summary>
     public static async Task<List<DoctorDnsAnswer>> DohAllAsync(HttpClient http, IReadOnlyList<DoctorDohEndpoint> endpoints, string name,
                                                                 int timeoutMs, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var tasks = endpoints.Select(ep => DohAsync(http, ep, name, timeoutMs, cts.Token)).ToList();
-        var pending = new List<Task<DoctorDnsAnswer>>(tasks);
-        var answers = new DoctorDnsAnswer?[tasks.Count];
-        DateTime? graceEnd = null;
-        while (pending.Count > 0)
+        var answers = new DoctorDnsAnswer?[endpoints.Count];
+        var running = new Dictionary<Task<DoctorDnsAnswer>, int>();
+        var clock = Stopwatch.StartNew();
+        var lastStart = TimeSpan.FromMilliseconds(timeoutMs + 1500);
+        int next = 0;
+        TimeSpan nextAt = TimeSpan.Zero;
+        TimeSpan? graceEnd = null;
+        bool CanStart() => graceEnd == null && next < endpoints.Count && running.Count < DohMaxRunning && clock.Elapsed < lastStart;
+        void Start()
         {
-            Task delay = graceEnd is { } g ? Task.Delay(Max(TimeSpan.Zero, g - DateTime.UtcNow), ct) : Task.Delay(Timeout.Infinite, ct);
-            var done = await Task.WhenAny(pending.Cast<Task>().Append(delay)).ConfigureAwait(false);
+            running.Add(DohAsync(http, endpoints[next], name, timeoutMs, cts.Token), next);
+            next++;
+            nextAt = clock.Elapsed + DohHeadStart;
+        }
+
+        while (next < DohFirstWave && CanStart()) Start();
+        while (running.Count > 0)
+        {
+            TimeSpan? wake = graceEnd ?? (CanStart() ? nextAt : null);
+            Task delay = wake is { } w ? Task.Delay(Max(TimeSpan.Zero, w - clock.Elapsed), cts.Token) : Task.Delay(Timeout.Infinite, cts.Token);
+            var done = await Task.WhenAny(running.Keys.Cast<Task>().Append(delay)).ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
-            if (done == delay) break;
+            if (done == delay)
+            {
+                if (graceEnd != null) break;
+                if (CanStart()) Start();
+                continue;
+            }
             var t = (Task<DoctorDnsAnswer>)done;
-            pending.Remove(t);
             var a = await t.ConfigureAwait(false);
-            answers[tasks.IndexOf(t)] = a;
-            if (a.Good && graceEnd == null) graceEnd = DateTime.UtcNow.AddMilliseconds(700);
+            answers[running[t]] = a;
+            running.Remove(t);
+            if (a.Good) graceEnd ??= clock.Elapsed + DohGrace;
+            else if (CanStart()) Start();   // a failure: the next one now rather than after its head start
         }
         cts.Cancel();   // the stragglers: no longer needed
-        var list = new List<DoctorDnsAnswer>();
-        for (int i = 0; i < tasks.Count; i++)
+        var list = new List<DoctorDnsAnswer>(next);
+        for (int i = 0; i < next; i++)
             list.Add(answers[i] ?? new DoctorDnsAnswer { Source = endpoints[i].Name, Error = "too slow" });
         return list;
     }

@@ -264,17 +264,29 @@ internal sealed class DoctorEnvironment
         new IPEndPoint(IPAddress.Parse("8.8.8.8"), 53),
     };
 
-    /// <summary>Encrypted resolvers (RFC 8484) of Cloudflare, Google, Quad9, AdGuard and OpenDNS, by IP literal: their
-    /// certificates name the IPs. All are asked at once; the first answers win (a filter rarely blocks every one).</summary>
+    /// <summary>
+    /// Encrypted resolvers (RFC 8484) by IP literal: their certificates name the IPs. Asked in this order, a few at a time
+    /// (<see cref="DoctorDns.DohAllAsync"/>), and each one asked learns the name being diagnosed: the long-standing
+    /// operators first (Cloudflare, Google, Quad9, OpenDNS, AdGuard, then their second addresses), DNS.SB and DNSPod only
+    /// when none of those answers. AliDNS is left out: it answers names China censors with 0.0.0.0 (www.epochtimes.com,
+    /// www.minghui.org on 2026-10-28), which would stand in for the real answer.
+    /// </summary>
     public IReadOnlyList<DoctorDohEndpoint> Doh { get; init; } = new[]
     {
         new DoctorDohEndpoint("1.1.1.1", new Uri("https://1.1.1.1/dns-query"), "Cloudflare"),
         new DoctorDohEndpoint("8.8.8.8", new Uri("https://8.8.8.8/dns-query"), "Google"),
+        new DoctorDohEndpoint("9.9.9.9", new Uri("https://9.9.9.9/dns-query"), "Quad9"),
+        new DoctorDohEndpoint("208.67.222.222", new Uri("https://208.67.222.222/dns-query"), "OpenDNS"),
+        new DoctorDohEndpoint("94.140.14.14", new Uri("https://94.140.14.14/dns-query"), "AdGuard"),
         new DoctorDohEndpoint("1.0.0.1", new Uri("https://1.0.0.1/dns-query"), "Cloudflare"),
         new DoctorDohEndpoint("8.8.4.4", new Uri("https://8.8.4.4/dns-query"), "Google"),
-        new DoctorDohEndpoint("9.9.9.9", new Uri("https://9.9.9.9/dns-query"), "Quad9"),
-        new DoctorDohEndpoint("94.140.14.14", new Uri("https://94.140.14.14/dns-query"), "AdGuard"),
-        new DoctorDohEndpoint("208.67.222.222", new Uri("https://208.67.222.222/dns-query"), "OpenDNS"),
+        new DoctorDohEndpoint("149.112.112.112", new Uri("https://149.112.112.112/dns-query"), "Quad9"),
+        new DoctorDohEndpoint("208.67.220.220", new Uri("https://208.67.220.220/dns-query"), "OpenDNS"),
+        new DoctorDohEndpoint("94.140.15.15", new Uri("https://94.140.15.15/dns-query"), "AdGuard"),
+        new DoctorDohEndpoint("185.222.222.222", new Uri("https://185.222.222.222/dns-query"), "DNS.SB"),
+        new DoctorDohEndpoint("45.11.45.11", new Uri("https://45.11.45.11/dns-query"), "DNS.SB"),
+        new DoctorDohEndpoint("120.53.53.53", new Uri("https://120.53.53.53/dns-query"), "DNSPod"),
+        new DoctorDohEndpoint("1.12.12.12", new Uri("https://1.12.12.12/dns-query"), "DNSPod"),
     };
 
     /// <summary>"Is the internet there": quick TCP connects to these.</summary>
@@ -285,7 +297,8 @@ internal sealed class DoctorEnvironment
     };
 
     /// <summary>The IPv6 addresses of the same resolvers and probes, asked instead of the IPv4 ones on an IPv6-only network
-    /// (mobile data on some carriers), where an IPv4 address can't be dialled. Their certificates name these too.</summary>
+    /// (mobile data on some carriers), where an IPv4 address can't be dialled. Their certificates name these too; AdGuard's
+    /// and DNSPod's name no IPv6 address, so those two are IPv4 only.</summary>
     public IReadOnlyList<IPEndPoint> PlainDnsV6 { get; init; } = new[]
     {
         new IPEndPoint(IPAddress.Parse("2606:4700:4700::1111"), 53),
@@ -295,8 +308,14 @@ internal sealed class DoctorEnvironment
     {
         new DoctorDohEndpoint("2606:4700:4700::1111", new Uri("https://[2606:4700:4700::1111]/dns-query"), "Cloudflare"),
         new DoctorDohEndpoint("2001:4860:4860::8888", new Uri("https://[2001:4860:4860::8888]/dns-query"), "Google"),
+        new DoctorDohEndpoint("2620:fe::fe", new Uri("https://[2620:fe::fe]/dns-query"), "Quad9"),
+        new DoctorDohEndpoint("2620:119:35::35", new Uri("https://[2620:119:35::35]/dns-query"), "OpenDNS"),
         new DoctorDohEndpoint("2606:4700:4700::1001", new Uri("https://[2606:4700:4700::1001]/dns-query"), "Cloudflare"),
         new DoctorDohEndpoint("2001:4860:4860::8844", new Uri("https://[2001:4860:4860::8844]/dns-query"), "Google"),
+        new DoctorDohEndpoint("2620:fe::9", new Uri("https://[2620:fe::9]/dns-query"), "Quad9"),
+        new DoctorDohEndpoint("2620:119:53::53", new Uri("https://[2620:119:53::53]/dns-query"), "OpenDNS"),
+        new DoctorDohEndpoint("2a09::", new Uri("https://[2a09::]/dns-query"), "DNS.SB"),
+        new DoctorDohEndpoint("2a11::", new Uri("https://[2a11::]/dns-query"), "DNS.SB"),
     };
     public IReadOnlyList<IPEndPoint> InternetProbesV6 { get; init; } = new[]
     {
