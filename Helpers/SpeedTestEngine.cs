@@ -137,7 +137,12 @@ public sealed class SpeedTestResult
 }
 
 /// <summary>A failure explained in one sentence for the user (Message), with the underlying exception attached.</summary>
-public sealed class SpeedTestException(string message, Exception? inner = null) : Exception(message, inner);
+public sealed class SpeedTestException(string message, Exception? inner = null) : Exception(message, inner)
+{
+    /// <summary>The server's doing rather than the link's: it failed while connecting or probing latency, before any
+    /// transfer, or it refused one with an HTTP error (a rate limit, a 403, a 503). Another server may well work.</summary>
+    public bool ServerSide { get; internal set; }
+}
 
 /// <summary>
 /// Download / upload throughput, idle latency + jitter, and latency under load (bufferbloat) against one destination,
@@ -379,6 +384,9 @@ public sealed class SpeedTestEngine
             AllowAutoRedirect = false,   // the providers follow same-host redirects themselves, while connecting
             UseProxy = false,            // the link itself is measured, never a proxy's
         };
+        // the listed servers are services the tab is built on: a resolver that blocks one's name doesn't end the test. Not
+        // the user's own, which may be a name only the local network knows (a NAS), with a private address.
+        if (!Destination.Saved) handler.ConnectCallback = ServiceDns.ConnectAsync;
         var client = new HttpClient(Options.WrapHandler?.Invoke(handler) ?? handler, disposeHandler: true)
         {
             Timeout = Timeout.InfiniteTimeSpan,   // every request has its own deadline / the phase's token
@@ -933,6 +941,20 @@ public sealed class SpeedTestEngine
 
     /// <summary>One sentence that says why, for the one error the tab shows.</summary>
     private SpeedTestException Explain(Exception ex, string during, CancellationToken ct)
+    {
+        var e = Sentence(ex, during, ct);
+        if (during is "connect" or "latency" || Refused(ex)) e.ServerSide = true;
+        return e;
+
+        static bool Refused(Exception? x)
+        {
+            for (; x is not null; x = x.InnerException)
+                if (x is SpeedTestHttpException) return true;
+            return false;
+        }
+    }
+
+    private SpeedTestException Sentence(Exception ex, string during, CancellationToken ct)
     {
         if (ex is SpeedTestException ste) return ste;
         string host = Host;

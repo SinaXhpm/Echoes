@@ -161,11 +161,13 @@ public partial class SpeedTestViewModel : ObservableObject
     }
 
     /// <summary>One test run: the button turns into Stop, the figures reset, and whatever goes wrong ends as ONE error
-    /// (a stop as "Stopped.").</summary>
+    /// (a stop as "Stopped."). The automatic choice (Cloudflare) goes on to another server when Cloudflare can't be
+    /// reached or won't run the test, and says which one it used and why; a server the user picked is never swapped.</summary>
     private async Task RunAsync()
     {
-        var destination = SelectedDestination;
-        var target = Route?.Invoke(destination) ?? destination;
+        var servers = new List<SpeedTestDestination> { SelectedDestination };
+        if (SelectedDestination.Id == SpeedTestDestinations.Cloudflare.Id)
+            servers.AddRange(SpeedTestDestinations.AutomaticFallbacks(TimeZoneInfo.Local.GetUtcOffset(DateTime.Now)));
         var options = (Options ?? new SpeedTestOptions()) with { Connections = Connections };
         int run = ++_run;
         _cts?.Dispose();
@@ -173,22 +175,46 @@ public partial class SpeedTestViewModel : ObservableObject
         var token = _cts.Token;
         IsRunning = true;
         Error = null;
-        ResetFigures();
-        UploadNa = destination.HasUpload == false;
-        _runDestination = destination;
-        ServerText = ServerLabel(destination, null, null);
-        Status = $"Connecting to {destination.Name}…";
+        _switchNote = null;
+        var failed = new List<(SpeedTestDestination Server, SpeedTestException Error)>();
 
         // Android: a foreground service keeps the test running if Echoes goes to the background; iOS keeps the screen on
         // (no-op on desktop). Released in the finally below, whatever ends the run.
         BackgroundGuard.Acquire("Speed test", GuardKind.Finite);
         try
         {
-            var engine = new SpeedTestEngine(target, options);
-            var result = await Task.Run(() => engine.RunAsync(p => Report(run, p), token), token);
-            if (run != _run) return;
-            ApplyFinal(result, destination);
-            Remember(result, destination);
+            foreach (var destination in servers)
+            {
+                if (failed.Count > 0) run = ++_run;   // its own id: a late report from the server before is dropped
+                int attempt = run;
+                ResetFigures();
+                UploadNa = destination.HasUpload == false;
+                _runDestination = destination;
+                ServerText = ServerLabel(destination, null, null);
+                Status = ConnectingStatus();
+                try
+                {
+                    var engine = new SpeedTestEngine(Route?.Invoke(destination) ?? destination, options);
+                    var result = await Task.Run(() => engine.RunAsync(p => Report(attempt, p), token), token);
+                    if (attempt != _run) return;
+                    ApplyFinal(result, destination);
+                    if (_switchNote is { } why) Status += $" · {why}, so {destination.Name} was used";
+                    Remember(result, destination);
+                    return;
+                }
+                catch (SpeedTestException ex) when (!token.IsCancellationRequested)
+                {
+                    if (attempt != _run) return;
+                    failed.Add((destination, ex));
+                    // the link failed mid-transfer (another server would likely fare the same), or no server is left
+                    if (!ex.ServerSide || failed.Count == servers.Count)
+                    {
+                        Fail(FailureText(failed));
+                        return;
+                    }
+                    _switchNote = SwitchNote(failed);
+                }
+            }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -212,6 +238,42 @@ public partial class SpeedTestViewModel : ObservableObject
             }
         }
     }
+
+    // Why the automatic test moved on, while it runs on the next server ("Cloudflare didn't work (the connection was
+    // reset)"); null on the first server.
+    private string? _switchNote;
+
+    private string ConnectingStatus()
+        => _switchNote is { } note ? $"{note}: trying {_runDestination.Name}…" : $"Connecting to {_runDestination.Name}…";
+
+    // "Cloudflare didn't work (the connection was reset)", "Cloudflare and Tele2 · Stockholm didn't work (…; …)"
+    private static string SwitchNote(IReadOnlyList<(SpeedTestDestination Server, SpeedTestException Error)> failed)
+        => $"{Names(failed.Select(f => f.Server.Name).ToList())} didn't work ({string.Join("; ", failed.Select(f => Brief(f.Error)))})";
+
+    // The one error of a run that tried more than one server: the first's own sentence and why the others didn't work; or,
+    // when the last connected and then failed, why it was used and what went wrong there.
+    private static string FailureText(List<(SpeedTestDestination Server, SpeedTestException Error)> failed)
+    {
+        var (last, error) = failed[^1];
+        if (failed.Count == 1) return error.Message;
+        if (!error.ServerSide) return $"{SwitchNote(failed.GetRange(0, failed.Count - 1))}, so the test ran on {last.Name}. {error.Message}";
+        var others = failed.Skip(1).ToList();
+        return $"{failed[0].Error.Message} {Names(others.Select(f => f.Server.Name).ToList())} didn't work either " +
+               $"({string.Join("; ", others.Select(f => Brief(f.Error)))}).";
+    }
+
+    // Why a server didn't work, in a few words: "the connection was reset", "HTTP 429 Too Many Requests",
+    // "speedtest.tele2.net answered with a web page instead of the test file".
+    private static string Brief(SpeedTestException e)
+    {
+        string s = SpeedTestProviders.ShortReason(e.InnerException ?? e);
+        int colon = s.IndexOf(": ", StringComparison.Ordinal);
+        return RemoteText.Clean(colon > 0 ? s[..colon] : s, 80);
+    }
+
+    // "A", "A and B", "A, B and C"
+    private static string Names(IReadOnlyList<string> names)
+        => names.Count <= 2 ? string.Join(" and ", names) : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
 
     // One message, the error itself (the status line stays empty beside it).
     private void Fail(string message)
@@ -250,7 +312,7 @@ public partial class SpeedTestViewModel : ObservableObject
         switch (p.Phase)
         {
             case SpeedTestPhase.Connecting:
-                Status = $"Connecting to {_runDestination.Name}…";
+                Status = ConnectingStatus();
                 break;
             case SpeedTestPhase.Latency:
                 Status = "Measuring latency…";

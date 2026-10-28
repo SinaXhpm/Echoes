@@ -190,6 +190,22 @@ public static class SpeedTestDestinations
     public static SpeedTestDestination? FindCurated(string? id)
         => id is null ? null : Curated.FirstOrDefault(d => d.Id == id);
 
+    /// <summary>
+    /// Where the automatic test (Cloudflare) goes on when Cloudflare can't be reached or won't run it: hosts of two
+    /// providers in the device's part of the world, told from its time zone, the one that also takes uploads first where
+    /// there is one (Tele2). Only the automatic choice falls back; a server the user picked is never swapped.
+    /// </summary>
+    public static IReadOnlyList<SpeedTestDestination> AutomaticFallbacks(TimeSpan utcOffset)
+    {
+        string[] ids = utcOffset.TotalHours switch
+        {
+            <= -2 => new[] { "dp-nyc", "lw-wdc" },   // the Americas
+            >= 5 => new[] { "dp-sin", "li-tyo" },    // South and East Asia, Oceania
+            _ => new[] { "t2-sto", "dp-fra" },       // Europe, Africa, the Middle East
+        };
+        return ids.Select(id => FindCurated(id)!).ToList();
+    }
+
     // ---------------- custom destinations ----------------
 
     /// <summary>
