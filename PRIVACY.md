@@ -26,7 +26,12 @@ Echoes is a network tool, so it makes network requests: the ones you start, to t
 - **Speed test servers:** speed.cloudflare.com, or the file host you choose (Cloudflare, Tele2, Leaseweb, Linode, Selectel, DataPacket and similar).
 - **Public DNS-over-HTTPS resolvers** (Cloudflare, Google, Quad9, OpenDNS, AdGuard) when you use the DNS tool.
 - **IP-information providers** (ipinfo.io, ipwho.is, ipapi.co, ip-api.com, geojs.io, freeipapi.com, iplocation.net) to look up the IP address you enter, or your own.
-- **WHOIS servers** (whois.iana.org, then the registry's and the registrar's server it points to, on port 43) and **RDAP** (rdap.org, rdap.verisign.com) for a domain's registration and expiry; RDAP, **RIPEstat** (stat.ripe.net, run by RIPE NCC) and the registries' WHOIS servers for who holds an IP address the DNS tool shows.
+- **WHOIS and RDAP**, for a domain's registration and expiry and for who holds an IP address or AS number. Each lookup asks one source after another until one answers:
+  - the WHOIS servers on port 43 (whois.iana.org, then the registry's and the registrar's server it points to; ARIN's whois.arin.net for addresses);
+  - RDAP through rdap.org and ARIN (rdap.arin.net, rdap-bootstrap.arin.net), or straight from the registry's own RDAP server, found in IANA's lists (data.iana.org);
+  - **RIPEstat** (stat.ripe.net, run by RIPE NCC);
+  - the WHOIS web services who-dat.as93.net and networkcalc.com;
+  - ip.guide for an address's network and AS.
 - **DNS blocklists** (Spamhaus, SpamCop, Barracuda) and the domain's own mail records, when you run the mail check on a domain.
 - **Connectivity and public-IP services:** well-known sites such as Google, Microsoft and Cloudflare, and connectivitycheck.gstatic.com (the Doctor checks that the internet works), and Cloudflare, ipify, ident.me and icanhazip (Dynamic DNS reads your public IP).
 - **Telegram** (api.telegram.org), only if you add your own bot token for uptime alerts, and **Cloudflare** (api.cloudflare.com), only if you add your own API token. A token stays on your device and is sent only to its own service.

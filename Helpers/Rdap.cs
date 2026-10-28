@@ -67,11 +67,19 @@ public static class Rdap
     /// cancelled.</summary>
     public static async Task<(string body, int status)> FetchAsync(string url, CancellationToken token, TimeSpan? timeout = null)
     {
+        var (body, status, _) = await FetchFinalAsync(url, token, timeout).ConfigureAwait(false);
+        return (body, status);
+    }
+
+    /// <summary><see cref="FetchAsync"/>, and the address that answered after redirects (rdap.org's to the registry).</summary>
+    public static async Task<(string body, int status, Uri? final)> FetchFinalAsync(string url, CancellationToken token, TimeSpan? timeout = null)
+    {
         // Headers first, then the body read with a ceiling (decompressed bytes, so a gzip bomb stops there too). The
         // client's Timeout ends with the headers, so the body gets the same deadline; it surfaces as "timed out".
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         deadline.CancelAfter(timeout ?? Timeout);
         using var response = await s_client.Value.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
+        Uri? final = response.RequestMessage?.RequestUri;
         await using var stream = await response.Content.ReadAsStreamAsync(deadline.Token).ConfigureAwait(false);
         using var ms = new MemoryStream();
         byte[] buf = new byte[16 * 1024];
@@ -83,7 +91,7 @@ public static class Rdap
         }
         // RDAP is JSON, so UTF-8 (RFC 8259); a BOM is skipped as ReadAsStringAsync did.
         int skip = ms.Length >= 3 && ms.GetBuffer()[0] == 0xEF && ms.GetBuffer()[1] == 0xBB && ms.GetBuffer()[2] == 0xBF ? 3 : 0;
-        return (Encoding.UTF8.GetString(ms.GetBuffer(), skip, (int)ms.Length - skip), (int)response.StatusCode);
+        return (Encoding.UTF8.GetString(ms.GetBuffer(), skip, (int)ms.Length - skip), (int)response.StatusCode, final);
     }
 
     // ---------------------------------------------------------------- RIPEstat
@@ -96,21 +104,6 @@ public static class Rdap
 
     private static string RipeStat(string call, string resource)
         => $"https://stat.ripe.net/data/{call}/data.json?resource={Uri.EscapeDataString(resource)}&sourceapp=echoes";
-
-    // rdap.org hands an address to its registry's RDAP server, and one of those can be out of reach from where the user is.
-    // Once one hasn't answered, addresses and AS numbers go to RIPEstat first for the rest of the session (rdap.org stays
-    // the fallback) instead of waiting out that timeout again for every row.
-    private static volatile bool s_ripeStatFirst;
-
-    /// <summary>RIPEstat is asked before rdap.org for addresses and AS numbers: rdap.org's registry didn't answer earlier.</summary>
-    public static bool PreferRipeStat => s_ripeStatFirst;
-
-    /// <summary>rdap.org didn't answer a WHOIS of an address or AS number (<paramref name="ex"/>): when that was the network
-    /// (a timeout, a refused or reset connection) rather than an answer it couldn't read, RIPEstat goes first from now on.</summary>
-    public static void RdapFailed(Exception ex)
-    {
-        if (ex is not (JsonException or InvalidDataException)) s_ripeStatFirst = true;
-    }
 
     /// <summary>A RIPEstat whois answer as WHOIS text ("key: value" lines, a blank line between objects), or null when it
     /// holds no record.</summary>
@@ -171,12 +164,17 @@ public static class Rdap
     }
 
     /// <summary>
-    /// Who holds <paramref name="ip"/>: its registry's RDAP through rdap.org, else RIPEstat's copy of the registry's WHOIS
-    /// (the other way round once rdap.org didn't answer, see <see cref="PreferRipeStat"/>), else the registry's classic
-    /// WHOIS (<see cref="Whois43"/>), and the AS it is announced
-    /// from, asked of RIPEstat alongside (RDAP rarely has it). Never throws for a network failure: that is
-    /// <see cref="IpWhois.Error"/>, naming each source's reason. Throws <see cref="OperationCanceledException"/> only
-    /// when <paramref name="ct"/> is cancelled.
+    /// Who holds <paramref name="ip"/>, from many sources (<see cref="Fallback"/>):
+    /// <list type="bullet">
+    /// <item>RDAP through rdap.org, through ARIN's (it hands other registries' space on to them), and through ARIN's
+    /// bootstrap;</item>
+    /// <item>RIPEstat's copy of the registry's WHOIS;</item>
+    /// <item>classic WHOIS through IANA, and straight from ARIN (<see cref="Whois43"/>);</item>
+    /// <item>ip.guide's summary.</item>
+    /// </list>
+    /// The AS it is announced from is asked alongside (RIPEstat, else ip.guide): RDAP rarely has it. Never throws for a
+    /// network failure: that is <see cref="IpWhois.Error"/>, naming each source's reason. Throws
+    /// <see cref="OperationCanceledException"/> only when <paramref name="ct"/> is cancelled.
     /// </summary>
     public static async Task<IpWhois> LookUpIpAsync(IPAddress ip, CancellationToken ct)
     {
@@ -187,46 +185,27 @@ public static class Rdap
         {
             if (s_cache.TryGetValue(key, out var cached)) return cached;   // another row asked for it meanwhile
             var announced = AnnouncedByAsync(key, ct);
-            var errors = new List<string>();
-            IpWhois? found = null;
-            bool ripeFirst = s_ripeStatFirst;
-            for (int i = 0; i < 2 && found == null; i++)
+            var sources = new List<Fallback.Source<IpWhois>>
             {
-                bool ripe = (i == 0) == ripeFirst;
-                string source = ripe ? "RIPEstat" : "rdap.org";
-                try
+                RdapNetwork("rdap.org", "https://rdap.org/ip/" + key),
+                RdapNetwork("ARIN's RDAP", "https://rdap.arin.net/registry/ip/" + key),
+                RdapNetwork("ARIN's RDAP bootstrap", "https://rdap-bootstrap.arin.net/bootstrap/ip/" + key),
+                new("RIPEstat", async t =>
                 {
-                    var (body, status) = await FetchAsync(ripe ? RipeStat("whois", key) : "https://rdap.org/ip/" + key, ct, InlineTimeout)
-                        .ConfigureAwait(false);
-                    // rdap.org knows every registry's blocks: no record there means nobody has it
-                    if (status == 404 && !ripe) { found = new IpWhois { Note = "No registry has a record of it (unallocated?)" }; break; }
-                    if (status is < 200 or >= 300 || !body.TrimStart().StartsWith('{')) { errors.Add($"{source}: HTTP {status}"); continue; }
-                    using var doc = JsonDocument.Parse(body);
-                    found = ripe ? FromRipeStat(doc.RootElement) : FromRdap(doc.RootElement);
-                    if (found == null) errors.Add($"{source}: no record");
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-                catch (Exception ex)
+                    using var doc = await JsonAsync(RipeStat("whois", key), t).ConfigureAwait(false);
+                    return FromRipeStat(doc.RootElement);
+                }),
+                Classic("WHOIS", key, null),
+                Classic("WHOIS " + Whois43.Arin, key, Whois43.Arin),
+                new("ip.guide", async t =>
                 {
-                    errors.Add($"{source}: {Reason(ex)}");
-                    if (!ripe) RdapFailed(ex);
-                }
-            }
-            // neither: the registry's classic WHOIS on port 43, which some networks leave open when they block the others
-            if (found == null)
-            {
-                try
-                {
-                    var answer = await Whois43.LookUpAsync(key, Whois43.Kind.Ip, ct, InlineTimeout * 2).ConfigureAwait(false);
-                    // IANA's record alone is the registry's whole block, not the holder's
-                    if (answer.Servers.Count > 1) found = FromGroups(Whois43.Objects(answer.Text));
-                    if (found == null) errors.Add("WHOIS (port 43): " + (answer.Note ?? "no record"));
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-                catch (Exception ex) { errors.Add("WHOIS (port 43): " + Reason(ex)); }
-            }
+                    using var doc = await JsonAsync("https://ip.guide/" + key, t).ConfigureAwait(false);
+                    return FromIpGuide(doc.RootElement);
+                }),
+            };
+            var result = await Fallback.FirstAsync("whois.inline", sources, ct, TimeSpan.FromSeconds(2), InlineTimeout).ConfigureAwait(false);
             string asn = await announced.ConfigureAwait(false);
-            if (found == null) return new IpWhois { Asn = asn, Error = "No WHOIS: " + string.Join("; ", errors) };
+            if (result.Value is not { } found) return new IpWhois { Asn = asn, Error = "No WHOIS: " + string.Join("; ", result.Errors) };
             if (found.Asn.Length == 0 && asn.Length > 0) found = found with { Asn = asn };
             if (s_cache.Count >= MaxCached) s_cache.Clear();
             s_cache[key] = found;
@@ -235,24 +214,79 @@ public static class Rdap
         finally { s_gate.Release(); }
     }
 
-    // RIPEstat's routing view: the AS(es) the address is announced from. "" when unknown, and never throws: the summary is
-    // whole without it.
+    // An RDAP network object. rdap.org and ARIN know every registry's blocks: no record there means nobody has it.
+    private static Fallback.Source<IpWhois> RdapNetwork(string name, string url) => new(name, async t =>
+    {
+        var (body, status) = await FetchAsync(url, t, InlineTimeout).ConfigureAwait(false);
+        if (status == 404) return new IpWhois { Note = "No registry has a record of it (unallocated?)" };
+        if (status is < 200 or >= 300 || !body.TrimStart().StartsWith('{')) throw new HttpRequestException(null, null, (HttpStatusCode)status);
+        using var doc = JsonDocument.Parse(body);
+        return FromRdap(doc.RootElement);
+    });
+
+    // Classic WHOIS through IANA, or starting at another server. IANA's record alone is the registry's whole block, not
+    // the holder's.
+    private static Fallback.Source<IpWhois> Classic(string name, string ip, string? first) => new(name, async t =>
+    {
+        var answer = await Whois43.LookUpAsync(ip, Whois43.Kind.Ip, t, firstServer: first).ConfigureAwait(false);
+        if (first == null && answer.Servers.Count == 1) throw new InvalidDataException(answer.Note ?? "only IANA's block");
+        return FromGroups(Whois43.Objects(answer.Text));
+    });
+
+    // A JSON answer, or an exception naming why not (the status, or not JSON).
+    private static async Task<JsonDocument> JsonAsync(string url, CancellationToken ct)
+    {
+        var (body, status) = await FetchAsync(url, ct, InlineTimeout).ConfigureAwait(false);
+        if (status is < 200 or >= 300 || !body.TrimStart().StartsWith('{')) throw new HttpRequestException(null, null, (HttpStatusCode)status);
+        return JsonDocument.Parse(body);
+    }
+
+    // The AS(es) the address is announced from: RIPEstat's routing view, else ip.guide's. "" when unknown, and never throws
+    // (only for the caller's cancellation): the summary is whole without it.
     private static async Task<string> AnnouncedByAsync(string ip, CancellationToken ct)
     {
         try
         {
-            var (body, status) = await FetchAsync(RipeStat("network-info", ip), ct, InlineTimeout).ConfigureAwait(false);
-            if (status != 200) return "";
-            using var doc = JsonDocument.Parse(body);
-            if (doc.RootElement.ValueKind != JsonValueKind.Object || !doc.RootElement.TryGetProperty("data", out var data)
-                || data.ValueKind != JsonValueKind.Object || !data.TryGetProperty("asns", out var asns) || asns.ValueKind != JsonValueKind.Array)
-                return "";
-            var list = asns.EnumerateArray()
-                .Select(a => a.ValueKind == JsonValueKind.String ? a.GetString() ?? "" : a.ValueKind == JsonValueKind.Number ? a.GetRawText() : "")
-                .Where(a => a.Length is > 0 and <= 10 && a.All(char.IsAsciiDigit)).ToList();
-            return string.Join(", ", list.Take(2).Select(a => "AS" + a)) + (list.Count > 2 ? $" +{list.Count - 2}" : "");
+            var result = await Fallback.FirstAsync("announced", new Fallback.Source<string>[]
+            {
+                new("RIPEstat", async t =>
+                {
+                    using var doc = await JsonAsync(RipeStat("network-info", ip), t).ConfigureAwait(false);
+                    if (!doc.RootElement.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Object
+                        || !data.TryGetProperty("asns", out var asns) || asns.ValueKind != JsonValueKind.Array)
+                        return null;
+                    var list = asns.EnumerateArray()
+                        .Select(a => a.ValueKind == JsonValueKind.String ? a.GetString() ?? "" : a.ValueKind == JsonValueKind.Number ? a.GetRawText() : "")
+                        .Where(a => a.Length is > 0 and <= 10 && a.All(char.IsAsciiDigit)).ToList();
+                    return list.Count == 0 ? null : string.Join(", ", list.Take(2).Select(a => "AS" + a)) + (list.Count > 2 ? $" +{list.Count - 2}" : "");
+                }),
+                new("ip.guide", async t =>
+                {
+                    using var doc = await JsonAsync("https://ip.guide/" + ip, t).ConfigureAwait(false);
+                    return FromIpGuide(doc.RootElement)?.Asn is { Length: > 0 } asn ? asn : null;
+                }),
+            }, ct, TimeSpan.FromSeconds(2), InlineTimeout).ConfigureAwait(false);
+            return result.Value ?? "";
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch { return ""; }
+    }
+
+    // ip.guide: the announced network (CIDR) and its AS (number, holder, country); no registry contacts.
+    private static IpWhois? FromIpGuide(JsonElement r)
+    {
+        if (r.ValueKind != JsonValueKind.Object || !r.TryGetProperty("network", out var net) || net.ValueKind != JsonValueKind.Object) return null;
+        string cidr = Str(net, "cidr");
+        string org = "", country = "", asn = "";
+        if (net.TryGetProperty("autonomous_system", out var a) && a.ValueKind == JsonValueKind.Object)
+        {
+            org = Str(a, "organization");
+            if (org.Length == 0) org = Str(a, "name");
+            country = Str(a, "country");
+            if (a.TryGetProperty("asn", out var n) && n.ValueKind == JsonValueKind.Number && n.TryGetInt64(out long number)) asn = "AS" + number;
+        }
+        var w = new IpWhois { Org = Clean(org), Country = Clean(country), Range = Clean(cidr), Asn = Clean(asn) };
+        return w.Org.Length + w.Range.Length == 0 ? null : w;
     }
 
     // The RDAP network object. The holder is the registrant that is an organisation (RIPE nests it under the abuse

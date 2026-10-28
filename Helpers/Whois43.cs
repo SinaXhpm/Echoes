@@ -12,11 +12,11 @@ using System.Threading.Tasks;
 namespace Echoes.Helpers;
 
 /// <summary>
-/// Classic WHOIS (RFC 3912: the query as one line over TCP port 43, the answer as text). The DNS tool asks it first for a
-/// domain and last for an address or AS number: many country domains have no RDAP (.ir among them), and from some networks
-/// the registry RDAP that rdap.org forwards to is out of reach (Verisign's, for .com and .net, from Iran) while port 43
-/// isn't. IANA names the server that holds the TLD, block or AS; a thin registry (.com, .net) names the registrar's server,
-/// which has the rest; ARIN names the registry a block or AS moved to.
+/// Classic WHOIS (RFC 3912: the query as one line over TCP port 43, the answer as text), one of the WHOIS sources
+/// (<see cref="WhoisLookup"/>): many country domains have no RDAP (.ir among them), and from some networks the registry
+/// RDAP that rdap.org forwards to is out of reach (Verisign's, for .com and .net, from Iran) while port 43 isn't. IANA
+/// names the server that holds the TLD, block or AS; a thin registry (.com, .net) names the registrar's server, which has
+/// the rest; ARIN names the registry a block or AS moved to.
 /// </summary>
 public static class Whois43
 {
@@ -26,43 +26,57 @@ public static class Whois43
     /// later server didn't answer (its predecessor's answer is the text then).</summary>
     public sealed record Answer(string Text, IReadOnlyList<string> Servers, string? Note);
 
-    private const string Iana = "whois.iana.org";
+    public const string Iana = "whois.iana.org";
+    /// <summary>ARIN's server: it answers for any address or AS number by pointing at the registry that holds it.</summary>
+    public const string Arin = "whois.arin.net";
     private const int Port = 43;
     private const int MaxBytes = 512 * 1024;
     private const int MaxHops = 4;
     private static readonly TimeSpan HopTimeout = TimeSpan.FromSeconds(8);
 
-    // IANA's server didn't answer this session (port 43 blocked here): the WHOIS pane asks RDAP first from then on.
-    private static volatile bool s_unreachable;
+    // The registries' servers, from IANA's records (2026-10-28), for when IANA's own server is out of reach: the TLDs
+    // whose server isn't whois.nic.<tld>. IANA lists none for .uk; Nominet's answers at whois.nic.uk.
+    private static readonly Dictionary<string, string> Registries = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["com"] = "whois.verisign-grs.com", ["net"] = "whois.verisign-grs.com", ["cc"] = "ccwhois.verisign-grs.com",
+        ["org"] = "whois.publicinterestregistry.org", ["de"] = "whois.denic.de", ["eu"] = "whois.eu",
+        ["nl"] = "whois.domain-registry.nl", ["ru"] = "whois.tcinet.ru", ["co"] = "whois.registry.co", ["ca"] = "whois.cira.ca",
+        ["au"] = "whois.auda.org.au", ["in"] = "whois.nixiregistry.in", ["jp"] = "whois.jprs.jp", ["cn"] = "whois.cnnic.cn",
+        ["tr"] = "whois.trabis.gov.tr", ["se"] = "whois.iis.se", ["be"] = "whois.dns.be", ["pl"] = "whois.dns.pl",
+        ["br"] = "whois.registro.br", ["mx"] = "whois.mx", ["nz"] = "whois.irs.net.nz",
+    };
 
-    /// <summary>Port 43 didn't answer earlier this session.</summary>
-    public static bool Unreachable => s_unreachable;
+    /// <summary>The registry's server for <paramref name="domain"/>'s TLD, without asking IANA.</summary>
+    public static string? RegistryServer(string domain)
+    {
+        int dot = domain.LastIndexOf('.');
+        if (dot <= 0 || dot == domain.Length - 1) return null;
+        string tld = domain[(dot + 1)..].ToLowerInvariant();
+        return Registries.TryGetValue(tld, out var server) ? server : IsHostName("whois.nic." + tld) ? "whois.nic." + tld : null;
+    }
 
     /// <summary>
-    /// Asks IANA, then the servers it and each answer point to. Throws for a network failure of the first server (and
-    /// remembers it, see <see cref="Unreachable"/>) and <see cref="OperationCanceledException"/> when
-    /// <paramref name="ct"/> is cancelled or <paramref name="timeout"/> (the whole chain) runs out.
+    /// Asks IANA (or <paramref name="firstServer"/>), then the servers each answer points to. Throws for a network failure
+    /// of the first server, and <see cref="OperationCanceledException"/> when <paramref name="ct"/> is cancelled or
+    /// <paramref name="timeout"/> (the whole chain) runs out.
     /// </summary>
-    public static async Task<Answer> LookUpAsync(string query, Kind kind, CancellationToken ct, TimeSpan? timeout = null)
+    public static async Task<Answer> LookUpAsync(string query, Kind kind, CancellationToken ct, TimeSpan? timeout = null,
+                                                 string? firstServer = null)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         if (timeout is { } t) deadline.CancelAfter(t);
         var token = deadline.Token;
 
-        var servers = new List<string> { Iana };
-        string text;
-        try { text = await AskAsync(Iana, query, token).ConfigureAwait(false); }
-        catch (Exception ex) when (ex is SocketException or IOException || (ex is OperationCanceledException && !ct.IsCancellationRequested))
-        {
-            s_unreachable = true;
-            throw;
-        }
-        s_unreachable = false;
+        string first = firstServer ?? Iana;
+        var servers = new List<string> { first };
+        bool iana = first == Iana;
+        string text = await AskAsync(first, iana ? query : QueryFor(first, query, kind), token).ConfigureAwait(false);
 
         // IANA's own record is the answer for what it holds itself (example.com, a reserved block); otherwise its
         // "refer:" (or "whois:") names the next server. A TLD it lists no server for may still have whois.nic.<tld>.
-        string? next = Field(text, "refer") ?? Field(text, "whois");
-        if (next == null && kind == Kind.Domain && query.LastIndexOf('.') is int dot and > 0)
+        // Any other server's answer points on as its successors' do.
+        string? next = iana ? Field(text, "refer") ?? Field(text, "whois") : Field(text, "Registrar WHOIS Server") ?? Field(text, "ReferralServer");
+        if (iana && next == null && kind == Kind.Domain && query.LastIndexOf('.') is int dot and > 0)
             next = "whois.nic." + query[(dot + 1)..];
         string? note = null;
         for (int hop = 1; hop < MaxHops && next != null; hop++)

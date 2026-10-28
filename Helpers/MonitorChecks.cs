@@ -234,9 +234,13 @@ public static class MonitorChecks
     {
         if (!IsAsciiName(domain)) return new(MonitorRdapOutcome.Failed, null);
         var urls = new List<string> { $"{RdapBaseUrl}/domain/{domain}" };
-        // .com / .net: Verisign's own server, should the bootstrap be unreachable (same fallback as the DNS tool's WHOIS).
-        if (RdapBaseUrl == DefaultRdapBase && (domain.EndsWith(".com", StringComparison.Ordinal) || domain.EndsWith(".net", StringComparison.Ordinal)))
-            urls.Add($"https://rdap.verisign.com/{domain[(domain.LastIndexOf('.') + 1)..]}/v1/domain/{domain}");
+        if (RdapBaseUrl == DefaultRdapBase)
+        {
+            // should rdap.org be unreachable: ARIN's bootstrap server, and for .com / .net Verisign's own server
+            urls.Add($"https://rdap-bootstrap.arin.net/bootstrap/domain/{domain}");
+            if (domain.EndsWith(".com", StringComparison.Ordinal) || domain.EndsWith(".net", StringComparison.Ordinal))
+                urls.Add($"https://rdap.verisign.com/{domain[(domain.LastIndexOf('.') + 1)..]}/v1/domain/{domain}");
+        }
 
         var outcome = MonitorRdapOutcome.Failed;
         foreach (var url in urls)
@@ -259,18 +263,24 @@ public static class MonitorChecks
         // WHOIS, which some networks leave open when they block the RDAP servers (Verisign's, from Iran). Not with a test
         // server standing in for rdap.org.
         if (RdapBaseUrl != DefaultRdapBase) return new(outcome, null);
-        try
+        // through IANA, else straight from the registry's server (IANA's own can be the one out of reach)
+        var firsts = new List<string?> { null };
+        if (Whois43.RegistryServer(domain) is { } registry) firsts.Add(registry);
+        foreach (string? first in firsts)
         {
-            var answer = await Whois43.LookUpAsync(domain, Whois43.Kind.Domain, ct, RdapTimeout * 2).ConfigureAwait(false);
-            if (answer.Servers.Count > 1)   // the registry answered (IANA alone only names it)
+            try
             {
-                var expiry = WhoisExpiry(answer.Text);
-                if (expiry == null && WhoisNotFound.IsMatch(answer.Text)) return new(MonitorRdapOutcome.NoData, null);
-                return new(MonitorRdapOutcome.Found, expiry);
+                var answer = await Whois43.LookUpAsync(domain, Whois43.Kind.Domain, ct, RdapTimeout * 2, first).ConfigureAwait(false);
+                if (first != null || answer.Servers.Count > 1)   // the registry answered (IANA alone only names it)
+                {
+                    var expiry = WhoisExpiry(answer.Text);
+                    if (expiry == null && WhoisNotFound.IsMatch(answer.Text)) return new(MonitorRdapOutcome.NoData, null);
+                    return new(MonitorRdapOutcome.Found, expiry);
+                }
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch (Exception) { /* the next; silent */ }
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch (Exception) { /* silent */ }
         return new(outcome, null);
     }
 

@@ -333,16 +333,14 @@ public partial class DnsViewModel : ObservableObject
         string query = DomainName.Trim();
         LogText = $"# whois {query}" + Environment.NewLine;
 
-        // rdap.org is the IANA bootstrap — it follows to the authoritative RDAP server for any
-        // TLD/registry, and also covers IPs and ASNs. Pick the right object type from the input.
-        // ASN test first: IPAddress.TryParse takes a bare number ("13335") as legacy IPv4 (0.0.52.23).
-        string kind =
-            System.Text.RegularExpressions.Regex.IsMatch(query, @"^(AS)?\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? "autnum" :
-            System.Net.IPAddress.TryParse(query, out _) ? "ip" : "domain";
-        string key = kind == "autnum" ? query.TrimStart('A', 'S', 'a', 's') : query;
+        // The object type from the input. ASN test first: IPAddress.TryParse takes a bare number ("13335") as legacy IPv4
+        // (0.0.52.23).
+        var kind =
+            System.Text.RegularExpressions.Regex.IsMatch(query, @"^(AS)?\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? Whois43.Kind.Asn :
+            System.Net.IPAddress.TryParse(query, out _) ? Whois43.Kind.Ip : Whois43.Kind.Domain;
 
         // a private, loopback or filter address is nobody's: no registry has it (RDAP answers 404, RIPEstat its catch-all block)
-        if (kind == "ip" && IPAddress.TryParse(query, out var address) && Rdap.SpecialPurpose(address) is { } note)
+        if (kind == Whois43.Kind.Ip && IPAddress.TryParse(query, out var address) && Rdap.SpecialPurpose(address) is { } note)
         {
             LogText = $"# whois {query}" + Environment.NewLine + Environment.NewLine + note + "." + Environment.NewLine
                       + "Special-purpose addresses aren't registered to anyone, so no registry has a record of it.";
@@ -350,112 +348,17 @@ public partial class DnsViewModel : ObservableObject
             return;
         }
 
-        // Classic WHOIS (port 43) goes first for a domain: many country domains have no RDAP (.ir among them), and the
-        // registry RDAP that rdap.org forwards to can be out of reach (Verisign's, for .com / .net, from Iran). Last for an
-        // address or AS number, whose registries' RDAP mostly answers. A port 43 that didn't answer this session puts it
-        // after RDAP.
-        const string ClassicWhois = "whois";
-        var providers = new List<string> { $"https://rdap.org/{kind}/{key}" };
-        if (kind == "domain")
+        // Many sources, the first answer wins (Helpers/WhoisLookup): classic WHOIS, RDAP and WHOIS web services. Its
+        // heading names where it came from; the sources that failed before it follow on the same line.
+        try
         {
-            if (key.EndsWith(".com", StringComparison.OrdinalIgnoreCase) || key.EndsWith(".net", StringComparison.OrdinalIgnoreCase))
-                providers.Add($"https://rdap.verisign.com/com/v1/domain/{key}");   // if rdap.org itself is down
-            providers.Insert(Whois43.Unreachable ? providers.Count : 0, ClassicWhois);
+            var (answer, errors) = await WhoisLookup.LookUpAsync(query, kind, token);
+            LogText = answer != null
+                ? string.Join("; ", errors.Prepend(answer.Heading)) + Environment.NewLine + Environment.NewLine + answer.Body
+                : "No WHOIS data — " + (errors.Count > 0 ? string.Join("; ", errors) : "no source answered") + ".";
         }
-        else
-        {
-            // an address or AS number: RIPEstat reads its registry's WHOIS when that registry's RDAP is out of reach
-            providers.Add(Rdap.RipeStatWhoisUrl(kind == "autnum" ? "AS" + key : key));
-            if (Rdap.PreferRipeStat) providers.Reverse();
-            providers.Add(ClassicWhois);
-        }
-
-        // every provider's reason: when none answers, the one error names them all
-        var errors = new List<string>();
-        Whois43.Answer? ianaOnly = null;
-        foreach (var url in providers)
-        {
-            if (url == ClassicWhois)
-            {
-                try
-                {
-                    var answer = await Whois43.LookUpAsync(query, kind switch { "ip" => Whois43.Kind.Ip, "autnum" => Whois43.Kind.Asn, _ => Whois43.Kind.Domain },
-                                                           token, TimeSpan.FromSeconds(20));
-                    // Only IANA answered (the server it named didn't): its record names the registry, not the holder, so
-                    // another source goes first; shown only when none answers.
-                    if (answer.Servers.Count == 1 && answer.Note != null)
-                    {
-                        errors.Add("WHOIS (port 43): " + answer.Note);
-                        ianaOnly = answer;
-                        continue;
-                    }
-                    ShowClassicWhois(answer, errors);
-                    return;
-                }
-                catch (OperationCanceledException) when (token.IsCancellationRequested) { LogText = "cancelled."; IsWorking = false; return; }
-                catch (OperationCanceledException) { errors.Add("WHOIS (port 43): timed out"); }
-                catch (Exception ex) { errors.Add("WHOIS (port 43): " + Whois43.Reason(ex)); }
-                continue;
-            }
-            string source = new Uri(url).Host;
-            bool ripe = Rdap.IsRipeStat(url);
-            try
-            {
-                var (body, status) = await Rdap.FetchAsync(url, token);
-
-                // Map the common RDAP HTTP statuses to a clear message instead of dumping the body.
-                if (status == 404) { errors.Add($"{source}: no registry record (HTTP 404)"); continue; }
-                if (status == 429) { errors.Add($"{source}: rate limited (HTTP 429) — try again shortly"); continue; }
-
-                if (status is >= 200 and < 300 && body.TrimStart().StartsWith('{'))
-                {
-                    // Up to 2 MB of JSON flattens into a lot of lines: parse and flatten off the UI thread.
-                    string? text = await Task.Run(() =>
-                    {
-                        if (ripe) return Rdap.RipeStatText(body) is { } whois ? TextLimit.Cap(whois) : null;
-                        using var doc = JsonDocument.Parse(body);
-                        var sb = new StringBuilder();
-                        ParseElement(doc.RootElement, sb);
-                        return TextLimit.Cap(sb.ToString());
-                    }, token);
-                    if (text == null) { errors.Add($"{source}: no record"); continue; }
-                    // where it came from, once at the top, when that isn't the registry's own RDAP
-                    if (ripe)
-                        text = "% via RIPEstat (the registry's WHOIS)" + (errors.Count > 0 ? "; " + string.Join("; ", errors) : "")
-                               + Environment.NewLine + Environment.NewLine + text;
-                    LogText = text;
-                    IsWorking = false;
-                    return;
-                }
-                errors.Add($"{source}: HTTP {status}");
-            }
-            catch (OperationCanceledException) when (token.IsCancellationRequested) { LogText = "cancelled."; IsWorking = false; return; }
-            // HttpClient.Timeout also surfaces as a cancellation: a slow / filtered rdap.org is a failed provider
-            // (try the next one), not a Stop — it used to end the whole WHOIS with "cancelled.".
-            catch (OperationCanceledException ex)
-            {
-                errors.Add($"{source}: timed out");
-                if (!ripe && kind != "domain") Rdap.RdapFailed(ex);
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"{source}: {ex.Message}");
-                if (!ripe && kind != "domain") Rdap.RdapFailed(ex);
-            }
-        }
-        if (ianaOnly != null) { ShowClassicWhois(ianaOnly, errors.Where(e => !e.StartsWith("WHOIS (port 43)", StringComparison.Ordinal)).ToList()); return; }
-        LogText = "No WHOIS data — " + (errors.Count > 0 ? string.Join("; ", errors) : "request failed / timed out") + ".";
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { LogText = "cancelled."; }
         IsWorking = false;
-
-        // the servers asked, once at the top, and what failed before, if anything
-        void ShowClassicWhois(Whois43.Answer answer, List<string> failed)
-        {
-            var heading = new List<string> { "% WHOIS " + string.Join(" → ", answer.Servers) };
-            if (answer.Note != null) heading.Add(answer.Note);
-            heading.AddRange(failed);
-            LogText = string.Join("; ", heading) + Environment.NewLine + Environment.NewLine + answer.Text;
-            IsWorking = false;
-        }
     }
 
     // A WHOIS handed over while a run goes on: it runs once that run has stopped.
@@ -495,24 +398,6 @@ public partial class DnsViewModel : ObservableObject
         => HostExtractor.FindAddresses(text).Where(a =>
             !IPAddress.TryParse(a.Split('/')[0], out var ip)
             || !(IPAddress.IsLoopback(ip) || ip.Equals(IPAddress.Any) || ip.Equals(IPAddress.IPv6Any)));
-
-    private static void ParseElement(JsonElement element, StringBuilder sb)
-    {
-        if (element.ValueKind == JsonValueKind.Object)
-        {
-            foreach (var property in element.EnumerateObject())
-            {
-                if (property.Value.ValueKind == JsonValueKind.Object || property.Value.ValueKind == JsonValueKind.Array)
-                    ParseElement(property.Value, sb);
-                else
-                    sb.AppendLine($"{property.Name}: {property.Value}");
-            }
-        }
-        else if (element.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in element.EnumerateArray()) ParseElement(item, sb);
-        }
-    }
 
     private List<QueryType> GetSelectedTypes()
     {
