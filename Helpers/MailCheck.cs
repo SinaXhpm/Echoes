@@ -24,7 +24,7 @@ public delegate Task<DnsResult> MailDnsQuery(string name, QueryType type, Cancel
 
 /// <summary>
 /// The email-domain check: MX (each host resolved), SPF (parsed, DNS lookups counted recursively), DMARC, DKIM under
-/// common selectors, MTA-STS (TXT + the HTTPS policy), TLS-RPT and the MX addresses on three DNS blocklists.
+/// common selectors, MTA-STS (TXT + the HTTPS policy), TLS-RPT and the MX addresses on five DNS blocklists.
 /// Every area reports ok / info / warning / fail findings with a one-line fix. Read-only: DNS queries and one HTTPS GET.
 /// </summary>
 public static class MailCheck
@@ -39,11 +39,15 @@ public static class MailCheck
         "fm1", "fm2", "fm3", "sig1", "mailjet", "key1", "key2", "cm",
     };
 
+    // Free lists that need no key (PSBL: "anybody is free to use"; DroneBL: "free of charge for both commercial and
+    // non-commercial purposes"), so one list's outage, rate limit or refusal of public resolvers still leaves answers.
     public static readonly (string Zone, string Name, string Delist)[] Blocklists =
     {
         ("zen.spamhaus.org", "Spamhaus ZEN", "https://check.spamhaus.org"),
         ("b.barracudacentral.org", "Barracuda", "https://www.barracudacentral.org/rbl/removal-request"),
         ("bl.spamcop.net", "SpamCop", "https://www.spamcop.net/bl.shtml"),
+        ("psbl.surriel.com", "PSBL", "https://psbl.org/remove"),
+        ("dnsbl.dronebl.org", "DroneBL", "https://dronebl.org/lookup"),
     };
 
     private const int MaxMxHosts = 10;
@@ -707,6 +711,31 @@ public static class MailCheck
                 _ => a,
             };
             return (ListState.Listed, code);
+        }
+        // DroneBL's answer names what the address was seen doing
+        if (zone == "dnsbl.dronebl.org")
+        {
+            string kind = a switch
+            {
+                "127.0.0.3" => "IRC spam drone",
+                "127.0.0.5" => "bottler",
+                "127.0.0.6" => "worm or spambot",
+                "127.0.0.7" => "DDoS drone",
+                "127.0.0.8" => "open SOCKS proxy",
+                "127.0.0.9" => "open HTTP proxy",
+                "127.0.0.10" => "proxy chain",
+                "127.0.0.11" => "web page proxy",
+                "127.0.0.12" => "open DNS resolver",
+                "127.0.0.13" => "dictionary attacks",
+                "127.0.0.14" => "open WinGate proxy",
+                "127.0.0.15" => "compromised router",
+                "127.0.0.16" => "autorooting worm",
+                "127.0.0.17" => "botnet",
+                "127.0.0.18" => "compromised host name",
+                "127.0.0.19" => "abused VPN",
+                _ => a,
+            };
+            return (ListState.Listed, kind);
         }
         return (ListState.Listed, a);
     }

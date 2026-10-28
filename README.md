@@ -239,7 +239,7 @@ Type a site or server and press Diagnose. Echoes checks everything between you a
 - Look up A, AAAA, MX, NS, TXT, CNAME, SOA, SRV, CAA and PTR records, several types at once.
 - **Encrypted DNS:** use plain resolvers (`1.1.1.1`, `8.8.8.8:53`), DNS over HTTPS (`https://1.1.1.1/dns-query`) or DNS over TLS (`tls://1.1.1.1`), picked from a presets menu (Cloudflare, Google, Quad9, OpenDNS, AdGuard, Shecan, Electro) or typed in. Each answer shows which transport answered and how fast.
 - **Compare resolvers:** query one name through many resolvers at once: median speed, success rate and answers, with tampered or filtered answers flagged and the fastest trustworthy resolver recommended.
-- **Email check:** MX, SPF (with the 10-lookup limit), DMARC, DKIM (common selectors), MTA-STS, TLS-RPT and spam blocklists for a domain, each with a one-line fix.
+- **Email check:** MX, SPF (with the 10-lookup limit), DMARC, DKIM (common selectors), MTA-STS, TLS-RPT and spam blocklists (Spamhaus, SpamCop, Barracuda, PSBL and DroneBL) for a domain, each with a one-line fix.
 - **WHOIS that keeps working:** domain registration details through classic WHOIS (from IANA to the registry and the registrar), RDAP and two WHOIS web services; addresses and AS numbers through RDAP, RIPEstat, WHOIS and ip.guide. Sources are asked one after another until one answers, so a blocked or down service doesn't end the lookup, and country domains without RDAP, such as `.ir`, work too.
 - Paste a full URL and Echoes takes the host name out of it.
 
