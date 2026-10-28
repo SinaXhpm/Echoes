@@ -53,33 +53,42 @@ public static class ServiceDns
         return await ConnectAsync(addresses, endpoint.Port, ct).ConfigureAwait(false);
     }
 
-    /// <summary>The addresses to use for <paramref name="host"/>; throws a host-not-found <see cref="SocketException"/>
-    /// (with every source's reason) when no source has a usable one.</summary>
-    public static async Task<IPAddress[]> ResolveAsync(string host, CancellationToken ct)
+    /// <summary>The addresses to use for <paramref name="host"/>, of <paramref name="family"/> only when given (a lookup
+    /// that must go out over IPv4 or IPv6); throws an <see cref="IOException"/> (host not found, with every source's
+    /// reason) when no source has a usable one.</summary>
+    public static async Task<IPAddress[]> ResolveAsync(string host, CancellationToken ct, AddressFamily? family = null)
     {
-        if (s_cache.TryGetValue(host, out var cached) && cached.Until > DateTime.UtcNow) return cached.Addresses;
+        string key = family is { } f ? host + "|" + f : host;
+        if (s_cache.TryGetValue(key, out var cached) && cached.Until > DateTime.UtcNow) return cached.Addresses;
         var sources = new List<Fallback.Source<IPAddress[]>>
         {
             new("system", async t =>
             {
-                var answer = (await Dns.GetHostAddressesAsync(host, t).ConfigureAwait(false)).Where(Usable).ToArray();
+                var answer = (await Dns.GetHostAddressesAsync(host, family ?? AddressFamily.Unspecified, t).ConfigureAwait(false))
+                    .Where(Usable).ToArray();
                 return answer.Length > 0 ? answer : null;   // nothing, or only a filter's / private address
             }),
         };
         foreach (string resolver in Resolvers)
-            sources.Add(new(new Uri(resolver).Host, t => ViaDohAsync(resolver, host, t)));
+            sources.Add(new(new Uri(resolver).Host, t => ViaDohAsync(resolver, host, family, key, t)));
         // Per name: a blocked one moves to DoH for the session, the others stay with the system.
-        var result = await Fallback.FirstAsync("dns:" + host, sources, ct, HeadStart, PerSource).ConfigureAwait(false);
+        var result = await Fallback.FirstAsync("dns:" + key, sources, ct, HeadStart, PerSource).ConfigureAwait(false);
         if (result.Value is { } addresses) return addresses;
         throw new IOException($"{host}: no usable address ({string.Join("; ", result.Errors)})", new SocketException((int)SocketError.HostNotFound));
     }
 
-    private static async Task<IPAddress[]?> ViaDohAsync(string resolver, string host, CancellationToken ct)
+    private static async Task<IPAddress[]?> ViaDohAsync(string resolver, string host, AddressFamily? family, string key, CancellationToken ct)
     {
         if (!ResolverSpec.TryParse(resolver, out var spec, out _)) return null;
         int ttl = int.MaxValue;
         var found = new List<IPAddress>();
-        foreach (var type in new[] { QueryType.A, QueryType.AAAA })
+        var types = family switch
+        {
+            AddressFamily.InterNetwork => new[] { QueryType.A },
+            AddressFamily.InterNetworkV6 => new[] { QueryType.AAAA },
+            _ => new[] { QueryType.A, QueryType.AAAA },
+        };
+        foreach (var type in types)
         {
             var result = await SecureDns.QueryAsync(spec, host, type, ct, PerSource).ConfigureAwait(false);
             if (!result.Answered) throw new IOException(result.ShortError ?? result.Error ?? "no answer");
@@ -94,7 +103,7 @@ public static class ServiceDns
         if (found.Count == 0) return null;
         var addresses = found.ToArray();
         var keepFor = TimeSpan.FromSeconds(Math.Clamp(ttl, 30, (int)MaxCacheFor.TotalSeconds));
-        s_cache[host] = (addresses, DateTime.UtcNow + keepFor);
+        s_cache[key] = (addresses, DateTime.UtcNow + keepFor);
         return addresses;
     }
 

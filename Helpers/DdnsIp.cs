@@ -327,7 +327,7 @@ public static class DdnsIpDetector
         var af = family == DdnsFamily.V4 ? AddressFamily.InterNetwork : AddressFamily.InterNetworkV6;
         string host = ep.Host.Length > 2 && ep.Host[0] == '[' && ep.Host[^1] == ']' ? ep.Host[1..^1] : ep.Host;
         IPAddress[] addrs = IPAddress.TryParse(host, out var literal) ? new[] { literal }
-            : serviceDns ? await ServiceDns.ResolveAsync(host, ct).ConfigureAwait(false)
+            : serviceDns ? await ServiceDns.ResolveAsync(host, ct, af).ConfigureAwait(false)
             : await Dns.GetHostAddressesAsync(host, af, ct).ConfigureAwait(false);
         Exception? last = null;
         foreach (var a in addrs)
