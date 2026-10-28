@@ -74,7 +74,8 @@ public partial class WebServerViewModel
     public bool IsFilesTab => SubTabIndex == 1;
     public bool IsLogTab => SubTabIndex == 2;
 
-    // The view tells whether the page is on screen (attached); with the Chat tab of Share & chat it means "read".
+    // The view tells whether the page can be seen (attached and not hidden: a phone hides the page it leaves, a desktop
+    // window may be hidden to the tray); with the Chat tab of Share & chat it means "read".
     private bool _viewShown;
     private long _lastSound = -10_000;
 

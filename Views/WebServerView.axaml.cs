@@ -20,6 +20,8 @@ public partial class WebServerView : UserControl
     private bool _stick = true;        // follow new messages while the user is at the bottom
     private bool _scrollQueued;
     private bool _macRestoreTried;
+    // the page on screen (a phone hides the page it leaves rather than detaching it): the chat counts as read only then
+    private readonly Controls.ShownWatch _shown;
 
     private void CtBindBox_DropDownOpened(object? sender, EventArgs e)
     {
@@ -44,10 +46,17 @@ public partial class WebServerView : UserControl
             if (_chatScroll != null) _chatScroll.ScrollChanged += OnChatScrollChanged;
             if (_vm is { ChatItems.Count: > 0 }) Dispatcher.UIThread.Post(() => ScrollToBottom(3), DispatcherPriority.Background);
         };
-        // back on screen after another tool: messages that came meanwhile scrolled nothing, so catch up to the end
+        // back on screen after another tool or sub-tab: messages that came meanwhile scrolled nothing, so catch up to the end
         ChatList.AttachedToVisualTree += (_, _) =>
         {
             if (_stick && _vm is { ChatItems.Count: > 0 }) QueueScroll();
+        };
+        _shown = new Controls.ShownWatch(this);
+        _shown.Changed += shown =>
+        {
+            if (_vm is null) return;
+            _vm.ViewShown = shown;
+            if (shown && _stick && _vm.ChatItems.Count > 0) QueueScroll();
         };
     }
 
@@ -56,14 +65,17 @@ public partial class WebServerView : UserControl
         base.OnDataContextChanged(e);
         if (_vm != null) _vm.ChatItems.CollectionChanged -= OnChatChanged;
         _vm = DataContext as WebServerViewModel;
-        if (_vm != null) _vm.ChatItems.CollectionChanged += OnChatChanged;
+        if (_vm != null)
+        {
+            _vm.ChatItems.CollectionChanged += OnChatChanged;
+            _vm.ViewShown = _shown.IsShown;
+        }
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
         if (_vm is null) return;
-        _vm.ViewShown = true;
         // Android: reopen the folder picked last time (its permission was kept with the bookmark)
         if (_vm.NeedsAndroidFolder && _vm.AndroidFolderBookmark is { Length: > 0 } bookmark)
             _ = RestoreAndroidFolderAsync(bookmark);
@@ -74,12 +86,6 @@ public partial class WebServerView : UserControl
             _macRestoreTried = true;
             _ = RestoreMacFolderAsync(macBookmark);
         }
-    }
-
-    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
-    {
-        base.OnDetachedFromVisualTree(e);
-        if (_vm != null) _vm.ViewShown = false;
     }
 
     // ---------------- chat: follow the newest message ----------------

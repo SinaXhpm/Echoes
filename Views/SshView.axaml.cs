@@ -38,33 +38,48 @@ public partial class SshView : UserControl
         };
 
         if (AppPlatform.IsMobile) SshRoot.Classes.Add("touch");
+        _shown = new Controls.ShownWatch(this);
+        _shown.Changed += _ => ReportPanes();
     }
 
     // A sub-tab's content is in the visual tree only while it is shown: the Files listing loads on first view, and the
-    // Server view polls only while it is attached (switching tools detaches the whole page too). Both tabs are built the
-    // first time they are shown (Views/Controls/Deferred), so their panes report themselves (XAML events) as they come.
-    private Control? _filesPane, _serverPane;
+    // Server view polls only while it can be seen (switching tools detaches the whole page on a desktop, hides it on a
+    // phone: hence the page's own watch). Both tabs are built the first time they are shown (Views/Controls/Deferred), so
+    // their panes report themselves (XAML events) as they come.
+    private readonly Controls.ShownWatch _shown;
+    private Control? _serverPane;
+    private bool _filesAttached, _serverAttached;
 
     private void FilesPane_Attached(object? sender, VisualTreeAttachmentEventArgs e)
     {
-        _filesPane = sender as Control;
-        if (_vm is not null) _vm.FilesViewShown = true;
+        _filesAttached = true;
+        ReportPanes();
     }
 
     private void FilesPane_Detached(object? sender, VisualTreeAttachmentEventArgs e)
     {
-        if (_vm is not null) _vm.FilesViewShown = false;
+        _filesAttached = false;
+        ReportPanes();
     }
 
     private void ServerPane_Attached(object? sender, VisualTreeAttachmentEventArgs e)
     {
         _serverPane = sender as Control;
-        if (_vm is not null) _vm.ServerViewShown = true;
+        _serverAttached = true;
+        ReportPanes();
     }
 
     private void ServerPane_Detached(object? sender, VisualTreeAttachmentEventArgs e)
     {
-        if (_vm is not null) _vm.ServerViewShown = false;
+        _serverAttached = false;
+        ReportPanes();
+    }
+
+    private void ReportPanes()
+    {
+        if (_vm is null) return;
+        _vm.FilesViewShown = _filesAttached && _shown.IsShown;
+        _vm.ServerViewShown = _serverAttached && _shown.IsShown;
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -75,8 +90,7 @@ public partial class SshView : UserControl
         if (_vm is null) return;
         // a minimized window or a phone app in the background keeps the pane "visible": no commands on the server then
         _vm.ServerViewProbe = () => _serverPane is { } pane && AppPlatform.OnScreen(pane);
-        _vm.FilesViewShown = _filesPane is { } files && TopLevel.GetTopLevel(files) is not null;
-        _vm.ServerViewShown = _serverPane is { } server && TopLevel.GetTopLevel(server) is not null;
+        ReportPanes();
     }
 
     // ---------------------------------------------------------------- key file

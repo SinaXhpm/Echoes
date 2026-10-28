@@ -1,13 +1,10 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Reactive;
 using Avalonia.Threading;
-using Avalonia.VisualTree;
 using Echoes.Helpers;
 using Echoes.ViewModels;
 
@@ -30,13 +27,15 @@ public partial class MonitorView : UserControl
     // The phone shell hides the page it leaves (IsVisible on the page's host) instead of taking it out of the visual tree,
     // so detaching alone left the clock ticking behind every other page for the rest of the session: it follows the
     // visibility of the view and of its ancestors too.
-    private readonly List<IDisposable> _visibilityWatch = new();
+    private readonly Controls.ShownWatch _shown;
     private MonitorViewModel? _vm;
 
     public MonitorView()
     {
         InitializeComponent();
         _clock.Tick += (_, _) => { if (OnScreen()) _vm?.Tick(); };
+        _shown = new Controls.ShownWatch(this);
+        _shown.Changed += _ => UpdateClock();
 
         // Tunnel so we see Enter before the AcceptsReturn boxes turn it into a newline. Desktop only: a phone keyboard
         // has no Shift+Enter, so there Enter must stay a newline (one target per line) and the buttons add / save.
@@ -72,17 +71,12 @@ public partial class MonitorView : UserControl
     {
         base.OnAttachedToVisualTree(e);
         AppPlatform.ForegroundChanged += UpdateClock;
-        for (Visual? v = this; v is not null; v = v.GetVisualParent())
-            _visibilityWatch.Add(v.GetPropertyChangedObservable(IsVisibleProperty)
-                                  .Subscribe(new AnonymousObserver<AvaloniaPropertyChangedEventArgs>(_ => UpdateClock())));
         UpdateClock();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         AppPlatform.ForegroundChanged -= UpdateClock;
-        foreach (var watch in _visibilityWatch) watch.Dispose();
-        _visibilityWatch.Clear();
         _clock.Stop();
         base.OnDetachedFromVisualTree(e);
     }
