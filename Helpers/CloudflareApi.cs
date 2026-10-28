@@ -174,7 +174,9 @@ public sealed class CloudflareApi : IDisposable
             handler.Proxy = wp;
             handler.UseProxy = true;
         }
-        // No proxy given: the system proxy applies (SocketsHttpHandler's default), as with HttpHelper.
+        // No proxy given: the system proxy applies (SocketsHttpHandler's default), as with HttpHelper, and
+        // api.cloudflare.com's name goes around a resolver that blocks it (ServiceDns).
+        else handler.ConnectCallback = ServiceDns.ConnectAsync;
 
         var http = new HttpClient(handler) { Timeout = Timeout };
         var ver = typeof(CloudflareApi).Assembly.GetName().Version;

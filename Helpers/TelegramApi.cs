@@ -220,7 +220,9 @@ public sealed class TelegramApi : IDisposable
             handler.Proxy = wp;
             handler.UseProxy = true;
         }
-        // No proxy given: the system proxy applies (SocketsHttpHandler's default), as with HttpHelper.
+        // No proxy given: the system proxy applies (SocketsHttpHandler's default), as with HttpHelper, and
+        // api.telegram.org's name goes around a resolver that blocks it (ServiceDns).
+        else handler.ConnectCallback = ServiceDns.ConnectAsync;
 
         // The per-call deadline (re-armed while bytes move) replaces HttpClient.Timeout, which would cut a slow upload.
         var http = new HttpClient(handler) { Timeout = System.Threading.Timeout.InfiniteTimeSpan };

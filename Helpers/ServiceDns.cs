@@ -40,11 +40,15 @@ public static class ServiceDns
     // own answers are cached by the system.
     private static readonly ConcurrentDictionary<string, (IPAddress[] Addresses, DateTime Until)> s_cache = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>A <see cref="SocketsHttpHandler.ConnectCallback"/> that resolves as described above.</summary>
+    /// <summary>A <see cref="SocketsHttpHandler.ConnectCallback"/> that resolves as described above. A connection to the
+    /// system's proxy (another host than the request's) resolves as the system does: a local or private proxy address is
+    /// what it should be.</summary>
     public static async ValueTask<Stream> ConnectAsync(SocketsHttpConnectionContext context, CancellationToken ct)
     {
         var endpoint = context.DnsEndPoint;
+        bool toProxy = !string.Equals(endpoint.Host, context.InitialRequestMessage.RequestUri?.IdnHost, StringComparison.OrdinalIgnoreCase);
         IPAddress[] addresses = IPAddress.TryParse(endpoint.Host, out var literal) ? new[] { literal }
+            : toProxy ? await Dns.GetHostAddressesAsync(endpoint.Host, ct).ConfigureAwait(false)
             : await ResolveAsync(endpoint.Host, ct).ConfigureAwait(false);
         return await ConnectAsync(addresses, endpoint.Port, ct).ConfigureAwait(false);
     }
