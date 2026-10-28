@@ -375,18 +375,20 @@ public static class DoctorDns
         return r;
     }
 
-    // Asked at once at the start, the head start of each next one, the most running at a time, and the grace the ones
-    // still running get once one has answered.
+    // The first two are asked at once and get a second to themselves: a first answer over a fresh connection on a distant
+    // link takes 0.6 to 1 s (650-990 ms on the test network). Then the next starts every 300 ms, at most eight run at a
+    // time, and the ones still running get a grace period once one has answered.
     private const int DohFirstWave = 2, DohMaxRunning = 8;
-    private static readonly TimeSpan DohHeadStart = TimeSpan.FromMilliseconds(300), DohGrace = TimeSpan.FromMilliseconds(700);
+    private static readonly TimeSpan DohFirstWaveAlone = TimeSpan.FromSeconds(1), DohHeadStart = TimeSpan.FromMilliseconds(300),
+                                     DohGrace = TimeSpan.FromMilliseconds(700);
 
     /// <summary>
-    /// Asks the DoH endpoints in their order, a few at a time: the first two at once, then the next whenever one fails, or
-    /// after a head start without an answer. Once one has answered, no other is asked; those already asked get a short
-    /// grace period (so their answers can join the trusted set) and are then left behind — a filtered endpoint never
-    /// holds the run up. Each endpoint asked learns the name, so the order is also who learns it: one further down only
-    /// when those before it don't answer. None starts later than <paramref name="timeoutMs"/> plus 1.5 s after the first.
-    /// The result holds the endpoints that were asked, in their order.
+    /// Asks the DoH endpoints in their order, a few at a time: the first two at once; once they have had a second without
+    /// an answer, the next every 300 ms; and the next at once whenever one fails. Once one has answered, no other is asked;
+    /// those already asked get a short grace period (so their answers can join the trusted set) and are then left behind —
+    /// a filtered endpoint never holds the run up. Each endpoint asked learns the name, so the order is also who learns
+    /// it: one further down only when those before it don't answer. None starts later than <paramref name="timeoutMs"/>
+    /// plus 2 s after the first. The result holds the endpoints that were asked, in their order.
     /// </summary>
     public static async Task<List<DoctorDnsAnswer>> DohAllAsync(HttpClient http, IReadOnlyList<DoctorDohEndpoint> endpoints, string name,
                                                                 int timeoutMs, CancellationToken ct)
@@ -395,7 +397,7 @@ public static class DoctorDns
         var answers = new DoctorDnsAnswer?[endpoints.Count];
         var running = new Dictionary<Task<DoctorDnsAnswer>, int>();
         var clock = Stopwatch.StartNew();
-        var lastStart = TimeSpan.FromMilliseconds(timeoutMs + 1500);
+        var lastStart = TimeSpan.FromMilliseconds(timeoutMs + 2000);
         int next = 0;
         TimeSpan nextAt = TimeSpan.Zero;
         TimeSpan? graceEnd = null;
@@ -404,7 +406,7 @@ public static class DoctorDns
         {
             running.Add(DohAsync(http, endpoints[next], name, timeoutMs, cts.Token), next);
             next++;
-            nextAt = clock.Elapsed + DohHeadStart;
+            nextAt = Max(DohFirstWaveAlone, clock.Elapsed + DohHeadStart);
         }
 
         while (next < DohFirstWave && CanStart()) Start();
