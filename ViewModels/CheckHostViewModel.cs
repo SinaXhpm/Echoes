@@ -310,6 +310,7 @@ public partial class CheckHostViewModel : ObservableObject
         DrainQueue();
         if (end == CheckHostEnd.Deadline && NoneReported())
             throw new CheckHostException($"check-host.net's nodes sent no result within {CheckHostErrors.Seconds(Polling.Deadline)}.");
+        s_checkHostFailed = false;   // it answers again: the next start gets the full wait
         return end;
     }
 
