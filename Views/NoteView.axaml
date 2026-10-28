@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Echoes.ViewModels"
              xmlns:helpers="using:Echoes.Helpers"
+             xmlns:ctl="using:Echoes.Views.Controls"
              x:Class="Echoes.Views.NoteView"
              x:DataType="vm:NoteViewModel">
 
@@ -35,6 +36,11 @@
         </Style>
         <Style Selector="Button.secondary Path.glyph">
             <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <!-- the search field's magnifier, quieter (a style: inside the unlocked page's template a DynamicResource set on the
+             element ranks below the class styles above) -->
+        <Style Selector="Panel#SearchCell Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
         </Style>
         <!-- 48px icon tile at the top of the unlock card and the empty editor -->
         <Style Selector="Border.hero">
@@ -222,8 +228,9 @@
             </Border>
         </ScrollViewer>
 
-        <!-- ===== Unlocked ===== -->
-        <DockPanel IsVisible="{Binding !IsLocked}">
+        <!-- ===== Unlocked: built the first time the notes open (every start begins locked) ===== -->
+        <ctl:Deferred IsVisible="{Binding !IsLocked}"><DataTemplate x:DataType="vm:NoteViewModel">
+        <DockPanel>
             <!-- a failed save (disk full, …) must not go unnoticed while the notes are open -->
             <Border DockPanel.Dock="Top" Margin="0,0,0,12" Padding="12,8" CornerRadius="{StaticResource Radius.Md}" BorderThickness="1"
                     Background="{DynamicResource Danger.Soft}" BorderBrush="{DynamicResource Danger.Border}"
@@ -304,7 +311,7 @@
                 <Panel x:Name="SearchCell">
                     <TextBox Classes="field" Text="{Binding SearchQuery}" PlaceholderText="Search notes" Padding="8,0,8,0">
                         <TextBox.InnerLeftContent>
-                            <Path Classes="glyph" Data="{StaticResource NoteGlyphSearch}" Stroke="{DynamicResource Text.Muted}" Margin="12,0,0,0"/>
+                            <Path Classes="glyph" Data="{StaticResource NoteGlyphSearch}" Margin="12,0,0,0"/>
                         </TextBox.InnerLeftContent>
                         <TextBox.InnerRightContent>
                             <TextBlock Text="{Binding FilteredNotes.Count}" ToolTip.Tip="Notes shown"
@@ -442,5 +449,6 @@
                 </Border>
             </Grid>
         </DockPanel>
+        </DataTemplate></ctl:Deferred>
     </Panel>
 </UserControl>
