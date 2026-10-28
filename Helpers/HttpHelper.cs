@@ -30,13 +30,17 @@ public static class HttpHelper
     /// moved repository). SocketsHttpHandler drops the Authorization header on every redirect and never follows https →
     /// http, but it replays every OTHER request header to wherever a redirect points — so a caller must not add a secret
     /// header (an API key, a cookie) or put one in the URL. None does: the tools that send credentials (Cloudflare,
-    /// Telegram) build their own handler with redirects off. Proxy credentials only ever go to the proxy.</para></summary>
+    /// Telegram) build their own handler with redirects off. Proxy credentials only ever go to the proxy.</para>
+    /// <para><paramref name="serviceDns"/>: a client for a web service a tool is built on (not a host the user tests)
+    /// resolves names through <see cref="ServiceDns"/>, which goes around a resolver that blocks the name. Not with a
+    /// proxy: the proxy resolves them.</para></summary>
     public static HttpClient Create(
         string? proxyAddress = null,
         string? proxyUser = null,
         string? proxyPass = null,
         bool skipSslVerify = false,
-        TimeSpan? timeout = null)
+        TimeSpan? timeout = null,
+        bool serviceDns = false)
     {
         // Validate the proxy before allocating the handler: WebProxy(string) runs new Uri() and throws a
         // bare UriFormatException on a typo ("1.2.3.4 8080", port 99999), which reads as a crash.
@@ -67,6 +71,8 @@ public static class HttpHelper
             handler.Proxy = proxy;
             handler.UseProxy = true;
         }
+        else if (serviceDns)
+            handler.ConnectCallback = ServiceDns.ConnectAsync;
 
         if (skipSslVerify)
             handler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;

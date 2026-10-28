@@ -316,7 +316,7 @@ public static class MonitorChecks
 
     private static async Task<(int Status, string Body)> FetchRdapAsync(string url, CancellationToken ct)
     {
-        using var client = HttpHelper.Create(timeout: RdapTimeout);
+        using var client = HttpHelper.Create(timeout: RdapTimeout, serviceDns: RdapBaseUrl == DefaultRdapBase);
         client.DefaultRequestHeaders.Accept.ParseAdd("application/rdap+json");
         client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);

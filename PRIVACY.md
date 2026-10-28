@@ -24,7 +24,7 @@ Echoes is a network tool, so it makes network requests: the ones you start, to t
 - **The hosts, ports and URLs you test** (ping, traceroute, port scan, cURL, DNS, TLS, SSH, sockets, Doctor).
 - **check-host.net**, to test a host from servers around the world.
 - **Speed test servers:** speed.cloudflare.com, or the file host you choose (Cloudflare, Tele2, Leaseweb, Linode, Selectel, DataPacket and similar).
-- **Public DNS-over-HTTPS resolvers** (Cloudflare, Google, Quad9, OpenDNS, AdGuard) when you use the DNS tool.
+- **Public DNS-over-HTTPS resolvers** (Cloudflare, Google, Quad9, OpenDNS, AdGuard) when you use the DNS tool. The same resolvers, and DNS.SB, are also asked for the name of a service Echoes itself uses (such as rdap.org or api.github.com), but only when your network's own resolver doesn't answer for it or answers with a filter's address. The hosts you test are always looked up the way your system looks them up.
 - **IP-information providers** (ipinfo.io, ipwho.is, ipapi.co, ip-api.com, geojs.io, freeipapi.com, iplocation.net) to look up the IP address you enter, or your own.
 - **WHOIS and RDAP**, for a domain's registration and expiry and for who holds an IP address or AS number. Each lookup asks one source after another until one answers:
   - the WHOIS servers on port 43 (whois.iana.org, then the registry's and the registrar's server it points to; ARIN's whois.arin.net for addresses);

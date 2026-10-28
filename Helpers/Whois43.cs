@@ -141,8 +141,8 @@ public static class Whois43
     {
         using var hop = CancellationTokenSource.CreateLinkedTokenSource(ct);
         hop.CancelAfter(HopTimeout);
-        var addresses = (await Dns.GetHostAddressesAsync(server, hop.Token).ConfigureAwait(false))
-            .Where(a => Rdap.SpecialPurpose(a) == null)
+        // ServiceDns: the system's answer, or public DoH's when the system's resolver blocks the name; public addresses only
+        var addresses = (await ServiceDns.ResolveAsync(server, hop.Token).ConfigureAwait(false))
             .OrderBy(a => a.AddressFamily == AddressFamily.InterNetworkV6)   // IPv4 first: some servers' IPv6 drops it
             .ToArray();
         if (addresses.Length == 0) throw new SocketException((int)SocketError.HostNotFound);

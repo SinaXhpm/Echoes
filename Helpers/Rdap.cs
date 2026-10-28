@@ -56,7 +56,7 @@ public static class Rdap
     // cancels at its own deadline.
     private static readonly Lazy<HttpClient> s_client = new(() =>
     {
-        var client = HttpHelper.Create(timeout: Timeout);
+        var client = HttpHelper.Create(timeout: Timeout, serviceDns: true);
         client.DefaultRequestHeaders.Accept.ParseAdd("application/rdap+json");
         client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         return client;
