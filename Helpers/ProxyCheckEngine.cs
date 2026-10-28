@@ -1,11 +1,15 @@
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -55,7 +59,8 @@ public sealed class ProxyCheckResult
 /// Checks one proxy: TCP reachability and connect time, the protocol (SOCKS5, SOCKS4/4a or HTTP CONNECT / plain HTTP —
 /// detected when the line doesn't say), login failures, and one light request through it to an IP echo service
 /// (Cloudflare's https://www.cloudflare.com/cdn-cgi/trace) for the exit IP, its country and the time to first byte.
-/// A proxy that only forwards plain http:// requests (no CONNECT) is tried with the same page over http://.
+/// A proxy that only forwards plain http:// requests (no CONNECT) is tried with the same page over http://. When the
+/// trace doesn't come through a proxy that took the request, other IP services are asked through it the same way.
 /// </summary>
 public static class ProxyCheckEngine
 {
@@ -68,31 +73,64 @@ public static class ProxyCheckEngine
     // Cloudflare's trace by NAME: the TLS hello then carries a server name (some networks' filters reset one without, as to
     // https://1.1.1.1), and http:// is served too (1.1.1.1 redirects it to https). The proxy resolves the name (SOCKS5,
     // HTTP); SOCKS4 can't, so it gets an IPv4 address looked up here.
-    private sealed record Echo(string Host, int Port, bool Tls, string Path);
+    private sealed record Echo(string Name, string Host, int Port, bool Tls, string Path);
 
-    private static readonly Echo RealEcho = new("www.cloudflare.com", 443, true, "/cdn-cgi/trace");
-    private static readonly Echo RealPlainEcho = new("www.cloudflare.com", 80, false, "/cdn-cgi/trace");
+    private static readonly Echo RealEcho = new("Cloudflare", "www.cloudflare.com", 443, true, "/cdn-cgi/trace");
+    private static readonly Echo RealPlainEcho = new("Cloudflare", "www.cloudflare.com", 80, false, "/cdn-cgi/trace");
+
+    // When the trace doesn't come through (Cloudflare unreachable or refusing from the proxy's exit, its name filtered on
+    // the way), these are asked through the same proxy, the same way, for the exit IP and its country: the ones not on
+    // Cloudflare's network first (ipinfo.io, ipleak.net). Through a tunnel over HTTPS, so the proxy can't rewrite the
+    // answer; a proxy without CONNECT only relays http:// (ip.sb and country.is send that on to https).
+    private static readonly Echo[] RealTunnelEchoes =
+    {
+        new("ipinfo.io", "ipinfo.io", 443, true, "/json"),
+        new("ipleak.net", "ipleak.net", 443, true, "/json/"),
+        new("ipwho.is", "ipwho.is", 443, true, "/"),
+        new("ifconfig.co", "ifconfig.co", 443, true, "/json"),
+        new("ip.sb", "api.ip.sb", 443, true, "/geoip"),
+        new("country.is", "api.country.is", 443, true, "/"),
+    };
+
+    private static readonly Echo[] RealPlainEchoes =
+    {
+        new("ipinfo.io", "ipinfo.io", 80, false, "/json"),
+        new("ip-api.com", "ip-api.com", 80, false, "/json/?fields=status,countryCode,query"),
+        new("ipleak.net", "ipleak.net", 80, false, "/json/"),
+        new("ipwho.is", "ipwho.is", 80, false, "/"),
+        new("ifconfig.co", "ifconfig.co", 80, false, "/json"),
+    };
+
     private static Echo? _testEcho;
+    private static Echo[] _testOthers = Array.Empty<Echo>();
+
+    // The other IP services: two at a time, a head start apart, each with its own deadline, all within a budget (after a
+    // timeout only the first two: the proxy most likely doesn't relay anything).
+    private static readonly TimeSpan OthersHeadStart = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan OthersPerSource = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan OthersBudget = TimeSpan.FromSeconds(16);
 
     private static readonly SemaphoreSlim V4Gate = new(1, 1);
-    private static (string Host, IPAddress Address, long Until)? _v4Cache;
+    private static readonly ConcurrentDictionary<string, (IPAddress Address, long Until)> s_v4 = new(StringComparer.OrdinalIgnoreCase);
 
-    // The echo host's IPv4 address for SOCKS4 (cached for 10 minutes: one lookup for a whole list).
+    // An echo host's IPv4 address for SOCKS4 (cached for 10 minutes: one lookup for a whole list). The proxy is handed the
+    // address, so it is resolved around a resolver that blocks the name (ServiceDns): a filter's answer would send it nowhere.
     private static async Task<IPAddress?> EchoIpv4Async(Echo echo, CancellationToken ct)
     {
         if (IPAddress.TryParse(echo.Host, out var literal)) return literal.AddressFamily == AddressFamily.InterNetwork ? literal : null;
+        if (s_v4.TryGetValue(echo.Host, out var c) && c.Until > Environment.TickCount64) return c.Address;
         await V4Gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (_v4Cache is { } c && c.Host == echo.Host && c.Until > Environment.TickCount64) return c.Address;
+            if (s_v4.TryGetValue(echo.Host, out c) && c.Until > Environment.TickCount64) return c.Address;
             using var dns = CancellationTokenSource.CreateLinkedTokenSource(ct);
             dns.CancelAfter(ConnectTimeout);
             IPAddress[] all;
-            try { all = await Dns.GetHostAddressesAsync(echo.Host, AddressFamily.InterNetwork, dns.Token).ConfigureAwait(false); }
+            try { all = await ServiceDns.ResolveAsync(echo.Host, dns.Token).ConfigureAwait(false); }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return null; }
-            catch (SocketException) { return null; }
+            catch (Exception ex) when (ex is SocketException or IOException) { return null; }
             var a = Array.Find(all, x => x.AddressFamily == AddressFamily.InterNetwork);
-            if (a != null) _v4Cache = (echo.Host, a, Environment.TickCount64 + 10 * 60_000);
+            if (a != null) s_v4[echo.Host] = (a, Environment.TickCount64 + 10 * 60_000);
             return a;
         }
         finally { V4Gate.Release(); }
@@ -100,21 +138,47 @@ public static class ProxyCheckEngine
 
     /// <summary>
     /// Test hook: the IP echo service as a loopback plain-HTTP URL (http://127.0.0.1:port/path) answering in the trace
-    /// format ("ip=…\nloc=…"). Only loopback is accepted. Null restores Cloudflare's. Not bound to any UI or setting.
+    /// format ("ip=…\nloc=…"), a JSON object ("ip", "country_code") or a bare address; <paramref name="others"/> stand in
+    /// for the other IP services (none: none is asked). Only loopback is accepted. Null restores the real services. Not
+    /// bound to any UI or setting.
     /// </summary>
-    internal static void SetTestEcho(string? url)
+    internal static void SetTestEcho(string? url, params string[] others)
     {
-        if (url is null) { _testEcho = null; return; }
+        if (url is null)
+        {
+            _testEcho = null;
+            _testOthers = Array.Empty<Echo>();
+            return;
+        }
+        _testEcho = TestEcho(url, "test");
+        _testOthers = others.Select((o, i) => TestEcho(o, "test" + (i + 2))).ToArray();
+    }
+
+    private static Echo TestEcho(string url, string name)
+    {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || u.Scheme != Uri.UriSchemeHttp || !IPAddress.TryParse(u.Host, out var ip)
             || !IPAddress.IsLoopback(ip) || ip.AddressFamily != AddressFamily.InterNetwork)
             throw new ArgumentException("The test echo must be an http://127.x.x.x URL.");
-        _testEcho = new Echo(u.Host, u.Port, false, u.PathAndQuery);
+        return new Echo(name, u.Host, u.Port, false, u.PathAndQuery);
     }
 
     private static Echo TunnelEcho => _testEcho ?? RealEcho;
     private static Echo PlainEcho => _testEcho ?? RealPlainEcho;
+    private static Echo[] OtherEchoes(Via via) => _testEcho != null ? _testOthers : via == Via.Plain ? RealPlainEchoes : RealTunnelEchoes;
 
     private enum Verdict { NotThis, Done }
+
+    // How a proxy was found to carry a request: what a request to another IP service through it repeats.
+    private enum Via { Socks5, Socks4, Socks4a, Connect, Plain }
+
+    private static Via ViaOf(string proto) => proto switch
+    {
+        "SOCKS5" => Via.Socks5,
+        "SOCKS4" => Via.Socks4,
+        "SOCKS4a" => Via.Socks4a,
+        "HTTP" => Via.Connect,
+        _ => Via.Plain,
+    };
 
     private sealed class Step
     {
@@ -126,6 +190,12 @@ public static class ProxyCheckEngine
         public int HttpCode;
         /// <summary>The answer came from Cloudflare (a CF-RAY header): the proxy did relay it.</summary>
         public bool Relayed;
+        /// <summary>The proxy took the request but the IP service's answer didn't come through: the other IP services are
+        /// asked through it this way (<see cref="Result"/> stands when none answers either).</summary>
+        public Via? TryOthers;
+        /// <summary>Why the IP service's answer didn't come, in a few words ("HTTP 403", "timed out").</summary>
+        public string Brief = string.Empty;
+        public bool AfterTimeout;
     }
 
     /// <summary>How long a probe waits for the FIRST answer: a server of another protocol often just waits for more.</summary>
@@ -199,8 +269,8 @@ public static class ProxyCheckEngine
                 {
                     step = kind switch
                     {
-                        ProxyKind.Socks5 => await Socks5Async(stream, entry, deadline.Token).ConfigureAwait(false),
-                        ProxyKind.Socks4 or ProxyKind.Socks4a => await Socks4Async(stream, entry, kind, deadline.Token).ConfigureAwait(false),
+                        ProxyKind.Socks5 => await Socks5Async(stream, entry, TunnelEcho, deadline.Token).ConfigureAwait(false),
+                        ProxyKind.Socks4 or ProxyKind.Socks4a => await Socks4Async(stream, entry, kind, TunnelEcho, deadline.Token).ConfigureAwait(false),
                         _ => await HttpAsync(stream, entry, addrs, deadline.Token).ConfigureAwait(false),
                     };
                 }
@@ -212,7 +282,11 @@ public static class ProxyCheckEngine
                 catch (StepTimeoutException ex)
                 {
                     ct.ThrowIfCancellationRequested();   // a Stop, not a slow proxy
-                    step = new Step { Verdict = Verdict.Done, Result = new ProxyCheckResult { Status = ProxyCheckStatus.Timeout, Protocol = ex.Protocol, Detail = ex.Message } };
+                    step = new Step
+                    {
+                        Verdict = Verdict.Done, Result = new ProxyCheckResult { Status = ProxyCheckStatus.Timeout, Protocol = ex.Protocol, Detail = ex.Message },
+                        TryOthers = ViaOf(ex.Protocol), Brief = "timed out", AfterTimeout = true,
+                    };
                 }
                 catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException)
                 {
@@ -222,6 +296,8 @@ public static class ProxyCheckEngine
             if (step.Verdict == Verdict.Done)
             {
                 var r = step.Result!;
+                // outside the attempt's deadline: the other IP services have their own
+                if (step.TryOthers is { } via) r = await OtherEchoesAsync(via, entry, addrs, step, ct).ConfigureAwait(false);
                 return new ProxyCheckResult
                 {
                     Status = r.Status, Protocol = r.Protocol, ConnectMs = connectMs, FirstByteMs = r.FirstByteMs,
@@ -262,6 +338,72 @@ public static class ProxyCheckEngine
     {
         public StepTimeoutException(string protocol, string message) : base(message) => Protocol = protocol;
         public string Protocol { get; }
+    }
+
+    // ---------------------------------------------------------------- the other IP services
+
+    // Cloudflare's trace didn't come through a proxy that took the request: the other IP services through it, the same
+    // way, each on a connection of its own (Fallback: the first answer wins). Their result, or the failed one with why
+    // they didn't answer either.
+    private static async Task<ProxyCheckResult> OtherEchoesAsync(Via via, ProxyCheckEntry e, IPAddress[] addrs, Step failed, CancellationToken ct)
+    {
+        var r = failed.Result!;
+        var echoes = OtherEchoes(via);
+        if (failed.AfterTimeout) echoes = echoes.Take(2).ToArray();
+        if (echoes.Length == 0) return r;
+        var sources = echoes.Select(echo => new Fallback.Source<ProxyCheckResult>(echo.Name, async t =>
+        {
+            Step s;
+            try { s = await ThroughAsync(via, e, addrs, echo, t).ConfigureAwait(false); }
+            catch (StepTimeoutException) { t.ThrowIfCancellationRequested(); throw new TimeoutException(); }
+            catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException) { throw new InvalidDataException("the connection dropped"); }
+            if (s.Result is { Status: ProxyCheckStatus.Working } ok) return ok;
+            throw new InvalidDataException(s.Brief.Length > 0 ? s.Brief : s.Why.Length > 0 ? s.Why : "no answer");
+        })).ToList();
+
+        string why;
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        budget.CancelAfter(OthersBudget);
+        try
+        {
+            var got = await Fallback.FirstAsync(via == Via.Plain ? "proxy-echo-http" : "proxy-echo", sources, budget.Token,
+                                                OthersHeadStart, OthersPerSource, maxConcurrent: 2).ConfigureAwait(false);
+            if (got.Value is { } ok)
+                return new ProxyCheckResult
+                {
+                    Status = ok.Status, Protocol = ok.Protocol, FirstByteMs = ok.FirstByteMs, ExitIp = ok.ExitIp, Country = ok.Country,
+                    Detail = (via == Via.Plain ? "Relays http:// only (no CONNECT). " : string.Empty)
+                             + $"Exit IP from {got.Source}: Cloudflare's trace didn't come through ({(failed.Brief.Length > 0 ? failed.Brief : "failed")}).",
+                };
+            why = string.Join("; ", got.Errors);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { why = $"no answer within {OthersBudget.TotalSeconds:0} s"; }
+        if (r.Status is not (ProxyCheckStatus.Failed or ProxyCheckStatus.Timeout) || why.Length == 0) return r;
+        return new ProxyCheckResult
+        {
+            Status = r.Status, Protocol = r.Protocol, FirstByteMs = r.FirstByteMs, ExitIp = r.ExitIp, Country = r.Country,
+            Detail = r.Detail + " Other IP services through it: " + why + ".",
+        };
+    }
+
+    // One IP service through the proxy as the check found it works: a new connection, the same handshake.
+    private static async Task<Step> ThroughAsync(Via via, ProxyCheckEntry e, IPAddress[] addrs, Echo echo, CancellationToken ct)
+    {
+        var (socket, _, fail) = await ConnectAsync(addrs, e.Port, ct).ConfigureAwait(false);
+        if (socket is null) return Done(fail!.Status, string.Empty, fail.Detail, "the proxy didn't take the connection");
+        using var stream = new NetworkStream(socket, ownsSocket: true);
+        switch (via)
+        {
+            case Via.Socks5: return await Socks5Async(stream, e, echo, ct).ConfigureAwait(false);
+            case Via.Socks4: return await Socks4Async(stream, e, ProxyKind.Socks4, echo, ct).ConfigureAwait(false);
+            case Via.Socks4a: return await Socks4Async(stream, e, ProxyKind.Socks4a, echo, ct).ConfigureAwait(false);
+            case Via.Plain: return await RequestEchoAsync(stream, "HTTP (no CONNECT)", plainViaHttpProxy: true, e, echo, ct).ConfigureAwait(false);
+        }
+        var (code, notHttp) = await SendConnectAsync(stream, e, echo, ct).ConfigureAwait(false);
+        if (notHttp != null) return notHttp;
+        return code is >= 200 and < 300
+            ? await RequestEchoAsync(stream, "HTTP", plainViaHttpProxy: false, e, echo, ct).ConfigureAwait(false)
+            : Done(ProxyCheckStatus.Failed, "HTTP", $"It refused CONNECT to {echo.Host} (HTTP {code}).", $"CONNECT answered HTTP {code}");
     }
 
     // ---------------------------------------------------------------- TCP
@@ -323,7 +465,7 @@ public static class ProxyCheckEngine
 
     // ---------------------------------------------------------------- SOCKS5 (RFC 1928 / 1929)
 
-    private static async Task<Step> Socks5Async(NetworkStream s, ProxyCheckEntry e, CancellationToken ct)
+    private static async Task<Step> Socks5Async(NetworkStream s, ProxyCheckEntry e, Echo echo, CancellationToken ct)
     {
         byte[] greet = e.HasLogin ? new byte[] { 5, 2, 0, 2 } : new byte[] { 5, 1, 0 };
         await s.WriteAsync(greet, ct).ConfigureAwait(false);
@@ -358,7 +500,6 @@ public static class ProxyCheckEngine
                 return Done(ProxyCheckStatus.Failed, proto, $"It asks for a login method Echoes doesn't speak (0x{buf[1]:X2}).");
         }
 
-        var echo = TunnelEcho;
         // an address as such; a name for the proxy to resolve (ATYP 3: length + name)
         byte atyp;
         byte[] addr;
@@ -383,7 +524,13 @@ public static class ProxyCheckEngine
         await s.WriteAsync(req, ct).ConfigureAwait(false);
         n = await ReadAtLeastAsync(s, buf, 5, ct).ConfigureAwait(false);
         if (n < 2 || buf[0] != 5) return Done(ProxyCheckStatus.Failed, proto, "It broke off the connect request.");
-        if (buf[1] != 0) return Done(ProxyCheckStatus.Failed, proto, "It couldn't open a connection to the IP service: " + Socks5Reply(buf[1]) + ".");
+        if (buf[1] != 0)
+        {
+            var refused = Done(ProxyCheckStatus.Failed, proto, "It couldn't open a connection to the IP service: " + Socks5Reply(buf[1]) + ".", Socks5Reply(buf[1]));
+            // it can't reach this one (or may not): another IP service may be reachable; an unsupported command isn't
+            if (buf[1] is >= 1 and <= 6) refused.TryOthers = Via.Socks5;
+            return refused;
+        }
         if (n < 5) return Done(ProxyCheckStatus.Failed, proto, "It broke off the connect request.");
         // the rest of the reply (the bound address) must be read before the tunnel carries the request
         int need = 4 + buf[3] switch { 1 => 4, 4 => 16, 3 => 1 + buf[4], _ => 0 } + 2;
@@ -394,7 +541,7 @@ public static class ProxyCheckEngine
             if (m == 0) return Done(ProxyCheckStatus.Failed, proto, "It broke off the connect request.");
             n += m;
         }
-        return await RequestEchoAsync(s, proto, plainViaHttpProxy: false, e, ct).ConfigureAwait(false);
+        return await RequestEchoAsync(s, proto, plainViaHttpProxy: false, e, echo, ct).ConfigureAwait(false);
     }
 
     private static string Socks5Reply(byte rep) => rep switch
@@ -412,10 +559,9 @@ public static class ProxyCheckEngine
 
     // ---------------------------------------------------------------- SOCKS4 / 4a
 
-    private static async Task<Step> Socks4Async(NetworkStream s, ProxyCheckEntry e, ProxyKind kind, CancellationToken ct)
+    private static async Task<Step> Socks4Async(NetworkStream s, ProxyCheckEntry e, ProxyKind kind, Echo echo, CancellationToken ct)
     {
         string proto = kind == ProxyKind.Socks4a ? "SOCKS4a" : "SOCKS4";
-        var echo = TunnelEcho;
         byte[] user = Encoding.UTF8.GetBytes(e.User);
         if (user.Length > 255) user = Array.Empty<byte>();
         // SOCKS4a: the proxy resolves the name (address 0.0.0.1, the name after the user id); SOCKS4: an IPv4 address
@@ -426,7 +572,12 @@ public static class ProxyCheckEngine
             name = Encoding.ASCII.GetBytes(echo.Host + "\0");
         }
         else if (await EchoIpv4Async(echo, ct).ConfigureAwait(false) is { } v4) ip = v4.GetAddressBytes();
-        else return Done(ProxyCheckStatus.Failed, proto, $"Couldn't look up {echo.Host} for the SOCKS4 test.");
+        else
+        {
+            var unknown = Done(ProxyCheckStatus.Failed, proto, $"Couldn't look up {echo.Host} for the SOCKS4 test.", "no IPv4 address for its name");
+            unknown.TryOthers = ViaOf(proto);
+            return unknown;
+        }
         var req = new byte[9 + user.Length + name.Length];
         req[0] = 4; req[1] = 1;
         req[2] = (byte)(echo.Port >> 8); req[3] = (byte)echo.Port;
@@ -439,21 +590,63 @@ public static class ProxyCheckEngine
         int n = await ReadFirstAsync(s, buf, 8, ct).ConfigureAwait(false);
         if (LooksHttp(buf, n)) return NotThis("answered HTTP", sawHttp: true);
         if (n < 8 || buf[0] is not (0 or 4)) return NotThis(n == 0 ? "no answer" : "unexpected answer");
-        return buf[1] switch
+        switch (buf[1])
         {
-            0x5A => await RequestEchoAsync(s, proto, plainViaHttpProxy: false, e, ct).ConfigureAwait(false),
-            0x5B => Done(ProxyCheckStatus.Failed, proto, "It rejected the request (91)."),
-            0x5C or 0x5D => Done(e.HasLogin ? ProxyCheckStatus.AuthFailed : ProxyCheckStatus.AuthRequired, proto,
-                                 "It rejected the user id (identd check failed)."),
-            _ => NotThis("unexpected answer"),
-        };
+            case 0x5A: return await RequestEchoAsync(s, proto, plainViaHttpProxy: false, e, echo, ct).ConfigureAwait(false);
+            case 0x5B:
+                // "rejected or failed": it may not reach this IP service; another may come through
+                var rejected = Done(ProxyCheckStatus.Failed, proto, "It rejected the request (91).", "rejected (91)");
+                rejected.TryOthers = ViaOf(proto);
+                return rejected;
+            case 0x5C or 0x5D:
+                return Done(e.HasLogin ? ProxyCheckStatus.AuthFailed : ProxyCheckStatus.AuthRequired, proto,
+                            "It rejected the user id (identd check failed).");
+            default: return NotThis("unexpected answer");
+        }
     }
 
     // ---------------------------------------------------------------- HTTP CONNECT, then plain HTTP
 
     private static async Task<Step> HttpAsync(NetworkStream s, ProxyCheckEntry e, IPAddress[] addrs, CancellationToken ct)
     {
-        var echo = TunnelEcho;
+        var (code, notHttp) = await SendConnectAsync(s, e, TunnelEcho, ct).ConfigureAwait(false);
+        if (notHttp != null) return notHttp;
+        if (code is >= 200 and < 300) return await RequestEchoAsync(s, "HTTP", plainViaHttpProxy: false, e, TunnelEcho, ct).ConfigureAwait(false);
+        if (code == 407)
+            return Done(e.HasLogin ? ProxyCheckStatus.AuthFailed : ProxyCheckStatus.AuthRequired, "HTTP",
+                        e.HasLogin ? "Wrong username or password (407)." : "It needs a username and password (407).");
+
+        // No CONNECT (or not to this port): a plain-HTTP proxy still forwards "GET http://…" — on a new connection.
+        var (socket, _, _) = await ConnectAsync(addrs, e.Port, ct).ConfigureAwait(false);
+        Step step;
+        if (socket is null) step = Done(ProxyCheckStatus.Failed, "HTTP", $"It refused CONNECT (HTTP {code}) and then the connection.");
+        else
+        {
+            using var plain = new NetworkStream(socket, ownsSocket: true);
+            step = await RequestEchoAsync(plain, "HTTP (no CONNECT)", plainViaHttpProxy: true, e, PlainEcho, ct).ConfigureAwait(false);
+            if (step.Result is { Status: ProxyCheckStatus.Failed } && step.HttpCode is > 0 and not 200 && !step.Relayed)
+            {
+                var verdict = code == 403 && step.HttpCode == 403
+                    ? Done(ProxyCheckStatus.Failed, "HTTP", "It refuses to relay to the IP service (HTTP 403).")
+                    : Done(ProxyCheckStatus.NotProxy, string.Empty,
+                           $"A web server, not a proxy: it answers HTTP {code} to CONNECT and HTTP {step.HttpCode} to a proxy request.");
+                // its own gateway error: a proxy that couldn't reach the IP service, perhaps; another may come through
+                if (step.TryOthers != null) { verdict.TryOthers = Via.Plain; verdict.Brief = step.Brief; }
+                step = verdict;
+            }
+        }
+        // A gateway error to CONNECT: it tunnels, but couldn't reach the IP service; other ones through a tunnel, then.
+        if (code is 502 or 503 or 504 && step.Result?.Status is ProxyCheckStatus.Failed or ProxyCheckStatus.NotProxy)
+        {
+            step.TryOthers = Via.Connect;
+            step.Brief = $"HTTP {code} to CONNECT";
+        }
+        return step;
+    }
+
+    // CONNECT to the echo: the answer's status code, or a step when it isn't an HTTP proxy's answer.
+    private static async Task<(int Code, Step? NotHttp)> SendConnectAsync(NetworkStream s, ProxyCheckEntry e, Echo echo, CancellationToken ct)
+    {
         string target = echo.Host + ":" + echo.Port;
         string auth = e.HasLogin ? "Proxy-Authorization: Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(e.User + ":" + e.Pass)) + "\r\n" : string.Empty;
         await s.WriteAsync(Encoding.ASCII.GetBytes(
@@ -463,27 +656,11 @@ public static class ProxyCheckEngine
         {
             first.CancelAfter(FirstAnswerTimeout);
             try { (head, _) = await ReadHeadAsync(s, first.Token).ConfigureAwait(false); }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return NotThis("no answer"); }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return (0, NotThis("no answer")); }
         }
-        if (head is null) return NotThis("closed the connection");
-        if (!head.StartsWith("HTTP/", StringComparison.Ordinal)) return NotThis("unexpected answer");
-        int code = StatusCode(head);
-        if (code is >= 200 and < 300) return await RequestEchoAsync(s, "HTTP", plainViaHttpProxy: false, e, ct).ConfigureAwait(false);
-        if (code == 407)
-            return Done(e.HasLogin ? ProxyCheckStatus.AuthFailed : ProxyCheckStatus.AuthRequired, "HTTP",
-                        e.HasLogin ? "Wrong username or password (407)." : "It needs a username and password (407).");
-
-        // No CONNECT (or not to this port): a plain-HTTP proxy still forwards "GET http://…" — on a new connection.
-        var (socket, _, _) = await ConnectAsync(addrs, e.Port, ct).ConfigureAwait(false);
-        if (socket is null) return Done(ProxyCheckStatus.Failed, "HTTP", $"It refused CONNECT (HTTP {code}) and then the connection.");
-        using var plain = new NetworkStream(socket, ownsSocket: true);
-        var step = await RequestEchoAsync(plain, "HTTP (no CONNECT)", plainViaHttpProxy: true, e, ct).ConfigureAwait(false);
-        if (step.Result is { Status: ProxyCheckStatus.Failed } && step.HttpCode is > 0 and not 200 && !step.Relayed)
-            return code == 403 && step.HttpCode == 403
-                ? Done(ProxyCheckStatus.Failed, "HTTP", "It refuses to relay to the IP service (HTTP 403).")
-                : Done(ProxyCheckStatus.NotProxy, string.Empty,
-                       $"A web server, not a proxy: it answers HTTP {code} to CONNECT and HTTP {step.HttpCode} to a proxy request.");
-        return step;
+        if (head is null) return (0, NotThis("closed the connection"));
+        if (!head.StartsWith("HTTP/", StringComparison.Ordinal)) return (0, NotThis("unexpected answer"));
+        return (StatusCode(head), null);
     }
 
     private static int StatusCode(string head)
@@ -520,9 +697,8 @@ public static class ProxyCheckEngine
 
     // ---------------------------------------------------------------- the request through the proxy
 
-    private static async Task<Step> RequestEchoAsync(Stream tunnel, string proto, bool plainViaHttpProxy, ProxyCheckEntry e, CancellationToken ct)
+    private static async Task<Step> RequestEchoAsync(Stream tunnel, string proto, bool plainViaHttpProxy, ProxyCheckEntry e, Echo echo, CancellationToken ct)
     {
-        var echo = plainViaHttpProxy ? PlainEcho : TunnelEcho;
         var sw = Stopwatch.StartNew();
         Stream s = tunnel;
         SslStream? ssl = null;
@@ -537,11 +713,11 @@ public static class ProxyCheckEngine
                 }
                 catch (AuthenticationException)
                 {
-                    return Done(ProxyCheckStatus.Failed, proto, "HTTPS through it failed the certificate check: it may intercept encrypted traffic.");
+                    return Done(ProxyCheckStatus.Failed, proto, "HTTPS through it failed the certificate check: it may intercept encrypted traffic.", "certificate check failed");
                 }
                 catch (Exception ex) when (ex is IOException or SocketException)
                 {
-                    return Done(ProxyCheckStatus.Failed, proto, "It dropped the HTTPS connection to the IP service.");
+                    return NoEcho(Done(ProxyCheckStatus.Failed, proto, "It dropped the HTTPS connection to the IP service.", "HTTPS dropped"), proto);
                 }
                 s = ssl;
             }
@@ -562,7 +738,11 @@ public static class ProxyCheckEngine
 
             var buf = new byte[MaxHeadBytes + MaxBodyBytes];
             int got = await s.ReadAsync(buf.AsMemory(0, buf.Length), ct).ConfigureAwait(false);
-            if (got == 0) return Done(ProxyCheckStatus.Failed, proto, "It closed the connection without an answer.");
+            if (got == 0)
+            {
+                var closed = Done(ProxyCheckStatus.Failed, proto, "It closed the connection without an answer.", "no answer");
+                return plainViaHttpProxy ? closed : NoEcho(closed, proto);
+            }
             int firstByte = (int)sw.ElapsedMilliseconds;
             try
             {
@@ -583,18 +763,21 @@ public static class ProxyCheckEngine
                             e.HasLogin ? "Wrong username or password (407)." : "It needs a username and password (407).");
             int bodyAt = text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
             string body = bodyAt >= 0 ? text[(bodyAt + 4)..] : string.Empty;
-            string ip = DdnsIpDetector.TraceValue(body, "ip");
-            if (ip.Length == 0 && IPAddress.TryParse(body.Trim(), out _)) ip = body.Trim();
+            if (bodyAt >= 0 && IsChunked(text[..bodyAt])) body = Dechunk(body);
+            var (ip, country) = ReadEcho(body);
             if (code != 200 || !IPAddress.TryParse(ip, out var exit))
             {
                 var failed = Done(ProxyCheckStatus.Failed, proto, code == 0
                     ? "Its answer wasn't HTTP: it may not relay this kind of traffic."
-                    : $"The answer through it was HTTP {code}, not the IP service's page.");
+                    : $"The answer through it was HTTP {code}, not the IP service's page.",
+                    code == 0 ? "not HTTP" : code == 200 ? "no address in the answer" : $"HTTP {code}");
                 failed.HttpCode = code;
                 failed.Relayed = bodyAt > 0 && text.AsSpan(0, bodyAt).Contains("\r\ncf-ray:", StringComparison.OrdinalIgnoreCase);
+                // Through a tunnel the proxy did its part. A plain-HTTP proxy did when the IP service answered (relayed),
+                // or when it answers with a gateway error of its own (it tried); otherwise it may be no proxy at all.
+                if (!plainViaHttpProxy || failed.Relayed || code is 502 or 503 or 504) failed.TryOthers = ViaOf(proto);
                 return failed;
             }
-            string loc = DdnsIpDetector.TraceValue(body, "loc").ToUpperInvariant();
             return new Step
             {
                 Verdict = Verdict.Done,
@@ -604,7 +787,7 @@ public static class ProxyCheckEngine
                     Protocol = proto,
                     FirstByteMs = firstByte,
                     ExitIp = exit.ToString(),
-                    Country = loc.Length == 2 && char.IsAsciiLetter(loc[0]) && char.IsAsciiLetter(loc[1]) && loc != "XX" && loc != "T1" ? loc : string.Empty,
+                    Country = country,
                 },
             };
         }
@@ -619,12 +802,85 @@ public static class ProxyCheckEngine
         }
     }
 
-    // The head is in and the body has all of its Content-Length (the trace answer is small): no need to wait for the close.
+    // The proxy carried the request, but the IP service's answer didn't come: another IP service may come through.
+    private static Step NoEcho(Step failed, string proto)
+    {
+        failed.TryOthers = ViaOf(proto);
+        return failed;
+    }
+
+    // The exit IP and its country in an IP service's answer: Cloudflare's trace ("ip=", "loc="), a JSON object ("ip" or
+    // "query", and a two-letter "country_code" / "country_iso" / "countryCode" / "country"), or a bare address. The answer
+    // is someone else's: only an address and two letters are taken from it.
+    private static (string Ip, string Country) ReadEcho(string body)
+    {
+        string ip = DdnsIpDetector.TraceValue(body, "ip");
+        if (ip.Length > 0) return (ip, CountryCode(DdnsIpDetector.TraceValue(body, "loc")));
+        int a = body.IndexOf('{'), b = body.LastIndexOf('}');
+        if (a < 0 || b < a) return (body.Trim(), string.Empty);
+        try
+        {
+            using var doc = JsonDocument.Parse(body.AsMemory(a, b - a + 1));
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return (string.Empty, string.Empty);
+            string Str(string name) => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? string.Empty : string.Empty;
+            string cc = string.Empty;
+            foreach (string field in new[] { "country_code", "country_iso", "countryCode", "country" })
+                if ((cc = CountryCode(Str(field))).Length > 0) break;
+            string found = Str("ip");
+            return (found.Length > 0 ? found : Str("query"), cc);
+        }
+        catch (JsonException) { return (string.Empty, string.Empty); }
+    }
+
+    private static string CountryCode(string s)
+    {
+        s = s.Trim().ToUpperInvariant();
+        return s.Length == 2 && char.IsAsciiLetter(s[0]) && char.IsAsciiLetter(s[1]) && s != "XX" && s != "T1" ? s : string.Empty;
+    }
+
+    private static bool IsChunked(string head)
+    {
+        int at = head.IndexOf("\r\nTransfer-Encoding:", StringComparison.OrdinalIgnoreCase);
+        if (at < 0) return false;
+        int stop = head.IndexOf("\r\n", at + 2, StringComparison.Ordinal);
+        return (stop < 0 ? head[at..] : head[at..stop]).Contains("chunked", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // A chunked body (RFC 9112 7.1) in one piece; what doesn't read as chunks ends it.
+    private static string Dechunk(string body)
+    {
+        var sb = new StringBuilder(body.Length);
+        int pos = 0;
+        while (pos < body.Length)
+        {
+            int eol = body.IndexOf("\r\n", pos, StringComparison.Ordinal);
+            if (eol < 0) break;
+            string size = body[pos..eol];
+            int semi = size.IndexOf(';');
+            if (semi >= 0) size = size[..semi];
+            if (!int.TryParse(size.Trim(), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out int len) || len <= 0) break;
+            int start = eol + 2;
+            if ((long)start + len > body.Length)
+            {
+                sb.Append(body, start, body.Length - start);
+                break;
+            }
+            sb.Append(body, start, len);
+            pos = start + len + 2;
+        }
+        return sb.ToString();
+    }
+
+    // The head is in and the body is complete: all of its Content-Length, or a chunked body's last chunk (the answers are
+    // small) — no need to wait for the close.
     private static bool LooksComplete(byte[] buf, int got)
     {
         int end = IndexOfBlankLine(buf, 0, got);
         if (end < 0) return false;
         string head = Encoding.Latin1.GetString(buf, 0, end);
+        if (IsChunked(head))
+            return got - (end + 4) >= 5 && buf.AsSpan(got - 5, 5).SequenceEqual("0\r\n\r\n"u8) && (got - (end + 4) == 5 || buf[got - 7] == '\r');
         int at = head.IndexOf("\r\nContent-Length:", StringComparison.OrdinalIgnoreCase);
         if (at < 0) return false;
         int start = at + "\r\nContent-Length:".Length;
@@ -633,6 +889,6 @@ public static class ProxyCheckEngine
         return int.TryParse(value, out int len) && got - (end + 4) >= len;
     }
 
-    private static Step Done(ProxyCheckStatus status, string proto, string detail)
-        => new() { Verdict = Verdict.Done, Result = new ProxyCheckResult { Status = status, Protocol = proto, Detail = detail } };
+    private static Step Done(ProxyCheckStatus status, string proto, string detail, string brief = "")
+        => new() { Verdict = Verdict.Done, Result = new ProxyCheckResult { Status = status, Protocol = proto, Detail = detail }, Brief = brief };
 }
