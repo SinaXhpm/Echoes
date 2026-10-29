@@ -14,14 +14,14 @@
 		     nav, its content host the page (each tab's content is a lazily-filled tool host, see
 		     ToolViews in MainView.axaml.cs). The sidebar always shows its labels (the user wants the menu
 		     open at every size); it's kept narrow and dense instead, so the window can stay small: it opens
-		     840 wide and exactly as tall as this list (MainWindow). ===== -->
+		     828 wide and exactly as tall as this list (MainWindow). ===== -->
 		<Style Selector="TabControl#MainTabs">
-			<Setter Property="Padding" Value="18,2,18,12"/>
+			<Setter Property="Padding" Value="16,2,16,12"/>
 			<Setter Property="Template">
 				<ControlTemplate>
 					<Grid ColumnDefinitions="Auto,*" x:DataType="vm:MainViewModel">
 						<!-- SIDEBAR -->
-						<Border Name="PART_Sidebar" Grid.Column="0" Width="172"
+						<Border Name="PART_Sidebar" Grid.Column="0" Width="160"
 								Background="{DynamicResource Bg.Sidebar}"
 								BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,1,0">
 							<Grid RowDefinitions="Auto,Auto,*,Auto">
@@ -35,12 +35,12 @@
 								     rather than in a footer, so the list can breathe without making the window taller. The
 								     buttons are siblings of the TitleBar-role border, not children, so they stay clickable. -->
 								<Grid Grid.Row="1" ColumnDefinitions="*,Auto" Background="{DynamicResource Bg.Sidebar}">
-									<Border Name="PART_Brand" Padding="13,6,4,6" Background="{DynamicResource Bg.Sidebar}"
+									<Border Name="PART_Brand" Padding="12,5,3,5" Background="{DynamicResource Bg.Sidebar}"
 											chrome:WindowDecorationProperties.ElementRole="TitleBar">
 										<StackPanel Orientation="Horizontal" Spacing="9" IsHitTestVisible="False">
-											<Image Source="avares://Echoes/Assets/logo-256.png" Width="20" Height="20"
+											<Image Source="avares://Echoes/Assets/logo-256.png" Width="18" Height="18"
 												   RenderOptions.BitmapInterpolationMode="HighQuality"/>
-											<TextBlock Text="Echoes" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"
+											<TextBlock Text="Echoes" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center"
 													   Foreground="{DynamicResource Text.Primary}"/>
 										</StackPanel>
 									</Border>
@@ -62,7 +62,7 @@
 								<!-- nav -->
 								<ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
 											  HorizontalScrollBarVisibility="Disabled" AllowAutoHide="True">
-									<ItemsPresenter Name="PART_ItemsPresenter" Margin="8,0,8,3"
+									<ItemsPresenter Name="PART_ItemsPresenter" Margin="7,0,7,3"
 													ItemsPanel="{TemplateBinding ItemsPanel}"/>
 								</ScrollViewer>
 								<!-- footer: only the update pill, when there is one -->
@@ -82,7 +82,7 @@
 						<!-- PAGE: fills the height but asks for none, so the window opens fitted to the nav (MainWindow) -->
 						<ctl:HeightNeutral Grid.Column="1">
 							<Grid RowDefinitions="Auto,*" Background="{DynamicResource Bg.App}">
-								<Border Grid.Row="0" Name="PART_PageHeader" Padding="18,10,18,7" Background="{DynamicResource Bg.App}"
+								<Border Grid.Row="0" Name="PART_PageHeader" Padding="16,9,16,6" Background="{DynamicResource Bg.App}"
 										chrome:WindowDecorationProperties.ElementRole="TitleBar">
 									<StackPanel Spacing="2" IsHitTestVisible="False">
 										<TextBlock Classes="pageTitle" Text="{Binding $parent[views:MainView].PageTitle}"/>
@@ -106,7 +106,7 @@
 		     with the accent, marked by a short accent bar at its start, its label bold ===== -->
 		<Style Selector="TabItem.navtab">
 			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
-			<Setter Property="FontSize" Value="12.5"/>
+			<Setter Property="FontSize" Value="12"/>
 			<Setter Property="FontWeight" Value="Medium"/>
 			<Setter Property="Margin" Value="0"/>
 			<Setter Property="Padding" Value="0"/>
@@ -117,11 +117,11 @@
 						<TextBlock Name="PART_GroupLabel" Classes="navgroup" Text="{TemplateBinding Group}"
 								   IsHitTestVisible="False"
 								   IsVisible="{TemplateBinding Group, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-						<Border Name="PART_Pill" Height="23" CornerRadius="6" Padding="9,0"
+						<Border Name="PART_Pill" Height="22" CornerRadius="6" Padding="8,0"
 								Background="{DynamicResource Bg.Sidebar}">
 							<Panel>
 								<!-- 2px in from the pill's edge, out through its padding -->
-								<Border Name="PART_Indicator" Width="3" Height="12" CornerRadius="1.5" Margin="-7,0,0,0"
+								<Border Name="PART_Indicator" Width="2.5" Height="10" CornerRadius="1.25" Margin="-6,0,0,0"
 										HorizontalAlignment="Left" VerticalAlignment="Center"
 										Background="{DynamicResource Nav.Indicator}" IsVisible="False"/>
 								<ContentPresenter Name="PART_ContentPresenter" VerticalAlignment="Center"
@@ -163,9 +163,9 @@
 		     line weight the same), with the -3 margins shrinking their layout box to match. Smaller glyphs are most of
 		     what makes the list read as separate rows instead of a packed column. -->
 		<Style Selector="TabItem.navtab > StackPanel > Path.ico, Button.headBtn > Path.ico">
-			<Setter Property="RenderTransform" Value="scale(0.75)"/>
-			<Setter Property="Margin" Value="-3"/>
-			<Setter Property="StrokeThickness" Value="2"/>
+			<Setter Property="RenderTransform" Value="scale(0.6667)"/>
+			<Setter Property="Margin" Value="-4"/>
+			<Setter Property="StrokeThickness" Value="2.3"/>
 		</Style>
 		<Style Selector="TabItem.navtab:focus-visible /template/ Border#PART_Pill">
 			<Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
@@ -174,17 +174,17 @@
 		<!-- the brand row's About / theme buttons: small square icon buttons (the shared .sideLink is a wide row;
 		     its class style outranks template values, so this one needs a class in its selector too) -->
 		<Style Selector="Button.sideLink.headBtn">
-			<Setter Property="Padding" Value="5"/>
+			<Setter Property="Padding" Value="4"/>
 			<Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
 			<Setter Property="HorizontalAlignment" Value="Left"/>
 		</Style>
 		<!-- section labels: a clear gap above each group, a small one before its first item -->
 		<Style Selector="TabItem.navtab /template/ TextBlock#PART_GroupLabel">
-			<Setter Property="Margin" Value="10,5,0,2"/>
+			<Setter Property="Margin" Value="9,6,0,1"/>
 			<Setter Property="FontSize" Value="10"/>
 		</Style>
 		<Style Selector="TabItem.navtab:nth-child(1) /template/ TextBlock#PART_GroupLabel">
-			<Setter Property="Margin" Value="10,0,0,2"/>
+			<Setter Property="Margin" Value="9,0,0,1"/>
 		</Style>
 	</UserControl.Styles>
 
@@ -207,7 +207,7 @@
 						Subtitle="Live stats, TCP ping, traceroute and MTR"
 						AutomationProperties.Name="Ping">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoPing}"/>
 					<TextBlock Classes="navlabel" Text="Ping"/>
 				</StackPanel>
@@ -216,7 +216,7 @@
 						Subtitle="Why a site won't open for you"
 						AutomationProperties.Name="Doctor">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoDoctor}"/>
 					<TextBlock Classes="navlabel" Text="Doctor"/>
 				</StackPanel>
@@ -225,7 +225,7 @@
 						Subtitle="DoH / DoT lookups, mail check, WHOIS"
 						AutomationProperties.Name="DNS">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoDns}"/>
 					<TextBlock Classes="navlabel" Text="DNS"/>
 				</StackPanel>
@@ -234,7 +234,7 @@
 						Subtitle="TCP / UDP scan, service detection"
 						AutomationProperties.Name="Port Scanner">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoScanner}"/>
 					<TextBlock Classes="navlabel" Text="Scanner"/>
 				</StackPanel>
@@ -243,7 +243,7 @@
 						Subtitle="Checks from nodes around the world"
 						AutomationProperties.Name="Check Host">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoCheckHost}"/>
 					<TextBlock Classes="navlabel" Text="Check Host"/>
 				</StackPanel>
@@ -252,7 +252,7 @@
 						Subtitle="Uptime, expiry checks, Telegram alerts"
 						AutomationProperties.Name="Monitor">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoMonitor}"/>
 					<TextBlock Classes="navlabel" Text="Monitor"/>
 				</StackPanel>
@@ -261,7 +261,7 @@
 						Subtitle="Interfaces, Wi-Fi, ports and routes"
 						AutomationProperties.Name="Network">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoNetwork}"/>
 					<TextBlock Classes="navlabel" Text="Network"/>
 				</StackPanel>
@@ -270,7 +270,7 @@
 						Subtitle="Hardware, system, battery and sensors"
 						AutomationProperties.Name="Device">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoDevice}"/>
 					<TextBlock Classes="navlabel" Text="Device"/>
 				</StackPanel>
@@ -279,7 +279,7 @@
 						Subtitle="Internet speed and latency"
 						AutomationProperties.Name="Speed Test">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoSpeed}"/>
 					<TextBlock Classes="navlabel" Text="Speed Test"/>
 				</StackPanel>
@@ -290,7 +290,7 @@
 						Subtitle="HTTP requests, responses and TLS"
 						AutomationProperties.Name="cURL">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoCurl}"/>
 					<TextBlock Classes="navlabel" Text="cURL"/>
 				</StackPanel>
@@ -299,7 +299,7 @@
 						Subtitle="Certificates, expiry, versions, ciphers"
 						AutomationProperties.Name="TLS Inspector">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoTls}"/>
 					<TextBlock Classes="navlabel" Text="TLS Inspector"/>
 				</StackPanel>
@@ -308,7 +308,7 @@
 						Subtitle="Public IP and GeoIP lookups"
 						AutomationProperties.Name="IP Info">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoIpInfo}"/>
 					<TextBlock Classes="navlabel" Text="IP Info"/>
 				</StackPanel>
@@ -317,7 +317,7 @@
 						Subtitle="DNS, DDNS, SSL/TLS, security, rules"
 						AutomationProperties.Name="Cloudflare">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoCloudflare}"/>
 					<TextBlock Classes="navlabel" Text="Cloudflare"/>
 				</StackPanel>
@@ -326,7 +326,7 @@
 						Subtitle="Bot API calls, uploads, updates"
 						AutomationProperties.Name="Telegram Bot">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoTelegram}"/>
 					<TextBlock Classes="navlabel" Text="Telegram Bot"/>
 				</StackPanel>
@@ -337,7 +337,7 @@
 						Subtitle="Terminal, files, forwards, health"
 						AutomationProperties.Name="SSH">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoSsh}"/>
 					<TextBlock Classes="navlabel" Text="SSH"/>
 				</StackPanel>
@@ -346,7 +346,7 @@
 						Subtitle="TCP / UDP client and server, WebSocket"
 						AutomationProperties.Name="Socket">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoSocket}"/>
 					<TextBlock Classes="navlabel" Text="Socket"/>
 				</StackPanel>
@@ -355,7 +355,7 @@
 						Subtitle="Share files and chat, or catch webhooks"
 						AutomationProperties.Name="Web Server">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoWebServer}"/>
 					<TextBlock Classes="navlabel" Text="Web Server"/>
 				</StackPanel>
@@ -364,7 +364,7 @@
 						Subtitle="SOCKS5 / HTTP server and checker"
 						AutomationProperties.Name="Proxy">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoProxy}"/>
 					<TextBlock Classes="navlabel" Text="Proxy"/>
 				</StackPanel>
@@ -375,7 +375,7 @@
 						Subtitle="Encode, hash, convert, diff, generate"
 						AutomationProperties.Name="String Lab">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoStringLab}"/>
 					<TextBlock Classes="navlabel" Text="String Lab"/>
 				</StackPanel>
@@ -384,7 +384,7 @@
 						Subtitle="Encrypted notes"
 						AutomationProperties.Name="Notes">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoNotes}"/>
 					<TextBlock Classes="navlabel" Text="Notes"/>
 				</StackPanel>
@@ -394,7 +394,7 @@
 						Subtitle="Recent inputs and encrypted backups"
 						AutomationProperties.Name="History and Backup">
 			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="10">
+				<StackPanel Orientation="Horizontal" Spacing="8">
 					<Path Classes="ico" Data="{StaticResource IcoBackup}"/>
 					<TextBlock Classes="navlabel" Text="History &amp; Backup"/>
 				</StackPanel>

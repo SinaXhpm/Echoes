@@ -519,7 +519,7 @@
     <x:Double x:Key="Font.Small">11.5</x:Double>
     <x:Double x:Key="Font.Body">12.5</x:Double>
     <x:Double x:Key="Font.Title">13.5</x:Double>
-    <x:Double x:Key="Font.Page">18</x:Double>
+    <x:Double x:Key="Font.Page">16</x:Double>
     <!-- Control.Height / Font.Input are read with DynamicResource by the input and button styles, so a
          shell can re-size every control below it: the phone shell sets 40 / 14 for touch. -->
     <x:Double x:Key="Control.Height">28</x:Double>

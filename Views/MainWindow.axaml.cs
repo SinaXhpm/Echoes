@@ -18,7 +18,7 @@ public partial class MainWindow : Window
         // it triggers the update check on Loaded.
     }
 
-    // The window is 840 wide to start (the sidebar always shows its labels; the width stays the user's) and exactly as
+    // The window is 828 wide to start (the sidebar always shows its labels; the width stays the user's) and exactly as
     // tall as the nav list, always: never shorter (the sidebar would scroll) and never taller (empty space under it).
     // It opens fitted (SizeToContent = Height; the page area asks for no height, see HeightNeutral), then the height is
     // locked there (MinHeight = MaxHeight, no maximize) and re-fitted when the sidebar grows (the update pill) or the

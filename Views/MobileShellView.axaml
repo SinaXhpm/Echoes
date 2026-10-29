@@ -53,7 +53,7 @@
 		     with the accent, marked by a short accent bar at its start, its label bold ===== -->
 		<Style Selector="ListBox#Nav > ListBoxItem">
 			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
-			<Setter Property="FontSize" Value="15"/>
+			<Setter Property="FontSize" Value="14.5"/>
 			<Setter Property="FontWeight" Value="Medium"/>
 			<Setter Property="Padding" Value="0"/>
 			<Setter Property="Margin" Value="0,1"/>
@@ -63,7 +63,7 @@
 					<StackPanel>
 						<TextBlock Classes="navgroup" Text="{TemplateBinding Group}" IsHitTestVisible="False"
 								   IsVisible="{TemplateBinding Group, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-						<Border Name="PART_Pill" Height="46" CornerRadius="10"
+						<Border Name="PART_Pill" Height="42" CornerRadius="9"
 								Background="{DynamicResource Bg.Sidebar}">
 							<Panel>
 								<Border Name="PART_Indicator" Width="4" Height="18" CornerRadius="2" Margin="4,0,0,0"
@@ -102,6 +102,10 @@
 		</Style>
 		<Style Selector="ListBox#Nav Path.ico">
 			<Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+			<!-- the shared 24-unit glyphs at 20 px (the -2 margins shrink their layout box to match) -->
+			<Setter Property="RenderTransform" Value="scale(0.8333)"/>
+			<Setter Property="Margin" Value="-2"/>
+			<Setter Property="StrokeThickness" Value="1.9"/>
 		</Style>
 		<Style Selector="TextBlock.navgroup">
 			<Setter Property="Margin" Value="14,18,0,7"/>
@@ -189,63 +193,63 @@
 						<!-- DIAGNOSE -->
 						<ctl:NavListItem Tag="PING" Group="Diagnose" Title="Ping"
 										 Subtitle="Live stats, TCP ping, traceroute and MTR" AutomationProperties.Name="Ping">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoPing}"/>
 								<TextBlock Text="Ping" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="DOCTOR" Title="Doctor"
 										 Subtitle="Why a site won't open for you" AutomationProperties.Name="Doctor">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoDoctor}"/>
 								<TextBlock Text="Doctor" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="DNS" Title="DNS &amp; WHOIS"
 										 Subtitle="DoH / DoT lookups, mail check, WHOIS" AutomationProperties.Name="DNS">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoDns}"/>
 								<TextBlock Text="DNS" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="SCANNER" Title="Port Scanner"
 										 Subtitle="TCP / UDP scan, service detection" AutomationProperties.Name="Port Scanner">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoScanner}"/>
 								<TextBlock Text="Scanner" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="CHECK-HOST" Title="Check Host"
 										 Subtitle="Checks from nodes around the world" AutomationProperties.Name="Check Host">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoCheckHost}"/>
 								<TextBlock Text="Check Host" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="MONITOR" Title="Monitor"
 										 Subtitle="Uptime, expiry checks, Telegram alerts" AutomationProperties.Name="Monitor">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoMonitor}"/>
 								<TextBlock Text="Monitor" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="NETWORK" Title="Network"
 										 Subtitle="Interfaces, Wi-Fi, ports and routes" AutomationProperties.Name="Network">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoNetwork}"/>
 								<TextBlock Text="Network" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="DEVICE" Title="Device"
 										 Subtitle="Hardware, system, battery and sensors" AutomationProperties.Name="Device">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoDevice}"/>
 								<TextBlock Text="Device" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="SPEED TEST" Title="Speed Test"
 										 Subtitle="Internet speed and latency" AutomationProperties.Name="Speed Test">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoSpeed}"/>
 								<TextBlock Text="Speed Test" VerticalAlignment="Center"/>
 							</StackPanel>
@@ -254,35 +258,35 @@
 						<!-- WEB & API -->
 						<ctl:NavListItem Tag="CURL" Group="Web &amp; API" Title="cURL"
 										 Subtitle="HTTP requests, responses and TLS" AutomationProperties.Name="cURL">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoCurl}"/>
 								<TextBlock Text="cURL" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="TLS" Title="TLS Inspector"
 										 Subtitle="Certificates, expiry, versions, ciphers" AutomationProperties.Name="TLS Inspector">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoTls}"/>
 								<TextBlock Text="TLS Inspector" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="IP INFO" Title="IP Info"
 										 Subtitle="Public IP and GeoIP lookups" AutomationProperties.Name="IP Info">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoIpInfo}"/>
 								<TextBlock Text="IP Info" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="CLOUDFLARE" Title="Cloudflare"
 										 Subtitle="DNS, DDNS, SSL/TLS, security, rules" AutomationProperties.Name="Cloudflare">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoCloudflare}"/>
 								<TextBlock Text="Cloudflare" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="TELEGRAM BOT" Title="Telegram Bot"
 										 Subtitle="Bot API calls, uploads, updates" AutomationProperties.Name="Telegram Bot">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoTelegram}"/>
 								<TextBlock Text="Telegram Bot" VerticalAlignment="Center"/>
 							</StackPanel>
@@ -291,28 +295,28 @@
 						<!-- SERVE & CONNECT -->
 						<ctl:NavListItem Tag="SSH" Group="Serve &amp; Connect" Title="SSH"
 										 Subtitle="Terminal, files, forwards, health" AutomationProperties.Name="SSH">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoSsh}"/>
 								<TextBlock Text="SSH" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="SOCKET" Title="Socket"
 										 Subtitle="TCP / UDP client and server, WebSocket" AutomationProperties.Name="Socket">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoSocket}"/>
 								<TextBlock Text="Socket" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="WEB SERVER" Title="Web Server"
 										 Subtitle="Share files and chat, or catch webhooks" AutomationProperties.Name="Web Server">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoWebServer}"/>
 								<TextBlock Text="Web Server" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="PROXY" Title="Proxy"
 										 Subtitle="SOCKS5 / HTTP server and checker" AutomationProperties.Name="Proxy">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoProxy}"/>
 								<TextBlock Text="Proxy" VerticalAlignment="Center"/>
 							</StackPanel>
@@ -321,21 +325,21 @@
 						<!-- WORKSPACE -->
 						<ctl:NavListItem Tag="STRING LAB" Group="Workspace" Title="String Lab"
 										 Subtitle="Encode, hash, convert, diff, generate" AutomationProperties.Name="String Lab">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoStringLab}"/>
 								<TextBlock Text="String Lab" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="NOTES" Title="Notes"
 										 Subtitle="Encrypted notes" AutomationProperties.Name="Notes">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoNotes}"/>
 								<TextBlock Text="Notes" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
 						<ctl:NavListItem Tag="DATA" Title="History &amp; Backup"
 										 Subtitle="Recent inputs and encrypted backups" AutomationProperties.Name="History and Backup">
-							<StackPanel Orientation="Horizontal" Spacing="14">
+							<StackPanel Orientation="Horizontal" Spacing="12">
 								<Path Classes="ico" Data="{StaticResource IcoBackup}"/>
 								<TextBlock Text="History &amp; Backup" VerticalAlignment="Center"/>
 							</StackPanel>

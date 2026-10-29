@@ -6,7 +6,7 @@
         x:DataType="vm:MainViewModel"
         Icon="avares://Echoes/Assets/logo-256.png"
         Title=""
-        Width="840"
+        Width="828"
         SizeToContent="Height"
         MinWidth="600"
         CanMaximize="False"
