@@ -123,7 +123,6 @@ internal static class AndroidDeviceInfo
             r.Row("gpu", "Name", GLES20.GlGetString(GLES20.GlRenderer));
             r.Row("gpu", "Maker", GLES20.GlGetString(GLES20.GlVendor));
             r.Row("gpu", "OpenGL ES", GLES20.GlGetString(GLES20.GlVersion));
-            r.Row("gpu", "EGL", $"{v[0]}.{v[1]}");
         }
         finally
         {
@@ -181,6 +180,7 @@ internal static class AndroidDeviceInfo
     {
         var status = ctx.RegisterReceiver(null, new IntentFilter(Intent.ActionBatteryChanged));
         if (status is null) return;
+        bool charging = status.GetIntExtra(BatteryManager.ExtraStatus, -1) is 2 or 5;
         int level = status.GetIntExtra(BatteryManager.ExtraLevel, -1), scale = status.GetIntExtra(BatteryManager.ExtraScale, 100);
         if (level >= 0 && scale > 0) r.Row("battery", "Charge", $"{level * 100 / scale}%");
         r.Row("battery", "Status", status.GetIntExtra(BatteryManager.ExtraStatus, -1) switch
@@ -199,11 +199,12 @@ internal static class AndroidDeviceInfo
         int temp = status.GetIntExtra(BatteryManager.ExtraTemperature, int.MinValue);
         if (temp != int.MinValue) r.Row("battery", "Temperature", $"{temp / 10.0:0.0} °C");
         int mv = status.GetIntExtra(BatteryManager.ExtraVoltage, -1);
-        if (mv > 0) r.Row("battery", "Voltage", $"{mv / 1000.0:0.00} V");
+        // millivolts by the documentation; a few phones give whole volts
+        if (mv > 0) r.Row("battery", "Voltage", mv < 100 ? $"{mv} V" : $"{mv / 1000.0:0.00} V");
         if (OperatingSystem.IsAndroidVersionAtLeast(34))
         {
             int cycles = status.GetIntExtra(BatteryManager.ExtraCycleCount, -1);
-            if (cycles >= 0) r.Row("battery", "Charge cycles", cycles.ToString(CultureInfo.InvariantCulture));
+            if (cycles > 0) r.Row("battery", "Charge cycles", cycles.ToString(CultureInfo.InvariantCulture));
         }
         if (ctx.GetSystemService(Context.BatteryService) is BatteryManager bm)
         {
@@ -215,7 +216,8 @@ internal static class AndroidDeviceInfo
             {
                 // most phones report µA, a few mA: values under 20 000 are taken as mA
                 double ma = Math.Abs(ua) > 20_000 ? ua / 1000.0 : ua;
-                r.Row("battery", ma < 0 ? "Discharge current" : "Charge current", $"{Math.Abs(ma):0} mA");
+                // the sign isn't the same on every phone: the charging state says which way it flows
+                r.Row("battery", charging ? "Charge current" : "Discharge current", $"{Math.Abs(ma):0} mA");
             }
         }
     }

@@ -166,8 +166,9 @@ internal static class DeviceInfoLinux
         var m = KeyValues("/proc/meminfo", ':');
         long Kb(string k) => m.TryGetValue(k, out var v) ? Long(v.Replace("kB", string.Empty).Trim()) * 1024 : 0;
         long total = Kb("MemTotal"), avail = Kb("MemAvailable"), swap = Kb("SwapTotal"), swapFree = Kb("SwapFree");
-        if (total > 0) r.Row("memory", "Usable", DeviceInfo.Bytes(total));
-        if (total > 0 && avail > 0)
+        // Android: its own memory figures come first (the Android head); only the swap is added here
+        if (total > 0 && !OperatingSystem.IsAndroid()) r.Row("memory", "Usable", DeviceInfo.Bytes(total));
+        if (total > 0 && avail > 0 && !OperatingSystem.IsAndroid())
             r.Row("memory", "In use", $"{DeviceInfo.Bytes(total - avail)} ({DeviceInfo.Percent(total - avail, total)}), {DeviceInfo.Bytes(avail)} free");
         if (swap > 0) r.Row("memory", OperatingSystem.IsAndroid() ? "Swap (zram)" : "Swap", $"{DeviceInfo.Bytes(swap)}, {DeviceInfo.Bytes(swap - swapFree)} used");
     }
