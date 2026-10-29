@@ -539,7 +539,7 @@
         <Border Grid.Row="2" Classes="card output">
             <Grid RowDefinitions="Auto, Auto, *">
                 <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto, Auto" Margin="12,6,8,6" ColumnSpacing="8">
-                    <ListBox x:Name="ViewSwitch" Classes="modeSwitch" SelectedIndex="{Binding ViewIndex}" AutomationProperties.Name="Show">
+                    <ListBox ctl:PageTabs.Primary="True" x:Name="ViewSwitch" Classes="modeSwitch" SelectedIndex="{Binding ViewIndex}" AutomationProperties.Name="Show">
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
                         </ListBox.ItemsPanel>

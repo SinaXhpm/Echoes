@@ -12,29 +12,6 @@
 	</UserControl.Resources>
 
 	<UserControl.Styles>
-		<!-- ===== switcher: segmented pills; on a phone one row of equal cells (one per tab shown), so a
-		     larger platform font can never wrap it to a second line ===== -->
-		<Style Selector="TabControl#NetTabs.seg.narrow">
-			<Setter Property="ItemsPanel">
-				<ItemsPanelTemplate>
-					<UniformGrid Rows="1"/>
-				</ItemsPanelTemplate>
-			</Setter>
-		</Style>
-		<!-- only Interfaces is left (phones: no other tab can work there): no strip for one tab. The strip goes, not the
-		     tab: a hidden tab can't stay selected, and its page would go blank -->
-		<Style Selector="TabControl#NetTabs.single /template/ ItemsPresenter#PART_ItemsPresenter">
-			<Setter Property="IsVisible" Value="False"/>
-		</Style>
-		<Style Selector="TabControl#NetTabs.seg.narrow > TabItem">
-			<Setter Property="Margin" Value="0"/>
-			<Setter Property="FontSize" Value="11.5"/>
-			<Setter Property="HorizontalAlignment" Value="Stretch"/>
-		</Style>
-		<!-- five equal cells: the thumb keeps only a small inset around its label -->
-		<Style Selector="TabControl#NetTabs.seg.narrow > TabItem /template/ ContentPresenter#PART_ContentPresenter">
-			<Setter Property="Padding" Value="3,0"/>
-		</Style>
 
 		<!-- ===== Wi-Fi ===== -->
 		<!-- small segmented band picker inside the chart card (its tabs carry no content) -->
@@ -340,9 +317,8 @@
 		</Style>
 	</UserControl.Styles>
 
-	<!-- Padding 0: the shell already pads the page; content lines up with the switcher and title -->
-	<TabControl x:Name="NetTabs" Classes="seg" Padding="0" h:Responsive.BreakWidth="520" SelectedIndex="{Binding TabIndex}"
-				Classes.single="{Binding !ShowTabStrip}">
+	<!-- Padding 0: the shell already pads the page. Its tabs are shown in the page header (ctl:PageTabs) -->
+	<TabControl ctl:PageTabs.Primary="True" x:Name="NetTabs" Classes="seg" Padding="0" h:Responsive.BreakWidth="520" SelectedIndex="{Binding TabIndex}">
 
 		<!-- ============================ INTERFACES ============================ -->
 		<TabItem Header="Interfaces">

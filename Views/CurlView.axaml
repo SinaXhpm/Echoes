@@ -735,7 +735,7 @@
         </Border>
 
         <!-- ================= SECTIONS: Request · Response · Code · Saved ================= -->
-        <TabControl x:Name="Sections" Grid.Row="2" Classes="seg" Margin="0,12,0,0" Padding="0,10,0,0" SelectedIndex="{Binding SectionIndex}">
+        <TabControl ctl:PageTabs.Primary="True" x:Name="Sections" Grid.Row="2" Classes="seg" Margin="0,12,0,0" Padding="0,10,0,0" SelectedIndex="{Binding SectionIndex}">
             <TabControl.ItemsPanel>
                 <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
             </TabControl.ItemsPanel>

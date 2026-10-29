@@ -714,7 +714,7 @@
             <Border Grid.Row="0" Classes="card section">
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*, Auto">
-                        <TabControl Grid.Column="0" Classes="seg wsmode" Padding="0" SelectedIndex="{Binding ModeIndex}" VerticalAlignment="Center"
+                        <TabControl ctl:PageTabs.Primary="True" Grid.Column="0" Classes="seg wsmode" Padding="0" SelectedIndex="{Binding ModeIndex}" VerticalAlignment="Center"
                                     ToolTip.Tip="Chat and swap files with browsers on your network, or catch the requests a webhook / app sends">
                             <TabItem Header="Share &amp; chat"/>
                             <TabItem Header="Catch requests"/>
@@ -1117,7 +1117,7 @@
             <Border Grid.Row="0" Classes="card section">
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*, Auto">
-                        <TabControl Grid.Column="0" Classes="seg wsmode" Padding="0" SelectedIndex="{Binding ModeIndex}" VerticalAlignment="Center">
+                        <TabControl ctl:PageTabs.Primary="True" Grid.Column="0" Classes="seg wsmode" Padding="0" SelectedIndex="{Binding ModeIndex}" VerticalAlignment="Center">
                             <TabItem Header="Share &amp; chat"/>
                             <TabItem Header="Catch requests"/>
                         </TabControl>

@@ -1,6 +1,7 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:glob="clr-namespace:System.Globalization;assembly=System.Runtime">
+        xmlns:glob="clr-namespace:System.Globalization;assembly=System.Runtime"
+        xmlns:ctl="using:Echoes.Views.Controls">
 
     <!-- ============================================================
          Echoes design system — v4, after the modern macOS look: neutral
@@ -549,6 +550,125 @@
     </Style>
     <Style Selector="ListBox.modeSwitch:disabled > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Foreground" Value="{DynamicResource Seg.TextSelected}"/>
+    </Style>
+
+    <!-- ===== the page header's tabs (Views/Controls/PageTabStrip): a tool's main strip, shown as icon capsules in the
+         page header (beside the title on a desktop, a chip row under the app bar on a phone); the chosen one is tinted
+         with the accent. The tool's own strip (marked ctl:PageTabs.Primary) draws nothing. ===== -->
+    <Style Selector="TabControl.pageTabs /template/ ItemsPresenter#PART_ItemsPresenter">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <Style Selector="ListBox.pageTabs">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Hidden"/>
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="ItemsPanel">
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4"/></ItemsPanelTemplate>
+        </Setter>
+        <Setter Property="ItemTemplate">
+            <DataTemplate x:DataType="ctl:PageTab">
+                <StackPanel Orientation="Horizontal" Spacing="6" ToolTip.Tip="{Binding Tip}">
+                    <Path Classes="tabIco" Data="{Binding Icon}" IsVisible="{Binding HasIcon}"/>
+                    <TextBlock Text="{Binding Header}" VerticalAlignment="Center"/>
+                    <Border Classes="tabBadge" IsVisible="{Binding HasBadge}">
+                        <TextBlock Text="{Binding Badge}"/>
+                    </Border>
+                </StackPanel>
+            </DataTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip > ListBoxItem">
+        <Setter Property="Height" Value="24"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="Padding" Value="10,0"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Bg.Hover}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip > ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Bg.Pressed}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Bg.Pressed}"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                     ListBox.pageTabStrip > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                     ListBox.pageTabStrip > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
+                     ListBox.pageTabStrip > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip:disabled > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Foreground" Value="{DynamicResource Text.Disabled}"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip:disabled > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip Path.tabIco">
+        <Setter Property="Width" Value="14"/>
+        <Setter Property="Height" Value="14"/>
+        <Setter Property="Stretch" Value="Uniform"/>
+        <Setter Property="StrokeThickness" Value="1.8"/>
+        <Setter Property="StrokeLineCap" Value="Round"/>
+        <Setter Property="StrokeJoin" Value="Round"/>
+        <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip > ListBoxItem:pointerover Path.tabIco">
+        <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip > ListBoxItem:selected Path.tabIco">
+        <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip:disabled Path.tabIco">
+        <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip Border.tabBadge">
+        <Setter Property="CornerRadius" Value="7"/>
+        <Setter Property="Padding" Value="5,0"/>
+        <Setter Property="MinWidth" Value="16"/>
+        <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip Border.tabBadge > TextBlock">
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+    </Style>
+    <!-- phone: finger-sized chips in a row that scrolls sideways -->
+    <Style Selector="ListBox.pageTabStrip.phone > ListBoxItem">
+        <Setter Property="Height" Value="34"/>
+        <Setter Property="Padding" Value="13,0"/>
+        <Setter Property="CornerRadius" Value="17"/>
+        <Setter Property="FontSize" Value="13.5"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip.phone > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="CornerRadius" Value="17"/>
+    </Style>
+    <Style Selector="ListBox.pageTabStrip.phone Path.tabIco">
+        <Setter Property="Width" Value="16"/>
+        <Setter Property="Height" Value="16"/>
     </Style>
 
     <!-- ===== shell pieces (desktop sidebar + mobile drawer) ===== -->

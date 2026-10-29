@@ -24,6 +24,16 @@ public partial class MobileShellView : UserControl
     public string? PageTitle { get => GetValue(PageTitleProperty); set => SetValue(PageTitleProperty, value); }
     public string? PageSubtitle { get => GetValue(PageSubtitleProperty); set => SetValue(PageSubtitleProperty, value); }
 
+    // The open tool's main tab strip (Controls/PageTabs), shown as chips under the app bar; null for a tool without tabs.
+    public static readonly Avalonia.StyledProperty<Avalonia.Controls.Primitives.SelectingItemsControl?> PageTabsTargetProperty =
+        Avalonia.AvaloniaProperty.Register<MobileShellView, Avalonia.Controls.Primitives.SelectingItemsControl?>(nameof(PageTabsTarget));
+
+    public Avalonia.Controls.Primitives.SelectingItemsControl? PageTabsTarget
+    {
+        get => GetValue(PageTabsTargetProperty);
+        set => SetValue(PageTabsTargetProperty, value);
+    }
+
     private void UpdatePageHeader()
     {
         if (Nav?.SelectedItem is Controls.INavInfo nav)
@@ -40,6 +50,8 @@ public partial class MobileShellView : UserControl
         // History & Backup opens on History: the Backup page is built the first time its tab is shown (only then is its
         // host in the visual tree)
         BackupHost.AttachedToVisualTree += (_, _) => { if (_vm is not null) ToolViews.Fill(BackupHost, "BACKUP", _vm); };
+        // a page's tabs that are built when first shown (Cloudflare's, once unlocked) reach the chip row when they appear
+        Controls.PageTabs.Appeared += _ => FindPageTabs();
         Loaded += async (s, e) =>
         {
             if (DataContext is MainViewModel vm)
@@ -309,5 +321,11 @@ public partial class MobileShellView : UserControl
         {
             ToolViews.Fill(host, tool, vm);
         }
+        // the page exists now (Fill builds it at once): its main tabs go up into the chip row under the app bar
+        FindPageTabs();
     }
+
+    private void FindPageTabs()
+        => PageTabsTarget = Pages is not null && Nav is { SelectedIndex: >= 0 } nav && nav.SelectedIndex < Pages.ItemCount
+            ? Controls.PageTabs.FindIn(Pages.Items[nav.SelectedIndex] as Avalonia.LogicalTree.ILogical) : null;
 }

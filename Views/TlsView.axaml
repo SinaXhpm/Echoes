@@ -392,7 +392,7 @@
     </UserControl.Styles>
 
     <!-- Padding 0: the shell already pads the page -->
-    <TabControl x:Name="TlsTabs" Padding="0" SelectedIndex="{Binding TabIndex}">
+    <TabControl ctl:PageTabs.Primary="True" x:Name="TlsTabs" Padding="0" SelectedIndex="{Binding TabIndex}">
 
         <!-- ============================ INSPECT ============================ -->
         <TabItem Header="Inspect">

@@ -82,13 +82,22 @@
 						<!-- PAGE: fills the height but asks for none, so the window opens fitted to the nav (MainWindow) -->
 						<ctl:HeightNeutral Grid.Column="1">
 							<Grid RowDefinitions="Auto,*" Background="{DynamicResource Bg.App}">
-								<Border Grid.Row="0" Name="PART_PageHeader" Padding="18,10,18,7" Background="{DynamicResource Bg.App}"
-										chrome:WindowDecorationProperties.ElementRole="TitleBar">
-									<StackPanel Spacing="2" IsHitTestVisible="False">
-										<TextBlock Classes="pageTitle" Text="{Binding $parent[views:MainView].PageTitle}"/>
-										<TextBlock Classes="pageSubtitle" Text="{Binding $parent[views:MainView].PageSubtitle}"/>
-									</StackPanel>
-								</Border>
+								<!-- header: title + subtitle, and the page's tabs beside them (PageTabStrip). The drag area is the
+								     border behind both, not their parent: a tab inside a TitleBar-role element would drag the
+								     window instead of being clicked. The tabs' bottom sits on the subtitle's line, below
+								     Windows' caption buttons. -->
+								<Panel Grid.Row="0">
+									<Border Name="PART_PageHeader" Background="{DynamicResource Bg.App}"
+											chrome:WindowDecorationProperties.ElementRole="TitleBar"/>
+									<ctl:PageHeaderLayout Margin="18,10,18,4">
+										<StackPanel Spacing="2" IsHitTestVisible="False" Margin="0,0,0,5">
+											<TextBlock Classes="pageTitle" Text="{Binding $parent[views:MainView].PageTitle}"/>
+											<TextBlock Classes="pageSubtitle" Text="{Binding $parent[views:MainView].PageSubtitle}"/>
+										</StackPanel>
+										<ctl:PageTabStrip Name="PART_PageTabs" Target="{Binding $parent[views:MainView].PageTabsTarget}"
+														  AutomationProperties.Name="Page sections"/>
+									</ctl:PageHeaderLayout>
+								</Panel>
 								<ContentPresenter Grid.Row="1" Name="PART_SelectedContentHost"
 												  Margin="{TemplateBinding Padding}"
 												  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
@@ -399,7 +408,7 @@
 					<TextBlock Classes="navlabel" Text="History &amp; Backup"/>
 				</StackPanel>
 			</ctl:NavTabItem.Header>
-			<TabControl Padding="0">
+			<TabControl ctl:PageTabs.Primary="True" Padding="0">
 				<TabItem Header="History"><Decorator x:Name="HistoryHost"/></TabItem>
 				<TabItem Header="Backup"><Decorator x:Name="BackupHost"/></TabItem>
 			</TabControl>

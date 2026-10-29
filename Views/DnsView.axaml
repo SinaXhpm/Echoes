@@ -686,7 +686,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- the mode is picked before a run; locked while one goes on -->
-                <ListBox x:Name="DnsMode" Classes="modeSwitch" SelectedIndex="{Binding ModeIndex}" IsEnabled="{Binding !IsWorking}"
+                <ListBox ctl:PageTabs.Primary="True" x:Name="DnsMode" Classes="modeSwitch" SelectedIndex="{Binding ModeIndex}" IsEnabled="{Binding !IsWorking}"
                          AutomationProperties.Name="Mode">
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>

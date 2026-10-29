@@ -683,7 +683,7 @@
             </Border>
 
             <!-- ======================= sub-tabs ======================= -->
-            <TabControl x:Name="SshTabs" Grid.Row="1" Classes="seg" Padding="0" SelectedIndex="{Binding SelectedTab}">
+            <TabControl ctl:PageTabs.Primary="True" x:Name="SshTabs" Grid.Row="1" Classes="seg" Padding="0" SelectedIndex="{Binding SelectedTab}">
 
                 <!-- ============ terminal ============ -->
                 <TabItem Header="Terminal">

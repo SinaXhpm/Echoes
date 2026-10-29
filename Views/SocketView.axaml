@@ -491,7 +491,7 @@
                     <!-- locked while a session runs: switching would silently drop it -->
                     <Panel x:Name="SkModesTight" helpers:Responsive.BreakWidth="300">
                         <Panel x:Name="SkModesWrap" helpers:Responsive.BreakWidth="440">
-                            <TabControl x:Name="SkModes" Classes="seg modes" Padding="0"
+                            <TabControl ctl:PageTabs.Primary="True" x:Name="SkModes" Classes="seg modes" Padding="0"
                                         SelectedIndex="{Binding ModeIndex}" IsEnabled="{Binding IsIdle}">
                                 <TabItem Header="TCP client"/>
                                 <TabItem Header="TCP server"/>

@@ -12,9 +12,10 @@ namespace Echoes.Views.Controls;
 /// they leave out of the tree, but the phone shell's carousel only hides it (IsVisible on its host), so attach / detach
 /// alone said "shown" for every page visited once: a page's "is the user looking at me" logic (the chat's unread count,
 /// SSH's server polling) went on behind other pages. <see cref="Changed"/> fires on the UI thread when the answer changes.
-/// Made before the control is attached (a view's constructor).
+/// Made before the control is attached (a view's constructor) or while it is (the header's tab strip watching its
+/// target); disposed when no longer wanted.
 /// </summary>
-internal sealed class ShownWatch
+internal sealed class ShownWatch : IDisposable
 {
     private readonly Control _control;
     private readonly List<IDisposable> _ancestors = new();
@@ -23,22 +24,38 @@ internal sealed class ShownWatch
     public ShownWatch(Control control)
     {
         _control = control;
-        control.AttachedToVisualTree += (_, _) =>
+        control.AttachedToVisualTree += OnAttached;
+        control.DetachedFromVisualTree += OnDetached;
+        if (TopLevel.GetTopLevel(control) is not null)
         {
             _attached = true;
             Hook();
-        };
-        control.DetachedFromVisualTree += (_, _) =>
-        {
-            _attached = false;
-            Unhook();
-            Update();
-        };
+        }
     }
 
     public bool IsShown { get; private set; }
 
     public event Action<bool>? Changed;
+
+    public void Dispose()
+    {
+        _control.AttachedToVisualTree -= OnAttached;
+        _control.DetachedFromVisualTree -= OnDetached;
+        Unhook();
+    }
+
+    private void OnAttached(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        _attached = true;
+        Hook();
+    }
+
+    private void OnDetached(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        _attached = false;
+        Unhook();
+        Update();
+    }
 
     private void Hook()
     {

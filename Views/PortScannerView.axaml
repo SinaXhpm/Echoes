@@ -355,7 +355,7 @@
     </UserControl.Styles>
 
     <!-- Padding 0: the shell already pads the page; content lines up with the page title -->
-    <TabControl x:Name="Tabs" Padding="0">
+    <TabControl ctl:PageTabs.Primary="True" x:Name="Tabs" Padding="0">
 
         <!-- ===================== SETUP ===================== -->
         <!-- One ScrollViewer for the whole form, so nothing can overlap the action button at any height. -->

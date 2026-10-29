@@ -347,7 +347,7 @@
 
 		<!-- ===== Content ===== -->
 		<SplitView.Content>
-			<Grid RowDefinitions="Auto,*">
+			<Grid RowDefinitions="Auto,Auto,*">
 				<!-- app bar (no window chrome on mobile) -->
 				<Border Grid.Row="0" Background="{DynamicResource Bg.Sidebar}"
 						BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1">
@@ -365,8 +365,11 @@
 						</StackPanel>
 					</Grid>
 				</Border>
+				<!-- the page's tabs (Controls/PageTabStrip): finger-sized chips under the app bar, scrolling sideways -->
+				<ctl:PageTabStrip Grid.Row="1" Classes="phone" Margin="12,10,12,0" AutomationProperties.Name="Page sections"
+								  Target="{Binding $parent[views:MobileShellView].PageTabsTarget}"/>
 				<!-- Only the selected tool is shown -->
-				<Carousel Grid.Row="1" x:Name="Pages" Margin="12,12,12,10"
+				<Carousel Grid.Row="2" x:Name="Pages" Margin="12,12,12,10"
 						  SelectedIndex="{Binding #Nav.SelectedIndex}"
 						  PageTransition="{x:Null}">
 					<!-- Order MUST match the Nav ListBox above (Carousel is index-coupled to it). Each slot is an
@@ -393,7 +396,7 @@
 					<Decorator/>	<!-- STRING LAB -->
 					<Decorator/>	<!-- NOTES -->
 					<!-- DATA: HISTORY + BACKUP merged into one page (index-aligned with the Nav list) -->
-					<TabControl Padding="0">
+					<TabControl ctl:PageTabs.Primary="True" Padding="0">
 						<TabItem Header="History"><Decorator x:Name="HistoryHost"/></TabItem>
 						<TabItem Header="Backup"><Decorator x:Name="BackupHost"/></TabItem>
 					</TabControl>

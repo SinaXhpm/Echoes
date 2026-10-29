@@ -74,7 +74,6 @@ public partial class NetworkInfoViewModel : ObservableObject
     public bool ShowNeighborsTab => NetTables.CanReadNeighbors;
     public bool ShowPortsTab => NetTables.CanReadPorts;
     public bool ShowRoutesTab => NetTables.CanReadRoutes;
-    public bool ShowTabStrip => ShowWifiTab || ShowNeighborsTab || ShowPortsTab || ShowRoutesTab;
 
     private static int ShownTab(int index) => index switch
     {

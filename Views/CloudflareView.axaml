@@ -1560,7 +1560,7 @@
             </StackPanel>
 
             <!-- ============ ZONE TABS ============ -->
-            <TabControl x:Name="CfTabs" Grid.Row="1" Classes="seg" Margin="0,12,0,0" Padding="0,12,0,0"
+            <TabControl ctl:PageTabs.Primary="True" x:Name="CfTabs" Grid.Row="1" Classes="seg" Margin="0,12,0,0" Padding="0,12,0,0"
                         SelectedIndex="{Binding SelectedTabIndex}" IsVisible="{Binding HasZone}">
                 <TabControl.ItemsPanel>
                     <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
