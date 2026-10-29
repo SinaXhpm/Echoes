@@ -16,6 +16,7 @@ Your settings, the hosts and URLs you typed (history), notes, saved requests, SS
 - You can export everything to one password-protected backup file and restore it on another device. The file goes only where you save it.
 - On an iPhone or iPad, the files that browsers send to the file-sharing page are kept in the Echoes folder of the Files app (On My iPhone), so you can open, move or delete them there.
 - Deleting the app, or its data folder, deletes the data.
+- The Device page reads this computer's or phone's hardware details (model, serial numbers, memory, disks, battery …) on the device when you open it. They are shown and, if you press Copy, put on your clipboard; they are never sent anywhere.
 
 ## What leaves your device, and why
 

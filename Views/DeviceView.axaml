@@ -1,0 +1,131 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             xmlns:h="using:Echoes.Helpers"
+             x:Class="Echoes.Views.DeviceView"
+             x:DataType="vm:DeviceViewModel">
+    <UserControl.Resources>
+        <StreamGeometry x:Key="DevGlyphRefresh">M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8 M21 3v5h-5</StreamGeometry>
+        <StreamGeometry x:Key="DevGlyphCopy">M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2</StreamGeometry>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="TextBlock.devStatus">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <!-- a card's rows: the label in a fixed column (narrower on a phone), the value selectable and wrapping -->
+        <Style Selector="TextBlock.rowLabel">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Width" Value="172"/>
+            <Setter Property="Margin" Value="0,0,12,0"/>
+        </Style>
+        <Style Selector="Grid#DevRoot.narrow TextBlock.rowLabel">
+            <Setter Property="Width" Value="112"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.rowValue">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <!-- a group within a card (a memory module, a disk): a quiet rule above, the name in semibold -->
+        <Style Selector="Border.rowGroup">
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+            <Setter Property="Margin" Value="0,8,0,2"/>
+            <Setter Property="Padding" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="TextBlock.rowHeading">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <!-- the actions beside the heading, or under it on a phone (set by style only: a local Grid.Column would win) -->
+        <Style Selector="Grid#DevRoot.wide StackPanel#DevActions"><Setter Property="Grid.Column" Value="1"/></Style>
+        <Style Selector="Grid#DevRoot.narrow StackPanel#DevActions">
+            <Setter Property="Grid.Row" Value="1"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+        <Style Selector="Path.devIco">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.7"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button:pointerover Path.devIco">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid x:Name="DevRoot" h:Responsive.BreakWidth="520" RowDefinitions="Auto, *">
+        <Grid Grid.Row="0" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="12" Margin="0,0,0,12">
+            <StackPanel VerticalAlignment="Center" Spacing="2">
+                <TextBlock Classes="sectionTitle" Text="{Binding Headline}" TextWrapping="Wrap"/>
+                <TextBlock Classes="devStatus" Text="{Binding Status}"/>
+            </StackPanel>
+            <StackPanel x:Name="DevActions" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Classes="ghost" Command="{Binding CopyAllCommand}" Content="Copy all"
+                        ToolTip.Tip="Every card as text, for a report or a support request"/>
+                <Button Classes="secondary" Command="{Binding RefreshCommand}" Padding="12,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Path Classes="devIco" Data="{StaticResource DevGlyphRefresh}"/>
+                        <TextBlock Text="Refresh" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <TextBlock Grid.Row="1" Classes="devStatus" Text="Reading this device…" HorizontalAlignment="Center"
+                   VerticalAlignment="Center" IsVisible="{Binding ShowReading}"/>
+
+        <!-- virtualized by card: the sensors card of a phone alone has dozens of rows -->
+        <ItemsControl Grid.Row="1" ItemsSource="{Binding Sections}">
+            <ItemsControl.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            <ItemsControl.Template><ControlTemplate>
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                    <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}"/>
+                </ScrollViewer>
+            </ControlTemplate></ItemsControl.Template>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="h:DeviceSection">
+                    <Border Classes="card" Margin="0,0,0,12" Padding="16,10,8,14">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*, Auto">
+                                <TextBlock Classes="sectionTitle" Text="{Binding Title}" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Classes="icon" ToolTip.Tip="Copy this card"
+                                        Command="{Binding ((vm:DeviceViewModel)DataContext).CopySectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}">
+                                    <Path Classes="devIco" Data="{StaticResource DevGlyphCopy}"/>
+                                </Button>
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding Rows}" Margin="0,0,8,0">
+                                <ItemsControl.DataTemplates>
+                                    <DataTemplate DataType="h:DeviceHeading">
+                                        <Border Classes="rowGroup">
+                                            <TextBlock Classes="rowHeading" Text="{Binding Text}"/>
+                                        </Border>
+                                    </DataTemplate>
+                                    <DataTemplate DataType="h:DeviceRow">
+                                        <DockPanel Margin="0,3">
+                                            <TextBlock Classes="rowLabel" DockPanel.Dock="Left" Text="{Binding Label}"/>
+                                            <SelectableTextBlock Classes="rowValue" Text="{Binding Value}"/>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.DataTemplates>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+</UserControl>

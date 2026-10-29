@@ -240,6 +240,7 @@ internal static class ToolViews
         "WEB SERVER" => new WebServerView { DataContext = vm.WebServerVM },
         "PROXY" => new ProxyView { DataContext = vm.ProxyVM },
         "NETWORK" => new NetworkInfoView { DataContext = vm.NetworkVM },
+        "DEVICE" => new DeviceView { DataContext = new DeviceViewModel(vm.CurrentVersion) },
         "MONITOR" => new MonitorView { DataContext = vm.MonitorVM },
         "SSH" => new SshView { DataContext = vm.SshVM },
         "TELEGRAM BOT" => new TgView { DataContext = new TgViewModel() },

@@ -236,6 +236,13 @@
 								<TextBlock Text="Network" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
+						<ctl:NavListItem Tag="DEVICE" Title="Device"
+										 Subtitle="Hardware, system, battery and sensors" AutomationProperties.Name="Device">
+							<StackPanel Orientation="Horizontal" Spacing="14">
+								<Path Classes="ico" Data="{StaticResource IcoDevice}"/>
+								<TextBlock Text="Device" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
 						<ctl:NavListItem Tag="SPEED TEST" Title="Speed Test"
 										 Subtitle="Internet speed and latency" AutomationProperties.Name="Speed Test">
 							<StackPanel Orientation="Horizontal" Spacing="14">
@@ -372,6 +379,7 @@
 					<Decorator/>	<!-- CHECK-HOST -->
 					<Decorator/>	<!-- MONITOR -->
 					<Decorator/>	<!-- NETWORK -->
+					<Decorator/>	<!-- DEVICE -->
 					<Decorator/>	<!-- SPEED TEST -->
 					<Decorator/>	<!-- CURL -->
 					<Decorator/>	<!-- TLS -->

@@ -35,6 +35,8 @@ public class MainApplication : AvaloniaAndroidApplication<global::Echoes.App>
         var api = (int)global::Android.OS.Build.VERSION.SdkInt;
         Echoes.Helpers.AppInfo.PlatformOverride = $"Android {os} (API {api})";
         Echoes.Helpers.AppInfo.DeviceName = PhoneName();
+        //  • the Device page: what Android's SDK knows (Build, the screen, battery, GPU, cameras, sensors).
+        Echoes.Helpers.DeviceInfo.PlatformCollector = AndroidDeviceInfo.Collect;
         //  • after a backup restore, "Restart now" opens Echoes again in a fresh process, which loads the restored files.
         Echoes.Helpers.AppPlatform.RestartApp = RestartApp;
         base.OnCreate();

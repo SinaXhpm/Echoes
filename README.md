@@ -92,6 +92,7 @@ The App Store versions update through the App Store. The downloaded versions sho
 | [Check Host](#check-host-from-around-the-world) | Ping, HTTP, TCP, UDP and DNS checks from servers worldwide | check-host.net, Globalping |
 | [Monitor](#uptime-monitor) | Watches servers and websites, certificate and domain expiry, with Telegram alerts | Uptime Kuma, UptimeRobot |
 | [Network](#network-info) | Your adapters, Wi-Fi networks and channels, ARP neighbors, open ports and routing table | ipconfig, arp, netstat, Wi-Fi analyzers |
+| [Device](#device-info) | Every part of this computer or phone: model, processor, memory modules, GPUs, displays, disks, battery health, cameras and sensors | CPU-Z, HWiNFO, Speccy, CPU-X |
 | [Speed Test](#internet-speed-test) | Internet speed, latency, jitter and bufferbloat to the server you pick | Speedtest, fast.com |
 | [cURL](#curl-http-client) | Builds and sends HTTP requests, imports curl commands | curl, Postman, Insomnia |
 | [TLS Inspector](#ssltls-inspector) | Certificate chain, expiry, TLS versions and ciphers | openssl s_client, SSL checkers |
@@ -302,6 +303,20 @@ Keep an eye on your servers and websites, and hear when something changes.
 - **Routing:** the routing table.
 
 Interfaces work everywhere. Open ports are listed on every desktop system; neighbors, routing and the Wi-Fi analyzer on Windows and Linux.
+
+### Device info
+
+Everything about the computer or phone Echoes runs on, read on the device itself when you open the page (nothing is sent anywhere, nothing runs in the background):
+
+- **Device and firmware:** maker, model, type, serial number; the motherboard, BIOS / UEFI, Secure Boot and TPM.
+- **Processor:** name, cores and threads (performance and efficient cores on hybrid chips, clusters on phones), clocks, caches, instruction sets, and whether a hypervisor runs.
+- **Memory:** total, in use, and every module: size, DDR type, rated and running speed, maker and part number.
+- **Graphics and displays:** each GPU with its video memory and driver; each display's resolution, refresh rate, scaling, size and maker.
+- **Storage:** each disk's model, bus (NVMe, SATA, USB …), SSD or hard disk, capacity, firmware and temperature, and its volumes.
+- **Battery:** charge, design and full-charge capacity (its health), cycles, voltage and temperature.
+- **Phones:** the SoC and its core clusters, the Android or iOS version and patch level, every camera (megapixels, aperture, focal length), every sensor, and features such as NFC, eSIM and UWB.
+
+**Copy all** puts the whole report on the clipboard as text. What a system keeps from apps (on Linux the serial numbers, on phones most of the hardware IDs) is left out.
 
 ### Internet speed test
 

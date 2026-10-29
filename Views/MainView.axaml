@@ -14,7 +14,7 @@
 		     nav, its content host the page (each tab's content is a lazily-filled tool host, see
 		     ToolViews in MainView.axaml.cs). The sidebar always shows its labels (the user wants the menu
 		     open at every size); it's kept narrow and dense instead, so the window can stay small: it opens
-		     860 wide and exactly as tall as this list (MainWindow). ===== -->
+		     840 wide and exactly as tall as this list (MainWindow). ===== -->
 		<Style Selector="TabControl#MainTabs">
 			<Setter Property="Padding" Value="18,2,18,12"/>
 			<Setter Property="Template">
@@ -35,7 +35,7 @@
 								     rather than in a footer, so the list can breathe without making the window taller. The
 								     buttons are siblings of the TitleBar-role border, not children, so they stay clickable. -->
 								<Grid Grid.Row="1" ColumnDefinitions="*,Auto" Background="{DynamicResource Bg.Sidebar}">
-									<Border Name="PART_Brand" Padding="13,9,4,9" Background="{DynamicResource Bg.Sidebar}"
+									<Border Name="PART_Brand" Padding="13,6,4,6" Background="{DynamicResource Bg.Sidebar}"
 											chrome:WindowDecorationProperties.ElementRole="TitleBar">
 										<StackPanel Orientation="Horizontal" Spacing="9" IsHitTestVisible="False">
 											<Image Source="avares://Echoes/Assets/logo-256.png" Width="20" Height="20"
@@ -62,7 +62,7 @@
 								<!-- nav -->
 								<ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
 											  HorizontalScrollBarVisibility="Disabled" AllowAutoHide="True">
-									<ItemsPresenter Name="PART_ItemsPresenter" Margin="8,0,8,6"
+									<ItemsPresenter Name="PART_ItemsPresenter" Margin="8,0,8,3"
 													ItemsPanel="{TemplateBinding ItemsPanel}"/>
 								</ScrollViewer>
 								<!-- footer: only the update pill, when there is one -->
@@ -117,7 +117,7 @@
 						<TextBlock Name="PART_GroupLabel" Classes="navgroup" Text="{TemplateBinding Group}"
 								   IsHitTestVisible="False"
 								   IsVisible="{TemplateBinding Group, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-						<Border Name="PART_Pill" Height="24" CornerRadius="6" Padding="9,0"
+						<Border Name="PART_Pill" Height="23" CornerRadius="6" Padding="9,0"
 								Background="{DynamicResource Bg.Sidebar}">
 							<Panel>
 								<!-- 2px in from the pill's edge, out through its padding -->
@@ -180,10 +180,11 @@
 		</Style>
 		<!-- section labels: a clear gap above each group, a small one before its first item -->
 		<Style Selector="TabItem.navtab /template/ TextBlock#PART_GroupLabel">
-			<Setter Property="Margin" Value="10,7,0,4"/>
+			<Setter Property="Margin" Value="10,5,0,2"/>
+			<Setter Property="FontSize" Value="10"/>
 		</Style>
 		<Style Selector="TabItem.navtab:nth-child(1) /template/ TextBlock#PART_GroupLabel">
-			<Setter Property="Margin" Value="10,2,0,4"/>
+			<Setter Property="Margin" Value="10,0,0,2"/>
 		</Style>
 	</UserControl.Styles>
 
@@ -263,6 +264,15 @@
 				<StackPanel Orientation="Horizontal" Spacing="10">
 					<Path Classes="ico" Data="{StaticResource IcoNetwork}"/>
 					<TextBlock Classes="navlabel" Text="Network"/>
+				</StackPanel>
+			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
+		<ctl:NavTabItem Classes="navtab" Tag="DEVICE" Title="Device"
+						Subtitle="Hardware, system, battery and sensors"
+						AutomationProperties.Name="Device">
+			<ctl:NavTabItem.Header>
+				<StackPanel Orientation="Horizontal" Spacing="10">
+					<Path Classes="ico" Data="{StaticResource IcoDevice}"/>
+					<TextBlock Classes="navlabel" Text="Device"/>
 				</StackPanel>
 			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
 		<ctl:NavTabItem Classes="navtab" Tag="SPEED TEST" Title="Speed Test"

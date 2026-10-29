@@ -13,6 +13,7 @@
     <StreamGeometry x:Key="IcoDns">M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M3 12 H21 M12 3 A5.5 9 0 0 0 12 21 M12 3 A5.5 9 0 0 1 12 21</StreamGeometry>
     <StreamGeometry x:Key="IcoScanner">M11 4 A7 7 0 1 0 11 18 A7 7 0 1 0 11 4 Z M16 16 L21 21</StreamGeometry>
     <StreamGeometry x:Key="IcoNetwork">M9.5 3 h5 v4 h-5 Z M2.5 17 h5 v4 h-5 Z M16.5 17 h5 v4 h-5 Z M12 7 v3.5 M5 17 v-2.5 h14 v2.5 M12 10.5 v4</StreamGeometry>
+    <StreamGeometry x:Key="IcoDevice">M8 6.5 h8 a1.5 1.5 0 0 1 1.5 1.5 v8 a1.5 1.5 0 0 1 -1.5 1.5 h-8 a1.5 1.5 0 0 1 -1.5 -1.5 v-8 a1.5 1.5 0 0 1 1.5 -1.5 Z M10 10 h4 v4 h-4 Z M10 3.5 V6.5 M14 3.5 V6.5 M10 17.5 V20.5 M14 17.5 V20.5 M3.5 10 H6.5 M3.5 14 H6.5 M17.5 10 H20.5 M17.5 14 H20.5</StreamGeometry>
     <StreamGeometry x:Key="IcoProxy">M3 8.5 H17 M14 5.5 L17 8.5 L14 11.5 M21 15.5 H7 M10 12.5 L7 15.5 L10 18.5</StreamGeometry>
     <StreamGeometry x:Key="IcoWebServer">M3.5 4.5 h17 v5 h-17 Z M3.5 14.5 h17 v5 h-17 Z M6.5 7 m-0.8 0 a0.8 0.8 0 1 0 1.6 0 a0.8 0.8 0 1 0 -1.6 0 M6.5 17 m-0.8 0 a0.8 0.8 0 1 0 1.6 0 a0.8 0.8 0 1 0 -1.6 0</StreamGeometry>
     <StreamGeometry x:Key="IcoIpInfo">M12 21 C12 21 18.5 14.4 18.5 10 A6.5 6.5 0 1 0 5.5 10 C5.5 14.4 12 21 12 21 Z M12 12.5 A2.5 2.5 0 1 0 12 7.5 A2.5 2.5 0 1 0 12 12.5</StreamGeometry>
