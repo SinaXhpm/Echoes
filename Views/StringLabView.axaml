@@ -159,7 +159,7 @@
 	</UserControl.Styles>
 
 	<Grid x:Name="LabRoot" RowDefinitions="*, Auto, Auto">
-		<TabControl ctl:PageTabs.Primary="True" Grid.Row="0" Classes="seg cats" SelectedIndex="{Binding CategoryIndex}">
+		<TabControl Grid.Row="0" Classes="seg cats" SelectedIndex="{Binding CategoryIndex}">
 
 			<!-- ============ ENCODE ============ -->
 			<TabItem Header="Encode">

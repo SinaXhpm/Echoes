@@ -336,7 +336,7 @@
     </UserControl.Styles>
 
     <!-- Padding 0: the shell already pads the page; the views line up with the switcher -->
-    <TabControl ctl:PageTabs.Primary="True" x:Name="PxTabs" Classes="seg" Padding="0" SelectedIndex="{Binding ViewIndex}">
+    <TabControl x:Name="PxTabs" Classes="seg" Padding="0" SelectedIndex="{Binding ViewIndex}">
       <TabItem Header="Server">
     <ctl:Deferred><DataTemplate x:DataType="vm:ProxyViewModel">
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,12,0,0">

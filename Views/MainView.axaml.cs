@@ -18,16 +18,6 @@ public partial class MainView : UserControl
     public string? PageTitle { get => GetValue(PageTitleProperty); set => SetValue(PageTitleProperty, value); }
     public string? PageSubtitle { get => GetValue(PageSubtitleProperty); set => SetValue(PageSubtitleProperty, value); }
 
-    // The open tool's main tab strip (Controls/PageTabs), shown in the page header; null for a tool without tabs.
-    public static readonly StyledProperty<Avalonia.Controls.Primitives.SelectingItemsControl?> PageTabsTargetProperty =
-        AvaloniaProperty.Register<MainView, Avalonia.Controls.Primitives.SelectingItemsControl?>(nameof(PageTabsTarget));
-
-    public Avalonia.Controls.Primitives.SelectingItemsControl? PageTabsTarget
-    {
-        get => GetValue(PageTabsTargetProperty);
-        set => SetValue(PageTabsTargetProperty, value);
-    }
-
     public MainView()
     {
         InitializeComponent();
@@ -35,8 +25,6 @@ public partial class MainView : UserControl
         // History & Backup opens on History: the Backup page is built the first time its tab is shown (only then is its
         // host in the visual tree)
         BackupHost.AttachedToVisualTree += (_, _) => { if (_vm is not null) ToolViews.Fill(BackupHost, "BACKUP", _vm); };
-        // a page's tabs that are built when first shown (Cloudflare's, once unlocked) reach the header when they appear
-        Controls.PageTabs.Appeared += _ => FindPageTabs();
         Loaded += async (s, e) =>
         {
             if (DataContext is MainViewModel vm)
@@ -101,12 +89,7 @@ public partial class MainView : UserControl
         {
             ToolViews.Fill(host, tool, vm);
         }
-        // the page exists now (Fill builds it at once): its main tabs go up into the header
-        FindPageTabs();
     }
-
-    private void FindPageTabs()
-        => PageTabsTarget = Controls.PageTabs.FindIn((MainTabs?.SelectedItem as TabItem)?.Content as Avalonia.LogicalTree.ILogical);
 }
 
 /// <summary>

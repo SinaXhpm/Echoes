@@ -35,35 +35,4 @@
     <!-- socket tool: a plug -->
     <StreamGeometry x:Key="IcoSocket">M9 3 v4 M15 3 v4 M6.5 7 h11 v4 a5.5 5.5 0 0 1 -11 0 Z M12 16.5 V21</StreamGeometry>
     <!-- (the light / dark switch's sun / moon is IcoThemeToggle in Styles/Tokens.axaml: a per-theme resource) -->
-
-    <!--
-      Glyphs of the page header's tabs (Views/Controls/PageTabStrip picks one per tab title), on the same 24x24 grid,
-      stroked. Tabs named like a tool use that tool's glyph above.
-    -->
-    <StreamGeometry x:Key="TabRoute">M4 18.5 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 Z M16 5.5 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 Z M8 18.5 H15 a3 3 0 0 0 0 -6 H9 a3 3 0 0 1 0 -6 H16</StreamGeometry>
-    <StreamGeometry x:Key="TabTable">M4 5 H20 V19 H4 Z M4 10 H20 M4 14.5 H20 M10 10 V19</StreamGeometry>
-    <StreamGeometry x:Key="TabPort">M5.5 4 H18.5 a1.5 1.5 0 0 1 1.5 1.5 V18.5 a1.5 1.5 0 0 1 -1.5 1.5 H5.5 a1.5 1.5 0 0 1 -1.5 -1.5 V5.5 a1.5 1.5 0 0 1 1.5 -1.5 Z M9 9 V12 M15 9 V12 M9.5 16 H14.5</StreamGeometry>
-    <StreamGeometry x:Key="TabBars">M5 20 V11 M12 20 V5 M19 20 V14 M3 20 H21</StreamGeometry>
-    <StreamGeometry x:Key="TabMail">M3.5 6 H20.5 V18 H3.5 Z M3.5 6.5 L12 13 L20.5 6.5</StreamGeometry>
-    <StreamGeometry x:Key="TabCheck">M5 12.5 L9.5 17 L19 7.5</StreamGeometry>
-    <StreamGeometry x:Key="TabList">M9 6.5 H20 M9 12 H20 M9 17.5 H20 M4.5 6.5 H5 M4.5 12 H5 M4.5 17.5 H5</StreamGeometry>
-    <StreamGeometry x:Key="TabSliders">M4 7 H13 M17 7 H20 M15 5 V9 M4 17 H7 M11 17 H20 M9 15 V19</StreamGeometry>
-    <StreamGeometry x:Key="TabDoc">M7 3.5 H14 L18 7.5 V20.5 H7 Z M14 3.5 V7.5 H18 M9.5 12 H15.5 M9.5 16 H15.5</StreamGeometry>
-    <StreamGeometry x:Key="TabBell">M6.5 16 V11 a5.5 5.5 0 0 1 11 0 V16 L19 18 H5 Z M10 20.5 a2 2 0 0 0 4 0</StreamGeometry>
-    <StreamGeometry x:Key="TabWifi">M2.5 9 a13.5 13.5 0 0 1 19 0 M5.5 12.5 a9 9 0 0 1 13 0 M8.5 16 a4.5 4.5 0 0 1 7 0 M12 19.5 H12.01</StreamGeometry>
-    <StreamGeometry x:Key="TabPeople">M5.5 7.5 a3.5 3.5 0 1 0 7 0 a3.5 3.5 0 1 0 -7 0 Z M2.5 20 a6.5 6.5 0 0 1 13 0 M16 4.3 a3.5 3.5 0 0 1 0 6.4 M17.5 14 a6 6 0 0 1 4 6</StreamGeometry>
-    <StreamGeometry x:Key="TabSend">M5 19 L19 5 M10 5 H19 V14</StreamGeometry>
-    <StreamGeometry x:Key="TabReceive">M19 5 L5 19 M14 19 H5 V10</StreamGeometry>
-    <StreamGeometry x:Key="TabCode">M8 7.5 L3.5 12 L8 16.5 M16 7.5 L20.5 12 L16 16.5 M13.5 5 L10.5 19</StreamGeometry>
-    <StreamGeometry x:Key="TabBookmark">M6.5 3.5 H17.5 V20.5 L12 16.5 L6.5 20.5 Z</StreamGeometry>
-    <StreamGeometry x:Key="TabGrid">M4 4 H10 V10 H4 Z M14 4 H20 V10 H14 Z M4 14 H10 V20 H4 Z M14 14 H20 V20 H14 Z</StreamGeometry>
-    <StreamGeometry x:Key="TabShield">M12 3 L19.5 6 V11.5 C19.5 16 16.3 19.5 12 21 C7.7 19.5 4.5 16 4.5 11.5 V6 Z</StreamGeometry>
-    <StreamGeometry x:Key="TabBolt">M13 3 L5 13.5 H11.5 L10.5 21 L19 10.5 H12.5 Z</StreamGeometry>
-    <StreamGeometry x:Key="TabFolder">M3 7 a1.5 1.5 0 0 1 1.5 -1.5 H9 L11 8 H19.5 a1.5 1.5 0 0 1 1.5 1.5 V17.5 a1.5 1.5 0 0 1 -1.5 1.5 H4.5 a1.5 1.5 0 0 1 -1.5 -1.5 Z</StreamGeometry>
-    <StreamGeometry x:Key="TabInbox">M3.5 13.5 H8 L9.5 16 H14.5 L16 13.5 H20.5 M3.5 13.5 L6 5.5 H18 L20.5 13.5 V19 H3.5 Z</StreamGeometry>
-    <StreamGeometry x:Key="TabChat">M4 5.5 H20 V16 H11 L6.5 19.5 V16 H4 Z</StreamGeometry>
-    <StreamGeometry x:Key="TabFunnel">M4 5 H20 L14 12.5 V18.5 L10 20 V12.5 Z</StreamGeometry>
-    <StreamGeometry x:Key="TabKey">M10 9.5 a4.5 4.5 0 1 0 9 0 a4.5 4.5 0 1 0 -9 0 Z M11.5 12.5 L4 20 M6.5 17.5 L8.5 19.5 M8.5 15.5 L10 17</StreamGeometry>
-    <StreamGeometry x:Key="TabText">M5 6 H19 M12 6 V19 M9 19 H15</StreamGeometry>
-    <StreamGeometry x:Key="TabDatabase">M4.5 6 a7.5 2.5 0 1 0 15 0 a7.5 2.5 0 1 0 -15 0 Z M4.5 6 V18 a7.5 2.5 0 0 0 15 0 V6 M4.5 12 a7.5 2.5 0 0 0 15 0</StreamGeometry>
 </ResourceDictionary>

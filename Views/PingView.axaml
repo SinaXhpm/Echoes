@@ -295,7 +295,7 @@
                      IcmpPinger falls back by itself). The alerts only mean something for ping and TCP ping; they wrap
                      onto a second line on a phone instead of clipping. -->
                 <WrapPanel ItemSpacing="24" LineSpacing="8">
-                    <ListBox ctl:PageTabs.Primary="True" x:Name="ModeSwitch" Classes="modeSwitch modes" SelectedIndex="{Binding ModeIndex}" IsEnabled="{Binding !IsPinging}"
+                    <ListBox x:Name="ModeSwitch" Classes="modeSwitch modes" SelectedIndex="{Binding ModeIndex}" IsEnabled="{Binding !IsPinging}"
                              AutomationProperties.Name="Mode">
                         <!-- four modes: segments sized to their labels (four of Traceroute's width didn't fit a phone,
                              nor beside the alerts on the desktop) -->
