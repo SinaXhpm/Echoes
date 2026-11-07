@@ -14,13 +14,39 @@ using Echoes.Helpers;
 namespace Echoes.ViewModels;
 
 /// <summary>One chat message as the app shows it.</summary>
-public sealed class ChatRow
+public sealed partial class ChatRow : ObservableObject
 {
+    // A long message is shown shortened until asked for: laying out 16 KB of text stalls the list each time it scrolls in.
+    private const int ShortChars = 1000, ShortLines = 24;
+
+    private string? _short;
+
     public required long Seq { get; init; }
     /// <summary>"You" for this device's own messages, else the sender's name.</summary>
     public required string Header { get; init; }
     public required string TimeText { get; init; }
     public required string Body { get; init; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShownText), nameof(MoreText))]
+    private bool _expanded;
+
+    private string Short => _short ??= Shorten(Body);
+    public bool IsLong => !ReferenceEquals(Short, Body);
+    public string ShownText => Expanded ? Body : Short;
+    public string MoreText => Expanded ? "Show less" : "Show all";
+
+    /// <summary>The text up to the limits, or the same string when it fits.</summary>
+    private static string Shorten(string text)
+    {
+        int end = Math.Min(text.Length, ShortChars), lines = 0;
+        for (int i = 0; i < end; i++)
+            if (text[i] == '\n' && ++lines == ShortLines) end = i;
+        if (end == text.Length) return text;
+        if (char.IsHighSurrogate(text[end - 1])) end--;
+        return string.Concat(text.AsSpan(0, end), " …");
+    }
+
     public bool IsMine { get; init; }
     /// <summary>A file line (shared by this device, or received from a browser) rather than text.</summary>
     public bool IsFile { get; init; }
@@ -147,6 +173,12 @@ public partial class WebServerViewModel
 
     [RelayCommand]
     private void OpenChatLink(ChatRow? row) => LinkHelper.Open(row?.Url);
+
+    [RelayCommand]
+    private void ToggleChatMore(ChatRow? row)
+    {
+        if (row is { IsLong: true }) row.Expanded = !row.Expanded;
+    }
 
     /// <summary>Shares the picked files and posts each in the chat as a download link (the view's attach button).</summary>
     public void ShareInChat(SharedItem item)

@@ -156,7 +156,32 @@ public static class InputAssist
         {
             if (tb.PasswordChar != default) tb.SetValue(TextInputOptions.IsSensitiveProperty, true, BindingPriority.Style);
         });
+
+        // A finger on selectable text scrolls what is under it. The text would select itself as the finger moves, until
+        // the scroll takes over and leaves a stray selection behind. A double or triple tap still selects a word or all,
+        // but quick flicks on one spot aren't taps. Marked handled in the tunnel, so the text never sees them; the scroll
+        // gesture listens to handled events too.
+        InputElement.PointerPressedEvent.AddClassHandler<SelectableTextBlock>((text, e) =>
+        {
+            if (e.Pointer.Type != PointerType.Touch) return;
+            bool doubleTap = e.ClickCount > 1 && !_fingerTravelled;
+            _fingerTravelled = false;
+            _fingerDown = e.GetPosition(null);
+            if (doubleTap) return;
+            text.ClearSelection();
+            e.Handled = true;
+        }, RoutingStrategies.Tunnel);
+        InputElement.PointerMovedEvent.AddClassHandler<SelectableTextBlock>((_, e) =>
+        {
+            if (e.Pointer.Type != PointerType.Touch) return;
+            var moved = e.GetPosition(null) - _fingerDown;
+            if (Math.Abs(moved.X) + Math.Abs(moved.Y) > 10) _fingerTravelled = true;
+            e.Handled = true;
+        }, RoutingStrategies.Tunnel);
     }
+
+    private static Point _fingerDown;
+    private static bool _fingerTravelled;
 
     /// <summary>Registers the app-wide handlers (typed digits, masked boxes) before the first view exists; the attached
     /// properties register theirs as they are set.</summary>

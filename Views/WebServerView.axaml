@@ -241,7 +241,7 @@
         <Style Selector="ItemsControl.chat">
             <Setter Property="ItemsPanel">
                 <ItemsPanelTemplate>
-                    <VirtualizingStackPanel/>
+                    <ctl:ChatPanel/>
                 </ItemsPanelTemplate>
             </Setter>
             <Setter Property="Template">
@@ -336,6 +336,21 @@
         </Style>
         <Style Selector="Button.tiny:pointerover Path.glyph">
             <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Button.more">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0,4,8,0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.more:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.more:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
         </Style>
         <Style Selector="TextBox.chatInput">
             <Setter Property="MinHeight" Value="{DynamicResource Control.Height}"/>
@@ -888,9 +903,12 @@
                                                     </Button>
                                                 </Grid>
                                                 <Border Classes="bubble">
-                                                    <Grid ColumnDefinitions="Auto, *" ColumnSpacing="8">
+                                                    <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto" ColumnSpacing="8">
                                                         <Path Classes="fileIcon" Data="{StaticResource WsIcoFile}" IsVisible="{Binding IsFile}" VerticalAlignment="Top" Margin="0,1,0,0"/>
-                                                        <SelectableTextBlock Grid.Column="1" Classes="chatText" Classes.file="{Binding IsFile}" Text="{Binding Body}" FlowDirection="{Binding TextFlow}"/>
+                                                        <SelectableTextBlock Grid.Column="1" Classes="chatText" Classes.file="{Binding IsFile}" Text="{Binding ShownText}" FlowDirection="{Binding TextFlow}"/>
+                                                        <Button Grid.Row="1" Grid.Column="1" Classes="more" IsVisible="{Binding IsLong}" Content="{Binding MoreText}"
+                                                                Command="{Binding $parent[ItemsControl].((vm:WebServerViewModel)DataContext).ToggleChatMoreCommand}"
+                                                                CommandParameter="{Binding}"/>
                                                     </Grid>
                                                 </Border>
                                             </StackPanel>

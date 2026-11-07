@@ -19,6 +19,7 @@ public partial class WebServerView : UserControl
     private ScrollViewer? _chatScroll;
     private bool _stick = true;        // follow new messages while the user is at the bottom
     private bool _scrollQueued;
+    private bool _listChanged;         // a list change not laid out yet
     private bool _macRestoreTried;
     // the page on screen (a phone hides the page it leaves rather than detaching it): the chat counts as read only then
     private readonly Controls.ShownWatch _shown;
@@ -39,12 +40,14 @@ public partial class WebServerView : UserControl
         // new line. Phone keyboards have no Shift+Enter, so there Enter stays a newline and the Send button sends.
         ChatBox.AddHandler(KeyDownEvent, OnChatKeyDown, RoutingStrategies.Tunnel);
 
+        // A notch up stops following at once, ahead of a follow already queued by a message that just came in a busy chat.
+        ChatList.AddHandler(PointerWheelChangedEvent, (_, e) => { if (e.Delta.Y > 0) _stick = false; }, RoutingStrategies.Tunnel);
         ChatList.TemplateApplied += (_, e) =>
         {
             if (_chatScroll != null) _chatScroll.ScrollChanged -= OnChatScrollChanged;
             _chatScroll = e.NameScope.Find<ScrollViewer>("PART_Scroll");
             if (_chatScroll != null) _chatScroll.ScrollChanged += OnChatScrollChanged;
-            if (_vm is { ChatItems.Count: > 0 }) Dispatcher.UIThread.Post(() => ScrollToBottom(3), DispatcherPriority.Background);
+            if (_vm is { ChatItems.Count: > 0 }) QueueScroll();
         };
         // back on screen after another tool or sub-tab: messages that came meanwhile scrolled nothing, so catch up to the end
         ChatList.AttachedToVisualTree += (_, _) =>
@@ -92,19 +95,26 @@ public partial class WebServerView : UserControl
 
     private void OnChatScrollChanged(object? sender, ScrollChangedEventArgs e)
     {
-        if (_chatScroll is null) return;
-        // only a scroll by the user (offset moved) decides whether to keep following; growth alone doesn't
-        if (Math.Abs(e.OffsetDelta.Y) > 0.01) _stick = AtBottom(_chatScroll);
-        // growth that wasn't followed (messages that came while the chat was behind the Files / Log sub-tab or another
-        // page) is caught up as soon as the list is laid out again
-        else if (_stick && Math.Abs(e.ExtentDelta.Y) > 0.01 && !AtBottom(_chatScroll)) QueueScroll();
+        if (_chatScroll is not { } list) return;
+        double fromEnd = list.Extent.Height - list.Viewport.Height - list.Offset.Y;
+        // Moving decides whether to follow: up and away from the end stops it, even by a pixel (a slow finger), and coming
+        // back to the end starts it again. Not the move that lays out a list change: past the row limit the oldest row goes
+        // and the offset drops with it.
+        if (_listChanged) _listChanged = false;
+        else if (e.OffsetDelta.Y < -0.01 && fromEnd > 1) _stick = false;
+        else if (e.OffsetDelta.Y > 0.01 && fromEnd < 24) _stick = true;
+        // Following, but not at the end: new rows, rows that turned out taller than estimated, messages that came behind
+        // another tab or page, a viewport made smaller by the phone's keyboard.
+        if (_stick && fromEnd > 1) QueueScroll();
     }
-
-    private static bool AtBottom(ScrollViewer sv) => sv.Offset.Y >= sv.Extent.Height - sv.Viewport.Height - 24;
 
     private void OnChatChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (e.Action == NotifyCollectionChangedAction.Reset) _stick = true;
+        _listChanged = true;
+        // cleared, or this device's own message just sent: back to the newest
+        if (e.Action == NotifyCollectionChangedAction.Reset
+            || e is { Action: NotifyCollectionChangedAction.Add, NewItems: { Count: > 0 } added } && added[added.Count - 1] is ChatRow { IsMine: true })
+            _stick = true;
         if (_stick) QueueScroll();
     }
 
@@ -112,20 +122,12 @@ public partial class WebServerView : UserControl
     {
         if (_scrollQueued) return;
         _scrollQueued = true;
-        Dispatcher.UIThread.Post(() => { _scrollQueued = false; ScrollToBottom(3); }, DispatcherPriority.Background);
-    }
-
-    // the virtualizing panel estimates the extent: a second pass lands exactly on the end
-    private void ScrollToBottom(int attempts)
-    {
-        if (_chatScroll is null) return;
-        _chatScroll.ScrollToEnd();
-        _stick = true;
-        if (attempts > 1)
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (_chatScroll != null && _stick && !AtBottom(_chatScroll)) ScrollToBottom(attempts - 1);
-            }, DispatcherPriority.Background);
+        Dispatcher.UIThread.Post(() =>
+        {
+            _scrollQueued = false;
+            // asked again when it runs: the wheel or a finger may have moved the list since it was queued
+            if (_stick) _chatScroll?.ScrollToEnd();
+        }, DispatcherPriority.Background);
     }
 
     private void OnChatKeyDown(object? sender, KeyEventArgs e)
