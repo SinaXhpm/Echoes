@@ -205,7 +205,7 @@ See whether a host is up, how fast it answers, which route your traffic takes, a
 - **Packet options:** payload size, interval, count, timeout, TTL, Don't fragment and IPv4 / IPv6. With Don't fragment, a packet too big for the path says so ("Packet too big", with the MTU where the system reports it): an easy way to find the path MTU.
 - **TCP ping:** connects to a port (443, or the port in a pasted host:port or URL) every interval and times it (SYN to SYN/ACK). Works where ICMP is blocked and on Android, and tells a closed port (refused), a silent drop (timeout) and a DNS failure apart.
 - **Traceroute:** the classic hop-by-hop route.
-- **MTR:** a live table for every hop (loss, last / avg / best / worst, jitter, reverse DNS, multiple paths) that shows exactly where a problem starts.
+- **MTR:** a live table for every hop (loss, last / avg / best / worst, jitter, reverse DNS, multiple paths) that shows exactly where a problem starts. Click a hop to see who runs it: network, organization, AS, country, address range and abuse contact, with WHOIS and IP Info one click away.
 - **Works without admin rights:** where ICMP isn't allowed (locked-down Linux, containers), Echoes uses UDP datagrams by itself, for traceroute and MTR too on Linux and Android. If neither works, it tells you why.
 - Optional alerts when a host comes online or goes offline.
 

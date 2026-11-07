@@ -34,7 +34,7 @@ public partial class MainViewModel : ObservableObject
     private CheckHostViewModel? _checkHostVM;
     private ProxyViewModel? _proxyVM;
     private DoctorViewModel? _doctorVM;
-    public PingViewModel PingVM => _pingVM ??= new();
+    public PingViewModel PingVM => _pingVM ??= new(this);
     public DnsViewModel DnsVM => _dnsVM ??= new(this);
     public CurlViewModel CurlVM => _curlVM ??= new();
     public PortScannerViewModel PortScannerVM => _portScannerVM ??= new();

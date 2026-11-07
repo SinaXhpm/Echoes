@@ -148,7 +148,11 @@
             <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         </Style>
-        <Style Selector="ListBox#MtrList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <!-- selecting a hop only marks it for the keyboard: opening is what a click does -->
+        <Style Selector="ListBox#MtrList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox#MtrList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox#MtrList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox#MtrList ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
         </Style>
         <Style Selector="Grid#MtrRoot.narrow ListBox#MtrList ListBoxItem">
@@ -165,22 +169,22 @@
             <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
         </Style>
         <Style Selector="Grid.hop > TextBlock.num">
-            <Setter Property="Width" Value="52"/>
+            <Setter Property="Width" Value="46"/>
             <Setter Property="TextAlignment" Value="Right"/>
         </Style>
         <Style Selector="Grid.hop > TextBlock.cTtl">
             <Setter Property="Width" Value="26"/>
             <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
         </Style>
-        <Style Selector="Grid.hop > TextBlock.cLoss"><Setter Property="Width" Value="60"/></Style>
-        <Style Selector="Grid.hop > TextBlock.cSent"><Setter Property="Width" Value="46"/></Style>
+        <Style Selector="Grid.hop > TextBlock.cLoss"><Setter Property="Width" Value="54"/></Style>
+        <Style Selector="Grid.hop > TextBlock.cSent"><Setter Property="Width" Value="40"/></Style>
         <Style Selector="Grid.hop > TextBlock.cLoss.warn"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
         <Style Selector="Grid.hop > TextBlock.cLoss.bad"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
         <Style Selector="Grid.hop > TextBlock.cAvg"><Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/></Style>
         <Style Selector="Grid.hop > ctl|LatencySparkline.cGraph">
-            <Setter Property="Width" Value="92"/>
+            <Setter Property="Width" Value="64"/>
             <Setter Property="Height" Value="16"/>
-            <Setter Property="Margin" Value="16,0,0,0"/>
+            <Setter Property="Margin" Value="10,0,0,0"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="StrokeThickness" Value="1.25"/>
         </Style>
@@ -245,6 +249,29 @@
         <Style Selector="Grid#MtrRoot.narrow Grid#MtrHead, Grid#MtrRoot.narrow Border#MtrHeadRule">
             <Setter Property="IsVisible" Value="False"/>
         </Style>
+        <!-- a hop's "who runs this" (Styles/IpPanel.axaml): under its row, lined up with the host -->
+        <Style Selector="ContentControl.hopWho">
+            <Setter Property="Margin" Value="26,0,0,4"/>
+        </Style>
+        <Style Selector="Grid.hop.canOpen">
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Path.hopChevron">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Height" Value="10"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.8"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="Data" Value="M6 9 L12 15 L18 9"/>
+        </Style>
+        <Style Selector="Path.hopChevron.open">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="Data" Value="M6 15 L12 9 L18 15"/>
+        </Style>
+        <StyleInclude Source="avares://Echoes/Styles/IpPanel.axaml"/>
     </UserControl.Styles>
 
     <Grid RowDefinitions="Auto, *" RowSpacing="12">
@@ -487,7 +514,7 @@
         <!-- ===== MTR: header / hop table / progress ===== -->
         <Border Grid.Row="1" Classes="card output" IsVisible="{Binding IsMtrMode}">
             <ctl:Deferred><DataTemplate x:DataType="vm:PingViewModel">
-            <Grid x:Name="MtrRoot" helpers:Responsive.BreakWidth="640" RowDefinitions="Auto, Auto, Auto, Auto, *, Auto">
+            <Grid x:Name="MtrRoot" helpers:Responsive.BreakWidth="600" RowDefinitions="Auto, Auto, Auto, Auto, *, Auto">
                 <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="16,8,8,8">
                     <TextBlock Classes="cardHeader" Text="Hops" Margin="0" VerticalAlignment="Center"/>
                     <Button Grid.Column="1" Classes="ghost" Command="{Binding CopyLogCommand}" Content="Copy"
@@ -507,12 +534,12 @@
                     <TextBlock Classes="head num cBest" Text="Best"/>
                     <TextBlock Classes="head num cWorst" Text="Worst"/>
                     <TextBlock Classes="head num cStd" Text="StDev" ToolTip.Tip="Standard deviation of the round trips (ms)"/>
-                    <TextBlock Classes="head cGraph" Text="Recent" Width="92" Margin="16,0,0,0"/>
+                    <TextBlock Classes="head cGraph" Text="Recent" Width="64" Margin="10,0,0,0"/>
                 </Grid>
                 <Border Grid.Row="3" x:Name="MtrHeadRule" Classes="divider"/>
 
                 <Panel Grid.Row="4">
-                    <ListBox x:Name="MtrList" ItemsSource="{Binding Mtr.Hops}">
+                    <ListBox x:Name="MtrList" ItemsSource="{Binding Mtr.Hops}" KeyDown="Hops_KeyDown">
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <VirtualizingStackPanel/>
@@ -520,7 +547,9 @@
                         </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:MtrHopRow">
-                                <Grid Classes="hop" ColumnDefinitions="Auto, *, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto"
+                                <StackPanel>
+                                <Grid Classes="hop" Classes.canOpen="{Binding CanOpen}" Background="Transparent" Tapped="Hop_Tapped"
+                                      ColumnDefinitions="Auto, *, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto"
                                       RowDefinitions="Auto, Auto">
                                     <TextBlock Classes="cTtl" Text="{Binding TtlText}"/>
                                     <Grid Classes="cHost" ColumnDefinitions="Auto, *, Auto" ToolTip.Tip="{Binding HostTip}" Background="Transparent">
@@ -535,6 +564,8 @@
                                             <Border Classes="badge danger rowBadge" IsVisible="{Binding HasNote}">
                                                 <TextBlock Text="{Binding Note}"/>
                                             </Border>
+                                            <Path Classes="hopChevron" Classes.open="{Binding Who.IsOpen, FallbackValue=False}" IsVisible="{Binding CanOpen}"
+                                                  VerticalAlignment="Center" ToolTip.Tip="Who runs this address"/>
                                         </StackPanel>
                                     </Grid>
                                     <TextBlock Classes="num cLoss" Classes.warn="{Binding SomeLoss}" Classes.bad="{Binding AllLost}" Text="{Binding LossText}"/>
@@ -548,6 +579,8 @@
                                                           Series="{Binding Series}" Version="{Binding SeriesVersion}"/>
                                     <TextBlock Classes="cSum" Text="{Binding Summary}"/>
                                 </Grid>
+                                <ContentControl Classes="hopWho" Content="{Binding Who}" ContentTemplate="{StaticResource IpPanelTemplate}" IsVisible="{Binding Who.IsOpen, FallbackValue=False}"/>
+                                </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>

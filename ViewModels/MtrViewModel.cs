@@ -33,7 +33,14 @@ public sealed partial class MtrViewModel : ObservableObject
     /// <summary>The empty table's how-to line: not beside an error.</summary>
     public bool ShowHint => Hops.Count == 0 && !StatusIsError;
 
-    public MtrViewModel() => Hops.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ShowHint));
+    /// <summary>The hops' "who runs this address" panels; a new trace stops their lookups still running.</summary>
+    private readonly IpLinkScope _whois;
+
+    public MtrViewModel(IToolLinks? links = null)
+    {
+        _whois = new IpLinkScope(links);
+        Hops.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ShowHint));
+    }
 
     /// <summary>Tests / screenshots: session tuning (e.g. a simulated network via <see cref="MtrOptions.Probe"/>).</summary>
     public MtrOptions? Options { get; set; }
@@ -62,6 +69,7 @@ public sealed partial class MtrViewModel : ObservableObject
         // Addresses whose name never came: ask again in this run (MtrReverseDns keeps a definite "no such name", and
         // forgets a timed-out lookup after a minute — this table held on to the miss for the whole session).
         foreach (var unnamed in _names.Where(kv => kv.Value is null).Select(kv => kv.Key).ToList()) _names.Remove(unnamed);
+        _whois.CancelLookups();
         Hops.Clear();
         Status = string.Empty;
         StatusIsError = false;
@@ -161,7 +169,7 @@ public sealed partial class MtrViewModel : ObservableObject
             if (i < Hops.Count) row = Hops[i];
             else
             {
-                row = new MtrHopRow(hop.Ttl, Options?.HistoryLength ?? 40);
+                row = new MtrHopRow(hop.Ttl, Options?.HistoryLength ?? 40, _whois);
                 Hops.Add(row);
             }
             if (hop.Address is { } a) RequestName(runId, a);
@@ -308,15 +316,40 @@ public sealed partial class MtrHopRow : ObservableObject
 {
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-    public MtrHopRow(int ttl, int history)
+    private readonly IpLinkScope _whois;
+    private List<string> _addresses = new();
+
+    public MtrHopRow(int ttl, int history, IpLinkScope whois)
     {
         Ttl = ttl;
         TtlText = ttl.ToString(Inv);
         Series = new LatencySeries(Math.Max(1, history));
+        _whois = whois;
     }
 
     public int Ttl { get; }
     public string TtlText { get; }
+
+    /// <summary>Who runs this hop's address(es), under the row; made when first opened: a running trace asks nothing about
+    /// the hops nobody opens.</summary>
+    [ObservableProperty] private IpPanel? _who;
+
+    /// <summary>Opens or closes the row's <see cref="Who"/>; a silent hop has no address to ask about.</summary>
+    public void ToggleWho()
+    {
+        Who ??= _whois.For(_addresses);
+        Who?.ToggleCommand.Execute(null);
+    }
+
+    // The addresses at this TTL changed (the route moved): an open panel follows them.
+    private void SetAddresses(List<string> addresses)
+    {
+        if (addresses.SequenceEqual(_addresses)) return;
+        _addresses = addresses;
+        if (Who is not { } old) return;
+        Who = _whois.For(addresses);
+        if (old.IsOpen) Who?.ToggleCommand.Execute(null);
+    }
 
     /// <summary>The hop's recent results (NaN = no answer) for the row's graph; redrawn when <see cref="SeriesVersion"/> changes.</summary>
     public LatencySeries Series { get; }
@@ -324,7 +357,8 @@ public sealed partial class MtrHopRow : ObservableObject
 
     [ObservableProperty] private string _host = "???";
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasName))] private string? _name;
-    [ObservableProperty] private bool _isSilent = true;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanOpen))] private bool _isSilent = true;
+    public bool CanOpen => !IsSilent;
     [ObservableProperty] private bool _isDestination;
 
     /// <summary>"+1", "+2": other addresses answer at this TTL too (equal-cost multipath).</summary>
@@ -367,6 +401,7 @@ public sealed partial class MtrHopRow : ObservableObject
 
         bool silent = hop.Address is null;
         IsSilent = silent;
+        SetAddresses(silent ? new List<string>() : others.ConvertAll(o => o.Address.ToString()).Prepend(hop.Address!.ToString()).ToList());
         Host = silent ? "???" : hop.Address!.ToString();
         Name = silent ? null : name;
         IsDestination = hop.IsDestination;

@@ -1,0 +1,108 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Echoes.ViewModels"
+        x:CompileBindings="True">
+    <!-- What a tool shows about an address it found (ViewModels/IpPanel.cs): the DNS results and MTR's hops include this
+         last in their styles, so these win over their tables' own text styles inside a row. -->
+    <Styles.Resources>
+        <!-- The addresses of a result row (a lookup answer, a compared resolver's answers, an email finding), opened
+             under it by its toggle: for each, who holds it (the inline WHOIS, asked as it opens), then WHOIS in full and
+             IP Info for it. -->
+        <DataTemplate x:Key="IpPanelTemplate" x:DataType="vm:IpPanel">
+            <Border Classes="ipPanel" IsVisible="{Binding IsOpen}">
+                <StackPanel Spacing="10">
+                    <ItemsControl ItemsSource="{Binding Items}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Spacing="10"/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:IpItem">
+                                <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto, Auto, Auto" ColumnSpacing="8">
+                                    <SelectableTextBlock Classes="ipAddr" Text="{Binding Label}"/>
+                                    <!-- beside the address (wide) or under the facts (phone): placed by the styles -->
+                                    <StackPanel Classes="ipSendBar" Orientation="Horizontal" Spacing="6">
+                                        <Button x:Name="IpWhoisBtn" Classes="ghost ipSend" Content="WHOIS" Command="{Binding WhoisCommand}" IsVisible="{Binding CanSend}"
+                                                ToolTip.Tip="WHOIS (RDAP) for this address in full, in the DNS tool"/>
+                                        <Button x:Name="IpInfoBtn" Classes="ghost ipSend" Content="IP Info" Command="{Binding IpInfoCommand}" IsVisible="{Binding CanSend}"
+                                                ToolTip.Tip="Look this address up in IP Info: location, ISP, proxy / hosting flags"/>
+                                        <Button Classes="ghost ipSend" Content="Copy" Command="{Binding CopyCommand}" ToolTip.Tip="Copy this address"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Classes="ipStatus" Classes.error="{Binding IsError}"
+                                               Text="{Binding Status}" IsVisible="{Binding HasStatus}"/>
+                                    <ItemsControl Grid.Row="2" Grid.ColumnSpan="2" ItemsSource="{Binding Facts}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><WrapPanel ItemSpacing="16" LineSpacing="2"/></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:IpFact">
+                                                <SelectableTextBlock Classes="ipFact">
+                                                    <Run Text="{Binding Key}" Foreground="{DynamicResource Text.Muted}"/>
+                                                    <Run Text=" "/>
+                                                    <Run Text="{Binding Value}" FontFamily="{StaticResource MonoFont}"/>
+                                                </SelectableTextBlock>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Classes="ipMore" Text="{Binding MoreText}" IsVisible="{Binding HasMore}"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </Styles.Resources>
+
+        <Style Selector="Border.ipPanel">
+            <Setter Property="Margin" Value="0,8,0,2"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.ipAddr">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.ipStatus">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+        </Style>
+        <Style Selector="TextBlock.ipStatus.error">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.ipFact">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+        </Style>
+        <Style Selector="TextBlock.ipMore">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <!-- WHOIS / IP Info: small beside the address; finger-sized on a phone -->
+        <Style Selector="Button.ghost.ipSend">
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style Selector="Grid.narrow Button.ghost.ipSend">
+            <Setter Property="Height" Value="36"/>
+        </Style>
+        <Style Selector="Grid.wide StackPanel.ipSendBar">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        </Style>
+        <Style Selector="Grid.narrow StackPanel.ipSendBar">
+            <Setter Property="Grid.Row" Value="3"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+</Styles>

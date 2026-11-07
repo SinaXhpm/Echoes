@@ -67,7 +67,7 @@ public partial class PingViewModel : ObservableObject
     public string EmptyHint => IsTcpMode ? "Enter a host and a port and press Start." : "Enter a host and press Start.";
 
     /// <summary>The MTR table and its run.</summary>
-    public MtrViewModel Mtr { get; } = new();
+    public MtrViewModel Mtr { get; }
 
     private const string ModeKey = "ping.mode";
     private static readonly string[] ModeNames = { "ping", "traceroute", "mtr", "tcp" };
@@ -100,8 +100,9 @@ public partial class PingViewModel : ObservableObject
     /// <summary>Replaces the network in Ping mode (tests): (address, timeoutMs, packet options, token) → result.</summary>
     internal Func<IPAddress, int, IcmpProbeOptions, CancellationToken, Task<IcmpPinger.PingResult>>? IcmpProbe { get; set; }
 
-    public PingViewModel()
+    public PingViewModel(IToolLinks? links = null)
     {
+        Mtr = new MtrViewModel(links);
         if (HistoryService.Instance.Last("ping.host") is { } last) TargetHost = last;
         LoadSettings();
         int saved = Array.IndexOf(ModeNames, ProfileService.Instance.GetSetting(ModeKey));

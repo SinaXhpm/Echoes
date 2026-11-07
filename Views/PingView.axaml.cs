@@ -1,5 +1,7 @@
 using System;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Echoes.ViewModels;
 using System.Collections.Specialized;
 
 namespace Echoes.Views;
@@ -8,6 +10,16 @@ public partial class PingView : UserControl
 {
     private ScrollViewer? _logScroll;
     private bool _follow = true;   // follow new lines while the user is at the bottom: scrolling up to read stops it
+
+    // MTR: a hop opens to show who runs its address, by click, tap or Enter
+    private void Hop_Tapped(object? sender, TappedEventArgs e) => ((sender as Control)?.DataContext as MtrHopRow)?.ToggleWho();
+
+    private void Hops_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || (sender as ListBox)?.SelectedItem is not MtrHopRow row) return;
+        row.ToggleWho();
+        e.Handled = true;
+    }
 
     public PingView()
     {

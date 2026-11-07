@@ -107,7 +107,8 @@ public sealed partial class IpItem : ObservableObject
     public string Address { get; }
     /// <summary>As the row has it: the address, or its range.</summary>
     public string Label { get; }
-    public bool CanSend => _scope.Links != null;
+    /// <summary>WHOIS and IP Info have something to say: not about a private or other special-purpose address.</summary>
+    public bool CanSend => _scope.Links != null && Rdap.SpecialPurpose(_ip) is null;
 
     /// <summary>"looking up…", what the address is (private, loopback …), or why nothing came back.</summary>
     [ObservableProperty]
@@ -123,6 +124,9 @@ public sealed partial class IpItem : ObservableObject
 
     [RelayCommand]
     private void IpInfo() => _scope.Links?.LookUpIp(Address);
+
+    [RelayCommand]
+    private Task Copy() => ClipboardHelper.SetTextAsync(Label);
 
     /// <summary>Asks who holds the address, unless that is known or being asked already. UI thread.</summary>
     internal void Load()
