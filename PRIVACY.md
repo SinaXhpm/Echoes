@@ -1,6 +1,6 @@
 # Echoes privacy policy
 
-Last updated: 15 November 2026
+Last updated: 18 November 2026
 
 Echoes is a free, open-source network toolkit (ping, traceroute, port scanner, DNS, SSH, speed test, file-sharing web server and more). This page says what it does with your data. The short version: **it collects none.**
 
@@ -68,4 +68,4 @@ If this policy changes, the new version replaces this page, with a new date at t
 
 ## Contact
 
-Questions or concerns: open an issue at <https://github.com/SinaXhpm/Echoes/issues>.
+Questions or concerns: write to [sinaxhpm@gmail.com](mailto:sinaxhpm@gmail.com), or open an issue at <https://github.com/SinaXhpm/Echoes/issues>.
