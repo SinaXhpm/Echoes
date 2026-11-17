@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Tests of the shared helpers (Helpers\, ViewModels\), the same on Windows, Linux and macOS.
+
+       Run them:   dotnet test Echoes.Tests            (or the Test Explorer of an editor)
+       or start the test program itself, which takes xUnit's options (-? lists them), after "dotnet run" and its separator:
+                   dotnet run (project Echoes.Tests), then: -class "*PcapFileTests"
+
+       Two kinds of test live here:
+       * Logic: packet decoding, the capture filter, capture files, subnet arithmetic, reply parsers. No network; they
+         give the same result everywhere.
+       * Live (the "Live network" collection): real sockets on this computer's loopback interface, to prove the
+         per-system code (choosing the interface a socket sends from, ICMP, packet capture, the neighbor table). A test
+         that needs something this computer or user doesn't have (root for a packet socket, Npcap) is reported as
+         skipped with the reason, never as passed. .github/workflows/tests.yml runs all of it on the three desktop
+         systems, a second time with the rights capture needs. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- the desktop head's framework, so the tests compile against the API it ships with -->
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- ...and run on a newer .NET where 8 isn't installed (a computer with only the current SDK) -->
+    <RollForward>Major</RollForward>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <!-- as the released app (Echoes.csproj, Release): no ICU data, the invariant culture -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Echoes.csproj is a self-contained program; here it is referenced as a library -->
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Echoes.csproj" AdditionalProperties="SelfContained=false" />
+  </ItemGroup>
+</Project>

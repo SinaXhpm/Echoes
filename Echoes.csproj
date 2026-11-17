@@ -6,8 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 
-    <!-- The Android and iOS heads live in subfolders with their own projects; keep them out of the desktop build. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);Echoes.Android\**;Echoes.iOS\**</DefaultItemExcludes>
+    <!-- The Android and iOS heads and the tests live in subfolders with their own projects; keep them out of the desktop build. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);Echoes.Android\**;Echoes.iOS\**;Echoes.Tests\**</DefaultItemExcludes>
 
     <Version>1.0.0</Version>
     <Description>Small utilities for network, API, and string tasks; throwing packets from a distant time, just to see what comes willowing back across the sand.</Description>
@@ -79,5 +79,10 @@
 
   <ItemGroup>
     <None Include=".github\workflows\release.yml" />
+  </ItemGroup>
+
+  <!-- Echoes.Tests reads the helpers' internal members (parsers, the per-system socket code). -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Echoes.Tests" />
   </ItemGroup>
 </Project>
