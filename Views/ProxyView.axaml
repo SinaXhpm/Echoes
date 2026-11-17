@@ -210,6 +210,18 @@
         <Style Selector="Grid#PxUpGrid.narrow > CheckBox#PxUpDns">
             <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.ColumnSpan" Value="3"/><Setter Property="Margin" Value="0,8,0,0"/>
         </Style>
+        <!-- the upstream's certificate: quiet when trusted, a warning while one is refused -->
+        <Style Selector="Border#PxUpCert">
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        </Style>
+        <Style Selector="Border#PxUpCert.refused">
+            <Setter Property="Background" Value="{DynamicResource Warning.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Warning.Border}"/>
+        </Style>
         <Style Selector="Grid#PxRules TextBox">
             <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
             <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
@@ -639,9 +651,10 @@
                     </Grid>
 
                     <!-- read at START like the settings above, so locked while the proxy runs -->
-                    <StackPanel x:Name="PxAdvanced" Spacing="12" IsVisible="{Binding ShowAdvanced}" IsEnabled="{Binding !IsRunning}">
+                    <!-- (the settings are fixed while the proxy runs; the upstream's certificate can still be trusted then) -->
+                    <StackPanel x:Name="PxAdvanced" Spacing="12" IsVisible="{Binding ShowAdvanced}">
                         <Border Classes="divider"/>
-                        <StackPanel>
+                        <StackPanel IsEnabled="{Binding !IsRunning}">
                             <TextBlock Classes="fieldLabel" Text="Protocols"/>
                             <WrapPanel ItemSpacing="20" LineSpacing="6" Margin="2,0,0,0">
                                 <CheckBox IsChecked="{Binding Socks5}" Content="SOCKS5"/>
@@ -654,7 +667,7 @@
                             </WrapPanel>
                         </StackPanel>
 
-                        <Grid x:Name="PxNumbers" helpers:Responsive.BreakWidth="520" ColumnDefinitions="*, *, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="12">
+                        <Grid x:Name="PxNumbers" IsEnabled="{Binding !IsRunning}" helpers:Responsive.BreakWidth="520" ColumnDefinitions="*, *, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="12">
                             <StackPanel x:Name="PxNum1">
                                 <TextBlock Classes="fieldLabel" Text="Connect timeout (s)"/>
                                 <NumericUpDown Classes="field" Value="{Binding ConnectTimeout}" Minimum="1" Maximum="120" ShowButtonSpinner="False"
@@ -679,7 +692,7 @@
                             </StackPanel>
                         </Grid>
 
-                        <Grid x:Name="PxRules" helpers:Responsive.BreakWidth="520" ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="12">
+                        <Grid x:Name="PxRules" IsEnabled="{Binding !IsRunning}" helpers:Responsive.BreakWidth="520" ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="12">
                             <StackPanel x:Name="PxRuleClients">
                                 <TextBlock Classes="fieldLabel" Text="Allowed clients"/>
                                 <TextBox x:Name="PxAllowBox" Classes="field" Text="{Binding AllowedClients}" MaxLength="60000"
@@ -705,16 +718,16 @@
 
                         <!-- the upstream (parent) proxy: everything goes on through it instead of straight to the sites -->
                         <StackPanel x:Name="PxUpstream" Spacing="8">
-                            <CheckBox IsChecked="{Binding UseUpstream}" Content="Send through an upstream proxy"
+                            <CheckBox IsChecked="{Binding UseUpstream}" IsEnabled="{Binding !IsRunning}" Content="Send through an upstream proxy"
                                       ToolTip.Tip="Every connection goes on through another proxy (SOCKS5, SOCKS4a, HTTP or HTTPS) instead of straight to the site: a proxy program on this device (v2rayN, Clash, Tor), a company proxy, a server elsewhere. While it is on, nothing goes to a site directly. UDP goes through it too if it is a SOCKS5 proxy; SOCKS4a and HTTP carry none"/>
-                            <Grid x:Name="PxUpGrid" helpers:Responsive.BreakWidth="520" IsVisible="{Binding UseUpstream}"
+                            <Grid x:Name="PxUpGrid" helpers:Responsive.BreakWidth="520" IsVisible="{Binding UseUpstream}" IsEnabled="{Binding !IsRunning}"
                                   ColumnDefinitions="2*, *, *" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="12">
                                 <StackPanel x:Name="PxUpAddr">
                                     <TextBlock Classes="fieldLabel" Text="Upstream address"/>
                                     <TextBox Classes="field" Text="{Binding UpstreamAddress}" FontFamily="{StaticResource MonoFont}"
                                              TextInputOptions.ContentType="Url" AutomationProperties.Name="Upstream proxy address"
                                              PlaceholderText="socks5://127.0.0.1:10808"
-                                             ToolTip.Tip="host:port (SOCKS5 on ports 1080, 1081 and 9050, HTTP on the others), or with its kind: socks5://, socks4a://, http://, or https:// for an HTTP proxy reached over TLS (its certificate must be valid). A login typed as user:pass@host:port moves to the two fields"/>
+                                             ToolTip.Tip="host:port (SOCKS5 on ports 1080, 1081 and 9050, HTTP on the others), or with its kind: socks5://, socks4a://, http://, or https:// for an HTTP proxy reached over TLS (its certificate must be valid, or trusted here by its fingerprint). A login typed as user:pass@host:port moves to the two fields"/>
                                 </StackPanel>
                                 <StackPanel x:Name="PxUpUser">
                                     <TextBlock Classes="fieldLabel" Text="User"/>
@@ -729,6 +742,24 @@
                                 <CheckBox x:Name="PxUpDns" IsChecked="{Binding UpstreamResolve}" Content="Let the upstream look up site names"
                                           ToolTip.Tip="Site names go to the upstream proxy as names, so they don't show in this device's DNS lookups. They are still looked up here where the proxy must know where they lead: with an IP version or blocked addresses set, and for clients on other devices while the upstream is on this device or your own network"/>
                             </Grid>
+                            <!-- an https:// upstream's certificate: one the proxy refused, to trust by its fingerprint; or the one trusted -->
+                            <Border x:Name="PxUpCert" IsVisible="{Binding CertPanelVisible}" Classes.refused="{Binding CertIsRefused}">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="{Binding CertTitle}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                    <TextBlock Classes="hint" Text="{Binding CertDetail}" TextWrapping="Wrap"/>
+                                    <SelectableTextBlock Text="{Binding CertFingerprint}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource Font.Small}"
+                                                         TextWrapping="Wrap" Foreground="{DynamicResource Text.Secondary}"
+                                                         AutomationProperties.Name="Certificate fingerprint"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button Classes="secondary" Content="Trust this certificate" Command="{Binding TrustUpstreamCertCommand}"
+                                                IsVisible="{Binding CertIsRefused}"
+                                                ToolTip.Tip="Take this exact certificate for this upstream proxy from now on, though no authority vouches for it. A different one is still refused"/>
+                                        <Button Classes="ghost" Content="Forget" Command="{Binding ForgetUpstreamCertCommand}"
+                                                IsVisible="{Binding !CertIsRefused}"
+                                                ToolTip.Tip="Stop trusting this certificate: the upstream proxy's certificate must then be valid as a site's is"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>

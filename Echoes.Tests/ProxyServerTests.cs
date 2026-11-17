@@ -67,6 +67,8 @@ public partial class ProxyServerTests
             return client;
         }
 
+        public Task<string?> CheckUpstreamTlsAsync(CancellationToken ct) => _server.CheckUpstreamTlsAsync(ct);
+
         public void Dispose() => _server.Dispose();
     }
 

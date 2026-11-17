@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
@@ -47,6 +48,15 @@ internal sealed class ProxyUpstreamException : Exception
     /// fare no better.</summary>
     public bool Fatal { get; init; }
 }
+
+/// <summary>
+/// An https:// upstream's certificate that wasn't taken, as the user is shown it to decide whether it is the proxy's own.
+/// <see cref="Upstream"/>: the proxy it came from ("https://host:port"); <see cref="Fingerprint"/>: SHA-256, 64 hex
+/// digits; <see cref="Problem"/>: what is wrong with it, in words; <see cref="Changed"/>: another certificate was trusted
+/// for this proxy.
+/// </summary>
+public sealed record UpstreamCertificate(string Upstream, string Fingerprint, string Subject, string Issuer, DateTime NotAfter,
+                                         string Problem, bool Changed);
 
 /// <summary>
 /// The proxy that <see cref="ProxyServer"/> sends its connections on to, instead of connecting to the targets itself
@@ -95,6 +105,53 @@ public sealed class ProxyUpstream
     /// <summary>Tests only: decides on an https:// upstream's certificate in place of the system's check (a test
     /// certificate is self-signed). Given the certificate and what the system found wrong with it.</summary>
     internal Func<X509Certificate?, SslPolicyErrors, bool>? CertificateCheck { get; set; }
+
+    /// <summary>
+    /// The SHA-256 fingerprint (64 hex digits) of a certificate the user trusts for this https:// upstream although nothing
+    /// vouches for it (self-signed, made for another name, expired): that exact certificate is taken, whatever else is
+    /// wrong with it, and no other. Null: none. May change while the proxy runs (trusted from the page).
+    /// </summary>
+    public string? TrustedCertificate
+    {
+        get => _trusted;
+        set => _trusted = NormalizeFingerprint(value);
+    }
+    private volatile string? _trusted;
+
+    /// <summary>Raised, on a pool thread, when an https:// upstream's certificate isn't taken: what to show the user,
+    /// who may trust it by its fingerprint.</summary>
+    public event Action<UpstreamCertificate>? CertificateRefused;
+
+    /// <summary>A SHA-256 fingerprint as 64 upper-case hex digits; typed or pasted with ':', '-' or spaces between the
+    /// bytes, or in lower case, it is read the same. Null when it isn't one.</summary>
+    public static string? NormalizeFingerprint(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var hex = new StringBuilder(64);
+        foreach (char c in text.Trim())
+        {
+            if (Uri.IsHexDigit(c)) hex.Append(char.ToUpperInvariant(c));
+            else if (c is not (':' or '-' or ' ')) return null;
+        }
+        return hex.Length == 64 ? hex.ToString() : null;
+    }
+
+    /// <summary>"AB:CD:…": a fingerprint as certificate viewers show it, a pair of digits a byte.</summary>
+    public static string FormatFingerprint(string hex)
+    {
+        var s = new StringBuilder(hex.Length * 3 / 2);
+        for (int i = 0; i < hex.Length; i += 2)
+        {
+            if (i > 0) s.Append(':');
+            s.Append(hex, i, Math.Min(2, hex.Length - i));
+        }
+        return s.ToString();
+    }
+
+    /// <summary>The address as <see cref="Display"/> shows it when it is an https:// proxy ("https://host:port"), else
+    /// null: what a trusted certificate is kept for.</summary>
+    public static string? TlsDisplay(string? address)
+        => Parse(address, null, null, true, out _) is { Tls: true } up ? up.Display : null;
 
     /// <summary>
     /// Reads the address as the other tools' proxy boxes do (<see cref="HttpHelper.NormalizeProxy"/>: "host:port",
@@ -201,13 +258,15 @@ public sealed class ProxyUpstream
     /// <summary>
     /// For an https:// upstream: TLS on the connection just made to it, before anything else is said. Its certificate
     /// must be valid for <see cref="Host"/> as a browser requires of a site's (a trusted issuer, not expired, the name or
-    /// address it was reached by); HTTP/1.1 is asked for. Returns the stream everything goes over from then on. Throws
-    /// <see cref="ProxyUpstreamException"/> when the certificate isn't valid or the handshake fails (an
+    /// address it was reached by), or be the one the user trusts for it (<see cref="TrustedCertificate"/>); HTTP/1.1 is
+    /// asked for. Returns the stream everything goes over from then on. Throws <see cref="ProxyUpstreamException"/> when
+    /// the certificate isn't taken (raising <see cref="CertificateRefused"/>) or the handshake fails (an
     /// <see cref="OperationCanceledException"/> for <paramref name="ct"/> passes through).
     /// </summary>
     internal async Task<SslStream> SecureAsync(Stream s, CancellationToken ct)
     {
         var found = SslPolicyErrors.None;
+        UpstreamCertificate? refused = null;
         var ssl = new SslStream(s, leaveInnerStreamOpen: false);
         var options = new SslClientAuthenticationOptions
         {
@@ -217,7 +276,14 @@ public sealed class ProxyUpstream
             RemoteCertificateValidationCallback = (_, certificate, _, errors) =>
             {
                 found = errors;
-                return CertificateCheck is { } check ? check(certificate, errors) : errors == SslPolicyErrors.None;
+                if (CertificateCheck is { } check) return check(certificate, errors);
+                if (errors == SslPolicyErrors.None) return true;
+                if (certificate is null) return false;
+                string print = Convert.ToHexString(certificate.GetCertHash(HashAlgorithmName.SHA256));
+                string? trusted = _trusted;
+                if (trusted == print) return true;
+                refused = Describe(certificate, print, errors, changed: trusted is not null);
+                return false;
             },
         };
         try
@@ -229,11 +295,48 @@ public sealed class ProxyUpstream
         {
             ssl.Dispose();
             if (ex is OperationCanceledException) throw;
+            if (refused is not null)
+            {
+                try { CertificateRefused?.Invoke(refused); } catch { /* the page's own trouble: the connection is refused all the same */ }
+                throw NotTrusted(refused);
+            }
             if (found != SslPolicyErrors.None && ex is AuthenticationException) throw BadCertificate(found);
             throw new ProxyUpstreamException("upstream: TLS failed",
                 $"TLS with the upstream proxy {Display} failed ({ex.Message.TrimEnd('.')}). Is it an https:// proxy? A plain HTTP proxy is http://.", inner: ex) { Fatal = true };
         }
     }
+
+    // What the user is shown of a certificate that wasn't taken, to decide whether it is the proxy's own: who it is for,
+    // who issued it, until when, what is wrong with it, and its fingerprint to compare with the one the owner gives.
+    private UpstreamCertificate Describe(X509Certificate certificate, string print, SslPolicyErrors errors, bool changed)
+    {
+        var owned = certificate as X509Certificate2 is null ? new X509Certificate2(certificate) : null;
+        var c = (certificate as X509Certificate2) ?? owned!;
+        try
+        {
+            string subject = c.GetNameInfo(X509NameType.SimpleName, false), issuer = c.GetNameInfo(X509NameType.SimpleName, true);
+            bool selfSigned = c.SubjectName.RawData.AsSpan().SequenceEqual(c.IssuerName.RawData);
+            var now = DateTime.Now;
+            var what = new List<string>(4);
+            if (changed) what.Add("it isn't the certificate trusted for this proxy (it changed, or something else answers in its place)");
+            if (errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)) what.Add($"it is made for another name than {Host}");
+            if (errors.HasFlag(SslPolicyErrors.RemoteCertificateChainErrors))
+            {
+                if (c.NotAfter < now) what.Add($"it expired on {c.NotAfter:yyyy-MM-dd}");
+                else if (c.NotBefore > now) what.Add($"it isn't valid before {c.NotBefore:yyyy-MM-dd}");
+                what.Add(selfSigned ? "it is self-signed, so no authority vouches for it" : "it isn't from an issuer this device trusts");
+            }
+            if (what.Count == 0) what.Add("this device doesn't accept it");
+            return new UpstreamCertificate(Display, print, subject.Length > 0 ? subject : c.Subject, issuer.Length > 0 ? issuer : c.Issuer,
+                                           c.NotAfter, string.Join("; ", what), changed);
+        }
+        finally { owned?.Dispose(); }
+    }
+
+    private ProxyUpstreamException NotTrusted(UpstreamCertificate c)
+        => new(c.Changed ? "upstream: certificate changed" : "upstream: bad certificate",
+               $"The upstream proxy {Display}'s certificate isn't trusted: {c.Problem}. Nothing was sent to it. "
+               + $"Its SHA-256 fingerprint is {FormatFingerprint(c.Fingerprint)}; if that is the proxy's own, trust it under the upstream address (Advanced).") { Fatal = true };
 
     private ProxyUpstreamException BadCertificate(SslPolicyErrors errors)
     {

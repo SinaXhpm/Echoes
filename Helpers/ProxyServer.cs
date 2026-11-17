@@ -1210,6 +1210,30 @@ public sealed partial class ProxyServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// For an https:// upstream: one connection to it, made as a client's would be (the outgoing interface too), with
+    /// TLS and nothing after it, so a certificate that isn't taken is reported (<see cref="ProxyUpstream.CertificateRefused"/>)
+    /// before any client needs the proxy. Null when there is nothing to check or all went well; else the log's short text
+    /// for what went wrong ("upstream: bad certificate", "upstream down" …).
+    /// </summary>
+    public async Task<string?> CheckUpstreamTlsAsync(CancellationToken ct)
+    {
+        if (_upstream is not { Proxy.Tls: true } up) return null;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(_connectMs);
+        var self = new Peer("this device", IPAddress.Loopback, IPAddress.Loopback, IsLocal: true);
+        try
+        {
+            var hops = await up.AddressesAsync(timeout.Token).ConfigureAwait(false);
+            using var remote = await OpenUpstreamAsync(up, hops, self, timeout.Token).ConfigureAwait(false);
+            return null;
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            return DialFailText(ex);
+        }
+    }
+
     // A connection to the upstream (ConnectUpstreamAsync), with TLS on it for an https:// one.
     private async Task<Remote> OpenUpstreamAsync(UpstreamLink up, IPAddress[] hops, Peer peer, CancellationToken ct)
     {

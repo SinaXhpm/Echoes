@@ -244,7 +244,8 @@ public partial class ProxyServerTests
                 Assert.Equal(1, await Socks5Async(client.GetStream(), "127.0.0.1", target.Port, deadline.Token));
             var row = await proxy.EntryAsync(e => !e.Ok, deadline.Token);
             Assert.Equal("upstream: bad certificate", row.Status);
-            Assert.Contains("isn't from an issuer this device trusts", row.Detail);
+            Assert.Contains("it is self-signed, so no authority vouches for it", row.Detail);
+            Assert.Contains(ProxyUpstream.FormatFingerprint(Sha256(front.Certificate)), row.Detail);   // to compare, and trust
 
             using (var client = await proxy.ConnectAsync(deadline.Token))
             {
@@ -265,6 +266,98 @@ public partial class ProxyServerTests
 
         Assert.Empty(parent.Log);   // nothing got through to the proxy behind
         Assert.Equal(0, target.Accepted);
+    }
+
+    private static string Sha256(X509Certificate2 certificate) => Convert.ToHexString(certificate.GetCertHash(HashAlgorithmName.SHA256));
+
+    [Fact]
+    public async Task A_certificate_trusted_by_its_fingerprint_is_taken_and_no_other()
+    {
+        using var deadline = Live.Deadline();
+        using var target = new Target();
+        using var parent = new Proxy();
+        using var front = new TlsFront(parent.Port);
+        using var other = new TlsFront(parent.Port);   // the same name, another certificate
+        var up = UpstreamAt($"https://localhost:{front.Port}");
+        var refused = new List<UpstreamCertificate>();
+        up.CertificateRefused += c => { lock (refused) refused.Add(c); };
+        using var proxy = new Proxy(Through(up));
+
+        // not trusted: refused, and the page is told what it was, to offer it
+        using (var client = await proxy.ConnectAsync(deadline.Token))
+            Assert.Equal(1, await Socks5Async(client.GetStream(), "127.0.0.1", target.Port, deadline.Token));
+        UpstreamCertificate seen;
+        lock (refused) seen = Assert.Single(refused);
+        Assert.Equal(($"https://localhost:{front.Port}", Sha256(front.Certificate), "localhost", false), (seen.Upstream, seen.Fingerprint, seen.Subject, seen.Changed));
+        Assert.Contains("self-signed", seen.Problem);
+
+        // trusted by its fingerprint (as the page does it, while the proxy runs): taken at once
+        up.TrustedCertificate = ProxyUpstream.FormatFingerprint(seen.Fingerprint).ToLowerInvariant();   // as pasted
+        using (var client = await proxy.ConnectAsync(deadline.Token))
+        {
+            var s = client.GetStream();
+            Assert.Equal(0, await Socks5Async(s, "127.0.0.1", target.Port, deadline.Token));
+            await EchoesAsync(s, deadline.Token);
+        }
+
+        // ...that certificate only: another one in its place is refused, and said to have changed
+        var trusted = up.TrustedCertificate;
+        var moved = UpstreamAt($"https://localhost:{other.Port}");
+        moved.TrustedCertificate = trusted;
+        UpstreamCertificate? changed = null;
+        moved.CertificateRefused += c => changed = c;
+        using (var proxy2 = new Proxy(Through(moved)))
+        {
+            using (var client = await proxy2.ConnectAsync(deadline.Token))
+                Assert.Equal(1, await Socks5Async(client.GetStream(), "127.0.0.1", target.Port, deadline.Token));
+            var row = await proxy2.EntryAsync(e => !e.Ok, deadline.Token);
+            Assert.Equal("upstream: certificate changed", row.Status);
+            Assert.Contains("isn't the certificate trusted for this proxy", row.Detail);
+        }
+        Assert.True(changed is { Changed: true });
+        Assert.Equal(Sha256(other.Certificate), changed!.Fingerprint);
+    }
+
+    [Fact]
+    public async Task A_trusted_certificate_is_taken_though_it_is_made_for_another_name()
+    {
+        using var deadline = Live.Deadline();
+        using var target = new Target();
+        using var parent = new Proxy();
+        using var front = new TlsFront(parent.Port, "elsewhere.test");
+        var up = UpstreamAt($"https://localhost:{front.Port}");
+        up.TrustedCertificate = Sha256(front.Certificate);
+        using var proxy = new Proxy(Through(up));
+        using var client = await proxy.ConnectAsync(deadline.Token);
+
+        var s = client.GetStream();
+        Assert.Equal(0, await Socks5Async(s, "127.0.0.1", target.Port, deadline.Token));
+        await EchoesAsync(s, deadline.Token);
+    }
+
+    [Fact]
+    public async Task The_check_at_start_reports_a_certificate_that_isnt_trusted()
+    {
+        using var deadline = Live.Deadline();
+        using var parent = new Proxy();
+        using var front = new TlsFront(parent.Port);
+        var up = UpstreamAt($"https://localhost:{front.Port}");
+        UpstreamCertificate? seen = null;
+        up.CertificateRefused += c => seen = c;
+        using var proxy = new Proxy(Through(up));
+
+        Assert.Equal("upstream: bad certificate", await proxy.CheckUpstreamTlsAsync(deadline.Token));
+        Assert.Equal(Sha256(front.Certificate), seen?.Fingerprint);
+        Assert.Empty(parent.Log);   // a handshake only: nothing was asked of the proxy behind
+
+        up.TrustedCertificate = seen!.Fingerprint;
+        Assert.Null(await proxy.CheckUpstreamTlsAsync(deadline.Token));
+
+        // nothing to check: no upstream, or one without TLS
+        using var plain = new Proxy();
+        Assert.Null(await plain.CheckUpstreamTlsAsync(deadline.Token));
+        using var socks = new Proxy(Through(UpstreamAt($"socks5://127.0.0.1:{parent.Port}")));
+        Assert.Null(await socks.CheckUpstreamTlsAsync(deadline.Token));
     }
 
     [Fact]

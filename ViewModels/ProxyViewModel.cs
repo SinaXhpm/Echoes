@@ -74,6 +74,15 @@ public partial class ProxyViewModel : ObservableObject
     /// <summary>Site names go to the upstream as names (it looks them up), where that is safe.</summary>
     [ObservableProperty] private bool _upstreamResolve = true;
 
+    // An https:// upstream's certificate the user trusts although nothing vouches for it (self-signed, made for another
+    // name): its SHA-256 fingerprint and the upstream it is trusted for ("https://host:port"), taken for that one only.
+    // And the last one the running proxy refused, offered to be trusted.
+    [ObservableProperty] private string? _trustedCert;
+    [ObservableProperty] private string? _trustedCertFor;
+    [ObservableProperty] private UpstreamCertificate? _refusedCert;
+    private string? _tlsUpstream;            // the address typed, as "https://host:port" when it is an https:// one
+    private ProxyUpstream? _liveUpstream;    // the running proxy's: a certificate trusted now is taken at once
+
     public const int DefaultConnectTimeout = 15, DefaultIdleTimeout = 300;
     public const int MaxSpeedLimitKb = 1_000_000;
     /// <summary>The longest text a rule box keeps (the boxes' MaxLength).</summary>
@@ -172,7 +181,7 @@ public partial class ProxyViewModel : ObservableObject
         KAllowClients = "proxy.allowClients", KAllowPorts = "proxy.allowPorts", KBlockHosts = "proxy.blockHosts", KUdp = "proxy.udp",
         // ("proxy.useProxy", as every tool's switch for a proxy is called: a restored backup turns it off, as it does theirs)
         KUseUpstream = "proxy.useProxy", KUpstream = "proxy.upstream", KUpUser = "proxy.upstreamUser", KUpPass = "proxy.upstreamPass",
-        KUpResolve = "proxy.upstreamDns";
+        KUpResolve = "proxy.upstreamDns", KUpCert = "proxy.upstreamCert";   // ("https://host:port FINGERPRINT")
     private const int MaxSavedList = 16 * 1024;
     private bool _restoring;
 
@@ -199,6 +208,12 @@ public partial class ProxyViewModel : ObservableObject
             UpstreamUser = p.GetSetting(KUpUser) ?? string.Empty;
             UpstreamPass = SecretProtector.Unprotect(p.GetSetting(KUpPass));
             UpstreamResolve = p.GetBool(KUpResolve, true);
+            if (p.GetSetting(KUpCert) is { } pin && pin.LastIndexOf(' ') is > 0 and var space
+                && ProxyUpstream.NormalizeFingerprint(pin[(space + 1)..]) is { } print)
+            {
+                TrustedCertFor = pin[..space];
+                TrustedCert = print;
+            }
             ConnectTimeout = Math.Clamp(p.GetInt(KConnectTimeout, DefaultConnectTimeout), 1, 120);
             IdleTimeout = Math.Clamp(p.GetInt(KIdleTimeout, DefaultIdleTimeout), 10, 86_400);
             MaxPerClient = p.GetInt(KPerClient, 0) is > 0 and <= 512 and var perClient ? perClient : null;
@@ -268,7 +283,14 @@ public partial class ProxyViewModel : ObservableObject
     partial void OnAllowedPortsChanged(string value) => AdvancedChanged(() => SaveText(KAllowPorts, value));
     partial void OnBlockedHostsChanged(string value) => AdvancedChanged(() => SaveText(KBlockHosts, value));
     partial void OnUdpChanged(bool value) => AdvancedChanged(() => ProfileService.Instance.SetBool(KUdp, value));
-    partial void OnUseUpstreamChanged(bool value) => AdvancedChanged(() => ProfileService.Instance.SetBool(KUseUpstream, value));
+    partial void OnUseUpstreamChanged(bool value)
+    {
+        AdvancedChanged(() => ProfileService.Instance.SetBool(KUseUpstream, value));
+        NotifyCert();
+    }
+
+    partial void OnTrustedCertChanged(string? value) => NotifyCert();
+    partial void OnRefusedCertChanged(UpstreamCertificate? value) => NotifyCert();
     partial void OnUpstreamUserChanged(string value) { if (!_restoring) SaveText(KUpUser, value); }
     partial void OnUpstreamResolveChanged(bool value) { if (!_restoring) ProfileService.Instance.SetBool(KUpResolve, value); }
 
@@ -281,6 +303,7 @@ public partial class ProxyViewModel : ObservableObject
     // (the password sealed) once typing pauses, so the text doesn't change under the caret.
     partial void OnUpstreamAddressChanged(string value)
     {
+        NotifyCert();
         if (_restoring) return;
         SaveText(KUpstream, HttpHelper.WithoutUserInfo(value));
         if (value.Contains('@')) _ = MoveLoginSoonAsync();
@@ -302,6 +325,83 @@ public partial class ProxyViewModel : ObservableObject
         UpstreamAddress = split.Address;
         if (split.User.Length > 0) UpstreamUser = split.User;
         if (split.Pass.Length > 0) UpstreamPass = split.Pass;
+    }
+
+    // --- an https:// upstream's certificate: the panel under the upstream address shows the one the running proxy
+    // refused (with "Trust this certificate"), else the one trusted for the address typed (with "Forget").
+
+    private UpstreamCertificate? ShownRefused => RefusedCert is { } r && r.Upstream == _tlsUpstream ? r : null;
+    private bool ShownTrusted => TrustedCert is not null && TrustedCertFor == _tlsUpstream;
+
+    public bool CertPanelVisible => UseUpstream && _tlsUpstream is not null && (ShownRefused is not null || ShownTrusted);
+    public bool CertIsRefused => ShownRefused is not null;
+
+    public string CertTitle => ShownRefused switch
+    {
+        { Changed: true } => "The upstream proxy's certificate changed",
+        not null => "The upstream proxy's certificate isn't trusted",
+        _ => "Trusted certificate",
+    };
+
+    public string CertDetail => ShownRefused is { } r
+        ? $"{char.ToUpperInvariant(r.Problem[0])}{r.Problem[1..]}. Issued to {r.Subject} by {r.Issuer}, valid until {r.NotAfter:yyyy-MM-dd}. "
+          + "Nothing goes through this proxy until it is trusted. Trust it only if the fingerprint below is the one the proxy's owner gives you."
+        : "Taken for this proxy although no authority vouches for it. Any other certificate is still refused.";
+
+    public string CertFingerprint => (ShownRefused?.Fingerprint ?? (ShownTrusted ? TrustedCert : null)) is { } hex
+        ? "SHA-256  " + ProxyUpstream.FormatFingerprint(hex)
+        : string.Empty;
+
+    private void NotifyCert()
+    {
+        _tlsUpstream = ProxyUpstream.TlsDisplay(UpstreamAddress);
+        OnPropertyChanged(nameof(CertPanelVisible));
+        OnPropertyChanged(nameof(CertIsRefused));
+        OnPropertyChanged(nameof(CertTitle));
+        OnPropertyChanged(nameof(CertDetail));
+        OnPropertyChanged(nameof(CertFingerprint));
+    }
+
+    /// <summary>The certificate the proxy refused is taken from now on, for that upstream (at once if it is running).</summary>
+    [RelayCommand]
+    private void TrustUpstreamCert()
+    {
+        if (ShownRefused is not { } r) return;
+        TrustedCertFor = r.Upstream;
+        TrustedCert = r.Fingerprint;
+        ProfileService.Instance.SetSetting(KUpCert, $"{r.Upstream} {r.Fingerprint}");
+        if (_liveUpstream is { } live && live.Display == r.Upstream) live.TrustedCertificate = r.Fingerprint;
+        RefusedCert = null;
+    }
+
+    [RelayCommand]
+    private void ForgetUpstreamCert()
+    {
+        TrustedCertFor = null;
+        TrustedCert = null;
+        ProfileService.Instance.SetSetting(KUpCert, null);
+        if (_liveUpstream is { } live) live.TrustedCertificate = null;
+    }
+
+    // Raised on a pool thread by the running proxy's upstream: shown in Advanced (opened for it), where it can be trusted.
+    private void OnUpstreamCertificateRefused(UpstreamCertificate c) => Dispatcher.UIThread.Post(() =>
+    {
+        if (RefusedCert == c) return;   // (each refused connection reports it: the same one again changes nothing)
+        RefusedCert = c;
+        ShowAdvanced = true;
+    });
+
+    // Right after START with an https:// upstream: its certificate is checked once, so one that isn't trusted shows (with
+    // "Trust this certificate") before a client needs the proxy; anything else wrong with the upstream is said too.
+    private async Task CheckUpstreamAsync(ProxyServer server)
+    {
+        string? problem;
+        try { problem = await server.CheckUpstreamTlsAsync(default); }
+        catch { return; }
+        if (problem is null || !ReferenceEquals(server, _server)) return;
+        StatusMessage += problem.Contains("certificate", StringComparison.Ordinal)
+            ? "  ⚠ The upstream proxy's certificate isn't trusted: see Advanced."
+            : $"  ⚠ The upstream proxy didn't take a check connection ({problem}).";
     }
 
     // The upstream is this proxy itself (its port, on an address it listens on): every connection would come back here,
@@ -393,6 +493,7 @@ public partial class ProxyViewModel : ObservableObject
             upstream = ProxyUpstream.Parse(UpstreamAddress, UpstreamUser, UpstreamPass, UpstreamResolve, out string? upProblem);
             if (upstream is null) { Refuse(upProblem ?? "Enter the upstream proxy's address (host:port)."); return; }
             if (IsThisProxy(upstream, SelectedBind?.Address ?? IPAddress.Any)) { Refuse($"The upstream proxy can't be this proxy itself (port {Port} of this device)."); return; }
+            if (upstream.Tls && TrustedCertFor == upstream.Display) upstream.TrustedCertificate = TrustedCert;
         }
 
         // The chosen outgoing interface as it is now. Not up: said at once, instead of a proxy that connects nowhere.
@@ -442,6 +543,12 @@ public partial class ProxyViewModel : ObservableObject
             _statsTimer = new PacedTimer(500, 2000, PollStats);   // twice a second while traffic moves, every 2 s when idle
             _statsTimer.Start();
             RefreshAddresses();
+            if (upstream is not null)
+            {
+                _liveUpstream = upstream;
+                upstream.CertificateRefused += OnUpstreamCertificateRefused;
+                RefusedCert = null;   // what an earlier run refused is checked again now
+            }
             // No auth on a LAN-reachable bind = anyone on the network can use it. That's the feature,
             // so it isn't blocked — but say so plainly instead of a bare "live".
             bool openToLan = !RequireAuth && !IPAddress.IsLoopback(bind) && !rules.LimitsClients;
@@ -455,6 +562,7 @@ public partial class ProxyViewModel : ObservableObject
                             + (upstream is not null ? $", via {upstream.Display}" : "") + "."
                             + (udpBlocked ? $" UDP is off: {(upstream!.Kind == ProxyUpstreamKind.Socks4a ? "a" : "an")} {upstream.KindName} upstream proxy can't carry it." : "")
                             + (openToLan ? "  ⚠ No auth: anyone on your network can use it." : "");
+            if (upstream is { Tls: true }) _ = CheckUpstreamAsync(server);
         }
         catch (SocketException ex)
         {
@@ -487,6 +595,8 @@ public partial class ProxyViewModel : ObservableObject
         DrainLog();   // entries logged just before STOP still show
         try { _server?.Dispose(); } catch { }
         _server = null;
+        if (_liveUpstream is { } upstream) upstream.CertificateRefused -= OnUpstreamCertificateRefused;
+        _liveUpstream = null;
         _watch?.Dispose();
         _watch = null;
         IsRunning = false;

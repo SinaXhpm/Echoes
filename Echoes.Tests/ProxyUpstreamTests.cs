@@ -74,6 +74,39 @@ public class ProxyUpstreamTests
         Assert.Equal(Basic("u", "p"), Up("https://u:p@proxy.example:8443").AuthorizationLine());
     }
 
+    [Theory]
+    [InlineData("AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89")]
+    [InlineData("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")]
+    [InlineData(" ab cd ef 01 23 45 67 89 ab cd ef 01 23 45 67 89 ab cd ef 01 23 45 67 89 ab cd ef 01 23 45 67 89 ")]
+    [InlineData("AB-CD-EF-01-23-45-67-89-AB-CD-EF-01-23-45-67-89-AB-CD-EF-01-23-45-67-89-AB-CD-EF-01-23-45-67-89")]
+    public void A_fingerprint_is_read_however_it_was_copied(string typed)
+    {
+        const string hex = "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789";
+        Assert.Equal(hex, ProxyUpstream.NormalizeFingerprint(typed));
+        Assert.Equal("AB:CD:EF:01", ProxyUpstream.FormatFingerprint(hex)[..11]);
+        Assert.Equal(hex, ProxyUpstream.NormalizeFingerprint(ProxyUpstream.FormatFingerprint(hex)));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("ABCDEF")]                                                              // too short (and SHA-1's 40 digits too)
+    [InlineData("A94A8FE5CCB19BA61C4C0873D391E987982FBBD3")]
+    [InlineData("GBCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789")]  // not hex
+    [InlineData("ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF012345678900")] // too long
+    public void What_isnt_a_sha256_fingerprint_is_none(string? typed)
+        => Assert.Null(ProxyUpstream.NormalizeFingerprint(typed));
+
+    [Fact]
+    public void A_certificate_is_trusted_for_the_https_address_it_came_from()
+    {
+        Assert.Equal("https://proxy.example:8443", ProxyUpstream.TlsDisplay("https://u:p@Proxy.Example:8443/"));
+        Assert.Null(ProxyUpstream.TlsDisplay("http://proxy.example:8080"));
+        Assert.Null(ProxyUpstream.TlsDisplay("socks5://proxy.example:1080"));
+        Assert.Null(ProxyUpstream.TlsDisplay("https://proxy.example"));   // no port yet
+        Assert.Null(Up("https://proxy.example:443").TrustedCertificate);
+    }
+
     [Fact]
     public void Socks4_takes_a_user_id_but_no_password()
     {
