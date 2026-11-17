@@ -364,12 +364,13 @@ public static class MonitorProbe
         var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; Echoes-Monitor/1.0)");
         client.DefaultRequestHeaders.CacheControl = new CacheControlHeaderValue { NoCache = true };
-        // Only the status line is read — but to reuse the connection, .NET drains an unread body when the response is
-        // disposed, so every check downloaded the whole page: a 300 KB home page every 5 s is ~5 GB a day. Ask for it
-        // compressed, as every browser does (never decoded here: AutomaticDecompression stays off), which cuts that to
-        // what the server sends compressed, typically a quarter of it or less, and cap the drain (MaxResponseDrainSize).
-        // Connection reuse — and so what the response time measures — is unchanged for any page that compresses to
-        // 128 KB or less.
+        // A plain check asks with HEAD (HttpAsync): no page travels. The GET checks (a keyword rule, a failed HEAD asked
+        // again, a server that answers HEAD wrongly) read only what they need — but to reuse the connection, .NET drains an
+        // unread body when the response is disposed, so such a check downloads the page: a 300 KB home page every 5 s is
+        // ~5 GB a day. Ask for it compressed, as every browser does (never decoded here: AutomaticDecompression stays off),
+        // which cuts that to what the server sends compressed, typically a quarter of it or less, and cap the drain
+        // (MaxResponseDrainSize). Connection reuse — and so what the response time measures — is unchanged for any page
+        // that compresses to 128 KB or less.
         foreach (var encoding in new[] { "gzip", "deflate", "br" })
             client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue(encoding));
         return client;
@@ -588,6 +589,10 @@ public static class MonitorProbe
         }
     }
 
+    // Monitors checked with GET after all: their server failed a HEAD that a GET then passed (405 / 501 for HEAD, or a HEAD
+    // it answers differently). By URL, for the session: one entry per such monitor at most.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> s_getOnly = new(StringComparer.Ordinal);
+
     private static async Task<ProbeResult> HttpAsync(string url, int timeout, HttpClient http, string? keyword, bool mustContain,
                                                      CancellationToken ct)
     {
@@ -597,9 +602,29 @@ public static class MonitorProbe
         int ms = 0, code = 0;
         try
         {
+            // Without a keyword rule only the status matters: HEAD, so the page never travels. A GET's unread page is
+            // downloaded anyway when its response is disposed (to reuse the connection, up to MaxResponseDrainSize): up to
+            // 128 KB a check, ~0.5 GB a day per monitor at the 5 s default for a page that compresses to 30 KB. A HEAD that
+            // fails is asked again with GET (a budget of its own) before anything is reported: a server that refuses HEAD
+            // (405, 501) or answers it differently mustn't read as down, and the detail panel gets the GET's error page. (A
+            // HEAD that gets no answer at all isn't: the GET would fare no better.)
+            bool headFailed = false;
+            if (keyword is null && !s_getOnly.ContainsKey(url))
+            {
+                using (var head = new HttpRequestMessage(HttpMethod.Head, url))
+                using (var answer = await http.SendAsync(head, HttpCompletionOption.ResponseHeadersRead, linked.Token).ConfigureAwait(false))
+                {
+                    int status = (int)answer.StatusCode;
+                    if (status is >= 200 and <= 399) return ProbeResult.Success((int)sw.ElapsedMilliseconds, status);
+                }
+                headFailed = true;
+                sw.Restart();
+                linked.CancelAfter(timeout);
+            }
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            // ResponseHeadersRead + dispose returns the connection to the pool right after the status line; the body is
-            // never downloaded — unless a keyword rule needs the page (then at most MaxKeywordBodyBytes of it).
+            // ResponseHeadersRead + dispose returns the connection to the pool right after the status line (an unread page is
+            // drained first, up to MaxResponseDrainSize) — unless a keyword rule needs the page (then at most
+            // MaxKeywordBodyBytes of it).
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, linked.Token).ConfigureAwait(false);
             ms = (int)sw.ElapsedMilliseconds;
             code = (int)response.StatusCode;
@@ -607,6 +632,7 @@ public static class MonitorProbe
             // outages, as in every uptime monitor.
             if (code is >= 200 and <= 399)
             {
+                if (headFailed) s_getOnly.TryAdd(url, 0);   // this server's HEAD can't be trusted: GET from now on
                 if (keyword is null) return ProbeResult.Success(ms, code);
                 var (found, capped, readError, page) = await FindKeywordAsync(response, keyword, linked.Token).ConfigureAwait(false);
                 if (readError is not null)
