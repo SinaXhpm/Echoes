@@ -161,5 +161,10 @@ public sealed partial class MonitorViewModel : IToolSession
 public partial class CloudflareViewModel : IToolSession
 {
     bool IToolSession.IsBusy => IsBusy;
-    void IToolSession.EndSession() => _restoreCts?.Cancel();
+    void IToolSession.EndSession()
+    {
+        _restoreCts?.Cancel();
+        // the DDNS panel's "2 min ago" clock (a 30 s timer) stops with the tab, as when the vault locks
+        IsDdnsOpen = false;
+    }
 }

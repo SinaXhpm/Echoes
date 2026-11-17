@@ -165,9 +165,19 @@ public sealed class ProfileService : ISettings
     {
         lock (_gate) { return _settings.TryGetValue(key, out var v) ? v : null; }
     }
+    // A value the profile holds already writes nothing: every write is the whole file, serialized and fsynced.
     public void SetSetting(string key, string? value)
     {
-        lock (_gate) { _settings[key] = value ?? string.Empty; Save(); }
+        lock (_gate) { if (Put(key, value)) Save(); }
+    }
+
+    // Caller holds _gate. False when the key holds that value already (a missing key and "" are different).
+    private bool Put(string key, string? value)
+    {
+        string v = value ?? string.Empty;
+        if (_settings.TryGetValue(key, out var old) && string.Equals(old, v, StringComparison.Ordinal)) return false;
+        _settings[key] = v;
+        return true;
     }
     public void Remove(string key)
     {
@@ -183,13 +193,14 @@ public sealed class ProfileService : ISettings
         lock (_gate) { return _settings.TryGetValue(key, out var v) && int.TryParse(v, out var i) ? i : def; }
     }
 
-    // Set several settings and write the file once (avoids one write per field).
+    // Set several settings and write the file once (avoids one write per field), and not at all when none changed.
     public void SetMany(params (string key, string? value)[] items)
     {
         lock (_gate)
         {
-            foreach (var (k, v) in items) _settings[k] = v ?? string.Empty;
-            Save();
+            bool changed = false;
+            foreach (var (k, v) in items) changed |= Put(k, v);
+            if (changed) Save();
         }
     }
 
