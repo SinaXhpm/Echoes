@@ -1635,7 +1635,8 @@ public sealed partial class ProxyServer : IDisposable
     }
 
     // Copies src → dst until EOF, then passes the half-close on (dstSocket: the socket under dst; over TLS the close is
-    // said in TLS first, close_notify, so the other end reads an end and not a cut). Traffic re-arms the shared idle timer
+    // said in TLS first, close_notify, so the other end reads an end and not a cut, except on Apple's systems, see
+    // TlsCloseEndsReading). Traffic re-arms the shared idle timer
     // (at most once a second: a fast download is thousands of reads a second). True = clean EOF from src; false = reset /
     // idle timeout / stop. The copy buffer is pooled and given back while the tunnel waits for data (a zero-byte read,
     // which TLS passes down to the socket too), so the dozens of idle keep-alive tunnels a browser holds open cost no buffers.
@@ -1680,7 +1681,7 @@ public sealed partial class ProxyServer : IDisposable
         {
             if (buf is not null) ArrayPool<byte>.Shared.Return(buf);
         }
-        if (dst is SslStream tls)
+        if (dst is SslStream tls && !TlsCloseEndsReading)
         {
             try { await tls.ShutdownAsync().WaitAsync(tok).ConfigureAwait(false); }
             catch { /* the tunnel is ending anyway */ }
@@ -1688,6 +1689,12 @@ public sealed partial class ProxyServer : IDisposable
         try { dstSocket.Shutdown(SocketShutdown.Send); } catch { }
         return clean;
     }
+
+    // Apple's TLS (SecureTransport, under SslStream on macOS / iOS) ends the whole session when it sends close_notify:
+    // every read after it returns "end" at once, so the answer to a client's half-close through an https:// upstream was
+    // lost there. On those systems the half-close goes on as the FIN alone. The upstream still reads it as the end of what
+    // was sent (at a record boundary, which a Pump always stops on) and its answer still comes back.
+    private static readonly bool TlsCloseEndsReading = OperatingSystem.IsMacOS() || OperatingSystem.IsIOS() || OperatingSystem.IsTvOS();
 
     private const int RelayBuffer = 64 * 1024;
 

@@ -297,7 +297,8 @@ public partial class ProxyServerTests
             Assert.Equal("got 5", await HalfCloseAsync(client, "hello", deadline.Token));
         }
 
-        // through an https:// upstream: the end goes over TLS (close_notify), and the answer comes back after it
+        // through an https:// upstream: the end goes over TLS (close_notify; on macOS the FIN alone, as Apple's TLS can't
+        // read after its close_notify), and the answer comes back after it
         using var parent = new Proxy();
         using var front = new TlsFront(parent.Port);
         using (var proxy = new Proxy(Through(Trusting(UpstreamAt($"https://localhost:{front.Port}"), front))))
