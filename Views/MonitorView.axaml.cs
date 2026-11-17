@@ -138,6 +138,14 @@ public partial class MonitorView : UserControl
         else if (vm.HasSelection) { vm.CloseDetailCommand.Execute(null); e.Handled = true; }
     }
 
+    // the page the last failing HTTP check got, in the shared response viewer
+    private void OnShowLastResponse(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control anchor && DataContext is MonitorViewModel vm && vm.Detail.LastResponse is { } page)
+            Controls.ResponseView.ShowFlyout(anchor, new HttpResponseViewModel(page, vm.Detail.Title),
+                                             $"{vm.Detail.Title} · the page with the last error");
+    }
+
     private void UpdateLayoutClasses()
     {
         double width = MonRoot.Bounds.Width;
@@ -150,6 +158,13 @@ public partial class MonitorView : UserControl
 
         bool oneLine = !phone && width >= SummaryOneLine;
         var c = MonRoot.Classes;
+        if (phone != c.Contains("phone"))
+        {
+            // phone: the stats are a 4 x 2 grid of equal columns that share the card's width, however narrow the phone;
+            // desktop: one line, each as wide as it needs
+            StatsGrid.ColumnDefinitions = new ColumnDefinitions(phone ? "*,*,*,*,Auto,Auto,Auto,Auto,Auto" : "Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto");
+            StatsGrid.HorizontalAlignment = phone ? Avalonia.Layout.HorizontalAlignment.Stretch : Avalonia.Layout.HorizontalAlignment.Left;
+        }
         c.Set("phone", phone);
         c.Set("sw", oneLine);
         c.Set("slabel", !phone && (!oneLine || width >= SummaryLabel));

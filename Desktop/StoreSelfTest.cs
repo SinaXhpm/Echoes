@@ -133,6 +133,38 @@ internal static class StoreSelfTest
             return got.Length + " bytes";
         });
 
+        // Choosing the interface a probe leaves from (Ping, DNS, the scanner): the list the pickers show, and a datagram
+        // through the loopback interface (IP_BOUND_IF, by the interface's index), which the sandbox has to allow too.
+        Check("interfaces listed", () =>
+        {
+            var all = NetIfaces.Up(withLoopback: true);
+            if (all.Count == 0) throw new InvalidOperationException("no interface is listed: the pickers would be empty");
+            foreach (var i in all)
+                if (i.Index <= 0) throw new InvalidOperationException(i.Name + " has no interface index");
+            return string.Join(", ", all.Select(i => $"{i.Label} #{i.Index}"));
+        });
+
+        Check("UDP through the loopback interface", () =>
+        {
+            var lo = NetIfaces.Up(withLoopback: true).FirstOrDefault(i => i.IsLoopback && i.V4 is not null)
+                     ?? throw new InvalidOperationException("no loopback interface is listed");
+            using var server = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+            using var client = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            if (!lo.TryBind(client, out string? note)) throw new InvalidOperationException(note ?? "the socket couldn't be tied to " + lo.Name);
+            client.SendTo(new byte[] { 1, 2, 3 }, server.Client.LocalEndPoint!);
+            server.Client.ReceiveTimeout = 3000;
+            IPEndPoint any = new(IPAddress.Any, 0);
+            byte[] got = server.Receive(ref any);
+            return $"{got.Length} bytes from {any} through {lo.Name}";
+        });
+
+        // the Capture tool: live capture is closed to a sandboxed app, and the tool has to say so instead of offering it
+        Check("live capture is off in the sandbox", () =>
+        {
+            if (PacketCapture.Supported) throw new InvalidOperationException("the Capture tool offers live capture");
+            return PacketCapture.Requirement;
+        });
+
         // ping: the app's own probe, which falls back from ICMP to UDP by itself. Informational: a network may drop either.
         try
         {

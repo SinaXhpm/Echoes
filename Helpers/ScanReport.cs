@@ -114,10 +114,12 @@ public static class ScanReport
 
     public static string Flags(ScanOptions o)
     {
-        if (o.PingOnly) return "-sn";
+        // -e: the interface the probes left from (quoted when its name has a space, as Windows' names do)
+        string iface = o.Via is { } via ? "-e " + (via.Name.Contains(' ') ? "\"" + via.Name + "\"" : via.Name) : "";
+        if (o.PingOnly) return iface.Length > 0 ? "-sn " + iface : "-sn";
         return string.Join(" ", new[]
         {
-            o.Tcp ? "-sT" : "", o.Udp ? "-sU" : "", o.ServiceDetection ? "-sV" : "", o.SkipDiscovery ? "-Pn" : "",
+            o.Tcp ? "-sT" : "", o.Udp ? "-sU" : "", o.ServiceDetection ? "-sV" : "", o.SkipDiscovery ? "-Pn" : "", iface,
         }.Where(s => s.Length > 0));
     }
 
@@ -175,7 +177,7 @@ public static class ScanReport
         foreach (int port in pass.UbiquitousPorts)
             tail.AppendLine($"(port {port}/tcp is open on nearly every host scanned — a transparent proxy or ISP interception on the path is likelier than a real service on each)");
         if (pass.UnknownProbes > 0)
-            tail.AppendLine($"({pass.UnknownProbes:N0} probe(s) couldn't be sent — the OS ran out of sockets; those ports are unknown, not filtered)");
+            tail.AppendLine("(" + ScanText.UnknownNote(pass, $"{pass.UnknownProbes:N0} probe(s)") + ")");
         if (pass.RecheckSkipped > 0)
             tail.AppendLine($"({pass.RecheckSkipped:N0} silent UDP port(s) left open|filtered: the host rate-limits its ICMP errors and re-checking more would take too long)");
         if (pass.DroppedRows > 0)
@@ -197,7 +199,8 @@ public static class ScanReport
             sb.AppendLine("Host is up" + (h.LatencyMs > 0 ? $" ({ScanText.Latency(h.LatencyMs)} latency)" : "")
                           + (h.Reason.Length > 0 ? $", {h.Reason}." : "."));
         else
-            sb.AppendLine("Host seems down: nothing answered" + (h.Reason == "socket-limit" ? " (the OS ran out of sockets)." : "."));
+            sb.AppendLine("Host seems down: nothing answered" + (h.Reason == "socket-limit" ? " (the OS ran out of sockets)."
+                          : ScanText.IsIfaceReason(h.Reason) ? " (the probes couldn't be sent from the chosen interface)." : "."));
         if (!string.IsNullOrEmpty(h.ReverseName) && !string.Equals(h.ReverseName, h.Name, StringComparison.OrdinalIgnoreCase))
             sb.AppendLine($"rDNS record for {h.Ip}: {h.ReverseName}");
         if (h.OtherAddresses is { Count: > 0 } others)

@@ -168,6 +168,13 @@ public partial class SocketView : UserControl
 
     // ---------------- one context menu for every entry ----------------
 
+    // a refused handshake's answer, in the shared response viewer
+    private void OnShowResponse(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: SocketEntry { Response: { } answer } } anchor)
+            Controls.ResponseView.ShowFlyout(anchor, new HttpResponseViewModel(answer, "WebSocket handshake"), "The answer to the WebSocket handshake");
+    }
+
     private void OnEntryContext(object? sender, ContextRequestedEventArgs e)
     {
         if (OpenEntryMenu(e.Source)) e.Handled = true;

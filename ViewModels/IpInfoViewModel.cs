@@ -83,6 +83,7 @@ public sealed class IpProviderResult
 
 public partial class IpInfoViewModel : ObservableObject
 {
+    private readonly ToolStore Store = ToolStore.Current;   // this instance's settings: its own copy when it is one of several tabs (ToolStore)
     [ObservableProperty] private string _targetIp = string.Empty;
     [ObservableProperty] private string _rawResult = string.Empty;          // copy text + fallback/error text
     [ObservableProperty] private IpGeoResult? _result;                      // merged answer → hero
@@ -102,8 +103,8 @@ public partial class IpInfoViewModel : ObservableObject
     public ObservableCollection<string> Providers { get; } = new(new[] { "Auto (cross-check)" }.Concat(Table.Select(p => p.Name)));
     [ObservableProperty] private int _selectedProviderIndex;
 
-    public ObservableCollection<string> TargetHistory => HistoryService.Instance.Get("ip.target");
-    public ObservableCollection<string> ProxyHistory => HistoryService.Instance.Get("ip.proxy");
+    public ObservableCollection<string> TargetHistory => Store.History.Get("ip.target");
+    public ObservableCollection<string> ProxyHistory => Store.History.Get("ip.proxy");
 
     [ObservableProperty] private string _subnetInput = "192.168.1.0/24";
     [ObservableProperty] private string _subnetOutput = string.Empty;
@@ -115,13 +116,13 @@ public partial class IpInfoViewModel : ObservableObject
 
     partial void OnTabIndexChanged(int value)
     {
-        if (_loaded && value >= 0) ProfileService.Instance.SetSetting(KTab, value.ToString(CultureInfo.InvariantCulture));
+        if (_loaded && value >= 0) Store.Profile.SetSetting(KTab, value.ToString(CultureInfo.InvariantCulture));
     }
 
     // Whether the box comes back empty (the last lookup was this device's own address) or with the last address.
-    private static void SaveMyIpLast(bool mine)
+    private void SaveMyIpLast(bool mine)
     {
-        if (ProfileService.Instance.GetBool(KMyIpLast) != mine) ProfileService.Instance.SetBool(KMyIpLast, mine);
+        if (Store.Profile.GetBool(KMyIpLast) != mine) Store.Profile.SetBool(KMyIpLast, mine);
     }
 
     private bool _loaded;
@@ -135,9 +136,9 @@ public partial class IpInfoViewModel : ObservableObject
 
     public IpInfoViewModel()
     {
-        var ps = ProfileService.Instance;
+        var ps = Store.Profile;
         UseProxy = ps.GetBool("ip.useProxy");
-        ProxyAddress = ps.GetSetting("ip.proxyAddr") ?? (HistoryService.Instance.Last("ip.proxy") ?? string.Empty);
+        ProxyAddress = ps.GetSetting("ip.proxyAddr") ?? (Store.History.Last("ip.proxy") ?? string.Empty);
         ProxyUser = ps.GetSetting("ip.proxyUser") ?? string.Empty;
         // Stored encrypted via SecretProtector (per-user key); legacy plaintext and old-format values still
         // load and are re-saved in the current format right away.
@@ -146,7 +147,7 @@ public partial class IpInfoViewModel : ObservableObject
         if (rawPass.Length > 0 && ProxyPass.Length == 0) _unreadablePass = rawPass;
         if (int.TryParse(ps.GetSetting("ip.provider"), out int pi) && pi >= 0 && pi < Providers.Count) SelectedProviderIndex = pi;
         // The address looked up last (none when "My IP" was the last lookup), the subnet box and the sub-tab.
-        if (!ps.GetBool(KMyIpLast) && HistoryService.Instance.Last("ip.target") is { } lastTarget) TargetIp = lastTarget;
+        if (!ps.GetBool(KMyIpLast) && Store.History.Last("ip.target") is { } lastTarget) TargetIp = lastTarget;
         if (ps.GetSetting(KSubnet) is { Length: > 0 } subnet) SubnetInput = subnet;
         TabIndex = Math.Clamp(ps.GetInt(KTab, 0), 0, 1);
         _loaded = true;
@@ -237,7 +238,7 @@ public partial class IpInfoViewModel : ObservableObject
         _persistPending = false;
         // The address goes into the plaintext profile: never with user info in it, even half-typed.
         string address = ParseProxyUserInfo(ProxyAddress)?.Clean ?? ProxyAddress;
-        ProfileService.Instance.SetMany(
+        Store.Profile.SetMany(
             ("ip.useProxy", UseProxy ? "true" : "false"), ("ip.proxyAddr", address),
             ("ip.proxyUser", ProxyUser), ("ip.proxyPass", _unreadablePass ?? SecretProtector.Protect(ProxyPass)),
             ("ip.provider", SelectedProviderIndex.ToString()));
@@ -249,7 +250,7 @@ public partial class IpInfoViewModel : ObservableObject
         try
         {
             if (string.IsNullOrWhiteSpace(SubnetInput)) return;
-            if (SubnetInput.Length <= 256) ProfileService.Instance.SetSetting(KSubnet, SubnetInput.Trim());
+            if (SubnetInput.Length <= 256) Store.Profile.SetSetting(KSubnet, SubnetInput.Trim());
             SubnetOutput = SubnetCalc.Describe(SubnetInput);
         }
         catch (Exception ex) { SubnetOutput = "Error: " + ex.Message; }
@@ -285,7 +286,7 @@ public partial class IpInfoViewModel : ObservableObject
     private async Task LookupIp()
     {
         if (IsWorking) return;
-        HistoryService.Instance.Add("ip.target", TargetIp);
+        Store.History.Add("ip.target", TargetIp);
         SaveMyIpLast(string.IsNullOrWhiteSpace(TargetIp));
         await FetchIpInfo(TargetIp);
     }
@@ -385,7 +386,7 @@ public partial class IpInfoViewModel : ObservableObject
             using var client = HttpHelper.Create(proxy, ProxyUser, ProxyPass, timeout: TimeSpan.FromSeconds(10), serviceDns: true);
             // Every provider answers with a few hundred bytes of JSON; don't let a hostile proxy stream more.
             client.MaxResponseContentBufferSize = 256 * 1024;
-            if (proxy != null) HistoryService.Instance.Add("ip.proxy", proxy);   // only once it parsed
+            if (proxy != null) Store.History.Add("ip.proxy", proxy);   // only once it parsed
             // Every request goes to the proxy: when it can't be reached, no provider can, so that is said at once
             // instead of after every provider failed in turn.
             if (proxy != null && await ProxyUnreachableAsync(proxy) is { } why)

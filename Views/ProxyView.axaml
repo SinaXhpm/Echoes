@@ -11,6 +11,9 @@
         <!-- stroked glyphs, 24x24 box (same convention as Assets/ToolIcons.axaml) -->
         <StreamGeometry x:Key="PxIcoCopy">M10 8 H18 A2 2 0 0 1 20 10 V18 A2 2 0 0 1 18 20 H10 A2 2 0 0 1 8 18 V10 A2 2 0 0 1 10 8 Z M5 16 A1.5 1.5 0 0 1 4 14.5 V5.5 A1.5 1.5 0 0 1 5.5 4 H14.5 A1.5 1.5 0 0 1 16 5</StreamGeometry>
         <StreamGeometry x:Key="PxIcoFlow">M3 8.5 H17 M14 5.5 L17 8.5 L14 11.5 M21 15.5 H7 M10 12.5 L7 15.5 L10 18.5</StreamGeometry>
+        <!-- the Advanced heading's arrow, 15x15 box (as DoctorView's) -->
+        <StreamGeometry x:Key="PxChevRight">M5 3 L9.5 7.5 L5 12</StreamGeometry>
+        <StreamGeometry x:Key="PxChevDown">M3 5 L7.5 9.5 L12 5</StreamGeometry>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -55,7 +58,8 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
-        <!-- ===== server settings: [listen on][port][max connections] on one line, stacked on a phone ===== -->
+        <!-- ===== server settings: [listen on][port][max connections] on one line and [outgoing interface][IP version]
+             under it, the same two columns; stacked on a phone ===== -->
         <Style Selector="Grid#PxFields.wide > StackPanel#PxBind">
             <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
         </Style>
@@ -70,20 +74,45 @@
             <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
             <Setter Property="Margin" Value="0,12,0,0"/>
         </Style>
+        <Style Selector="Grid#PxFields > StackPanel#PxOut, Grid#PxFields > StackPanel#PxIpVersion">
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#PxFields.wide > StackPanel#PxOut">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        </Style>
+        <Style Selector="Grid#PxFields.narrow > StackPanel#PxOut">
+            <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#PxFields.wide > StackPanel#PxIpVersion">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+        </Style>
+        <Style Selector="Grid#PxFields.narrow > StackPanel#PxIpVersion">
+            <Setter Property="Grid.Row" Value="3"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
         <Style Selector="Grid#PxAction.wide > Button#PxToggle">
             <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
         </Style>
         <Style Selector="Grid#PxAction.narrow > Button#PxToggle">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
         </Style>
         <Style Selector="Grid#PxAction.wide > TextBlock#PxStatus">
             <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
-            <Setter Property="Margin" Value="16,0,0,0"/>
+            <Setter Property="Margin" Value="16,0,12,0"/>
         </Style>
         <Style Selector="Grid#PxAction.narrow > TextBlock#PxStatus">
-            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
             <Setter Property="Margin" Value="2,10,0,0"/>
+        </Style>
+        <!-- the Advanced heading: at the row's right end; under the status on a phone -->
+        <Style Selector="Grid#PxAction.wide > Button#PxAdvToggle">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+        <Style Selector="Grid#PxAction.narrow > Button#PxAdvToggle">
+            <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
         </Style>
         <Style Selector="TextBlock#PxStatus">
             <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
@@ -105,7 +134,88 @@
             <Setter Property="Margin" Value="0,8,0,0"/>
         </Style>
 
-        <!-- ===== live stats: three metric tiles; 2 + 1 compact rows (traffic full width) below 640px ===== -->
+        <!-- ===== Advanced: a heading that opens the rest of the server's options ===== -->
+        <Style Selector="Button#PxAdvToggle">
+            <Setter Property="Padding" Value="8,0,10,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.count">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="MinWidth" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Padding" Value="4,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.count > TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Path.chev">
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="Data" Value="{StaticResource PxChevRight}"/>
+        </Style>
+        <Style Selector="Path.chev.open"><Setter Property="Data" Value="{StaticResource PxChevDown}"/></Style>
+        <!-- the four numbers: one line when wide, two by two on a phone -->
+        <Style Selector="Grid#PxNumbers.wide > StackPanel#PxNum2"><Setter Property="Grid.Column" Value="1"/></Style>
+        <Style Selector="Grid#PxNumbers.wide > StackPanel#PxNum3"><Setter Property="Grid.Column" Value="2"/></Style>
+        <Style Selector="Grid#PxNumbers.wide > StackPanel#PxNum4"><Setter Property="Grid.Column" Value="3"/></Style>
+        <Style Selector="Grid#PxNumbers.narrow > StackPanel">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#PxNumbers.narrow > StackPanel#PxNum2"><Setter Property="Grid.Column" Value="2"/></Style>
+        <Style Selector="Grid#PxNumbers.narrow > StackPanel#PxNum3">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#PxNumbers.narrow > StackPanel#PxNum4">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <!-- the rules: [allowed clients][allowed ports] and the blocked hosts under them; one under the other on a phone -->
+        <Style Selector="Grid#PxRules.wide > StackPanel#PxRulePorts"><Setter Property="Grid.Column" Value="1"/></Style>
+        <Style Selector="Grid#PxRules.wide > StackPanel#PxRuleBlock">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#PxRules.narrow > StackPanel">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#PxRules.narrow > StackPanel#PxRulePorts">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#PxRules.narrow > StackPanel#PxRuleBlock">
+            <Setter Property="Grid.Row" Value="2"/><Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <!-- the upstream proxy: [address][user][password] on one line when wide; the address, then user and password in halves -->
+        <Style Selector="Grid#PxUpGrid.wide > StackPanel#PxUpUser"><Setter Property="Grid.Column" Value="1"/></Style>
+        <Style Selector="Grid#PxUpGrid.wide > StackPanel#PxUpPass"><Setter Property="Grid.Column" Value="2"/></Style>
+        <Style Selector="Grid#PxUpGrid.wide > CheckBox#PxUpDns">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.ColumnSpan" Value="3"/><Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#PxUpGrid.narrow > StackPanel#PxUpAddr"><Setter Property="Grid.ColumnSpan" Value="3"/></Style>
+        <Style Selector="Grid#PxUpGrid.narrow > StackPanel#PxUpUser">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#PxUpGrid.narrow > StackPanel#PxUpPass">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#PxUpGrid.narrow > CheckBox#PxUpDns">
+            <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.ColumnSpan" Value="3"/><Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#PxRules TextBox">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+        </Style>
+
+        <!-- ===== live stats: four metric tiles on one line; two by two below 640px ===== -->
         <Style Selector="Border.card.tile">
             <Setter Property="Padding" Value="14,12"/>
         </Style>
@@ -125,6 +235,29 @@
             <Setter Property="Margin" Value="0,4,0,0"/>
             <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
         </Style>
+        <!-- the two traffic tiles: the total since Start, and the rate right now beside it (label over value on a phone too) -->
+        <Style Selector="Grid.tileFlow">
+            <Setter Property="Margin" Value="0,4,0,0"/>
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid.tileFlow > TextBlock.total">
+            <Setter Property="FontSize" Value="17"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Grid.tileFlow > TextBlock.rate">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+            <Setter Property="Margin" Value="8,0,0,2"/>
+        </Style>
+        <Style Selector="Grid#PxStats.narrow Grid.tileFlow > TextBlock.total">
+            <Setter Property="FontSize" Value="{StaticResource Font.Title}"/>
+        </Style>
+        <Style Selector="Grid#PxStats.narrow Grid.tileFlow > TextBlock.rate">
+            <Setter Property="Margin" Value="6,0,0,1"/>
+        </Style>
         <Style Selector="Grid#PxStats.narrow > Border.tile">
             <Setter Property="Padding" Value="12,10"/>
         </Style>
@@ -138,17 +271,18 @@
             <Setter Property="Margin" Value="8,0,0,0"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <Style Selector="Grid#PxStats > Border">
+        <Style Selector="Grid#PxStats > Border#PxStat2"><Setter Property="Grid.Column" Value="1"/></Style>
+        <Style Selector="Grid#PxStats > Border#PxStat3"><Setter Property="Grid.Column" Value="2"/></Style>
+        <Style Selector="Grid#PxStats > Border#PxStat4"><Setter Property="Grid.Column" Value="3"/></Style>
+        <Style Selector="Grid#PxStats.narrow > Border">
             <Setter Property="Grid.ColumnSpan" Value="2"/>
         </Style>
-        <Style Selector="Grid#PxStats.narrow > Border">
-            <Setter Property="Grid.ColumnSpan" Value="3"/>
-        </Style>
-        <Style Selector="Grid#PxStats > Border#PxStat2"><Setter Property="Grid.Column" Value="2"/></Style>
-        <Style Selector="Grid#PxStats > Border#PxStat3"><Setter Property="Grid.Column" Value="4"/></Style>
-        <Style Selector="Grid#PxStats.narrow > Border#PxStat2"><Setter Property="Grid.Column" Value="3"/></Style>
+        <Style Selector="Grid#PxStats.narrow > Border#PxStat2"><Setter Property="Grid.Column" Value="2"/></Style>
         <Style Selector="Grid#PxStats.narrow > Border#PxStat3">
-            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="6"/><Setter Property="Margin" Value="0,12,0,0"/>
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#PxStats.narrow > Border#PxStat4">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Margin" Value="0,12,0,0"/>
         </Style>
 
         <!-- ===== proxy address tiles ===== -->
@@ -268,12 +402,30 @@
             <Setter Property="Margin" Value="14,0,0,0"/>
         </Style>
         <Style Selector="Grid#PcAction.narrow > TextBlock#PcSummary">
-            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
             <Setter Property="Margin" Value="2,8,0,0"/>
         </Style>
         <Style Selector="Grid#PcAction.narrow > Button#PcToggle">
-            <Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Grid.ColumnSpan" Value="3"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <!-- the check's two options: right of the summary when wide, a line of their own under the button on a phone -->
+        <Style Selector="Grid#PcAction.wide > StackPanel#PcOptions">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#PcAction.narrow > StackPanel#PcOptions">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="StackPanel#PcOptions TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="StackPanel#PcOptions NumericUpDown">
+            <Setter Property="Width" Value="58"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
         </Style>
         <Style Selector="TextBlock#PcSummary">
             <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
@@ -282,15 +434,15 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <!-- results head: title + counts | sort, copy, export (one line; the tools take a second line on a phone) -->
-        <Style Selector="Grid#PcHead.wide > StackPanel#PcTools">
+        <Style Selector="Grid#PcHead.wide > WrapPanel#PcTools">
             <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/>
         </Style>
-        <Style Selector="Grid#PcHead.narrow > StackPanel#PcTools">
+        <Style Selector="Grid#PcHead.narrow > WrapPanel#PcTools">
             <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
             <Setter Property="Margin" Value="0,8,0,0"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
         </Style>
-        <Style Selector="StackPanel#PcTools > Button.ghost">
+        <Style Selector="WrapPanel#PcTools > Button.ghost">
             <Setter Property="Padding" Value="10,0"/>
         </Style>
         <!-- result columns (header + rows) -->
@@ -303,6 +455,35 @@
         <Style Selector="Grid#PcResults :is(Control).pTtfb"><Setter Property="Grid.Column" Value="4"/><Setter Property="Width" Value="66"/></Style>
         <Style Selector="Grid#PcResults :is(Control).pExit"><Setter Property="Grid.Column" Value="5"/><Setter Property="Width" Value="108"/></Style>
         <Style Selector="Grid#PcResults :is(Control).pCc"><Setter Property="Grid.Column" Value="6"/><Setter Property="Width" Value="40"/></Style>
+        <Style Selector="Grid#PcResults :is(Control).pResp"><Setter Property="Grid.Column" Value="7"/><Setter Property="Width" Value="28"/></Style>
+        <!-- the row's answer: a small page glyph that opens the response viewer -->
+        <Style Selector="Button.respBtn">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.respBtn Path">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="StrokeThickness" Value="1.4"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Button.respBtn:pointerover Path">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
         <Style Selector="Grid#PcResults TextBlock.num">
             <Setter Property="TextAlignment" Value="Right"/>
             <Setter Property="Padding" Value="0,0,10,0"/>
@@ -362,7 +543,7 @@
                     <!-- Listen settings are read only at START, so they lock while it runs: editing them
                          live would show a bind/port/auth the running server doesn't have. -->
                     <Grid x:Name="PxFields" helpers:Responsive.BreakWidth="600"
-                          ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="12">
+                          ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto, Auto, Auto" ColumnSpacing="12">
                         <StackPanel x:Name="PxBind">
                             <TextBlock Classes="fieldLabel" Text="Listen on"/>
                             <ComboBox Classes="field" ItemsSource="{Binding BindOptions}" SelectedItem="{Binding SelectedBind}"
@@ -387,6 +568,29 @@
                                                ToolTip.Tip="Maximum simultaneous connections"/>
                             </StackPanel>
                         </Grid>
+                        <!-- where the proxy's own connections go out: clients come in on one network and leave through this
+                             interface. Taken at START; the list is read again whenever it opens. -->
+                        <StackPanel x:Name="PxOut">
+                            <TextBlock Classes="fieldLabel" Text="Outgoing interface"/>
+                            <ComboBox x:Name="OutIfaceBox" Classes="field" HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding OutIface.Options}" SelectedItem="{Binding OutIface.Selected}"
+                                      IsEnabled="{Binding !IsRunning}" DropDownOpened="OutIfaceBox_DropDownOpened"
+                                      AutomationProperties.Name="Outgoing interface"
+                                      ToolTip.Tip="The network interface the proxy's connections to sites leave from (Wi-Fi, Ethernet, a VPN): clients can come in on one network and go out through another. Default route: the system chooses. While the chosen interface is down nothing is connected">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:IfaceOption">
+                                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Tip}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel x:Name="PxIpVersion">
+                            <TextBlock Classes="fieldLabel" Text="IP version"/>
+                            <ComboBox Classes="field" HorizontalAlignment="Stretch" ItemsSource="{Binding IpVersionOptions}"
+                                      SelectedIndex="{Binding IpVersionIndex}" IsEnabled="{Binding !IsRunning}"
+                                      AutomationProperties.Name="IP version"
+                                      ToolTip.Tip="Which kind of address the proxy connects to. Auto: whatever a site has, in the system's order"/>
+                        </StackPanel>
                     </Grid>
 
                     <!-- optional credentials: SOCKS5 user/pass + HTTP Basic; [require password][username][password] on one line when wide -->
@@ -411,7 +615,7 @@
 
                     <Border Classes="divider"/>
 
-                    <Grid x:Name="PxAction" helpers:Responsive.BreakWidth="480" ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
+                    <Grid x:Name="PxAction" helpers:Responsive.BreakWidth="520" ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto, Auto, Auto">
                         <Button x:Name="PxToggle" Classes="toggle" MinWidth="148"
                                 Command="{Binding ToggleServerCommand}" Classes.active="{Binding IsRunning}">
                             <Panel>
@@ -420,13 +624,119 @@
                             </Panel>
                         </Button>
                         <TextBlock x:Name="PxStatus" Text="{Binding StatusMessage}"/>
+                        <!-- Advanced: closed until asked for, and opening under this row, so Start stays where it is. The
+                             number beside it counts what is set away from its default (the tooltip names them). -->
+                        <Button x:Name="PxAdvToggle" Classes="ghost" Command="{Binding ToggleAdvancedCommand}"
+                                ToolTip.Tip="{Binding AdvancedTip}" AutomationProperties.Name="Advanced options">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Path Classes="chev" Classes.open="{Binding ShowAdvanced}"/>
+                                <TextBlock Text="Advanced" VerticalAlignment="Center"/>
+                                <Border Classes="count" IsVisible="{Binding HasAdvancedChanges}">
+                                    <TextBlock Text="{Binding AdvancedCount}"/>
+                                </Border>
+                            </StackPanel>
+                        </Button>
                     </Grid>
+
+                    <!-- read at START like the settings above, so locked while the proxy runs -->
+                    <StackPanel x:Name="PxAdvanced" Spacing="12" IsVisible="{Binding ShowAdvanced}" IsEnabled="{Binding !IsRunning}">
+                        <Border Classes="divider"/>
+                        <StackPanel>
+                            <TextBlock Classes="fieldLabel" Text="Protocols"/>
+                            <WrapPanel ItemSpacing="20" LineSpacing="6" Margin="2,0,0,0">
+                                <CheckBox IsChecked="{Binding Socks5}" Content="SOCKS5"/>
+                                <CheckBox IsChecked="{Binding Socks4}" Content="SOCKS4 / 4a"
+                                          ToolTip.Tip="For older programs. SOCKS4 has no password login: it is refused while a password is required"/>
+                                <CheckBox IsChecked="{Binding Http}" Content="HTTP"
+                                          ToolTip.Tip="HTTP proxying: CONNECT tunnels for https:// and forwarding for http://"/>
+                                <CheckBox IsChecked="{Binding Udp}" IsEnabled="{Binding Socks5}" Content="UDP (SOCKS5)"
+                                          ToolTip.Tip="Relay UDP for SOCKS5 clients (UDP ASSOCIATE): DNS, QUIC, games and calls. Only the client's own address may use its relay port, and only hosts it has sent to may answer. Through an upstream proxy only if it is SOCKS5"/>
+                            </WrapPanel>
+                        </StackPanel>
+
+                        <Grid x:Name="PxNumbers" helpers:Responsive.BreakWidth="520" ColumnDefinitions="*, *, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="12">
+                            <StackPanel x:Name="PxNum1">
+                                <TextBlock Classes="fieldLabel" Text="Connect timeout (s)"/>
+                                <NumericUpDown Classes="field" Value="{Binding ConnectTimeout}" Minimum="1" Maximum="120" ShowButtonSpinner="False"
+                                               ToolTip.Tip="How long the proxy waits for a site to take the connection, in seconds"/>
+                            </StackPanel>
+                            <StackPanel x:Name="PxNum2">
+                                <TextBlock Classes="fieldLabel" Text="Idle timeout (s)"/>
+                                <NumericUpDown Classes="field" Value="{Binding IdleTimeout}" Minimum="10" Maximum="86400" ShowButtonSpinner="False"
+                                               ToolTip.Tip="A connection with no traffic for this many seconds is closed"/>
+                            </StackPanel>
+                            <StackPanel x:Name="PxNum3">
+                                <TextBlock Classes="fieldLabel" Text="Per client"/>
+                                <NumericUpDown Classes="field" Value="{Binding MaxPerClient}" Minimum="1" Maximum="512" ShowButtonSpinner="False"
+                                               PlaceholderText="Auto"
+                                               ToolTip.Tip="The most connections one other device may hold at once. Empty: half of Max connections, at least 8. This device's own programs aren't counted"/>
+                            </StackPanel>
+                            <StackPanel x:Name="PxNum4">
+                                <TextBlock Classes="fieldLabel" Text="Speed limit (KB/s)"/>
+                                <NumericUpDown Classes="field" Value="{Binding SpeedLimit}" Minimum="1" Maximum="1000000" ShowButtonSpinner="False"
+                                               PlaceholderText="No limit"
+                                               ToolTip.Tip="A limit for all connections together, in KB/s, for download and for upload. Empty: no limit"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid x:Name="PxRules" helpers:Responsive.BreakWidth="520" ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="12">
+                            <StackPanel x:Name="PxRuleClients">
+                                <TextBlock Classes="fieldLabel" Text="Allowed clients"/>
+                                <TextBox x:Name="PxAllowBox" Classes="field" Text="{Binding AllowedClients}" MaxLength="60000"
+                                         PlaceholderText="Everyone (or 192.168.1.0/24, 192.168.1.20-40)"
+                                         helpers:InputAssist.PhonePlaceholder="Everyone (or 192.168.1.0/24)"
+                                         ToolTip.Tip="Only these devices may use the proxy: addresses, subnets (192.168.1.0/24), ranges (192.168.1.20-40) or 192.168.1.*, separated by commas or spaces. Empty: everyone who can reach the port. This device itself always may"/>
+                            </StackPanel>
+                            <StackPanel x:Name="PxRulePorts">
+                                <TextBlock Classes="fieldLabel" Text="Allowed ports"/>
+                                <TextBox x:Name="PxPortsBox" Classes="field" Text="{Binding AllowedPorts}" MaxLength="60000"
+                                         PlaceholderText="Every port (or 80, 443, 8000-8100)"
+                                         helpers:InputAssist.PhonePlaceholder="Every port (or 80, 443)"
+                                         ToolTip.Tip="Only these ports of a site may be reached, by TCP and by UDP: 80, 443, 8000-8100. Empty: every port"/>
+                            </StackPanel>
+                            <StackPanel x:Name="PxRuleBlock">
+                                <TextBlock Classes="fieldLabel" Text="Blocked hosts"/>
+                                <TextBox Classes="field multiline" Text="{Binding BlockedHosts}" MaxLength="60000" Height="52"
+                                         AcceptsReturn="True" TextWrapping="Wrap" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         PlaceholderText="None (or example.com, *.ads.example.net, 203.0.113.0/24)"
+                                         ToolTip.Tip="Sites the proxy refuses: example.com (and everything under it), *.example.com (only what is under it), wildcards such as ads*.example.net, and addresses or subnets. Separated by commas, spaces or new lines"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- the upstream (parent) proxy: everything goes on through it instead of straight to the sites -->
+                        <StackPanel x:Name="PxUpstream" Spacing="8">
+                            <CheckBox IsChecked="{Binding UseUpstream}" Content="Send through an upstream proxy"
+                                      ToolTip.Tip="Every connection goes on through another proxy (SOCKS5, SOCKS4a, HTTP or HTTPS) instead of straight to the site: a proxy program on this device (v2rayN, Clash, Tor), a company proxy, a server elsewhere. While it is on, nothing goes to a site directly. UDP goes through it too if it is a SOCKS5 proxy; SOCKS4a and HTTP carry none"/>
+                            <Grid x:Name="PxUpGrid" helpers:Responsive.BreakWidth="520" IsVisible="{Binding UseUpstream}"
+                                  ColumnDefinitions="2*, *, *" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="12">
+                                <StackPanel x:Name="PxUpAddr">
+                                    <TextBlock Classes="fieldLabel" Text="Upstream address"/>
+                                    <TextBox Classes="field" Text="{Binding UpstreamAddress}" FontFamily="{StaticResource MonoFont}"
+                                             TextInputOptions.ContentType="Url" AutomationProperties.Name="Upstream proxy address"
+                                             PlaceholderText="socks5://127.0.0.1:10808"
+                                             ToolTip.Tip="host:port (SOCKS5 on ports 1080, 1081 and 9050, HTTP on the others), or with its kind: socks5://, socks4a://, http://, or https:// for an HTTP proxy reached over TLS (its certificate must be valid). A login typed as user:pass@host:port moves to the two fields"/>
+                                </StackPanel>
+                                <StackPanel x:Name="PxUpUser">
+                                    <TextBlock Classes="fieldLabel" Text="User"/>
+                                    <TextBox Classes="field" Text="{Binding UpstreamUser}" PlaceholderText="Optional"
+                                             AutomationProperties.Name="Upstream proxy user"/>
+                                </StackPanel>
+                                <StackPanel x:Name="PxUpPass">
+                                    <TextBlock Classes="fieldLabel" Text="Password"/>
+                                    <TextBox Classes="field" Text="{Binding UpstreamPass}" PlaceholderText="Optional" IsUndoEnabled="False" PasswordChar="●"
+                                             AutomationProperties.Name="Upstream proxy password"/>
+                                </StackPanel>
+                                <CheckBox x:Name="PxUpDns" IsChecked="{Binding UpstreamResolve}" Content="Let the upstream look up site names"
+                                          ToolTip.Tip="Site names go to the upstream proxy as names, so they don't show in this device's DNS lookups. They are still looked up here where the proxy must know where they lead: with an IP version or blocked addresses set, and for clients on other devices while the upstream is on this device or your own network"/>
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
             <!-- ===== LIVE STATS (while running) ===== -->
             <Grid x:Name="PxStats" Grid.Row="1" helpers:Responsive.BreakWidth="640" IsVisible="{Binding IsRunning}"
-                  ColumnDefinitions="*,*,*,*,*,*" RowDefinitions="Auto, Auto" ColumnSpacing="12">
+                  ColumnDefinitions="*,*,*,*" RowDefinitions="Auto, Auto" ColumnSpacing="12">
                 <Border x:Name="PxStat1" Classes="card tile">
                     <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
                         <TextBlock Classes="tileLabel" Text="Active"/>
@@ -439,10 +749,22 @@
                         <TextBlock Classes="tileValue" Text="{Binding TotalConnections}"/>
                     </Grid>
                 </Border>
-                <Border x:Name="PxStat3" Classes="card tile">
+                <Border x:Name="PxStat3" Classes="card tile" ToolTip.Tip="Sent on for the clients since Start, and the rate right now">
                     <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
-                        <TextBlock Classes="tileLabel" Text="Traffic"/>
-                        <TextBlock Classes="tileValue" Text="{Binding TrafficText}"/>
+                        <TextBlock Classes="tileLabel" Text="Upload"/>
+                        <Grid Classes="tileFlow" ColumnDefinitions="Auto, *">
+                            <TextBlock Classes="total" Text="{Binding UploadText}"/>
+                            <TextBlock Grid.Column="1" Classes="rate" Text="{Binding UploadRate}"/>
+                        </Grid>
+                    </Grid>
+                </Border>
+                <Border x:Name="PxStat4" Classes="card tile" ToolTip.Tip="Brought back to the clients since Start, and the rate right now">
+                    <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto">
+                        <TextBlock Classes="tileLabel" Text="Download"/>
+                        <Grid Classes="tileFlow" ColumnDefinitions="Auto, *">
+                            <TextBlock Classes="total" Text="{Binding DownloadText}"/>
+                            <TextBlock Grid.Column="1" Classes="rate" Text="{Binding DownloadRate}"/>
+                        </Grid>
                     </Grid>
                 </Border>
             </Grid>
@@ -453,8 +775,8 @@
                     <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12">
                         <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
                             <TextBlock Classes="sectionTitle" Text="Proxy address"/>
-                            <TextBlock Classes="hint" Text="Use as a SOCKS5 or HTTP proxy."
-                                       ToolTip.Tip="SOCKS5 and HTTP share the same host:port. In a browser or curl, set the proxy to this address (plus the username and password if a password is required)."/>
+                            <TextBlock Classes="hint" Text="Use as a SOCKS or HTTP proxy."
+                                       ToolTip.Tip="SOCKS5, SOCKS4 and HTTP share the same host:port (whichever are switched on). In a browser or curl, set the proxy to this address (plus the username and password if a password is required)."/>
                         </StackPanel>
                         <Button Grid.Column="1" Classes="ghost" Command="{Binding RefreshAddressesCommand}" Content="Refresh" VerticalAlignment="Top"/>
                     </Grid>
@@ -515,7 +837,7 @@
                                   ItemsSource="{Binding Connections}" IsVisible="{Binding HasConnections}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="helpers:ProxyLogEntry">
-                                <Border Classes="zebra" ToolTip.Tip="{Binding Client, StringFormat='client {0}'}">
+                                <Border Classes="zebra" ToolTip.Tip="{Binding Tip}">
                                     <Grid ColumnDefinitions="Auto, Auto, *, Auto, Auto" RowDefinitions="Auto, Auto" VerticalAlignment="Center">
                                         <TextBlock Classes="cell time" Foreground="{DynamicResource Text.Muted}" Text="{Binding Time}"/>
                                         <TextBlock Classes="cell proto" Foreground="{DynamicResource Info}" Text="{Binding Proto}"/>
@@ -559,13 +881,25 @@
                              AcceptsReturn="True" TextWrapping="NoWrap" IsReadOnly="{Binding IsChecking}" MaxLength="200000"
                              ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
                              PlaceholderText="203.0.113.7:8080&#10;socks5://user:pass@proxy.example.net:1080&#10;198.51.100.4:3128:user:pass"
+                             helpers:InputAssist.PhonePlaceholder="203.0.113.7:8080&#10;socks5://user:pass@host:1080&#10;198.51.100.4:3128:user:pass"
                              ToolTip.Tip="host:port · scheme://user:pass@host:port · host:port:user:pass — one per line or mixed in any text"/>
-                    <Grid x:Name="PcAction" helpers:Responsive.BreakWidth="480" ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
+                    <Grid x:Name="PcAction" helpers:Responsive.BreakWidth="600" ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto, Auto, Auto">
                         <Button x:Name="PcToggle" Classes="toggle" MinWidth="148" Classes.active="{Binding IsChecking}"
                                 Command="{Binding ToggleCheckCommand}">
                             <TextBlock Text="{Binding CheckButtonText}" HorizontalAlignment="Center"/>
                         </Button>
                         <TextBlock x:Name="PcSummary" Text="{Binding CheckSummary}"/>
+                        <!-- read when a check starts, so locked while one runs -->
+                        <StackPanel x:Name="PcOptions" Orientation="Horizontal" Spacing="8" IsEnabled="{Binding !IsChecking}">
+                            <TextBlock Text="Timeout (s)"/>
+                            <NumericUpDown Classes="field" Value="{Binding CheckTimeout}" Minimum="2" Maximum="60" ShowButtonSpinner="False"
+                                           AutomationProperties.Name="Timeout in seconds"
+                                           ToolTip.Tip="How long a proxy gets to take the connection, in seconds (a request through it gets twice as long)"/>
+                            <TextBlock Text="At once" Margin="6,0,0,0"/>
+                            <NumericUpDown Classes="field" Value="{Binding CheckParallel}" Minimum="1" Maximum="64" ShowButtonSpinner="False"
+                                           AutomationProperties.Name="Proxies checked at once"
+                                           ToolTip.Tip="How many proxies are checked at the same time"/>
+                        </StackPanel>
                     </Grid>
                 </StackPanel>
             </Border>
@@ -586,7 +920,8 @@
                                 <TextBlock Text="{Binding LeftCount, StringFormat='{}{0} left'}"/>
                             </Border>
                         </WrapPanel>
-                        <StackPanel x:Name="PcTools" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                        <!-- wraps onto a second line on a small phone instead of running past the edge -->
+                        <WrapPanel x:Name="PcTools" ItemSpacing="4" LineSpacing="4" VerticalAlignment="Center">
                             <ComboBox Classes="field" ItemsSource="{Binding SortOptions}" SelectedIndex="{Binding SortIndex}" Width="124"
                                       ToolTip.Tip="Sort the results" AutomationProperties.Name="Sort by"/>
                             <Button Classes="ghost" Content="Copy working" Command="{Binding CopyWorkingCommand}" IsEnabled="{Binding HasCheckRows}"
@@ -599,11 +934,11 @@
                                     </MenuFlyout>
                                 </Button.Flyout>
                             </Button>
-                        </StackPanel>
+                        </WrapPanel>
                     </Grid>
 
                     <Panel Grid.Row="1" Classes="pcHeads">
-                        <Grid ColumnDefinitions="*, Auto, Auto, Auto, Auto, Auto, Auto" Margin="8,0,8,6" IsVisible="{Binding HasCheckRows}">
+                        <Grid ColumnDefinitions="*, Auto, Auto, Auto, Auto, Auto, Auto, Auto" Margin="8,0,8,6" IsVisible="{Binding HasCheckRows}">
                             <TextBlock Classes="colhead pProxy" Text="Proxy"/>
                             <TextBlock Classes="colhead pType" Text="Type"/>
                             <TextBlock Classes="colhead pStatus" Text="Status"/>
@@ -611,6 +946,7 @@
                             <TextBlock Classes="colhead pTtfb num" Text="1st byte" ToolTip.Tip="Time to the first byte of a request through the proxy"/>
                             <TextBlock Classes="colhead pExit" Text="Exit IP"/>
                             <TextBlock Classes="colhead pCc" Text="Where"/>
+                            <Panel Classes="pResp"/>
                         </Grid>
                     </Panel>
 
@@ -630,7 +966,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ProxyCheckRow">
                                 <Border Classes="zebra" ToolTip.Tip="{Binding Tip}">
-                                    <Grid ColumnDefinitions="*, Auto, Auto, Auto, Auto, Auto, Auto" RowDefinitions="Auto, Auto" VerticalAlignment="Center">
+                                    <Grid ColumnDefinitions="*, Auto, Auto, Auto, Auto, Auto, Auto, Auto" RowDefinitions="Auto, Auto" VerticalAlignment="Center">
                                         <TextBlock Classes="cell pProxy" Foreground="{DynamicResource Text.Primary}" Text="{Binding Display}"/>
                                         <TextBlock Classes="cell pType wideCell" Foreground="{DynamicResource Info}" Text="{Binding Protocol}"/>
                                         <TextBlock Classes="st pStatus" Classes.busy="{Binding IsBusy}" Classes.ok="{Binding IsOk}"
@@ -643,8 +979,16 @@
                                                    Source="{Binding Country, Converter={x:Static helpers:CountryFlagConverter.Instance}}"/>
                                             <TextBlock Classes="cell" Foreground="{DynamicResource Text.Secondary}" Text="{Binding Country}"/>
                                         </StackPanel>
+                                        <!-- the answer the request through it got, in the shared response viewer -->
+                                        <Panel Classes="pResp">
+                                            <Button x:Name="RespBtn" Classes="respBtn" IsVisible="{Binding HasResponse}" Click="OnShowCheckResponse"
+                                                    ToolTip.Tip="Show the answer the request through it got (status, headers, body)"
+                                                    AutomationProperties.Name="Show the answer">
+                                                <Path Data="M4.5 2.5 H9.5 L12.5 5.5 V13.5 H4.5 Z M9.5 2.5 V5.5 H12.5 M6.5 8.5 H10.5 M6.5 11 H10.5"/>
+                                            </Button>
+                                        </Panel>
                                         <!-- phone: the details on a second line -->
-                                        <Grid Grid.Row="1" Grid.ColumnSpan="7" Classes="narrowLine" ColumnDefinitions="Auto, *" Margin="0,3,0,0">
+                                        <Grid Grid.Row="1" Grid.ColumnSpan="8" Classes="narrowLine" ColumnDefinitions="Auto, *" Margin="0,3,0,0">
                                             <Image Width="16" Height="12" VerticalAlignment="Center" Margin="0,0,6,0"
                                                    IsVisible="{Binding Country, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                                    Source="{Binding Country, Converter={x:Static helpers:CountryFlagConverter.Instance}}"/>

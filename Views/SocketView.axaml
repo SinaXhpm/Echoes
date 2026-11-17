@@ -467,6 +467,11 @@
         <Style Selector="TabControl.inmode > TabItem /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Padding" Value="10,0"/>
         </Style>
+        <!-- Outside WebSocket mode the JSON segment is hidden, and Hex is the last piece of the track: it takes the
+             rounded end (the shared style rounds the last child, which is the hidden one, so the track ended square). -->
+        <Style Selector="TabControl.inmode:not(.json) > TabItem:nth-child(2) /template/ Border#PART_LayoutRoot">
+            <Setter Property="CornerRadius" Value="0,7,7,0"/>
+        </Style>
         <Style Selector="TextBlock.inputError">
             <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
             <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
@@ -695,6 +700,9 @@
                                                             Command="{Binding $parent[ItemsControl].((vm:SocketViewModel)DataContext).ConnectAnywayCommand}"
                                                             CommandParameter="{Binding}"
                                                             ToolTip.Tip="Connect again, trusting exactly this certificate — for this connection only"/>
+                                                    <Button x:Name="ShowAnswerBtn" Classes="secondary" Content="Show the answer" HorizontalAlignment="Left"
+                                                            IsVisible="{Binding HasResponse}" Click="OnShowResponse"
+                                                            ToolTip.Tip="What the server sent back instead of switching to WebSocket: its status, headers and body"/>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
@@ -774,7 +782,7 @@
                                 </Grid>
                             </Panel>
 
-                            <TabControl x:Name="SkInMode" Classes="seg inmode" Padding="0" SelectedIndex="{Binding InputModeIndex}"
+                            <TabControl x:Name="SkInMode" Classes="seg inmode" Classes.json="{Binding IsWsMode}" Padding="0" SelectedIndex="{Binding InputModeIndex}"
                                         ToolTip.Tip="Send text, raw bytes typed as hex (a binary message on a WebSocket), or JSON checked before it goes">
                                 <TabItem Header="Text"/>
                                 <TabItem Header="Hex"/>

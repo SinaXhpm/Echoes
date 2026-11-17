@@ -146,9 +146,11 @@ public static class ServiceScanner
     /// the HTTP request too when nothing else was sent; it is NOT disposed here (the caller abort-closes it).
     /// <paramref name="sniHost"/> is the target's hostname (TLS SNI, HTTP Host) or empty for the IP.
     /// </summary>
+    /// <param name="via">The scan's interface: the extra connections a probe opens leave from it too.</param>
     public static async Task<ServiceInfo> ProbeAsync(IPAddress addr, int port, Socket? reuse, string sniHost,
-                                                     int timeoutMs, CancellationToken ct)
+                                                     int timeoutMs, CancellationToken ct, NetIface? via = null)
     {
+        s_via.Value = via;   // for this probe's own connections (see ConnectAsync); gone again when the probe returns
         var info = new ServiceInfo { Service = NmapData.ServiceName(port) };
         int t = Math.Max(400, timeoutMs);
         string host = string.IsNullOrEmpty(sniHost) ? Literal(addr) : sniHost;
@@ -218,9 +220,16 @@ public static class ServiceScanner
 
     // ---- connection + I/O helpers ----
 
+    // The interface of the probe that is running in this async flow (ProbeAsync sets it). The TLS, RDP, PostgreSQL and
+    // extra probes each open connections of their own through ConnectAsync, several calls down: it travels with the
+    // flow instead of through every signature, and a value set inside a probe never reaches its caller.
+    private static readonly AsyncLocal<NetIface?> s_via = new();
+
     private static async Task<Socket> ConnectAsync(IPAddress addr, int port, int timeoutMs, CancellationToken ct)
     {
         var socket = new Socket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        try { ScanSocket.Tie(socket, s_via.Value); }
+        catch { socket.Dispose(); throw; }
         // Abortive (RST) close on dispose, like the scan's own sockets: a graceful FIN leaves each extra probe
         // connection in TIME_WAIT, and on a big Windows scan those exhaust the ephemeral ports.
         try { socket.LingerState = new LingerOption(true, 0); } catch { }

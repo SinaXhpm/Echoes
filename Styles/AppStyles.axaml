@@ -1,20 +1,23 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
         xmlns:glob="clr-namespace:System.Globalization;assembly=System.Runtime">
 
     <!-- ============================================================
-         Echoes design system — v4, after the modern macOS look: neutral
-         graphite / light-grey surfaces, grouped boxes, a source-list
-         sidebar, white-on-accent buttons, segmented controls with a raised
-         thumb. Colors / radii / type scale live in Styles/Tokens.axaml (all
-         SOLID: no alpha, no blur, no shadows); Fluent's own control brushes
-         are re-pointed there too, so the state colors (hover / focus /
-         pressed / disabled) of inputs, combos, checks and menus come from
-         the tokens automatically.
+         Echoes design system — v5 "cyber", after the Submarine app: flat
+         near-black zinc surfaces with hairline borders, tools as tabs in a
+         top bar, and color used as a tint: a main action is a deep blue
+         fill with a blue border and blue text (STOP the same in red), the
+         chosen segment of a switch likewise. Colors / radii / type scale
+         live in Styles/Tokens.axaml (all SOLID: no alpha, no blur, no
+         shadows); Fluent's own control brushes are re-pointed there too,
+         so the state colors (hover / focus / pressed / disabled) of
+         inputs, combos, checks and menus come from the tokens
+         automatically.
 
          Building blocks used by the views:
-           text     TextBlock.pageTitle / .pageSubtitle / .sectionTitle /
-                    .fieldLabel / .cardHeader / .muted / .mono
+           text     TextBlock.sectionTitle / .fieldLabel / .cardHeader /
+                    .muted / .mono
            inputs   TextBox.field (+ .multiline), AutoCompleteBox.field,
                     ComboBox.field
            buttons  Button.primary / .secondary / .ghost / .danger /
@@ -37,17 +40,6 @@
     </Style>
 
     <!-- ===== typography ===== -->
-    <Style Selector="TextBlock.pageTitle">
-        <Setter Property="FontSize" Value="{StaticResource Font.Page}"/>
-        <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
-        <Setter Property="LetterSpacing" Value="-0.3"/>
-    </Style>
-    <Style Selector="TextBlock.pageSubtitle">
-        <Setter Property="FontSize" Value="11.5"/>
-        <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
-        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-    </Style>
     <Style Selector="TextBlock.sectionTitle">
         <Setter Property="FontSize" Value="{StaticResource Font.Title}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
@@ -125,6 +117,10 @@
     <Style Selector="ComboBox">
         <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
     </Style>
+    <!-- a placeholder longer than its box (a small phone) ends in "…" instead of being cut mid-letter -->
+    <Style Selector="ComboBox /template/ TextBlock#PlaceholderTextBlock">
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    </Style>
     <Style Selector="ComboBox.field">
         <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
         <Setter Property="MinHeight" Value="0"/>
@@ -157,6 +153,11 @@
     <Style Selector="NumericUpDown.field /template/ TextBox">
         <Setter Property="MinHeight" Value="0"/>
         <Setter Property="FontSize" Value="{DynamicResource Font.Input}"/>
+    </Style>
+    <!-- and so does the frame around it: Fluent gives it a 32 px min height, taller than the field, which cut the
+         frame's top and bottom edges off at the field's corners -->
+    <Style Selector="NumericUpDown.field /template/ ButtonSpinner">
+        <Setter Property="MinHeight" Value="0"/>
     </Style>
 
     <!-- dropdown and menu rows: the hover / selection is a rounded pill inset from the popup's edges, with a hairline
@@ -236,6 +237,7 @@
     <Style Selector="Border.badge > TextBlock, Border.badge > StackPanel > TextBlock">
         <Setter Property="FontSize" Value="10.5"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="LetterSpacing" Value="0.3"/>
         <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
     </Style>
     <Style Selector="Border.badge.accent">
@@ -279,46 +281,52 @@
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
 
-    <!-- primary: solid accent -->
+    <!-- primary: tinted with the accent (a deep blue fill, a blue hairline, blue text), as Submarine draws its main
+         actions; the border brightens under the pointer -->
     <Style Selector="Button.primary, Button.toggle">
-        <Setter Property="Background" Value="{DynamicResource Accent}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
-        <Setter Property="Foreground" Value="{DynamicResource Text.OnAccent}"/>
+        <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
     </Style>
     <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.toggle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource Accent.Hover}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Hover}"/>
-        <Setter Property="Foreground" Value="{DynamicResource Text.OnAccent}"/>
+        <Setter Property="Background" Value="{DynamicResource Accent.SoftHover}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent.BorderHover}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
     </Style>
     <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.toggle:pressed /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource Accent.Pressed}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Pressed}"/>
-        <Setter Property="Foreground" Value="{DynamicResource Text.OnAccent}"/>
+        <Setter Property="Background" Value="{DynamicResource Accent.SoftPressed}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
     </Style>
     <Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.toggle:disabled /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource Accent.Disabled}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Accent.Disabled}"/>
-        <Setter Property="Foreground" Value="{DynamicResource Text.OnAccentDisabled}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Text.Disabled}"/>
     </Style>
 
-    <!-- toggle.active = the running state (STOP): solid danger -->
+    <!-- toggle.active = the running state (STOP), and danger: the same tint in red -->
     <Style Selector="Button.toggle.active, Button.danger">
-        <Setter Property="Background" Value="{DynamicResource Danger.Solid}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Danger.Solid}"/>
-        <Setter Property="Foreground" Value="{DynamicResource Text.OnDanger}"/>
+        <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
     </Style>
     <Style Selector="Button.toggle.active /template/ ContentPresenter#PART_ContentPresenter, Button.danger /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Foreground" Value="{DynamicResource Text.OnDanger}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
     </Style>
     <Style Selector="Button.toggle.active:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource Danger.SolidHover}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Danger.SolidHover}"/>
-        <Setter Property="Foreground" Value="{DynamicResource Text.OnDanger}"/>
+        <Setter Property="Background" Value="{DynamicResource Danger.SoftHover}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Danger.BorderHover}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
     </Style>
     <Style Selector="Button.toggle.active:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.danger:pressed /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource Danger.SolidPressed}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource Danger.SolidPressed}"/>
-        <Setter Property="Foreground" Value="{DynamicResource Text.OnDanger}"/>
+        <Setter Property="Background" Value="{DynamicResource Danger.SoftPressed}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Danger}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+    </Style>
+    <Style Selector="Button.toggle.active:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.danger:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Text.Disabled}"/>
     </Style>
 
     <!-- secondary: raised neutral with a visible hairline -->
@@ -551,10 +559,17 @@
         <Setter Property="Foreground" Value="{DynamicResource Seg.TextSelected}"/>
     </Style>
 
-    <!-- ===== shell pieces (desktop sidebar + mobile drawer) ===== -->
-    <Style Selector="TextBlock.navlabel">
-        <Setter Property="VerticalAlignment" Value="Center"/>
+    <!-- ===== the caption buttons Avalonia draws at the end of the desktop top bar (Windows, Linux): size and colors are
+         Fluent's CaptionButton* keys (Styles/Tokens.axaml). Their glyph brightens under the pointer, as About's and the
+         theme switch's beside them do; on the close button's red it turns white. ===== -->
+    <Style Selector="chrome|WindowDrawnDecorations /template/ Button:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
     </Style>
+    <Style Selector="chrome|WindowDrawnDecorations /template/ Button#PART_CloseButton:pointerover, chrome|WindowDrawnDecorations /template/ Button#PART_CloseButton:pressed">
+        <Setter Property="Foreground" Value="White"/>
+    </Style>
+
+    <!-- ===== shell pieces (mobile drawer; the desktop top bar has its own in MainView) ===== -->
     <Style Selector="TextBlock.navgroup">
         <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
@@ -618,7 +633,7 @@
         <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
     </Style>
 
-    <!-- Per-tool nav glyphs (Assets/ToolIcons.axaml), shared by the desktop sidebar and the mobile
+    <!-- Per-tool nav glyphs (Assets/ToolIcons.axaml), shared by the desktop tabs / launcher and the mobile
          drawer. Stroked, not filled: a Path does not inherit Foreground like a TextBlock, so each
          shell overrides Stroke for its states. Drawn in a 24x24 box, hence Stretch=None. -->
     <Style Selector="Path.ico">

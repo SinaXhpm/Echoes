@@ -54,7 +54,8 @@ public static class NicSnapshot
     private const int WanRank = 2;
 
     // 0 = Wi-Fi / Ethernet, 1 = virtual or unknown, 2 = cellular / VPN / tunnel / link-local (last, and never the default).
-    private static int Rank(string name, NetworkInterfaceType type, IPAddress address)
+    // (NetIfaces orders the interface pickers the same way.)
+    internal static int Rank(string name, NetworkInterfaceType type, IPAddress address)
     {
         var b = address.GetAddressBytes();
         if (b[0] == 169 && b[1] == 254) return WanRank;                                // link-local (no DHCP answer)

@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Echoes.Helpers;
 using Echoes.ViewModels;
 using System;
@@ -41,6 +42,13 @@ public partial class SshView : UserControl
         _shown = new Controls.ShownWatch(this);
         _shown.Changed += _ => ReportPanes();
     }
+
+    /// <summary>
+    /// Whether a key pressed on <paramref name="source"/> came from the terminal pane (its output or its command line),
+    /// where the keys a shell uses stay with it. The connection form above and the other panes are ordinary fields: the
+    /// desktop shell's own keys (new tab, close tab, go to a tab) work from them.
+    /// </summary>
+    public bool IsTerminal(Visual source) => ReferenceEquals(source, SshTerm) || SshTerm.IsVisualAncestorOf(source);
 
     // A sub-tab's content is in the visual tree only while it is shown: the Files listing loads on first view, and the
     // Server view polls only while it can be seen (switching tools detaches the whole page on a desktop, hides it on a

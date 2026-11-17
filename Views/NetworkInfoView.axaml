@@ -31,6 +31,23 @@
 			<Setter Property="FontSize" Value="11.5"/>
 			<Setter Property="HorizontalAlignment" Value="Stretch"/>
 		</Style>
+		<!-- the Devices tab's tools: beside the title, at the end of the line; under it on a phone, from its start -->
+		<Style Selector="Grid#DevBar.wide > WrapPanel#DevTools">
+			<Setter Property="Grid.Column" Value="1"/><Setter Property="HorizontalAlignment" Value="Right"/>
+		</Style>
+		<Style Selector="Grid#DevBar.narrow > WrapPanel#DevTools">
+			<Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="HorizontalAlignment" Value="Left"/>
+		</Style>
+		<!-- a label that doesn't fit its cell (a small phone, a large system font) shrinks to fit rather than being cut -->
+		<Style Selector="TabControl#NetTabs.seg.narrow > TabItem">
+			<Setter Property="HeaderTemplate">
+				<DataTemplate>
+					<Viewbox StretchDirection="DownOnly" Stretch="Uniform">
+						<TextBlock Text="{Binding}"/>
+					</Viewbox>
+				</DataTemplate>
+			</Setter>
+		</Style>
 		<!-- five equal cells: the thumb keeps only a small inset around its label -->
 		<Style Selector="TabControl#NetTabs.seg.narrow > TabItem /template/ ContentPresenter#PART_ContentPresenter">
 			<Setter Property="Padding" Value="3,0"/>
@@ -331,6 +348,13 @@
 			<Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
 			<Setter Property="HorizontalAlignment" Value="Center"/>
 		</Style>
+		<!-- Devices: what a search is doing / how it ended -->
+		<Style Selector="TextBlock.devStatus">
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+		</Style>
+		<Style Selector="TextBlock.devStatus.error"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
 		<Style Selector="TextBlock.emptyText">
 			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
 			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
@@ -624,47 +648,83 @@
 			</DataTemplate></ctl:Deferred>
 		</TabItem>
 
-		<!-- ============================ NEIGHBORS ============================ -->
-		<TabItem Header="Neighbors" IsVisible="{Binding ShowNeighborsTab}">
+		<!-- ============================ DEVICES ============================ -->
+		<!-- The system's ARP cache (as before), and a search of one interface's network: an ARP sweep plus mDNS / SSDP,
+			 with names by reverse DNS, NetBIOS and LLMNR (Helpers/LanDiscovery). -->
+		<TabItem Header="Devices" IsVisible="{Binding ShowNeighborsTab}">
 			<ctl:Deferred><DataTemplate x:DataType="vm:NetworkInfoViewModel">
-			<Grid RowDefinitions="Auto, *" Margin="0,12,0,0">
-				<Grid Grid.Row="0" ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="0,0,0,12">
-					<StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2" Background="Transparent"
-								ToolTip.Tip="Devices in this machine's ARP cache (IP ↔ MAC)">
-						<StackPanel Orientation="Horizontal" Spacing="8">
-							<TextBlock Classes="sectionTitle" Text="ARP cache" VerticalAlignment="Center"/>
-							<Border Classes="badge" Padding="7,1" IsVisible="{Binding NeighborsHasRows}">
-								<TextBlock Text="{Binding Neighbors.Count}" FontFamily="{StaticResource MonoFont}"/>
-							</Border>
-						</StackPanel>
+			<Grid RowDefinitions="Auto, Auto, *" Margin="0,12,0,0">
+				<!-- the title, then the tools in what is left of the line (wrapping when that is short); narrow (a phone), the
+					 tools take a line of their own under the title -->
+				<Grid Grid.Row="0" x:Name="DevBar" h:Responsive.BreakWidth="520" ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto"
+					  ColumnSpacing="12" RowSpacing="8" Margin="0,0,0,12">
+					<StackPanel Grid.Column="0" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8" Background="Transparent"
+								ToolTip.Tip="The devices on your network: the ones this computer has talked to (its ARP cache, IP ↔ MAC), and the ones a search finds">
+						<TextBlock Classes="sectionTitle" Text="Devices" VerticalAlignment="Center"/>
+						<Border Classes="badge" Padding="7,1" IsVisible="{Binding NeighborsHasRows}">
+							<TextBlock Text="{Binding Devices.Count}" FontFamily="{StaticResource MonoFont}"/>
+						</Border>
 					</StackPanel>
-					<Button Grid.Column="1" Classes="secondary" Command="{Binding RefreshNeighborsCommand}" VerticalAlignment="Center" Padding="12,0">
-						<StackPanel Orientation="Horizontal" Spacing="8">
-							<Path Classes="btnIco" Data="{StaticResource GlyphRefresh}"/>
-							<TextBlock Text="Refresh" VerticalAlignment="Center"/>
-						</StackPanel>
-					</Button>
+					<!-- which network: the cache of every interface, or one interface's (whose network Find devices searches) -->
+					<WrapPanel x:Name="DevTools" ItemSpacing="8" LineSpacing="8" VerticalAlignment="Center">
+						<ComboBox x:Name="DeviceIfaceBox" Classes="field" Width="196"
+								  ItemsSource="{Binding DeviceIface.Options}" SelectedItem="{Binding DeviceIface.Selected}"
+								  IsEnabled="{Binding !IsFindingDevices}" DropDownOpened="DeviceIfaceBox_DropDownOpened"
+								  AutomationProperties.Name="Interface"
+								  ToolTip.Tip="The interface whose devices are listed and whose network Find devices searches">
+							<ComboBox.ItemTemplate>
+								<DataTemplate x:DataType="vm:IfaceOption">
+									<TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Tip}"/>
+								</DataTemplate>
+							</ComboBox.ItemTemplate>
+						</ComboBox>
+						<Button Classes="toggle" Classes.active="{Binding IsFindingDevices}" Command="{Binding FindDevicesCommand}"
+								Content="{Binding FindDevicesText}" MinWidth="112" IsVisible="{Binding CanFindDevices}"
+								ToolTip.Tip="Search the interface's network for devices: every address is asked by ARP (which a firewall doesn't stop), and mDNS, SSDP, NetBIOS and the router's DNS give their names. A few seconds"/>
+						<Button Classes="secondary" Command="{Binding RefreshNeighborsCommand}" VerticalAlignment="Center" Padding="12,0"
+								IsEnabled="{Binding !IsFindingDevices}" ToolTip.Tip="Show the ARP cache again (what this computer knows without searching)">
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<Path Classes="btnIco" Data="{StaticResource GlyphRefresh}"/>
+								<TextBlock Text="Cache" VerticalAlignment="Center"/>
+							</StackPanel>
+						</Button>
+						<Button Classes="icon" Command="{Binding CopyDevicesCommand}" IsEnabled="{Binding NeighborsHasRows}"
+								ToolTip.Tip="Copy the table" AutomationProperties.Name="Copy the table">
+							<Path Classes="glyph" Data="{StaticResource GlyphCopy}"/>
+						</Button>
+					</WrapPanel>
 				</Grid>
 
+				<!-- what a search is doing, or how it ended -->
+				<TextBlock Grid.Row="1" Classes="devStatus" Classes.error="{Binding DevicesStatusIsError}" Text="{Binding DevicesStatus}"
+						   IsVisible="{Binding HasDevicesStatus}" Margin="2,0,0,10"/>
+
 				<!-- table: scrolls sideways inside the card on a phone; rows virtualize vertically -->
-				<Border Grid.Row="1" Classes="card output" IsVisible="{Binding NeighborsHasRows}">
+				<Border Grid.Row="2" Classes="card output" IsVisible="{Binding NeighborsHasRows}">
 					<ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-						<Grid MinWidth="580" Width="{Binding $parent[ScrollViewer].Viewport.Width}" RowDefinitions="Auto, Auto, *">
-							<Grid Grid.Row="0" ColumnDefinitions="*,170,90,1.2*" MinHeight="36" Margin="14,0">
+						<Grid MinWidth="700" Width="{Binding $parent[ScrollViewer].Viewport.Width}" RowDefinitions="Auto, Auto, *">
+							<Grid Grid.Row="0" ColumnDefinitions="184,150,1*,1.5*,1*" MinHeight="36" Margin="14,0">
 								<TextBlock Grid.Column="0" Classes="colhead" Text="IP address"/>
 								<TextBlock Grid.Column="1" Classes="colhead" Text="MAC"/>
-								<TextBlock Grid.Column="2" Classes="colhead" Text="Type"/>
-								<TextBlock Grid.Column="3" Classes="colhead" Text="Interface"/>
+								<TextBlock Grid.Column="2" Classes="colhead" Text="Maker" ToolTip.Tip="Who made its network adapter, from the MAC address"/>
+								<TextBlock Grid.Column="3" Classes="colhead" Text="Name" ToolTip.Tip="Its name by the router's DNS, mDNS, NetBIOS, LLMNR or UPnP; with none, what it says about itself"/>
+								<TextBlock Grid.Column="4" Classes="colhead" Text="Found by"/>
 							</Grid>
 							<Border Grid.Row="1" Classes="divider"/>
-							<ItemsControl Grid.Row="2" Classes="table" ItemsSource="{Binding Neighbors}" IsVisible="{Binding NeighborsHasRows}">
+							<ItemsControl Grid.Row="2" Classes="table" ItemsSource="{Binding Devices}">
 								<ItemsControl.ItemTemplate>
-									<DataTemplate x:DataType="h:Neighbor">
-										<Grid ColumnDefinitions="*,170,90,1.2*" Height="28" Margin="14,0">
-											<TextBlock Grid.Column="0" Classes="cell key" Text="{Binding Ip}"/>
+									<DataTemplate x:DataType="vm:DeviceRow">
+										<Grid ColumnDefinitions="184,150,1*,1.5*,1*" Height="28" Margin="14,0" Background="Transparent" ToolTip.Tip="{Binding Tip}">
+											<StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+												<TextBlock Classes="cell key" Classes.dim="{Binding IsStale}" Text="{Binding Ip}"/>
+												<Border Classes="badge info" Padding="5,0" IsVisible="{Binding HasRole}" VerticalAlignment="Center">
+													<TextBlock Text="{Binding Role}" FontSize="10"/>
+												</Border>
+											</StackPanel>
 											<TextBlock Grid.Column="1" Classes="cell" Text="{Binding Mac}"/>
-											<TextBlock Grid.Column="2" Classes="cell dim" Text="{Binding Kind}"/>
-											<TextBlock Grid.Column="3" Classes="cell dim" Text="{Binding Iface}"/>
+											<TextBlock Grid.Column="2" Classes="cell dim prose" Text="{Binding Maker}"/>
+											<TextBlock Grid.Column="3" Classes="cell prose" Classes.dim="{Binding NameIsDetail}" Text="{Binding Name}"/>
+											<TextBlock Grid.Column="4" Classes="cell dim prose" Text="{Binding FoundBy}"/>
 										</Grid>
 									</DataTemplate>
 								</ItemsControl.ItemTemplate>
@@ -673,7 +733,7 @@
 					</ScrollViewer>
 				</Border>
 
-				<Border Grid.Row="1" Classes="card" IsVisible="{Binding !NeighborsHasRows}" VerticalAlignment="Top" Padding="24,28">
+				<Border Grid.Row="2" Classes="card" IsVisible="{Binding !NeighborsHasRows}" VerticalAlignment="Top" Padding="24,28">
 					<StackPanel Spacing="10" HorizontalAlignment="Center" MaxWidth="420">
 						<Path Classes="emptyIco" Data="{StaticResource IcoAbout}"/>
 						<TextBlock Classes="emptyText" Text="{Binding NeighborsNote}"/>

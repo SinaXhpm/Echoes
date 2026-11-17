@@ -196,24 +196,61 @@ public static class GlobalpingResults
         if (Long(r, "statusCode") is not long c || c is < 100 or > 999) return null;
         int code = (int)c;
         string name = RemoteText.Clean(Str(r, "statusCodeName"), 60);
-        double? ms = r.TryGetProperty("timings", out var t) && t.ValueKind == JsonValueKind.Object ? Num(t, "total") : null;
+        // the time to the answer without the body's download (a GET's total includes it), as a HEAD's total was
+        double? ms = null;
+        if (r.TryGetProperty("timings", out var t) && t.ValueKind == JsonValueKind.Object && Num(t, "total") is double total)
+            ms = Num(t, "download") is double dl && dl >= 0 && dl <= total ? total - dl : total;
         string head = name.Length > 0 ? $"{code} {name}" : code.ToString(CultureInfo.InvariantCulture);
         bool success = code is >= 200 and < 400;   // check-host.net counts a redirect as success too, and follows none
-        bool noHead = code is 405 or 501;          // the server is up; it just won't take a HEAD request
         return new CheckHostResult
         {
             Kind = CheckHostKind.Http,
-            State = success ? CheckHostState.Ok : code >= 500 && !noHead ? CheckHostState.Failed : CheckHostState.Warning,
+            State = success ? CheckHostState.Ok : code >= 500 ? CheckHostState.Failed : CheckHostState.Warning,
             Reached = true,
             LatencyMs = ms,
             Address = Ip(r, "resolvedAddress"),
             Raw = raw,
-            Output = output,
+            // the status line and the headers: the body has its own viewer
+            Output = HeadOf(output),
             Status = head,
             HttpCode = code,
             HttpReason = name,
-            Error = success ? "" : noHead ? $"The server answered {head} to a HEAD request." : $"The server answered {head}.",
+            Error = success ? "" : $"The server answered {head}.",
+            Response = Answer(r, code, name, output),
         };
+    }
+
+    /// <summary>What a probe sends back of a body (Globalping's limit).</summary>
+    public const int ProbeBodyBytes = 10_000;
+
+    // The probe's answer for the response viewer: its status line (the version as the probe's output gives it), its
+    // headers (rawHeaders, one per line) and the first 10 KB of its body (already decompressed by the probe).
+    private static HttpResponseSnapshot Answer(JsonElement r, int code, string name, string output)
+    {
+        string first = output.Split('\n', 2)[0].Trim();
+        string version = first.StartsWith("HTTP/", StringComparison.OrdinalIgnoreCase) ? first.Split(' ')[0] : "HTTP";
+        var headers = new List<(string, string)>();
+        string rawHeaders = r.TryGetProperty("rawHeaders", out var rh) && rh.ValueKind == JsonValueKind.String ? rh.GetString() ?? "" : "";
+        foreach (var line in rawHeaders.Split('\n'))
+        {
+            int colon = line.IndexOf(':');
+            // the remote's text: control and bidi characters out, each header on a line of its own
+            if (colon > 0) headers.Add((RemoteText.Clean(line[..colon].Trim(), 200), RemoteText.Clean(line[(colon + 1)..].Trim(), 8000)));
+        }
+        string body = r.TryGetProperty("rawBody", out var b) && b.ValueKind == JsonValueKind.String ? b.GetString() ?? "" : "";
+        bool cut = r.TryGetProperty("truncated", out var tr) && tr.ValueKind == JsonValueKind.True;
+        byte[] bytes = Encoding.UTF8.GetBytes(body);
+        return new HttpResponseSnapshot($"{version} {code} {name}", headers, bytes, bytes.Length, cut, ProbeBodyBytes)
+        {
+            About = cut ? "A probe sends back the first 10 KB of a body." : null,
+        };
+    }
+
+    // "HTTP/1.1 200\nServer: …\n\n<body>" → the part before the blank line
+    private static string HeadOf(string output)
+    {
+        int blank = output.IndexOf("\n\n", StringComparison.Ordinal);
+        return blank < 0 ? output : output[..blank];
     }
 
     private static CheckHostResult? Dns(JsonElement r, string raw, string output)

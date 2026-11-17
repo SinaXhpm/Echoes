@@ -225,6 +225,10 @@ public readonly record struct ProbeResult(bool Ran, bool Ok, int Ms, int Code, s
 
     /// <summary>The HTTP check answered, but its keyword rule failed (the text is missing / present).</summary>
     public bool Keyword { get; init; }
+
+    /// <summary>A failed HTTP check's answer (an error page, a CDN's or a proxy's; the page a keyword rule failed on):
+    /// its status, headers and the first <see cref="MonitorProbe.MaxPageBytes"/> of its body. Null otherwise.</summary>
+    public HttpResponseSnapshot? Response { get; init; }
 }
 
 /// <summary>
@@ -320,6 +324,11 @@ public static class MonitorProbe
     /// <summary>A keyword check reads at most this much of the page (decompressed).</summary>
     public const int MaxKeywordBodyBytes = 512 * 1024;
     public const int MaxKeywordLength = 200;
+
+    /// <summary>The most of a failed check's page kept for the detail panel (decompressed), and read off the wire for it:
+    /// the wire cap is what disposing the response would download anyway (MaxResponseDrainSize).</summary>
+    public const int MaxPageBytes = 64 * 1024;
+    private const int MaxPageWireBytes = 128 * 1024;
 
     // Happy-Eyeballs-style stagger: the next address gets its own attempt if the previous one hasn't connected by then.
     private const int ConnectStaggerMs = 250;
@@ -599,7 +608,7 @@ public static class MonitorProbe
             if (code is >= 200 and <= 399)
             {
                 if (keyword is null) return ProbeResult.Success(ms, code);
-                var (found, capped, readError) = await FindKeywordAsync(response, keyword, linked.Token).ConfigureAwait(false);
+                var (found, capped, readError, page) = await FindKeywordAsync(response, keyword, linked.Token).ConfigureAwait(false);
                 if (readError is not null)
                     return ProbeResult.Failure("but the page couldn't be read (" + readError + ")", ms, code) with { Keyword = true };
                 if (found == mustContain) return ProbeResult.Success(ms, code);
@@ -607,11 +616,23 @@ public static class MonitorProbe
                 string why = !mustContain ? $"but the page contains {quoted}"
                     : capped ? $"but {quoted} isn't in the first {MaxKeywordBodyBytes / 1024} KB"
                     : $"but {quoted} is missing";
-                return ProbeResult.Failure(why, ms, code) with { Keyword = true };
+                return ProbeResult.Failure(why, ms, code) with { Keyword = true, Response = Snapshot(response, page, url) };
             }
             string? phrase = response.ReasonPhrase;
             if (phrase is { Length: > 40 }) phrase = phrase[..40];
-            return ProbeResult.Failure(phrase ?? string.Empty, ms, code);
+            // The page the failure came with, for the detail panel. Disposing the response would download it anyway (to
+            // reuse the connection), so it is read instead: with a budget of its own, so a slow error page can't turn the
+            // 503 into "timed out" — what came in time is kept.
+            HttpResponseSnapshot? errorPage = null;
+            try
+            {
+                using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                budget.CancelAfter(Math.Max(500, timeout - (int)sw.ElapsedMilliseconds));
+                var read = await HttpBodyReader.ReadAsync(response.Content, MaxPageBytes, MaxPageWireBytes, budget.Token).ConfigureAwait(false);
+                errorPage = Snapshot(response, read, url);
+            }
+            catch (Exception) when (!ct.IsCancellationRequested) { /* the failure stands without its page */ }
+            return ProbeResult.Failure(phrase ?? string.Empty, ms, code) with { Response = errorPage };
         }
         // The page itself timing out after its status line came: a failed keyword check with the status kept.
         catch (OperationCanceledException) when (!ct.IsCancellationRequested && code > 0)
@@ -624,12 +645,29 @@ public static class MonitorProbe
 
     private static string Clip(string s, int max) => s.Length <= max ? s : s[..(max - 1)] + "…";
 
+    // A failed check's answer for the detail panel: its status line, every header, the body as read.
+    private static HttpResponseSnapshot Snapshot(HttpResponseMessage response, HttpBodyRead body, string url)
+    {
+        var v = response.Version;
+        string status = $"HTTP/{(v.Major >= 2 ? v.Major.ToString() : $"{v.Major}.{v.Minor}")} {(int)response.StatusCode} {response.ReasonPhrase}";
+        var headers = new List<(string, string)>();
+        foreach (var h in response.Headers.NonValidated) foreach (var value in h.Value) headers.Add((h.Key, value));
+        foreach (var h in response.Content.Headers.NonValidated) foreach (var value in h.Value) headers.Add((h.Key, value));
+        return new HttpResponseSnapshot(status, headers, body.Buf, body.Length, body.Cut, MaxPageBytes)
+        {
+            Undecoded = body.Undecoded,
+            // where the redirects ended
+            Url = response.RequestMessage?.RequestUri?.AbsoluteUri ?? url,
+        };
+    }
+
     /// <summary>
     /// Reads the body — decompressing gzip / deflate / br itself, since the client asks for compressed pages and never
     /// decodes them — up to <see cref="MaxKeywordBodyBytes"/>, and looks for <paramref name="keyword"/> (not
     /// case-sensitive). The timeout cancelling the read throws (the caller reports it); other read problems come back as text.
+    /// Page: the first <see cref="MaxPageBytes"/> of it as read, for the detail panel when the rule fails.
     /// </summary>
-    private static async Task<(bool Found, bool Capped, string? Error)> FindKeywordAsync(HttpResponseMessage response, string keyword, CancellationToken ct)
+    private static async Task<(bool Found, bool Capped, string? Error, HttpBodyRead Page)> FindKeywordAsync(HttpResponseMessage response, string keyword, CancellationToken ct)
     {
         Stream? body = null;
         try
@@ -646,7 +684,7 @@ public static class MonitorProbe
                     "identity" or "" => body,
                     _ => null,
                 };
-                if (decoded is null) return (false, false, "unsupported encoding " + Clip(encodings[i], 20));
+                if (decoded is null) return (false, false, "unsupported encoding " + Clip(encodings[i], 20), default);
                 body = decoded;
             }
 
@@ -662,11 +700,13 @@ public static class MonitorProbe
             }
             // UTF-8 (a Latin-1 page still matches an ASCII keyword byte for byte).
             string text = Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length);
-            return (text.Contains(keyword, StringComparison.OrdinalIgnoreCase), capped, null);
+            int kept = (int)Math.Min(ms.Length, MaxPageBytes);
+            var page = new HttpBodyRead(ms.GetBuffer().AsSpan(0, kept).ToArray(), kept, capped || ms.Length > kept, null);
+            return (text.Contains(keyword, StringComparison.OrdinalIgnoreCase), capped, null, page);
         }
         catch (OperationCanceledException) { throw; }
-        catch (InvalidDataException) { return (false, false, "bad compressed data"); }
-        catch (Exception ex) { return (false, false, Describe(ex)); }
+        catch (InvalidDataException) { return (false, false, "bad compressed data", default); }
+        catch (Exception ex) { return (false, false, Describe(ex), default); }
         finally
         {
             if (body is not null) await body.DisposeAsync().ConfigureAwait(false);

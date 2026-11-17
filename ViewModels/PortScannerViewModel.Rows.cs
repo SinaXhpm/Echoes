@@ -74,7 +74,8 @@ public sealed partial class ScanHostRow : ScanRow
             {
                 HostStatus.Up => Host.Reason.Length > 0 ? $"up · {Host.Reason}" : "up",
                 HostStatus.Down => "no response",
-                _ => Host.Reason == "socket-limit" ? "undetermined (out of sockets)" : "",
+                _ => Host.Reason == "socket-limit" ? "undetermined (out of sockets)"
+                   : ScanText.IsIfaceReason(Host.Reason) ? "undetermined (not sent from the chosen interface)" : "",
             };
         }
     }

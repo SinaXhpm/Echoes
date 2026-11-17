@@ -261,6 +261,10 @@ public sealed class CheckHostException : Exception
 
     /// <summary>The service is throttling this address: a poll should back off rather than give up.</summary>
     public bool RateLimited { get; }
+    /// <summary>The cause is on the user's side, not the service's: the proxy (its login, a name that doesn't resolve,
+    /// nothing answering at its address) or nodes picked that are no longer listed. Another service asked the same way
+    /// fails the same way, so a run doesn't move on to one.</summary>
+    public bool UserSide { get; init; }
     /// <summary>How long the service asked to wait (Globalping's Retry-After, or until its hourly limit resets).</summary>
     public TimeSpan? RetryAfter { get; init; }
     /// <summary>Globalping: tests this address may still run this hour (its rate-limit headers), when it said.</summary>
@@ -436,7 +440,10 @@ public sealed class CheckHostClient
             resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch (Exception ex) { throw new CheckHostException(CheckHostErrors.Network(ex, _viaProxy, timeout), ex); }
+        catch (Exception ex)
+        {
+            throw new CheckHostException(CheckHostErrors.Network(ex, _viaProxy, timeout), ex) { UserSide = CheckHostErrors.AtProxy(ex, _viaProxy) };
+        }
 
         using (resp)
         {
@@ -457,7 +464,7 @@ public sealed class CheckHostClient
             if (code == 429 || (!html && body.Contains("limit", StringComparison.OrdinalIgnoreCase) && code is 403 or 503))
                 throw new CheckHostException(CheckHostErrors.RateLimited, rateLimited: true);
             if (code == 407)
-                throw new CheckHostException("The proxy asked for a login (HTTP 407) — check the proxy's user name and password.");
+                throw new CheckHostException("The proxy asked for a login (HTTP 407) — check the proxy's user name and password.") { UserSide = true };
             if (code is 403 or 503 && html && LooksLikeBotWall(body))
                 throw new CheckHostException("check-host.net's bot protection blocked the request (HTTP " + code
                                              + "). Wait a few minutes and run again, or route it through a proxy.");
@@ -573,16 +580,7 @@ public static class CheckHostErrors
         if (ex is TaskCanceledException or OperationCanceledException or TimeoutException)
             return $"{service} didn't answer within {Seconds(timeout)}{via} — it may be slow or blocked on this network. Run again, or try a proxy.";
 
-        SocketException? socket = null;
-        HttpRequestError httpError = HttpRequestError.Unknown;
-        bool tls = false;
-        for (var e = ex; e is not null; e = e.InnerException)
-        {
-            if (e is HttpRequestException h && h.HttpRequestError != HttpRequestError.Unknown && httpError == HttpRequestError.Unknown)
-                httpError = h.HttpRequestError;
-            if (e is SocketException s) socket ??= s;
-            if (e is AuthenticationException) tls = true;
-        }
+        var (httpError, socket, tls) = Causes(ex);
         if (httpError == HttpRequestError.ProxyTunnelError)
             return $"The proxy refused to connect to {service} — check the proxy address and that it allows HTTPS (CONNECT).";
         if (httpError == HttpRequestError.SecureConnectionError || tls)
@@ -610,6 +608,34 @@ public static class CheckHostErrors
             return $"Can't reach {service}{via} ({inner.TrimEnd('.')}).";
         }
         return $"Can't reach {service}: " + Innermost(ex).TrimEnd('.') + ".";
+    }
+
+    /// <summary>The proxy itself failed, not the service behind it: its name doesn't resolve, or nothing answers at its
+    /// address (what <see cref="Network"/> says of these). Every service asked through it fails the same way. A proxy
+    /// that refused to connect on to the service isn't one of these: another service may get through it.</summary>
+    public static bool AtProxy(Exception ex, bool viaProxy)
+    {
+        if (!viaProxy || ex is TaskCanceledException or OperationCanceledException or TimeoutException) return false;
+        var (httpError, socket, tls) = Causes(ex);
+        if (httpError is HttpRequestError.ProxyTunnelError or HttpRequestError.SecureConnectionError || tls) return false;
+        return httpError == HttpRequestError.NameResolutionError
+               || socket?.SocketErrorCode is SocketError.HostNotFound or SocketError.NoData or SocketError.TryAgain or SocketError.ConnectionRefused;
+    }
+
+    // What a failed request comes down to: the HttpClient's own word for it, the socket's error, a failed TLS handshake.
+    private static (HttpRequestError Http, SocketException? Socket, bool Tls) Causes(Exception ex)
+    {
+        SocketException? socket = null;
+        HttpRequestError httpError = HttpRequestError.Unknown;
+        bool tls = false;
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            if (e is HttpRequestException h && h.HttpRequestError != HttpRequestError.Unknown && httpError == HttpRequestError.Unknown)
+                httpError = h.HttpRequestError;
+            if (e is SocketException s) socket ??= s;
+            if (e is AuthenticationException) tls = true;
+        }
+        return (httpError, socket, tls);
     }
 
     private static string Innermost(Exception ex)

@@ -181,7 +181,7 @@
 						</Button>
 					</StackPanel>
 
-					<!-- nav: same sections + order as the desktop sidebar -->
+					<!-- nav: same sections + order as the desktop launcher -->
 					<ListBox x:Name="Nav"
 							 SelectedIndex="0"
 							 SelectionChanged="Nav_SelectionChanged"

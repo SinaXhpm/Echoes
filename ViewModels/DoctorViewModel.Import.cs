@@ -94,7 +94,7 @@ public partial class DoctorViewModel
         var u = request.Url;
         string page = u.GetComponents(UriComponents.SchemeAndServer | UriComponents.Path, UriFormat.UriEscaped);
         Target = page.EndsWith('/') && u.AbsolutePath == "/" ? page[..^1] : page;
-        HistoryService.Instance.Add(HistoryKey, Target);
+        Store.History.Add(HistoryKey, Target);
         if (request.ResolveTo is { } pin && DoctorIp.TryParseOverride(pin, out var ip, out _)) OverrideIp = ip!.ToString();
         SetRequest(request);
     }

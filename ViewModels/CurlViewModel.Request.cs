@@ -23,8 +23,8 @@ public partial class CurlViewModel
     public CurlKvList FormFields { get; }
     public CurlPartList Parts { get; }
 
-    public ObservableCollection<string> UrlHistory => HistoryService.Instance.Get("curl.url");
-    public ObservableCollection<string> ProxyHistory => HistoryService.Instance.Get("curl.proxy");
+    public ObservableCollection<string> UrlHistory => Store.History.Get("curl.url");
+    public ObservableCollection<string> ProxyHistory => Store.History.Get("curl.proxy");
     public static IReadOnlyList<string> CommonHeaderNames => CurlHeaderHints.Names;
 
     // ---- tab badges

@@ -70,9 +70,14 @@ public partial class DnsViewModel
         }
         // a query nobody answers goes down the whole list (each one waits for its timeout): the lookup's cap applies here too
         if (specs.Count > MaxLookupResolvers) specs = specs.Take(MaxLookupResolvers).ToList();
+        if (!TryVia(out var via, out string viaProblem))
+        {
+            MailError = viaProblem;
+            return;
+        }
 
         var token = NewRun();
-        HistoryService.Instance.Add("dns.domain", DomainName);
+        Store.History.Add("dns.domain", DomainName);
         SaveServers();
         string ascii = SecureDns.ToAscii(domain);
         MailDomain = domain;
@@ -92,7 +97,7 @@ public partial class DnsViewModel
             {
                 int i = (start + k) % specs.Count;
                 DnsSession session;
-                lock (sessions) session = sessions[i] ??= new DnsSession(specs[i]);
+                lock (sessions) session = sessions[i] ??= new DnsSession(specs[i], null, via);
                 var r = await session.QueryAsync(name, type, ct).ConfigureAwait(false);
                 if (r.Answered)
                 {

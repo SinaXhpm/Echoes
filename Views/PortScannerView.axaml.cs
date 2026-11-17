@@ -9,6 +9,12 @@ public partial class PortScannerView : UserControl
 {
     private PortScannerViewModel? _vm;
 
+    // interfaces come and go (Wi-Fi, a VPN): the picker lists the current ones whenever it opens
+    private void IfaceBox_DropDownOpened(object? sender, System.EventArgs e)
+    {
+        if (_vm is { IsScanning: false } vm) vm.Iface.Refresh();
+    }
+
     public PortScannerView()
     {
         InitializeComponent();

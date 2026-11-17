@@ -25,6 +25,7 @@ namespace Echoes.ViewModels;
 /// </summary>
 public partial class TgViewModel : ObservableObject
 {
+    private readonly ToolStore Store = ToolStore.Current;   // this instance's settings: its own copy when it is one of several tabs (ToolStore)
     // ===================================================================== connection
 
     /// <summary>The bot token. Never logged or displayed; stored only sealed ("tg.botToken").</summary>
@@ -36,7 +37,7 @@ public partial class TgViewModel : ObservableObject
     [ObservableProperty] private string _proxyPass = string.Empty;
     private const string KeyToken = "tg.botToken", KeyProxyPass = "tg.proxyPass";
 
-    public ObservableCollection<string> ProxyHistory => HistoryService.Instance.Get("tg.proxy");
+    public ObservableCollection<string> ProxyHistory => Store.History.Get("tg.proxy");
 
     private enum Conn { None, Checking, Connected, InvalidToken, NetworkError }
     private Conn _conn = Conn.None;
@@ -112,7 +113,7 @@ public partial class TgViewModel : ObservableObject
 
     public TgViewModel()
     {
-        var ps = ProfileService.Instance;
+        var ps = Store.Profile;
         ps.Remove("tg.token");   // an earlier build's plain-text token: never kept that way (the sealed one is tg.botToken)
         BotToken = OpenSealed(ps.GetSetting(KeyToken));
         ProxyPass = OpenSealed(ps.GetSetting(KeyProxyPass));
@@ -120,7 +121,7 @@ public partial class TgViewModel : ObservableObject
         string savedProxy = ps.GetSetting("tg.proxy") ?? string.Empty;
         // Earlier builds had no switch: a saved proxy address meant "use it".
         UseProxy = ps.GetSetting("tg.useProxy") is { } up ? up == "true" : savedProxy.Trim().Length > 0;
-        ProxyAddress = savedProxy.Length > 0 ? savedProxy : HistoryService.Instance.Last("tg.proxy") ?? string.Empty;
+        ProxyAddress = savedProxy.Length > 0 ? savedProxy : Store.History.Last("tg.proxy") ?? string.Empty;
         ProxyUser = ps.GetSetting("tg.proxyUser") ?? string.Empty;
         ShowOptional = ps.GetBool("tg.optional");
         CustomMethodName = ps.GetSetting("tg.custom") ?? string.Empty;
@@ -196,7 +197,7 @@ public partial class TgViewModel : ObservableObject
             items.Add((KeyToken, SecretProtector.Protect(BotToken.Trim())));
             items.Add((KeyProxyPass, SecretProtector.Protect(savePass)));
         }
-        ProfileService.Instance.SetMany(items.ToArray());
+        Store.Profile.SetMany(items.ToArray());
     }
 
     // Only a value sealed with this install's key counts (a plain or legacy-sealed one is ignored, not trusted).
@@ -401,7 +402,7 @@ public partial class TgViewModel : ObservableObject
     private void RememberProxy()
     {
         if (!UseProxy || string.IsNullOrWhiteSpace(ProxyAddress)) return;
-        HistoryService.Instance.Add("tg.proxy", WithoutUserInfo(ProxyAddress));
+        Store.History.Add("tg.proxy", WithoutUserInfo(ProxyAddress));
     }
 
     // ===================================================================== send

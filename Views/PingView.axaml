@@ -12,6 +12,9 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
+        <!-- Start: 96 wide where the row has room; on a small phone only as wide as its label, so the host box keeps room -->
+        <Style Selector="Grid#TargetRow.wide Button#StartBtn"><Setter Property="MinWidth" Value="96"/></Style>
+        <Style Selector="Grid#TargetRow.narrow Button#StartBtn"><Setter Property="MinWidth" Value="64"/></Style>
         <!-- the options button beside Copy: sliders glyph + "Options", or the non-default values in accent -->
         <Style Selector="Path.btnIco">
             <Setter Property="Width" Value="14"/>
@@ -82,6 +85,12 @@
         </Style>
         <Style Selector="ListBox.modeSwitch.ipSeg > ListBoxItem">
             <Setter Property="Padding" Value="10,0"/>
+        </Style>
+
+        <!-- the interface picker beside the mode switch: as wide as a name and an address, never the whole row -->
+        <Style Selector="ComboBox.field.iface">
+            <Setter Property="MinWidth" Value="140"/>
+            <Setter Property="MaxWidth" Value="220"/>
         </Style>
 
         <!-- ===== status strip at the foot of an output card (packet statistics / MTR progress) ===== -->
@@ -280,7 +289,7 @@
         <Border Grid.Row="0" Classes="card" Padding="12">
             <StackPanel Spacing="12">
                 <!-- host · port (TCP mode) · Start. No column spacing: the hidden port column would still take one. -->
-                <Grid x:Name="TargetRow" ColumnDefinitions="*, Auto, Auto" RowDefinitions="Auto, Auto">
+                <Grid x:Name="TargetRow" helpers:Responsive.BreakWidth="300" ColumnDefinitions="*, Auto, Auto" RowDefinitions="Auto, Auto">
                     <TextBlock Classes="fieldLabel" Text="Host"/>
                     <TextBlock Grid.Column="1" Classes="fieldLabel" Text="Port" Margin="10,0,0,4" IsVisible="{Binding IsTcpMode}"/>
                     <AutoCompleteBox Grid.Row="1" Grid.Column="0" Classes="field" x:Name="HostBox" helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Host" helpers:InputAssist.PasteButton="True"
@@ -308,7 +317,7 @@
                         </TextBox.KeyBindings>
                     </TextBox>
 
-                    <Button Grid.Row="1" Grid.Column="2" x:Name="StartBtn" Classes="toggle" MinWidth="96" Margin="8,0,0,0"
+                    <Button Grid.Row="1" Grid.Column="2" x:Name="StartBtn" Classes="toggle" Margin="8,0,0,0"
                             Command="{Binding TogglePingCommand}"
                             Classes.active="{Binding IsPinging}">
                         <Panel>
@@ -340,6 +349,22 @@
                         <CheckBox IsChecked="{Binding NotifyOffline}" Content="Alert when down" VerticalAlignment="Center"
                                   ToolTip.Tip="Play a sound when the host (TCP: the port) stops answering"/>
                     </WrapPanel>
+                    <!-- the interface the probes leave from, in every mode (ping -I, mtr -I): taken at Start like the
+                         mode, so locked while a run goes on. The list is read again whenever it opens. -->
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <!-- a glyph, not a caption: with a caption the row no longer fitted beside the alerts -->
+                        <Path Classes="btnIco" Data="{StaticResource IcoNetwork}" ToolTip.Tip="Interface the probes leave from"/>
+                        <ComboBox x:Name="IfaceBox" Classes="field iface" ItemsSource="{Binding Iface.Options}" SelectedItem="{Binding Iface.Selected}"
+                                  IsEnabled="{Binding !IsPinging}" DropDownOpened="IfaceBox_DropDownOpened"
+                                  AutomationProperties.Name="Interface"
+                                  ToolTip.Tip="The network interface the probes leave from, like ping -I (Wi-Fi, Ethernet, a VPN). Default route: the system chooses. Stop to change">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:IfaceOption">
+                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Tip}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
                 </WrapPanel>
             </StackPanel>
         </Border>

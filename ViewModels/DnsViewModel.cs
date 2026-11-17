@@ -24,6 +24,7 @@ namespace Echoes.ViewModels;
 /// </summary>
 public partial class DnsViewModel : ObservableObject
 {
+    private readonly ToolStore Store = ToolStore.Current;   // this instance's settings: its own copy when it is one of several tabs (ToolStore)
     [ObservableProperty] private string _domainName = string.Empty;
     [ObservableProperty] private string _logText = string.Empty;
     [ObservableProperty] private bool _isWorking;
@@ -45,7 +46,7 @@ public partial class DnsViewModel : ObservableObject
     {
         RefreshPresetMarks();
         RebuildResolverRows();
-        if (_loaded) ProfileService.Instance.SetSetting("dns.mode", value.ToString(CultureInfo.InvariantCulture));
+        if (_loaded) Store.Profile.SetSetting("dns.mode", value.ToString(CultureInfo.InvariantCulture));
     }
 
     public string PrimaryText => ModeIndex switch { ModeCompare => "Compare", ModeEmail => "Check", _ => "Look up" };
@@ -94,7 +95,7 @@ public partial class DnsViewModel : ObservableObject
     partial void OnWrapResultChanged(bool value)
     {
         OnPropertyChanged(nameof(ResultWrapping));
-        if (_loaded) ProfileService.Instance.SetBool("dns.wrap", value);
+        if (_loaded) Store.Profile.SetBool("dns.wrap", value);
     }
 
     [ObservableProperty] private bool _typeA = true;
@@ -108,7 +109,7 @@ public partial class DnsViewModel : ObservableObject
     [ObservableProperty] private bool _typeCAA;
     [ObservableProperty] private bool _typePTR;
 
-    public ObservableCollection<string> DomainHistory => HistoryService.Instance.Get("dns.domain");
+    public ObservableCollection<string> DomainHistory => Store.History.Get("dns.domain");
 
     // Compact summary shown on the Record types dropdown button (kept in sync with the checkboxes).
     public string SelectedTypesSummary
@@ -129,7 +130,7 @@ public partial class DnsViewModel : ObservableObject
         if (e.PropertyName is { } n && n.StartsWith("Type", StringComparison.Ordinal))
         {
             OnPropertyChanged(nameof(SelectedTypesSummary));
-            if (_loaded) ProfileService.Instance.SetSetting(TypesKey, string.Join(",", GetSelectedTypes()));
+            if (_loaded) Store.Profile.SetSetting(TypesKey, string.Join(",", GetSelectedTypes()));
         }
     }
 
@@ -138,7 +139,7 @@ public partial class DnsViewModel : ObservableObject
 
     private void RestoreTypes()
     {
-        if (ProfileService.Instance.GetSetting(TypesKey) is not { } saved) return;
+        if (Store.Profile.GetSetting(TypesKey) is not { } saved) return;
         var on = new HashSet<string>(saved.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
                                      StringComparer.OrdinalIgnoreCase);
         TypeA = on.Contains("A");
@@ -154,27 +155,48 @@ public partial class DnsViewModel : ObservableObject
     }
 
     /// <param name="links">Where an address in the results is handed to (WHOIS, IP Info): MainViewModel.</param>
+    /// <summary>The interface the DNS queries leave from, in all three modes (dig -b): "Default route" lets the system
+    /// choose, as it always did. With an interface, "system" in the resolver list means that interface's DNS servers
+    /// (NetIface.DnsServers: its own list on Windows, the system's one list on Linux and macOS). WHOIS / RDAP lookups
+    /// stay on the default route. Taken when a run starts; locked while it goes on.</summary>
+    public IfacePicker Iface { get; }
+
+    private const string IfaceKey = "dns.iface";
+
+    // The chosen interface as it is now. False (with the reason) when one is chosen but isn't up: the run says so
+    // instead of quietly asking over the default route.
+    private bool TryVia(out NetIface? via, out string problem)
+    {
+        via = null;
+        problem = string.Empty;
+        if (Iface.Name is not { } chosen) return true;
+        via = Iface.Resolve();
+        if (via is null) problem = $"{chosen} isn't connected: choose another interface, or Default route.";
+        return via is not null;
+    }
+
     public DnsViewModel(IToolLinks? links = null)
     {
+        Iface = new IfacePicker(Store.Profile, IfaceKey, "Default route", "The system chooses the interface (its routing table)");
         _ips = new IpLinkScope(links);
         PresetGroups = BuildPresets();
         LoadServers();
-        if (HistoryService.Instance.Last("dns.domain") is { } last) DomainName = last;
-        WrapResult = ProfileService.Instance.GetBool("dns.wrap", true);
+        if (Store.History.Last("dns.domain") is { } last) DomainName = last;
+        WrapResult = Store.Profile.GetBool("dns.wrap", true);
         RestoreTypes();
-        string? ct = ProfileService.Instance.GetSetting("dns.compareType");
+        string? ct = Store.Profile.GetSetting("dns.compareType");
         if (ct != null && CompareTypes.Contains(ct)) CompareType = ct;
-        int mode = ProfileService.Instance.GetInt("dns.mode", ModeLookup);
+        int mode = Store.Profile.GetInt("dns.mode", ModeLookup);
         ModeIndex = mode is ModeCompare or ModeEmail ? mode : ModeLookup;
         RefreshPresetMarks();
         RebuildResolverRows();
-        NewResolverText = ProfileService.Instance.GetSetting(ResolverDraftKey) ?? "";
+        NewResolverText = Store.Profile.GetSetting(ResolverDraftKey) ?? "";
         _loaded = true;
     }
 
     private void LoadServers()
     {
-        DnsServersText = ProfileService.Instance.GetSetting("dns.servers") ?? string.Empty;
+        DnsServersText = Store.Profile.GetSetting("dns.servers") ?? string.Empty;
         if (string.IsNullOrWhiteSpace(DnsServersText))
         {
             // two plain resolvers and an encrypted one: where plain DNS to foreign servers is filtered, the DoH line still
@@ -182,12 +204,12 @@ public partial class DnsViewModel : ObservableObject
             DnsServersText = string.Join(Environment.NewLine, "1.1.1.1", "8.8.8.8", "https://cloudflare-dns.com/dns-query");
             SaveServers();
         }
-        string? cmp = ProfileService.Instance.GetSetting("dns.compare");
+        string? cmp = Store.Profile.GetSetting("dns.compare");
         CompareServersText = string.IsNullOrWhiteSpace(cmp) ? ResolverPresets.DefaultCompareList() : cmp;
     }
 
     private void SaveServers()
-        => ProfileService.Instance.SetSetting("dns.servers", DnsServersText);
+        => Store.Profile.SetSetting("dns.servers", DnsServersText);
 
     // Persist resolver edits as they happen: saved only by a lookup, an edit followed by WHOIS (or nothing) and
     // closing the app was lost. Cheap — the profile coalesces writes in the background.
@@ -236,7 +258,7 @@ public partial class DnsViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(DomainName) || IsWorking) return;
 
         var token = NewRun();
-        HistoryService.Instance.Add("dns.domain", DomainName);
+        Store.History.Add("dns.domain", DomainName);
         SaveServers();
         IsWorking = true;
         LogText = string.Empty;
@@ -270,6 +292,12 @@ public partial class DnsViewModel : ObservableObject
             IsWorking = false;
             return;
         }
+        if (!TryVia(out var via, out string viaProblem))
+        {
+            AddRow(new DnsRecordRow { Type = "ERR", IsStatus = true, Value = viaProblem });
+            IsWorking = false;
+            return;
+        }
 
         string host = DomainName.Trim();
         string asciiHost = SecureDns.ToAscii(host);   // punycode for internationalized (non-ASCII) domains
@@ -278,7 +306,7 @@ public partial class DnsViewModel : ObservableObject
         var tasks = specs.Select(spec => Task.Run(async () =>
         {
             // One session per resolver for every record type: the DoT connection / DoH pool / DnsClient instance is reused.
-            using var session = new DnsSession(spec);
+            using var session = new DnsSession(spec, null, via);
             foreach (var type in selectedTypes)
             {
                 if (token.IsCancellationRequested) return;
@@ -327,7 +355,7 @@ public partial class DnsViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(DomainName) || IsWorking) return;
 
         var token = NewRun();
-        HistoryService.Instance.Add("dns.domain", DomainName);
+        Store.History.Add("dns.domain", DomainName);
         IsWorking = true;
         ShowRecords = false;   // WHOIS/RDAP is freeform text
         string query = DomainName.Trim();

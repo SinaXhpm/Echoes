@@ -23,6 +23,7 @@ namespace Echoes.ViewModels;
 /// </summary>
 public partial class SshViewModel : ObservableObject
 {
+    private readonly ToolStore Store = ToolStore.Current;   // this instance's settings: its own copy when it is one of several tabs (ToolStore)
     // ===================================================================== connection form
     [ObservableProperty] private string _host = string.Empty;
     [ObservableProperty] private int _port = 22;
@@ -64,8 +65,8 @@ public partial class SshViewModel : ObservableObject
     public string ConnectLabel => IsConnecting ? "Cancel" : IsConnected ? "Disconnect" : "Connect";
     public string StatusText => IsConnecting ? "Connecting…" : IsConnected ? "Connected" : HasConnectError ? "Failed" : "Offline";
 
-    public ObservableCollection<string> HostHistory => HistoryService.Instance.Get("ssh.host");
-    public ObservableCollection<string> UserHistory => HistoryService.Instance.Get("ssh.user");
+    public ObservableCollection<string> HostHistory => Store.History.Get("ssh.host");
+    public ObservableCollection<string> UserHistory => Store.History.Get("ssh.user");
 
     // ===================================================================== persistence
     private bool _loaded;
@@ -76,11 +77,11 @@ public partial class SshViewModel : ObservableObject
 
     public SshViewModel()
     {
-        var ps = ProfileService.Instance;
+        var ps = Store.Profile;
         ps.Remove("ssh.pass");   // purge any password saved by an earlier build
-        Host = ps.GetSetting("ssh.host") ?? (HistoryService.Instance.Last("ssh.host") ?? string.Empty);
+        Host = ps.GetSetting("ssh.host") ?? (Store.History.Last("ssh.host") ?? string.Empty);
         Port = ps.GetInt("ssh.port", 22);
-        Username = ps.GetSetting("ssh.user") ?? (HistoryService.Instance.Last("ssh.user") ?? "root");
+        Username = ps.GetSetting("ssh.user") ?? (Store.History.Last("ssh.user") ?? "root");
         KeyPath = ps.GetSetting("ssh.keyPath") ?? string.Empty;
         ConnectViaProxy = ps.GetBool("ssh.inEnabled");
         ProxyInHost = ps.GetSetting("ssh.inHost") ?? "127.0.0.1";
@@ -134,7 +135,7 @@ public partial class SshViewModel : ObservableObject
         _persistPending = false;
         var specs = new List<SshForwardSpec>(Forwards.Count);
         foreach (var r in Forwards) specs.Add(r.Spec);
-        ProfileService.Instance.SetMany(
+        Store.Profile.SetMany(
             ("ssh.host", Host), ("ssh.port", Port.ToString()), ("ssh.user", Username), ("ssh.keyPath", KeyPath),
             ("ssh.inEnabled", ConnectViaProxy ? "true" : "false"), ("ssh.inHost", ProxyInHost), ("ssh.inPort", ProxyInPort.ToString()),
             ("ssh.outEnabled", EnableSocksTunnel ? "true" : "false"), ("ssh.outHost", TunnelHost), ("ssh.outPort", TunnelPort.ToString()),
@@ -224,8 +225,8 @@ public partial class SshViewModel : ObservableObject
         if (ConnectViaProxy && (ProxyInHost.Trim().Length == 0 || ProxyInPort is < 1 or > 65535))
         { ConnectError = "Enter the proxy's host and port, or turn the proxy off."; return; }
 
-        HistoryService.Instance.Add("ssh.host", host);
-        HistoryService.Instance.Add("ssh.user", user);
+        Store.History.Add("ssh.host", host);
+        Store.History.Add("ssh.user", user);
 
         var login = new SshLogin
         {

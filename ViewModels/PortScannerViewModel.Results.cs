@@ -388,10 +388,9 @@ public partial class PortScannerViewModel
         foreach (int port in pass.UbiquitousPorts.Take(3))
             lines.Add($"Port {port}/tcp is open on nearly every host scanned — likely a transparent proxy or ISP interception on the path, not a service on each host.");
         if (pass.UnknownProbes > 0 || pass.UnknownHosts > 0)
-            lines.Add($"The OS ran out of sockets: {(pass.UnknownProbes > 0 ? $"{pass.UnknownProbes:N0} probe(s)" : "")}"
-                      + (pass.UnknownProbes > 0 && pass.UnknownHosts > 0 ? " and " : "")
-                      + (pass.UnknownHosts > 0 ? $"{pass.UnknownHosts:N0} host check(s)" : "")
-                      + " couldn't be sent, so their state is unknown — try a slower timing template.");
+            lines.Add(ScanText.UnknownNote(pass, (pass.UnknownProbes > 0 ? $"{pass.UnknownProbes:N0} probe(s)" : "")
+                                                 + (pass.UnknownProbes > 0 && pass.UnknownHosts > 0 ? " and " : "")
+                                                 + (pass.UnknownHosts > 0 ? $"{pass.UnknownHosts:N0} host check(s)" : "")));
         if (pass.RecheckSkipped > 0)
             lines.Add($"{pass.RecheckSkipped:N0} silent UDP port(s) stay open|filtered unchecked: the host rate-limits its ICMP replies and re-checking that many would take too long — scan fewer UDP ports for an exact answer.");
         return string.Join("\n", lines);

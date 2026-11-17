@@ -22,6 +22,10 @@ public sealed class DoctorFacts
     public bool? InternetTcp { get; set; }
     /// <summary>The system resolver answered for a well-known name.</summary>
     public bool? InternetDns { get; set; }
+    /// <summary>From a chosen interface, every internet probe failed for a reason that is the interface's own (a VPN
+    /// program's redirect a socket tied to it can't follow, no route from it): that reason. The finding is then the
+    /// interface, not the network behind it.</summary>
+    public string? InterfaceProblem { get; set; }
     public bool? Captive { get; set; }
     public string? CaptiveDetail { get; set; }
     /// <summary>No IPv4 route, an IPv6 one: an IPv6-only network (mobile data on some carriers). The public resolvers and
@@ -142,6 +146,9 @@ public sealed class DoctorOptions
     /// <summary>A request copied from the browser, for the target's host: the web check of its scheme and port sends it as
     /// it is (null: the Doctor's own GET).</summary>
     public DoctorRequest? Request { get; init; }
+    /// <summary>The interface every check leaves from, its DNS lookups included (null: wherever the system's routing
+    /// points). A check it can't make says why instead of taking another way.</summary>
+    public NetIface? Interface { get; init; }
 }
 
 /// <summary>The same checks through the proxy.</summary>
@@ -219,6 +226,19 @@ public static class DoctorEngine
 
     internal static async Task<DoctorFacts> RunAsync(DoctorTarget t, DoctorEnvironment env, DoctorOptions opt, IDoctorSink sink, CancellationToken ct)
     {
+        // From a chosen interface: every socket of the run is tied to it (DoctorNet.From), the system's resolver is that
+        // interface's own DNS servers asked through it, and the routes are the kinds of address it has. Set before anything
+        // is made: the DoH client and the proxy keep it for their callbacks.
+        if (opt.Interface is { } iface)
+        {
+            DoctorNet.SendFrom(iface);
+            env = env with
+            {
+                SystemResolve = (host, token) => DoctorDns.ResolveFromAsync(iface, host, token),
+                Routes = () => DoctorNet.RoutesOf(iface),
+            };
+            if (opt.Proxy is { } viaProxy) viaProxy.From = iface;
+        }
         var f = new DoctorFacts(t)
         {
             Plan = t.Plan(env.DefaultHttpsPort, env.DefaultHttpPort),
@@ -243,6 +263,9 @@ public static class DoctorEngine
         var plan = f.Plan;
         sink.Log(DoctorCheck.Network, $"Target {t.Display()}: " + (plan.Raw is int rp ? $"port {rp}"
             : string.Join(", ", new[] { plan.Https is int hs ? $"HTTPS on {hs}" : null, plan.Http is int hp ? $"HTTP on {hp}" : null }.Where(x => x != null))));
+        if (opt.Interface is { } chosen)
+            sink.Log(DoctorCheck.Network, $"From the interface {chosen.Label}: every check leaves from it, and its DNS servers"
+                                          + " answer the system lookups" + (chosen.DnsServers.Count > 0 ? $" ({DoctorIp.List(chosen.DnsServers)})" : ""));
         sink.Log(DoctorCheck.Network, $"Routes: IPv4 {(v4 ? "yes" : "no")}, IPv6 {(v6 ? "yes" : "no")}"
                                       + (f.Ipv6Only ? f.Nat64 is { } n64 ? $" (IPv6 only, NAT64 {n64}/96)" : " (IPv6 only)" : ""));
         if (opt.Proxy is { } px) sink.Log(DoctorCheck.Network, $"Also through the proxy {px.Display} ({px.KindName}{(px.HasLogin ? ", with a login" : "")})");
@@ -371,7 +394,8 @@ public static class DoctorEngine
         var captive = DoctorNet.CaptiveAsync(env.CaptiveChecks, 3500, ct);
         var proxy = DoctorNet.SystemProxyAsync(1500);
 
-        var local = await Task.Run(DoctorNet.Local, ct).ConfigureAwait(false);
+        // from a chosen interface: that interface's own facts, not those of the system's first one with a gateway
+        var local = DoctorNet.From is { } chosen ? DoctorNet.LocalOf(chosen) : await Task.Run(DoctorNet.Local, ct).ConfigureAwait(false);
         local.SystemProxy = await proxy.ConfigureAwait(false);
         f.Local = local;
         double localMs = sw.Elapsed.TotalMilliseconds;
@@ -394,6 +418,7 @@ public static class DoctorEngine
         string? captiveDetail = cap.Detail;
         f.InternetTcp = probeRes.Any(p => p.Ok);
         f.InternetDns = nameRes.Any(n => n.Addresses.Count > 0);
+        if (probeRes.Length > 0 && probeRes.All(p => p.InterfaceFault)) f.InterfaceProblem = probeRes[0].Error;
         f.Captive = intercepted;
         f.CaptiveDetail = captiveDetail;
         if (cap.Answered is { } answered)
@@ -415,6 +440,8 @@ public static class DoctorEngine
         else if (f.InternetTcp == true)
             sink.Report(DoctorCheck.Internet, DoctorState.Warning,
                         $"{tcp}, but this system's resolver doesn't answer ({nameRes.FirstOrDefault()?.Error ?? "no address"})", ms);
+        else if (f.InterfaceProblem is { Length: > 0 } fault)   // the chosen interface, not the internet behind it
+            sink.Report(DoctorCheck.Internet, DoctorState.Fail, Cap(char.ToUpperInvariant(fault[0]) + fault[1..]), sw.Elapsed.TotalMilliseconds);
         else if (f.InternetDns == true)
             sink.Report(DoctorCheck.Internet, DoctorState.Warning, $"{tcp}, but DNS works — a restricted network?", nameRes.Select(n => n.Ms).DefaultIfEmpty(0).Min());
         else
@@ -991,6 +1018,12 @@ public static class DoctorEngine
             return;
         }
         var imported = RequestFor(f, tls, p);
+        // the user's own request carries their cookies and tokens: only to a server whose certificate this run trusted
+        if (tls && imported != null && f.Tls?.Outcome != DoctorTlsOutcome.Ok)
+        {
+            Tr(sink, row, DoctorState.Warning, "Imported request", NotSent);
+            imported = null;
+        }
         var url = imported?.Url ?? new Uri(t.Url(p, tls, withPath: tls ? plan.HttpsPrimary : plan.HttpPrimary));
         sink.Report(row, DoctorState.Running, Cap($"{imported?.Method ?? "GET"} {DoctorSecrets.Url(url.AbsoluteUri)}…"));
 
@@ -1009,10 +1042,12 @@ public static class DoctorEngine
             return s.Addresses.FirstOrDefault(DoctorIp.IsPublic) ?? s.Addresses.FirstOrDefault();
         }
 
-        var r = await DoctorHttp.GetAsync(url, conn.Address, ResolveOther, imported, ct).ConfigureAwait(false);
+        var r = await DoctorHttp.GetAsync(url, conn.Address, ResolveOther, imported, ct, env.TrustRoots).ConfigureAwait(false);
         if (tls) f.Https = r; else f.PlainHttp = r;
         ReportHttp(sink, row, r);
     }
+
+    private const string NotSent = "not sent: the certificate isn't trusted, so its cookies and headers stay on this device; the Doctor's own GET went instead";
 
     // The imported request when it is for this scheme and port: its own check sends it, and the other scheme's check
     // keeps the Doctor's plain GET (its cookies never go out over the other one).
@@ -1023,6 +1058,7 @@ public static class DoctorEngine
     private static void ReportHttp(IDoctorSink sink, DoctorCheck row, DoctorHttpResult r)
     {
         TraceHttp(sink, row, r);
+        if (Answer(r) is { } answer) sink.Response(row, answer);
         string chain = r.Chain.Count > 0 ? " · " + string.Join(" · ", r.Chain) : "";
         double? ms = r.Answered ? r.FirstByteMs : null;
         if (r.FilterPage != null)
@@ -1075,6 +1111,25 @@ public static class DoctorEngine
         if (!r.Answered || r.Error != null)
             Tr(sink, row, DoctorState.Fail, r.TimedOut ? "No answer" : r.ProxyLogin ? "Proxy login" : "Failed",
                r.TimedOut ? "no answer within 8 s" : (r.FailedHost != null ? r.FailedHost + ": " : "") + (r.Error ?? "failed"));
+    }
+
+    // The answer for the response viewer: the last one in the chain (a redirect's body isn't read; its Location header
+    // says where it went), its headers masked as in the trace. Null when nothing answered.
+    private static HttpResponseSnapshot? Answer(DoctorHttpResult r)
+    {
+        if (!r.Answered || r.Status == 0) return null;
+        var headers = r.Headers.Select(h => (h.Name, DoctorSecrets.Header(h.Name, h.Value))).ToList();
+        string about = r.FilterPage != null ? $"A filter's block page: {r.FilterPage}."
+                     : r.CaptivePage != null ? $"A captive portal: {r.CaptivePage}."
+                     : r.Chain.Count > 0 ? $"The last answer, after {string.Join(" · ", r.Chain)}."
+                     : r.Imported ? "The answer to your imported request." : "";
+        if (r.Error != null) about = (about.Length > 0 ? about + " " : "") + $"Then it failed: {r.Error}.";
+        return new HttpResponseSnapshot($"{r.Version} {r.Status} {r.Reason}", headers, r.Body, r.BodyBytes, r.BodyCut, DoctorHttp.BodyCap)
+        {
+            Undecoded = r.Undecoded,
+            Url = r.FinalUrl?.AbsoluteUri,
+            About = about.Length > 0 ? about : null,
+        };
     }
 
     // "connect 12 ms · TLS 31 ms · first byte 95 ms · done 120 ms"
@@ -1244,9 +1299,14 @@ public static class DoctorEngine
                 return;
             }
             var imported = RequestFor(f, true, hs);
+            if (imported != null && via.Tls.Outcome != DoctorTlsOutcome.Ok)   // as on the direct path: no secrets to an untrusted certificate
+            {
+                Tr(sink, DoctorCheck.ProxyHttps, DoctorState.Warning, "Imported request", NotSent);
+                imported = null;
+            }
             var url = imported?.Url ?? new Uri(t.Url(hs, true, withPath: plan.HttpsPrimary));
             sink.Report(DoctorCheck.ProxyHttps, DoctorState.Running, Cap($"{imported?.Method ?? "GET"} {DoctorSecrets.Url(url.AbsoluteUri)} through the proxy…"));
-            via.Https = await DoctorHttp.GetViaProxyAsync(url, proxy, f.Override, imported, ct).ConfigureAwait(false);
+            via.Https = await DoctorHttp.GetViaProxyAsync(url, proxy, f.Override, imported, ct, env.TrustRoots).ConfigureAwait(false);
             ReportHttp(sink, DoctorCheck.ProxyHttps, via.Https);
         }
 

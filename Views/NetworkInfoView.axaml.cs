@@ -11,6 +11,12 @@ public partial class NetworkInfoView : UserControl
         InitializeComponent();
     }
 
+    // interfaces come and go (Wi-Fi, a VPN): the Devices picker lists the current ones whenever it opens
+    private void DeviceIfaceBox_DropDownOpened(object? sender, System.EventArgs e)
+    {
+        if (DataContext is NetworkInfoViewModel { IsFindingDevices: false } vm) vm.DeviceIface.Refresh();
+    }
+
     // The Wi-Fi tab reads (and scans) only while it is on screen: the tab control keeps just the selected tab's content in
     // the visual tree, and a hidden tool page is detached or invisible, so attach / detach start and stop the polling, and
     // every tick checks it is still effectively visible. (The tab is built the first time it is shown, Views/Controls/

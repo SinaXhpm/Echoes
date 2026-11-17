@@ -23,7 +23,7 @@ namespace Echoes.Helpers;
 /// <see cref="Flush"/> writes synchronously — MainViewModel.FlushPersistence (exit / backgrounded), process exit, a
 /// backup export and a TOFU host pin call it. Every write is atomic (temp file + fsync + rename).</para>
 /// </summary>
-public sealed class ProfileService
+public sealed class ProfileService : ISettings
 {
     public static ProfileService Instance { get; } = new();
 
@@ -129,6 +129,8 @@ public sealed class ProfileService
         lock (_gate)
         {
             foreach (var list in _history.Values) list.Clear();
+            // each tool's (and tab's) own last input too, or a cleared host would still fill its box at the next start
+            foreach (var key in _settings.Keys.Where(ToolStore.IsLastValueKey).ToList()) _settings.Remove(key);
             _historyVersion++;
             Save();
         }
@@ -187,6 +189,31 @@ public sealed class ProfileService
         lock (_gate)
         {
             foreach (var (k, v) in items) _settings[k] = v ?? string.Empty;
+            Save();
+        }
+    }
+
+    /// <summary>Removes every setting whose key matches (a closed tab's copy, see <see cref="ToolStore"/>); one write.</summary>
+    public void RemoveWhere(Func<string, bool> match)
+    {
+        lock (_gate)
+        {
+            var keys = _settings.Keys.Where(match).ToList();
+            if (keys.Count == 0) return;
+            foreach (var key in keys) _settings.Remove(key);
+            Save();
+        }
+    }
+
+    /// <summary>Copies every setting under one key prefix to another (a duplicated tab); one write.</summary>
+    public void CopyKeys(string fromPrefix, string toPrefix)
+    {
+        lock (_gate)
+        {
+            var copies = _settings.Where(kv => kv.Key.StartsWith(fromPrefix, StringComparison.Ordinal))
+                                  .Select(kv => (Key: toPrefix + kv.Key[fromPrefix.Length..], kv.Value)).ToList();
+            if (copies.Count == 0) return;
+            foreach (var (key, value) in copies) _settings[key] = value;
             Save();
         }
     }

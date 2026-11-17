@@ -28,6 +28,7 @@ public sealed record NicOption(string Display, string? Ip)
 /// </summary>
 public partial class CurlViewModel : ObservableObject
 {
+    private readonly ToolStore Store = ToolStore.Current;   // this instance's settings: its own copy when it is one of several tabs (ToolStore)
     // Outer section: 0 Request · 1 Response · 2 Code · 3 Saved
     [ObservableProperty] private int _sectionIndex;
     [ObservableProperty] private int _requestTabIndex;
@@ -99,7 +100,7 @@ public partial class CurlViewModel : ObservableObject
         if (_loaded && !_applyingNics)
         {
             _preferredNicIp = value?.Ip;
-            ProfileService.Instance.SetSetting("curl.nicIp", value?.Ip ?? string.Empty);
+            Store.Profile.SetSetting("curl.nicIp", value?.Ip ?? string.Empty);
         }
         RequestChanged();
     }
@@ -140,7 +141,7 @@ public partial class CurlViewModel : ObservableObject
         if (!_loaded) _listedAtConstruction = Environment.TickCount64;
 
         // (Android: never a saved adapter, see CanChooseInterface)
-        if (!_loaded) _preferredNicIp = CanChooseInterface ? ProfileService.Instance.GetSetting("curl.nicIp") : null;
+        if (!_loaded) _preferredNicIp = CanChooseInterface ? Store.Profile.GetSetting("curl.nicIp") : null;
         string? keep = _preferredNicIp;
         _applyingNics = true;   // a fallback to Auto (the adapter is down) is shown, not saved
         try
@@ -173,7 +174,7 @@ public partial class CurlViewModel : ObservableObject
 
     private void RestoreSettings()
     {
-        var ps = ProfileService.Instance;
+        var ps = Store.Profile;
         // Values that can hold credentials are stored via SecretProtector (see WritePendingPersist). Unprotect passes
         // legacy plaintext straight through (re-saved encrypted on the next change), and a value that can't be decrypted
         // falls back like a missing one — but is kept on disk as stored (see _keepUrl).
@@ -190,9 +191,9 @@ public partial class CurlViewModel : ObservableObject
             return v;
         }
         // _loaded is still false: these sets neither persist nor refresh anything
-        Url = Restore("curl.url", HistoryService.Instance.Last("curl.url") ?? "https://", out _keepUrl);
+        Url = Restore("curl.url", Store.History.Last("curl.url") ?? "https://", out _keepUrl);
         OverrideIp = ps.GetSetting("curl.overrideIp") ?? string.Empty;
-        Proxy = Restore("curl.proxy", HistoryService.Instance.Last("curl.proxy") ?? string.Empty, out _keepProxy);
+        Proxy = Restore("curl.proxy", Store.History.Last("curl.proxy") ?? string.Empty, out _keepProxy);
         ProxyUser = ps.GetSetting("curl.proxyUser") ?? string.Empty;
         ProxyPass = Restore("curl.proxyPass", string.Empty, out _keepProxyPass);
         ps.Remove("curl.flags");   // purge the plaintext header/credential copy earlier builds wrote (no-op once gone)
@@ -235,8 +236,8 @@ public partial class CurlViewModel : ObservableObject
         else if (n == nameof(LibraryIndex) && LibraryIndex >= 0) SaveIndex("curl.library", LibraryIndex);
     }
 
-    private static void SaveIndex(string key, int value)
-        => ProfileService.Instance.SetSetting(key, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    private void SaveIndex(string key, int value)
+        => Store.Profile.SetSetting(key, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
     // Typing into Url / Proxy / … raises PropertyChanged per keystroke: debounce, so the whole profile isn't re-serialized
     // and atomically rewritten on the UI thread for every character.
@@ -274,7 +275,7 @@ public partial class CurlViewModel : ObservableObject
                 // (user:pass@, a ?token= style query value, a Telegram bot token in the path).
                 // SecretProtector is machine+user-bound obfuscation, not protection against same-user malware.
                 // A stored value that couldn't be opened goes back unchanged (Keep*), never its stand-in.
-                ProfileService.Instance.SetMany(
+                Store.Profile.SetMany(
                     ("curl.url", s.KeepUrl ?? (HasUserInfo(s.Url) || UrlSecrets.HasSecrets(s.Url) ? SecretProtector.Protect(s.Url) : s.Url)),
                     ("curl.overrideIp", s.OverrideIp),
                     ("curl.proxy", s.KeepProxy ?? (HasUserInfo(s.Proxy) ? SecretProtector.Protect(s.Proxy) : s.Proxy)),
@@ -340,8 +341,8 @@ public partial class CurlViewModel : ObservableObject
         StartRequestTimer();
         BeginResponse();
 
-        HistoryService.Instance.Add("curl.url", req.Url);
-        if (UseProxy && !string.IsNullOrWhiteSpace(Proxy)) HistoryService.Instance.Add("curl.proxy", StripUserInfo(Proxy));
+        Store.History.Add("curl.url", req.Url);
+        if (UseProxy && !string.IsNullOrWhiteSpace(Proxy)) Store.History.Add("curl.proxy", StripUserInfo(Proxy));
 
         string? nic = SelectedNicIp;
         SslLog = string.Empty;

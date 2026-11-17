@@ -18,6 +18,12 @@ public partial class SpeedTestView : UserControl
 
     private SpeedTestViewModel? _vm;
 
+    // interfaces come and go (Wi-Fi, a VPN): the picker lists the current ones whenever it opens
+    private void IfaceBox_DropDownOpened(object? sender, EventArgs e)
+    {
+        if (DataContext is SpeedTestViewModel { CanEditSetup: true } vm) vm.Iface.Refresh();
+    }
+
     public SpeedTestView()
     {
         InitializeComponent();

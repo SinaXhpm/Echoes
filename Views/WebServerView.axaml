@@ -493,14 +493,14 @@
             <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
         </Style>
         <Style Selector="Button.rowBtn.danger">
-            <Setter Property="Background" Value="{DynamicResource Danger.Solid}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Solid}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Text.OnDanger}"/>
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
         </Style>
         <Style Selector="Button.rowBtn.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource Danger.SolidHover}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Danger.SolidHover}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Text.OnDanger}"/>
+            <Setter Property="Background" Value="{DynamicResource Danger.SoftHover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.BorderHover}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
         </Style>
         <Style Selector="Border.confirmLine">
             <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>

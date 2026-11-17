@@ -74,6 +74,10 @@ public sealed class DoctorProxy
     internal NetworkCredential? Credentials => _user == null ? null : new NetworkCredential(_user, _pass ?? "");
     /// <summary>Trust exactly these roots for an https:// proxy's certificate (tests).</summary>
     internal X509Certificate2Collection? TrustRoots { get; set; }
+    /// <summary>The interface the run sends from (the tab's Interface choice; null = the system's routing): the proxy is
+    /// reached from it too. Set by <see cref="DoctorEngine"/>, as this proxy's connections are also made in HTTP handler
+    /// callbacks, outside the run's own flow.</summary>
+    internal NetIface? From { get; set; }
 
     public string Scheme => Kind switch
     {
@@ -246,17 +250,30 @@ public sealed class DoctorProxy
         if (IPAddress.TryParse(Host, out var lit)) addrs = new[] { lit };
         else
         {
-            try { addrs = await Dns.GetHostAddressesAsync(Host, ct).ConfigureAwait(false); }
+            // from a chosen interface the proxy's name is asked of that interface's DNS servers, as the run's other names are
+            try
+            {
+                addrs = From is { } via ? await DoctorDns.ResolveFromAsync(via, Host, ct).ConfigureAwait(false)
+                                        : await Dns.GetHostAddressesAsync(Host, ct).ConfigureAwait(false);
+            }
             catch (OperationCanceledException) { throw; }
+            catch (NetIfaceException e) { throw new DoctorProxyException(DoctorProxyStage.Reach, $"the proxy's name {Host} can't be looked up: {e.Message}", e); }
             catch (Exception e) { throw new DoctorProxyException(DoctorProxyStage.Reach, $"the proxy's name {Host} doesn't resolve", e); }
             if (addrs.Length == 0) throw new DoctorProxyException(DoctorProxyStage.Reach, $"the proxy's name {Host} doesn't resolve");
         }
         Exception? last = null;
         foreach (var a in DoctorIp.Ordered(addrs))
         {
-            var sock = new Socket(a.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+            Socket sock;
+            try { sock = DoctorNet.NewSocket(a.AddressFamily, SocketType.Stream, ProtocolType.Tcp, From); }
+            catch (NetIfaceException e)
+            {
+                last = e;   // the chosen interface has no address of this kind: the next address may be the other kind
+                continue;
+            }
             try
             {
+                sock.NoDelay = true;
                 await sock.ConnectAsync(new IPEndPoint(a, Port), ct).ConfigureAwait(false);
                 double ms = sw.Elapsed.TotalMilliseconds;
                 steps.Add(("Reach", $"{DoctorIp.EndPoint(a, Port)} answered in {DoctorEngine.Ms(ms)}"));

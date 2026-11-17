@@ -15,6 +15,7 @@ namespace Echoes.ViewModels;
 
 public partial class StringLabViewModel : ObservableObject
 {
+    private readonly ToolStore Store = ToolStore.Current;   // this instance's settings: its own copy when it is one of several tabs (ToolStore)
     [ObservableProperty] private string _errorMessage = string.Empty;
 
     // Drives the thin progress bar under the tabs. Only raised for work that is actually slow (see

@@ -76,10 +76,6 @@ public partial class CurlViewModel
             Avalonia.Threading.Dispatcher.UIThread.Post(oldValue.Dispose, Avalonia.Threading.DispatcherPriority.Background);
     }
 
-    /// <summary>Largest image the preview decodes (~128 MB of pixels): a few KB of PNG can declare 50000×50000.</summary>
-    private const long MaxPreviewPixels = 32_000_000;
-    /// <summary>Wider images are decoded scaled down to this (a 6000×4000 photo took 96 MB to show ~650 px of it).</summary>
-    private const int MaxPreviewWidth = 2560;
     [ObservableProperty] private string _bodyKindText = string.Empty;
     [ObservableProperty] private string _bodyNote = string.Empty;
     public bool HasBodyNote => BodyNote.Length > 0;
@@ -199,8 +195,6 @@ public partial class CurlViewModel
         ErrorHint = hint ?? string.Empty;
     }
 
-    private sealed record BodyBuild(CurlBodyKind Kind, string Text, CurlTextDocument? Raw, CurlTextDocument? Pretty, Bitmap? Image, string KindText, string Note);
-
     private async Task ShowResultAsync(CurlResult res, CurlRequest req, int gen)
     {
         EngineText = res.Engine;
@@ -253,9 +247,9 @@ public partial class CurlViewModel
         bool truncated = res.Truncated;
         string? ct = _bodyContentType;
         string? decoded = res.ContentEncodingDecoded;
-        BodyBuild b;
+        ResponseBodyBuild b;
         try { b = await Task.Run(() => BuildBody(buf, len, truncated, ct, decoded)); }
-        catch (Exception ex) { b = new BodyBuild(CurlBodyKind.Text, string.Empty, null, null, null, string.Empty, "Couldn't show the body: " + ex.Message); }
+        catch (Exception ex) { b = new ResponseBodyBuild(CurlBodyKind.Text, string.Empty, null, null, null, string.Empty, "Couldn't show the body: " + ex.Message); }
         if (gen != _runGen) return;
 
         _rawDoc = b.Raw;
@@ -274,73 +268,11 @@ public partial class CurlViewModel
         RenderWeb(b.Kind is CurlBodyKind.Html or CurlBodyKind.Text or CurlBodyKind.Xml or CurlBodyKind.Json ? b.Text : null, _finalUrl, routed);
     }
 
-    private static BodyBuild BuildBody(byte[] buf, int len, bool truncated, string? contentType, string? decodedFrom)
-    {
-        var kind = CurlBody.Sniff(buf, len, contentType);
-        string size = FileHttpServer.HumanSize(len);
-        string media = CurlBody.MediaTypeOf(contentType);
-        string note = truncated ? $"Showing the first {CurlEngine.MaxResponseBytes / (1024 * 1024)} MB — the response was larger. Save keeps what arrived." : string.Empty;
-        if (decodedFrom != null && note.Length == 0) note = $"Decoded from {decodedFrom} (the server compressed it)";
-        switch (kind)
-        {
-            case CurlBodyKind.Empty:
-                return new BodyBuild(kind, string.Empty, null, null, null, "Empty body", "The response has no body.");
-            case CurlBodyKind.Image:
-            {
-                Bitmap? image = null;
-                string? tooBig = null;
-                int width = 0, height = 0;
-                try
-                {
-                    // The dimensions first, from the header only: decoding a decompression bomb would take gigabytes.
-                    using (var probe = new MemoryStream(buf, 0, len, writable: false))
-                    using (var codec = SkiaSharp.SKCodec.Create(probe))
-                        if (codec is not null)
-                        {
-                            (width, height) = (codec.Info.Width, codec.Info.Height);
-                            if ((long)width * height > MaxPreviewPixels) tooBig = $"{width}×{height}";
-                        }
-                    if (tooBig is null)
-                    {
-                        // the preview only ever shrinks it to fit: a big photo is decoded at a preview width, not in full
-                        using var ms = new MemoryStream(buf, 0, len, writable: false);
-                        image = width > MaxPreviewWidth ? Bitmap.DecodeToWidth(ms, MaxPreviewWidth, BitmapInterpolationMode.MediumQuality) : new Bitmap(ms);
-                    }
-                }
-                catch { /* not decodable: fall back to the hex view */ }
-                if (image != null)
-                {
-                    if (width <= 0) (width, height) = (image.PixelSize.Width, image.PixelSize.Height);
-                    return new BodyBuild(kind, string.Empty, null, null, image, $"Image · {media} · {width}×{height} · {size}", note);
-                }
-                if (tooBig is not null && note.Length == 0)
-                    note = $"Image too large to preview ({tooBig} pixels): shown as hex. Save keeps the original bytes.";
-                goto case CurlBodyKind.Binary;
-            }
-            case CurlBodyKind.Binary:
-            {
-                var hex = CurlTextDocument.Create(CurlBody.HexDump(buf, len), CurlSyntax.None);
-                return new BodyBuild(kind, string.Empty, hex, null, null, $"Binary · {(media.Length > 0 ? media : "unknown type")} · {size}",
-                                     note.Length > 0 ? note : "Binary content, shown as hex — Save keeps the original bytes.");
-            }
-        }
-        string text = CurlBody.Decode(buf, len, CurlBody.CharsetOf(contentType), truncated);
-        var syntax = kind switch { CurlBodyKind.Json => CurlSyntax.Json, CurlBodyKind.Xml or CurlBodyKind.Html => CurlSyntax.Xml, _ => CurlSyntax.None };
-        var raw = CurlTextDocument.Create(text, syntax);
-        CurlTextDocument? pretty = null;
-        if (!truncated)
-        {
-            string? p = kind switch
-            {
-                CurlBodyKind.Json => CurlBody.PrettyJson(buf, len),
-                CurlBodyKind.Xml => CurlBody.PrettyXml(text),
-                _ => null,
-            };
-            if (p != null && p != text) pretty = CurlTextDocument.Create(p, syntax);
-        }
-        string label = kind switch { CurlBodyKind.Json => "JSON", CurlBodyKind.Xml => "XML", CurlBodyKind.Html => "HTML", _ => media.Length > 0 ? media : "Text" };
-        return new BodyBuild(kind, text, raw, pretty, null, $"{label} · {size}", note);
-    }
+    // laid out as every response viewer does (ResponseBodyBuilder); cURL's cap is 16 MB
+    private static ResponseBodyBuild BuildBody(byte[] buf, int len, bool truncated, string? contentType, string? decodedFrom)
+        => ResponseBodyBuilder.Build(buf, len, contentType, truncated,
+                                     $"Showing the first {CurlEngine.MaxResponseBytes / (1024 * 1024)} MB — the response was larger. Save keeps what arrived.",
+                                     $"\n\n… [response truncated at {CurlEngine.MaxResponseBytes / (1024 * 1024)} MB]", decodedFrom);
 
     private void BuildTiming(CurlResult res)
     {

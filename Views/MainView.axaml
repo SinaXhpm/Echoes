@@ -3,411 +3,568 @@
              xmlns:vm="using:Echoes.ViewModels"
              xmlns:views="using:Echoes.Views"
              xmlns:ctl="using:Echoes.Views.Controls"
-             xmlns:helpers="using:Echoes.Helpers"
              xmlns:chrome="using:Avalonia.Controls.Chrome"
              x:Class="Echoes.Views.MainView"
              x:DataType="vm:MainViewModel"
              Background="{DynamicResource Bg.App}" FontSize="12.5">
 
 	<UserControl.Styles>
-		<!-- ===== Shell layout: [sidebar | page]. The TabControl IS the shell: its strip is the sidebar
-		     nav, its content host the page (each tab's content is a lazily-filled tool host, see
-		     ToolViews in MainView.axaml.cs). The sidebar always shows its labels (the user wants the menu
-		     open at every size); it's kept narrow and dense instead, so the window can stay small: it opens
-		     828 wide and exactly as tall as this list (MainWindow). ===== -->
+		<!-- ===== Shell layout: [top bar] over [page]. The TabControl IS the shell: its strip is the top bar's row of tabs,
+		     its content host the page. Each tab is one tool instance (its content a lazily-filled host, see ToolViews in
+		     MainView.axaml.cs) or a new tab, which shows the launcher over the page area. The + button right after the tabs
+		     opens a new tab. The bar is 44 tall: the launcher's top margin matches it. ===== -->
 		<Style Selector="TabControl#MainTabs">
-			<Setter Property="Padding" Value="16,2,16,12"/>
+			<Setter Property="Padding" Value="16,12,16,12"/>
 			<Setter Property="Template">
 				<ControlTemplate>
-					<Grid ColumnDefinitions="Auto,*" x:DataType="vm:MainViewModel">
-						<!-- SIDEBAR -->
-						<Border Name="PART_Sidebar" Grid.Column="0" Width="160"
-								Background="{DynamicResource Bg.Sidebar}"
-								BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,1,0">
-							<Grid RowDefinitions="Auto,Auto,*,Auto">
-								<!-- Window drag areas (TitleBar role): they need a background to be hit-testable at all, else a
-								     press falls through to the content and the window can't be moved. Solid, the colour already
-								     under them; their texts are not hit-testable, so a press anywhere on them drags. -->
-								<!-- macOS draws the traffic lights over the top-left corner -->
-								<Border Grid.Row="0" Height="22" IsVisible="{Binding IsMac}" Background="{DynamicResource Bg.Sidebar}"
-										chrome:WindowDecorationProperties.ElementRole="TitleBar"/>
-								<!-- brand row: the name (a drag area) and, beside it, About + the light / dark switch — up here
-								     rather than in a footer, so the list can breathe without making the window taller. The
-								     buttons are siblings of the TitleBar-role border, not children, so they stay clickable. -->
-								<Grid Grid.Row="1" ColumnDefinitions="*,Auto" Background="{DynamicResource Bg.Sidebar}">
-									<Border Name="PART_Brand" Padding="12,5,3,5" Background="{DynamicResource Bg.Sidebar}"
-											chrome:WindowDecorationProperties.ElementRole="TitleBar">
-										<StackPanel Orientation="Horizontal" Spacing="9" IsHitTestVisible="False">
-											<Image Source="avares://Echoes/Assets/logo-256.png" Width="18" Height="18"
-												   RenderOptions.BitmapInterpolationMode="HighQuality"/>
-											<TextBlock Text="Echoes" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center"
-													   Foreground="{DynamicResource Text.Primary}"/>
-										</StackPanel>
-									</Border>
-									<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" Margin="0,0,8,0" VerticalAlignment="Center">
-										<Button Name="PART_About" Classes="sideLink headBtn" Command="{Binding OpenAboutCommand}"
-												ToolTip.Tip="{Binding CurrentVersion, StringFormat='About Echoes v{0}, updates'}"
-												AutomationProperties.Name="About Echoes">
-											<Path Classes="ico" Data="{StaticResource IcoAbout}"/>
+					<Grid RowDefinitions="Auto,*" x:DataType="vm:MainViewModel">
+						<!-- TOP BAR. The border is the window's drag area (TitleBar role: it needs a background to be
+						     hit-testable). The controls are its siblings on top, not children, so they stay clickable; the
+						     bar's empty parts fall through to the border and drag the window. The tabs stand on the bar's
+						     bottom edge: the chosen one, in the page's color, covers that edge's hairline and opens into the
+						     page below. -->
+						<Panel Grid.Row="0" Name="PART_TopBar" Height="44">
+							<Border Background="{DynamicResource Bg.Sidebar}"
+									BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,0,0,1"
+									chrome:WindowDecorationProperties.ElementRole="TitleBar"/>
+							<Grid ColumnDefinitions="Auto,*,Auto,Auto">
+								<!-- macOS draws the traffic lights at the start of the bar -->
+								<Border Grid.Column="0" Width="72" IsVisible="{Binding IsMac}"/>
+								<ctl:TabBarPanel Grid.Column="1" Margin="8,0,8,0" HorizontalAlignment="Left">
+									<!-- the row of tabs; while it is too full to show them all, a < and a > at its ends scroll it a
+									     barful at a time, each greyed where the row ends (MainView.FitTabList). They take no focus:
+									     the keyboard stays in the page, and Ctrl+Tab, Ctrl+1 … 9 and the list of tabs reach every tab. -->
+									<DockPanel>
+										<Button Name="PART_ScrollBack" DockPanel.Dock="Left" Classes="barBtn tabRowBtn tabScroll"
+												Margin="0,0,2,3" IsVisible="False" Focusable="False"
+												ToolTip.Tip="Show the tabs to the left" AutomationProperties.Name="Scroll the tabs left">
+											<Path Classes="ico" Data="M14.5 6 L8.5 12 L14.5 18"/>
 										</Button>
-										<!-- light / dark: the icon (a sun in the dark theme, a moon in the light one) and the tip are
-										     per-theme resources (Styles/Tokens.axaml), so the switch needs no state of its own -->
-										<Button Name="PART_ThemeToggle" Classes="sideLink headBtn"
-												Command="{Binding ToggleThemeCommand}" ToolTip.Tip="{DynamicResource Theme.ToggleTip}"
-												AutomationProperties.Name="Switch between the light and dark theme">
-											<Path Classes="ico" Data="{DynamicResource IcoThemeToggle}"/>
+										<Button Name="PART_ScrollForward" DockPanel.Dock="Right" Classes="barBtn tabRowBtn tabScroll"
+												Margin="2,0,0,3" IsVisible="False" Focusable="False"
+												ToolTip.Tip="Show the tabs to the right" AutomationProperties.Name="Scroll the tabs right">
+											<Path Classes="ico" Data="M9.5 6 L15.5 12 L9.5 18"/>
 										</Button>
-									</StackPanel>
-								</Grid>
-								<!-- nav -->
-								<ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
-											  HorizontalScrollBarVisibility="Disabled" AllowAutoHide="True">
-									<ItemsPresenter Name="PART_ItemsPresenter" Margin="7,0,7,3"
-													ItemsPanel="{TemplateBinding ItemsPanel}"/>
-								</ScrollViewer>
-								<!-- footer: only the update pill, when there is one -->
-								<StackPanel Grid.Row="3" Name="PART_SideFooter" Margin="8,0,8,8" IsVisible="{Binding IsUpdateAvailable}">
-									<Button Classes="updatePill" Command="{Binding OpenReleasesCommand}"
+										<ItemsPresenter Name="PART_ItemsPresenter" ClipToBounds="True" VerticalAlignment="Bottom"
+														ItemsPanel="{TemplateBinding ItemsPanel}"/>
+									</DockPanel>
+									<Button Name="PART_NewTab" Classes="barBtn tabRowBtn" Margin="4,0,0,3"
+											ToolTip.Tip="New tab" AutomationProperties.Name="New tab">
+										<Path Classes="ico" Data="M12 5 L12 19 M5 12 L19 12"/>
+									</Button>
+									<!-- every tab by name, shown while the row is too full to show them all (MainView.ShowTabList) -->
+									<Button Name="PART_TabList" Classes="barBtn tabRowBtn" Margin="0,0,0,3" IsVisible="False"
+											ToolTip.Tip="All tabs" AutomationProperties.Name="All tabs">
+										<Path Classes="ico" Data="M6.5 9.5 L12 15 L17.5 9.5"/>
+									</Button>
+								</ctl:TabBarPanel>
+								<!-- the update pill, About and the theme switch; on Windows / Linux the last two are in one row
+								     with the caption buttons Avalonia draws after them (captionRow, below) -->
+								<StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="0,0,8,0"
+											VerticalAlignment="Center" Classes.captionRow="{Binding !IsMac}">
+									<Button Classes="updatePill barPill" Command="{Binding OpenReleasesCommand}"
+											IsVisible="{Binding IsUpdateAvailable}"
 											ToolTip.Tip="{Binding LatestVersion, StringFormat='Version {0} is available — click to download'}">
-										<StackPanel Orientation="Horizontal" Spacing="8">
-											<Ellipse Width="7" Height="7" Fill="{DynamicResource Accent}" VerticalAlignment="Center"/>
+										<StackPanel Orientation="Horizontal" Spacing="6">
+											<Ellipse Width="6" Height="6" Fill="{DynamicResource Accent}" VerticalAlignment="Center"/>
 											<TextBlock Classes="sideLabel" Text="{Binding LatestVersion, StringFormat='Update to v{0}'}"
 													   VerticalAlignment="Center"/>
 										</StackPanel>
 									</Button>
+									<Button Name="PART_About" Classes="barBtn" Command="{Binding OpenAboutCommand}"
+											ToolTip.Tip="{Binding CurrentVersion, StringFormat='About Echoes v{0}, updates'}"
+											AutomationProperties.Name="About Echoes">
+										<Path Classes="ico" Data="{StaticResource IcoAbout}"/>
+									</Button>
+									<!-- light / dark: the icon (a sun in the dark theme, a moon in the light one) and the tip are
+									     per-theme resources (Styles/Tokens.axaml), so the switch needs no state of its own -->
+									<Button Name="PART_ThemeToggle" Classes="barBtn"
+											Command="{Binding ToggleThemeCommand}" ToolTip.Tip="{DynamicResource Theme.ToggleTip}"
+											AutomationProperties.Name="Switch between the light and dark theme">
+										<Path Classes="ico" Data="{DynamicResource IcoThemeToggle}"/>
+									</Button>
 								</StackPanel>
+								<!-- Windows / Linux: Avalonia draws the caption buttons (minimize, maximize, close) at the end of the
+								     bar; their width is measured once the window shows (MainView.FitCaptionSpace) -->
+								<Border Grid.Column="3" Width="{Binding $parent[views:MainView].CaptionSpace}" IsVisible="{Binding !IsMac}"/>
 							</Grid>
-						</Border>
+						</Panel>
 
-						<!-- PAGE: fills the height but asks for none, so the window opens fitted to the nav (MainWindow) -->
-						<ctl:HeightNeutral Grid.Column="1">
-							<Grid RowDefinitions="Auto,*" Background="{DynamicResource Bg.App}">
-								<Border Grid.Row="0" Name="PART_PageHeader" Padding="16,9,16,6" Background="{DynamicResource Bg.App}"
-										chrome:WindowDecorationProperties.ElementRole="TitleBar">
-									<StackPanel Spacing="2" IsHitTestVisible="False">
-										<TextBlock Classes="pageTitle" Text="{Binding $parent[views:MainView].PageTitle}"/>
-										<TextBlock Classes="pageSubtitle" Text="{Binding $parent[views:MainView].PageSubtitle}"/>
-									</StackPanel>
-								</Border>
-								<ContentPresenter Grid.Row="1" Name="PART_SelectedContentHost"
-												  Margin="{TemplateBinding Padding}"
-												  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-												  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
-												  Content="{TemplateBinding SelectedContent}"
-												  ContentTemplate="{TemplateBinding SelectedContentTemplate}"/>
-							</Grid>
-						</ctl:HeightNeutral>
+						<!-- PAGE -->
+						<ContentPresenter Grid.Row="1" Name="PART_SelectedContentHost"
+										  Margin="{TemplateBinding Padding}"
+										  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+										  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+										  Content="{TemplateBinding SelectedContent}"
+										  ContentTemplate="{TemplateBinding SelectedContentTemplate}"/>
 					</Grid>
 				</ControlTemplate>
 			</Setter>
 		</Style>
 
-		<!-- ===== Sidebar nav item, a source list: [section label] + a row with a teal glyph; the chosen row is tinted
-		     with the accent, marked by a short accent bar at its start, its label bold ===== -->
+		<!-- ===== A tab: [glyph] label [x], 36 high on the bar's bottom edge, rounded at the top. An idle tab is just its
+		     glyph and label on the bar (a hairline under it continues the bar's edge); under the pointer it lifts off the
+		     bar. The chosen tab is the page's own color, framed by a hairline and open at the bottom into the page, with an
+		     accent line along its top and its glyph in the accent. The close cross shows on the chosen tab and under the
+		     pointer; its slot is always there, so tabs never change width on hover. Each tab is as wide as its label (up to
+		     200); when the row doesn't fit, tabs shrink down to 96 (the label then runs over the hidden cross's slot, so
+		     most names still read in full), then the row scrolls (TabStripPanel, its arrows at the ends) and a button
+		     after + lists every tab. While something runs in the tab, a dot takes the glyph's place, as Submarine marks
+		     its sessions (NavTabItem.State): green running, amber waiting, red down, blue finished while another tab was
+		     chosen. ===== -->
 		<Style Selector="TabItem.navtab">
-			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
 			<Setter Property="FontSize" Value="12"/>
 			<Setter Property="FontWeight" Value="Medium"/>
 			<Setter Property="Margin" Value="0"/>
 			<Setter Property="Padding" Value="0"/>
 			<Setter Property="MinHeight" Value="0"/>
+			<Setter Property="MinWidth" Value="96"/>
+			<Setter Property="MaxWidth" Value="200"/>
 			<Setter Property="Template">
 				<ControlTemplate TargetType="ctl:NavTabItem">
-					<StackPanel>
-						<TextBlock Name="PART_GroupLabel" Classes="navgroup" Text="{TemplateBinding Group}"
-								   IsHitTestVisible="False"
-								   IsVisible="{TemplateBinding Group, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-						<Border Name="PART_Pill" Height="22" CornerRadius="6" Padding="8,0"
-								Background="{DynamicResource Bg.Sidebar}">
-							<Panel>
-								<!-- 2px in from the pill's edge, out through its padding -->
-								<Border Name="PART_Indicator" Width="2.5" Height="10" CornerRadius="1.25" Margin="-6,0,0,0"
-										HorizontalAlignment="Left" VerticalAlignment="Center"
-										Background="{DynamicResource Nav.Indicator}" IsVisible="False"/>
-								<ContentPresenter Name="PART_ContentPresenter" VerticalAlignment="Center"
-												  Content="{TemplateBinding Header}"
-												  ContentTemplate="{TemplateBinding HeaderTemplate}"
-												  Foreground="{TemplateBinding Foreground}"/>
-							</Panel>
-						</Border>
-					</StackPanel>
+					<!-- 35 high and a pixel above the bar's bottom hairline, which shows through (also under the pointer); the
+					     chosen one 36 and over it. Every tab keeps a side border, unseen but on the chosen one, so no tab
+					     changes width when it is chosen. -->
+					<Border Name="PART_Pill" Height="35" Margin="0,0,0,1" CornerRadius="7,7,0,0" Padding="10,0,6,0"
+							Background="Transparent" BorderBrush="Transparent" BorderThickness="1,1,1,0"
+							ToolTip.Tip="{TemplateBinding TipShown}">
+						<Panel>
+							<!-- the accent line along the chosen tab's top edge, between its rounded corners -->
+							<Border Name="PART_Line" Height="2" Margin="-3,-1,1,0" VerticalAlignment="Top" CornerRadius="1"
+									Background="{DynamicResource Nav.Indicator}" IsVisible="False"/>
+							<!-- glyph (or the state dot), label, close: in a squeezed tab the label also takes the hidden cross's
+							     slot (TabRowPanel) -->
+							<ctl:TabRowPanel CloseSlot="18">
+								<!-- the glyph's 16 square, whichever of the two shows: the tab keeps its width when the dot
+								     comes or goes -->
+								<Panel Width="16" Height="16" VerticalAlignment="Center">
+									<Path Name="PART_Icon" Classes="ico" Data="{TemplateBinding Glyph}"/>
+									<Ellipse Name="PART_State" Classes="tabState"/>
+								</Panel>
+								<TextBlock Name="PART_Label" Margin="7,0,2,0" VerticalAlignment="Center"
+										   Text="{TemplateBinding Header}" TextTrimming="CharacterEllipsis"
+										   Foreground="{TemplateBinding Foreground}"/>
+								<Button Name="PART_Close" Classes="tabClose" IsVisible="False" VerticalAlignment="Center"
+										ToolTip.Tip="Close tab" AutomationProperties.Name="Close tab">
+									<Path Classes="ico" Data="{StaticResource IcoClose}"/>
+								</Button>
+							</ctl:TabRowPanel>
+						</Panel>
+					</Border>
 				</ControlTemplate>
 			</Setter>
 		</Style>
+		<Style Selector="TabItem.navtab:pointerover">
+			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+		</Style>
 		<Style Selector="TabItem.navtab:pointerover /template/ Border#PART_Pill">
-			<Setter Property="Background" Value="{DynamicResource Nav.Hover}"/>
+			<Setter Property="Background" Value="{DynamicResource Tab.Hover}"/>
 		</Style>
 		<Style Selector="TabItem.navtab:pressed /template/ Border#PART_Pill">
-			<Setter Property="Background" Value="{DynamicResource Nav.Pressed}"/>
-		</Style>
-		<Style Selector="TabItem.navtab:selected /template/ Border#PART_Pill">
-			<Setter Property="Background" Value="{DynamicResource Nav.Selected}"/>
-		</Style>
-		<Style Selector="TabItem.navtab:selected:pointerover /template/ Border#PART_Pill">
-			<Setter Property="Background" Value="{DynamicResource Nav.SelectedHover}"/>
-		</Style>
-		<Style Selector="TabItem.navtab:selected /template/ Border#PART_Indicator">
-			<Setter Property="IsVisible" Value="True"/>
+			<Setter Property="Background" Value="{DynamicResource Tab.Pressed}"/>
 		</Style>
 		<Style Selector="TabItem.navtab:selected">
 			<Setter Property="Foreground" Value="{DynamicResource Text.Bright}"/>
-			<Setter Property="FontWeight" Value="SemiBold"/>
 		</Style>
-		<!-- A Path doesn't inherit Foreground: glyphs follow the state through Stroke. Child selectors on
-		     purpose: the header panel is the item's direct child, while the open tool (also a logical
-		     descendant of the item) must keep its own icon colours. -->
-		<Style Selector="TabItem.navtab > StackPanel > Path.ico">
-			<Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+		<Style Selector="TabItem.navtab:selected /template/ Border#PART_Pill">
+			<Setter Property="Background" Value="{DynamicResource Bg.App}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+			<Setter Property="Height" Value="36"/>
+			<Setter Property="Margin" Value="0"/>
 		</Style>
-		<!-- Sidebar glyphs at 18px: the shared 24-unit icons drawn three quarters size (a thicker stroke keeps the
-		     line weight the same), with the -3 margins shrinking their layout box to match. Smaller glyphs are most of
-		     what makes the list read as separate rows instead of a packed column. -->
-		<Style Selector="TabItem.navtab > StackPanel > Path.ico, Button.headBtn > Path.ico">
-			<Setter Property="RenderTransform" Value="scale(0.6667)"/>
-			<Setter Property="Margin" Value="-4"/>
-			<Setter Property="StrokeThickness" Value="2.3"/>
+		<Style Selector="TabItem.navtab:selected /template/ Border#PART_Line">
+			<Setter Property="IsVisible" Value="True"/>
 		</Style>
 		<Style Selector="TabItem.navtab:focus-visible /template/ Border#PART_Pill">
 			<Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+		</Style>
+		<Style Selector="TabItem.navtab:selected /template/ Button#PART_Close, TabItem.navtab:pointerover /template/ Button#PART_Close">
+			<Setter Property="IsVisible" Value="True"/>
+		</Style>
+		<!-- glyphs at 16px: the shared 24-unit icons drawn two thirds size, a thicker stroke keeping the line weight -->
+		<Style Selector="TabItem.navtab /template/ Path#PART_Icon, Button.barBtn > Path.ico">
+			<Setter Property="RenderTransform" Value="scale(0.6667)"/>
+			<Setter Property="Margin" Value="-4"/>
+			<Setter Property="StrokeThickness" Value="2.3"/>
+			<Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+		</Style>
+		<Style Selector="TabItem.navtab:pointerover /template/ Path#PART_Icon">
+			<Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+		</Style>
+		<Style Selector="TabItem.navtab:selected /template/ Path#PART_Icon">
+			<Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+		</Style>
+
+		<!-- the state dot: 8px of solid color, centered where the glyph was. Hidden, with the glyph back, while nothing
+		     runs. -->
+		<Style Selector="Ellipse.tabState">
+			<Setter Property="Width" Value="8"/>
+			<Setter Property="Height" Value="8"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+			<Setter Property="IsHitTestVisible" Value="False"/>
+			<Setter Property="IsVisible" Value="False"/>
+		</Style>
+		<Style Selector="TabItem.navtab:running /template/ Path#PART_Icon, TabItem.navtab:waiting /template/ Path#PART_Icon, TabItem.navtab:down /template/ Path#PART_Icon, TabItem.navtab:unseen /template/ Path#PART_Icon">
+			<Setter Property="IsVisible" Value="False"/>
+		</Style>
+		<Style Selector="TabItem.navtab:running /template/ Ellipse.tabState">
+			<Setter Property="Fill" Value="{DynamicResource Success}"/>
+			<Setter Property="IsVisible" Value="True"/>
+		</Style>
+		<Style Selector="TabItem.navtab:waiting /template/ Ellipse.tabState">
+			<Setter Property="Fill" Value="{DynamicResource Warning}"/>
+			<Setter Property="IsVisible" Value="True"/>
+		</Style>
+		<Style Selector="TabItem.navtab:down /template/ Ellipse.tabState">
+			<Setter Property="Fill" Value="{DynamicResource Danger}"/>
+			<Setter Property="IsVisible" Value="True"/>
+		</Style>
+		<Style Selector="TabItem.navtab:unseen /template/ Ellipse.tabState">
+			<Setter Property="Fill" Value="{DynamicResource Accent.Text}"/>
+			<Setter Property="IsVisible" Value="True"/>
+		</Style>
+
+		<!-- a tab's close cross: 18px, the glyph at half size -->
+		<Style Selector="Button.tabClose">
+			<Setter Property="Width" Value="18"/>
+			<Setter Property="Height" Value="18"/>
+			<Setter Property="MinHeight" Value="0"/>
+			<Setter Property="MinWidth" Value="0"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="CornerRadius" Value="4"/>
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="HorizontalContentAlignment" Value="Center"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="Button.tabClose > Path.ico">
+			<Setter Property="RenderTransform" Value="scale(0.5)"/>
+			<Setter Property="Margin" Value="-6"/>
+			<Setter Property="StrokeThickness" Value="3"/>
+			<Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+		</Style>
+		<Style Selector="Button.tabClose:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Nav.Pressed}"/>
+		</Style>
+		<Style Selector="Button.tabClose:pointerover > Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+		</Style>
+
+		<!-- the bar's square buttons: new tab, About, the theme switch; the row's arrows, + and the list of tabs sit level
+		     with the tabs (tabRowBtn, 30 high and centered on the chosen tab), the others in the middle of the bar -->
+		<Style Selector="Button.barBtn">
+			<Setter Property="Width" Value="30"/>
+			<Setter Property="Height" Value="28"/>
+			<Setter Property="MinHeight" Value="0"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="HorizontalContentAlignment" Value="Center"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="Button.barBtn.tabRowBtn">
+			<Setter Property="Height" Value="30"/>
+			<Setter Property="VerticalAlignment" Value="Bottom"/>
+		</Style>
+		<Style Selector="Button.barBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Tab.Hover}"/>
+		</Style>
+		<Style Selector="Button.barBtn:pressed /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Tab.Pressed}"/>
+		</Style>
+		<Style Selector="Button.barBtn:pointerover > Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+		</Style>
+		<!-- the row's < and >: narrower, their chevrons brighter than the bar's other glyphs so they are seen; greyed, and
+		     inert, at the end the row has reached -->
+		<Style Selector="Button.barBtn.tabScroll">
+			<Setter Property="Width" Value="22"/>
+		</Style>
+		<Style Selector="Button.tabScroll > Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+		</Style>
+		<Style Selector="Button.tabScroll:pointerover > Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource Text.Bright}"/>
+		</Style>
+		<Style Selector="Button.tabScroll:disabled /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="Transparent"/>
+		</Style>
+		<Style Selector="Button.tabScroll:disabled > Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+		</Style>
+		<!-- Windows / Linux: About and the theme switch are caption buttons as well, in one row with the minimize, maximize
+		     and close buttons Avalonia draws after them: the bar's full height, the same width, square, 2 apart as those are
+		     (and 2 from them, MainView.FitCaptionSpace), the same hover, press and glyph colors (the CaptionButton* keys,
+		     Styles/Tokens.axaml) -->
+		<Style Selector="StackPanel.captionRow">
+			<Setter Property="Margin" Value="0"/>
+			<Setter Property="VerticalAlignment" Value="Stretch"/>
+		</Style>
+		<Style Selector="StackPanel.captionRow > Button.barBtn">
+			<Setter Property="Width" Value="{DynamicResource CaptionButtonWidth}"/>
+			<Setter Property="Height" Value="{DynamicResource CaptionButtonHeight}"/>
+			<Setter Property="CornerRadius" Value="0"/>
+			<Setter Property="VerticalAlignment" Value="Top"/>
+		</Style>
+		<Style Selector="StackPanel.captionRow > Button.barBtn > Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource CaptionButtonForeground}"/>
+		</Style>
+		<Style Selector="StackPanel.captionRow > Button.barBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource CaptionButtonBackground}"/>
+		</Style>
+		<Style Selector="StackPanel.captionRow > Button.barBtn:pressed /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource CaptionButtonBorderBrush}"/>
+		</Style>
+		<Style Selector="StackPanel.captionRow > Button.barBtn:pointerover > Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+		</Style>
+		<!-- the update pill, sized for the bar, in its middle -->
+		<Style Selector="Button.updatePill.barPill">
+			<Setter Property="Padding" Value="9,0"/>
+			<Setter Property="Height" Value="24"/>
+			<Setter Property="MinHeight" Value="0"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+			<Setter Property="Margin" Value="0,0,4,0"/>
+		</Style>
+
+		<!-- ===== Launcher (a new tab, and the page the app opens on with no tabs saved): a search box, then every tool as a
+		     card, a block per group, in as many equal columns as the width holds (three as the window opens, two when
+		     narrow, four when wide). Blocks share a row where that leaves no gaps (LauncherPanel): Diagnose in two columns
+		     beside Web & API, Serve & Connect beside Workspace. The cards line up across the page, and grow a little taller
+		     to fill it when there is room. A card is [glyph badge] name over one line on what it does, with a (!) button
+		     in its corner that opens the details, and a dot when the tool has a tab (green while it runs, as on the tab).
+		     Built on first use (BuildLauncher). ===== -->
+		<Style Selector="TextBlock.launchGroup">
+			<Setter Property="FontSize" Value="11"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="LetterSpacing" Value="0.3"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+			<Setter Property="Margin" Value="6,4,0,0"/>
+		</Style>
+		<Style Selector="Button.launchCard">
+			<Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+			<Setter Property="Padding" Value="7,5,30,5"/>
+			<Setter Property="Margin" Value="2.5"/>
+			<Setter Property="MinHeight" Value="0"/>
+			<Setter Property="HorizontalAlignment" Value="Stretch"/>
+			<Setter Property="VerticalAlignment" Value="Stretch"/>
+			<Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+			<!-- the card under the keyboard is tinted like the chosen tab (below); Fluent's square white frame around a
+			     rounded card goes -->
+			<Setter Property="FocusAdorner" Value="{x:Null}"/>
+		</Style>
+		<!-- under the pointer a card's hairline brightens -->
+		<Style Selector="Button.launchCard:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Bg.CardHover}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}"/>
+		</Style>
+		<Style Selector="Button.launchCard:pressed /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Nav.Pressed}"/>
+		</Style>
+		<Style Selector="Button.launchCard:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Nav.Selected}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+		</Style>
+		<!-- the glyph's badge, tinted with its group's color (hue0-3: blue, violet, green, amber; MainView.HueOf), as
+		     Submarine tints its folders -->
+		<Style Selector="Border.launchBadge">
+			<Setter Property="Width" Value="26"/>
+			<Setter Property="Height" Value="26"/>
+			<Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+			<Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Accent.Border}"/>
 			<Setter Property="BorderThickness" Value="1"/>
 		</Style>
-		<!-- the brand row's About / theme buttons: small square icon buttons (the shared .sideLink is a wide row;
-		     its class style outranks template values, so this one needs a class in its selector too) -->
-		<Style Selector="Button.sideLink.headBtn">
-			<Setter Property="Padding" Value="4"/>
-			<Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
-			<Setter Property="HorizontalAlignment" Value="Left"/>
+		<Style Selector="Border.launchBadge > Path.ico">
+			<Setter Property="RenderTransform" Value="scale(0.6667)"/>
+			<Setter Property="Margin" Value="-4"/>
+			<Setter Property="StrokeThickness" Value="2.3"/>
+			<Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
 		</Style>
-		<!-- section labels: a clear gap above each group, a small one before its first item -->
-		<Style Selector="TabItem.navtab /template/ TextBlock#PART_GroupLabel">
-			<Setter Property="Margin" Value="9,6,0,1"/>
-			<Setter Property="FontSize" Value="10"/>
+		<Style Selector="Border.launchBadge.hue1">
+			<Setter Property="Background" Value="{DynamicResource Violet.Soft}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Violet.Border}"/>
 		</Style>
-		<Style Selector="TabItem.navtab:nth-child(1) /template/ TextBlock#PART_GroupLabel">
-			<Setter Property="Margin" Value="9,0,0,1"/>
+		<Style Selector="Border.launchBadge.hue1 > Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource Violet}"/>
+		</Style>
+		<Style Selector="Border.launchBadge.hue2">
+			<Setter Property="Background" Value="{DynamicResource Success.Soft}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Success.Border}"/>
+		</Style>
+		<Style Selector="Border.launchBadge.hue2 > Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource Success}"/>
+		</Style>
+		<Style Selector="Border.launchBadge.hue3">
+			<Setter Property="Background" Value="{DynamicResource Warning.Soft}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Warning.Border}"/>
+		</Style>
+		<Style Selector="Border.launchBadge.hue3 > Path.ico">
+			<Setter Property="Stroke" Value="{DynamicResource Warning}"/>
+		</Style>
+		<Style Selector="TextBlock.launchTitle">
+			<Setter Property="FontSize" Value="12.5"/>
+			<Setter Property="FontWeight" Value="Medium"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+			<Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+		</Style>
+		<Style Selector="TextBlock.launchSummary">
+			<Setter Property="FontSize" Value="11.5"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+			<Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+			<Setter Property="Margin" Value="0,1,0,0"/>
+		</Style>
+		<!-- the (!) in a card's corner: a small ring, the mark inside -->
+		<Style Selector="Button.launchInfo">
+			<Setter Property="Width" Value="18"/>
+			<Setter Property="Height" Value="18"/>
+			<Setter Property="MinWidth" Value="0"/>
+			<Setter Property="MinHeight" Value="0"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="Margin" Value="0,8,8,0"/>
+			<Setter Property="CornerRadius" Value="9"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+			<Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+			<Setter Property="FontSize" Value="11"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="HorizontalAlignment" Value="Right"/>
+			<Setter Property="VerticalAlignment" Value="Top"/>
+			<Setter Property="HorizontalContentAlignment" Value="Center"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="Button.launchInfo:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Nav.Selected}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/>
+		</Style>
+		<Style Selector="Button.launchInfo:pressed /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="{DynamicResource Nav.Pressed}"/>
+		</Style>
+		<Style Selector="Ellipse.launchDot">
+			<Setter Property="Width" Value="6"/>
+			<Setter Property="Height" Value="6"/>
+			<Setter Property="Margin" Value="0,0,14,10"/>
+			<Setter Property="HorizontalAlignment" Value="Right"/>
+			<Setter Property="VerticalAlignment" Value="Bottom"/>
+			<!-- grey for a tab that is open and idle (blue on a tab means "finished while you were away") -->
+			<Setter Property="Fill" Value="{DynamicResource Text.Muted}"/>
+			<Setter Property="IsHitTestVisible" Value="False"/>
+			<Setter Property="IsVisible" Value="False"/>
+		</Style>
+		<Style Selector="Panel.launchTile.open > Ellipse.launchDot">
+			<Setter Property="IsVisible" Value="True"/>
+		</Style>
+		<!-- a tab of the tool runs something: the dot takes the tab's color -->
+		<Style Selector="Panel.launchTile.running > Ellipse.launchDot">
+			<Setter Property="Fill" Value="{DynamicResource Success}"/>
+		</Style>
+		<Style Selector="Panel.launchTile.waiting > Ellipse.launchDot">
+			<Setter Property="Fill" Value="{DynamicResource Warning}"/>
+		</Style>
+		<Style Selector="Panel.launchTile.down > Ellipse.launchDot">
+			<Setter Property="Fill" Value="{DynamicResource Danger}"/>
+		</Style>
+
+		<!-- the search box over the cards: a 16px magnifier at its start, and at its end what Enter opens. The card of
+		     that best match carries the accent border. -->
+		<!-- (the box's own side padding is only around its text: the glyph sits 10 from the edge and 8 before the text,
+		     the hint 10 from the other edge) -->
+		<Style Selector="Path.launchSearchIco">
+			<Setter Property="RenderTransform" Value="scale(0.6667)"/>
+			<Setter Property="Margin" Value="6,-4,-8,-4"/>
+			<Setter Property="StrokeThickness" Value="2.3"/>
+		</Style>
+		<Style Selector="TextBlock.launchHint">
+			<Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+			<Setter Property="Margin" Value="8,0,10,0"/>
+		</Style>
+		<Style Selector="TextBlock.launchEmpty">
+			<Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="Margin" Value="0,48,0,0"/>
+		</Style>
+		<Style Selector="Panel.launchTile.best > Button.launchCard">
+			<Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+		</Style>
+		<Style Selector="Panel.launchTile.best > Button.launchCard:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+		</Style>
+
+		<!-- the (!) details and the close confirmation (flyouts anchored in this view) -->
+		<Style Selector="TextBlock.infoTitle">
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+		</Style>
+		<Style Selector="TextBlock.infoPoint">
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
+		</Style>
+		<Style Selector="TextBlock.infoMuted">
+			<Setter Property="FontSize" Value="11.5"/>
+			<Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+			<Setter Property="TextWrapping" Value="Wrap"/>
 		</Style>
 	</UserControl.Styles>
 
 	<Panel>
-	<TabControl x:Name="MainTabs" TabStripPlacement="Left"
-				SelectionChanged="OnTabSelectionChanged">
-		<TabControl.ItemsPanel>
+	<!-- The tabs are made in code (MainView.MakeTab): the saved ones at start, then as tools are opened. -->
+	<ctl:ShellTabControl x:Name="MainTabs" SelectionChanged="OnTabSelectionChanged">
+		<ctl:ShellTabControl.ItemsPanel>
 			<ItemsPanelTemplate>
-				<!-- a hairline of space between rows, so hover / selection pills never touch -->
-				<StackPanel Spacing="2"/>
+				<ctl:TabStripPanel Spacing="2"/>
 			</ItemsPanelTemplate>
-		</TabControl.ItemsPanel>
+		</ctl:ShellTabControl.ItemsPanel>
+	</ctl:ShellTabControl>
 
-		<!-- Grouped by what you're doing. Each tab's content is an empty host that gets its tool view
-		     (and view-model) on first visit — see ToolViews in MainView.axaml.cs — and keeps it, so a
-		     tool's state survives switching tabs. Tag = the tool id (code-behind keys on it). -->
+	<!-- the launcher, shown by a new tab, over the page below the bar (44, the bar's height); solid, so nothing under it shows -->
+	<Border Name="Launcher" Margin="0,44,0,0" Background="{DynamicResource Bg.App}"
+			IsVisible="{Binding $parent[views:MainView].IsLauncherOpen}">
+		<Grid RowDefinitions="Auto,*">
+			<!-- Find a tool by typing (the box has the focus when a new tab opens): its name, what it does, or a tool it
+			     stands in for (dig, nmap, Postman). Enter opens the best match, the arrows walk the cards. It stays put
+			     while the cards scroll; its width is the cards' (their 3 margin off each side of the 1240). -->
+			<Panel MaxWidth="1234" Margin="16,10,16,0">
+				<TextBox Name="LauncherSearch" Classes="field"
+						 PlaceholderText="Search tools: a name, a task, or a tool you know (dig, nmap, Postman)"
+						 AutomationProperties.Name="Search tools">
+					<TextBox.InnerLeftContent>
+						<Path Classes="ico launchSearchIco" Data="{StaticResource IcoScanner}"/>
+					</TextBox.InnerLeftContent>
+					<TextBox.InnerRightContent>
+						<TextBlock Name="LauncherHint" Classes="launchHint" IsVisible="False"/>
+					</TextBox.InnerRightContent>
+				</TextBox>
+			</Panel>
+			<!-- the cards fill the height the scroller has (MainView.LayoutLauncher), less this panel's 2 + 8 margin -->
+			<ScrollViewer Grid.Row="1" Name="LauncherScroll" HorizontalScrollBarVisibility="Disabled"
+						  VerticalScrollBarVisibility="Auto">
+				<Panel MaxWidth="1240" Margin="13,2,13,8" VerticalAlignment="Top">
+					<!-- (the groups' headings and cards: BuildLauncher) -->
+					<ctl:LauncherPanel Name="LauncherStack" MinColumnWidth="240" MaxColumns="4" MaxGrow="16"/>
+					<TextBlock Name="LauncherEmpty" Classes="launchEmpty" IsVisible="False"/>
+				</Panel>
+			</ScrollViewer>
+		</Grid>
+	</Border>
 
-		<!-- DIAGNOSE -->
-		<ctl:NavTabItem Classes="navtab" Tag="PING" Group="Diagnose" Title="Ping"
-						Subtitle="Live stats, TCP ping, traceroute and MTR"
-						AutomationProperties.Name="Ping">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoPing}"/>
-					<TextBlock Classes="navlabel" Text="Ping"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="DOCTOR" Title="Doctor"
-						Subtitle="Why a site won't open for you"
-						AutomationProperties.Name="Doctor">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoDoctor}"/>
-					<TextBlock Classes="navlabel" Text="Doctor"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="DNS" Title="DNS &amp; WHOIS"
-						Subtitle="DoH / DoT lookups, mail check, WHOIS"
-						AutomationProperties.Name="DNS">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoDns}"/>
-					<TextBlock Classes="navlabel" Text="DNS"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="SCANNER" Title="Port Scanner"
-						Subtitle="TCP / UDP scan, service detection"
-						AutomationProperties.Name="Port Scanner">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoScanner}"/>
-					<TextBlock Classes="navlabel" Text="Scanner"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="CHECK-HOST" Title="Check Host"
-						Subtitle="Checks from nodes around the world"
-						AutomationProperties.Name="Check Host">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoCheckHost}"/>
-					<TextBlock Classes="navlabel" Text="Check Host"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="MONITOR" Title="Monitor"
-						Subtitle="Uptime, expiry checks, Telegram alerts"
-						AutomationProperties.Name="Monitor">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoMonitor}"/>
-					<TextBlock Classes="navlabel" Text="Monitor"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="NETWORK" Title="Network"
-						Subtitle="Interfaces, Wi-Fi, ports and routes"
-						AutomationProperties.Name="Network">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoNetwork}"/>
-					<TextBlock Classes="navlabel" Text="Network"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="DEVICE" Title="Device"
-						Subtitle="Hardware, system, battery and sensors"
-						AutomationProperties.Name="Device">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoDevice}"/>
-					<TextBlock Classes="navlabel" Text="Device"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="SPEED TEST" Title="Speed Test"
-						Subtitle="Internet speed and latency"
-						AutomationProperties.Name="Speed Test">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoSpeed}"/>
-					<TextBlock Classes="navlabel" Text="Speed Test"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-
-		<!-- WEB & API -->
-		<ctl:NavTabItem Classes="navtab" Tag="CURL" Group="Web &amp; API" Title="cURL"
-						Subtitle="HTTP requests, responses and TLS"
-						AutomationProperties.Name="cURL">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoCurl}"/>
-					<TextBlock Classes="navlabel" Text="cURL"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="TLS" Title="TLS Inspector"
-						Subtitle="Certificates, expiry, versions, ciphers"
-						AutomationProperties.Name="TLS Inspector">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoTls}"/>
-					<TextBlock Classes="navlabel" Text="TLS Inspector"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="IP INFO" Title="IP Info"
-						Subtitle="Public IP and GeoIP lookups"
-						AutomationProperties.Name="IP Info">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoIpInfo}"/>
-					<TextBlock Classes="navlabel" Text="IP Info"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="CLOUDFLARE" Title="Cloudflare"
-						Subtitle="DNS, DDNS, SSL/TLS, security, rules"
-						AutomationProperties.Name="Cloudflare">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoCloudflare}"/>
-					<TextBlock Classes="navlabel" Text="Cloudflare"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="TELEGRAM BOT" Title="Telegram Bot"
-						Subtitle="Bot API calls, uploads, updates"
-						AutomationProperties.Name="Telegram Bot">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoTelegram}"/>
-					<TextBlock Classes="navlabel" Text="Telegram Bot"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-
-		<!-- SERVE & CONNECT -->
-		<ctl:NavTabItem Classes="navtab" Tag="SSH" Group="Serve &amp; Connect" Title="SSH"
-						Subtitle="Terminal, files, forwards, health"
-						AutomationProperties.Name="SSH">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoSsh}"/>
-					<TextBlock Classes="navlabel" Text="SSH"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="SOCKET" Title="Socket"
-						Subtitle="TCP / UDP client and server, WebSocket"
-						AutomationProperties.Name="Socket">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoSocket}"/>
-					<TextBlock Classes="navlabel" Text="Socket"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="WEB SERVER" Title="Web Server"
-						Subtitle="Share files and chat, or catch webhooks"
-						AutomationProperties.Name="Web Server">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoWebServer}"/>
-					<TextBlock Classes="navlabel" Text="Web Server"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="PROXY" Title="Proxy"
-						Subtitle="SOCKS5 / HTTP server and checker"
-						AutomationProperties.Name="Proxy">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoProxy}"/>
-					<TextBlock Classes="navlabel" Text="Proxy"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-
-		<!-- WORKSPACE -->
-		<ctl:NavTabItem Classes="navtab" Tag="STRING LAB" Group="Workspace" Title="String Lab"
-						Subtitle="Encode, hash, convert, diff, generate"
-						AutomationProperties.Name="String Lab">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoStringLab}"/>
-					<TextBlock Classes="navlabel" Text="String Lab"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<ctl:NavTabItem Classes="navtab" Tag="NOTES" Title="Notes"
-						Subtitle="Encrypted notes"
-						AutomationProperties.Name="Notes">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoNotes}"/>
-					<TextBlock Classes="navlabel" Text="Notes"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header><Decorator/></ctl:NavTabItem>
-		<!-- HISTORY + BACKUP share one nav entry with two sub-tabs -->
-		<ctl:NavTabItem Classes="navtab" Tag="DATA" Title="History &amp; Backup"
-						Subtitle="Recent inputs and encrypted backups"
-						AutomationProperties.Name="History and Backup">
-			<ctl:NavTabItem.Header>
-				<StackPanel Orientation="Horizontal" Spacing="8">
-					<Path Classes="ico" Data="{StaticResource IcoBackup}"/>
-					<TextBlock Classes="navlabel" Text="History &amp; Backup"/>
-				</StackPanel>
-			</ctl:NavTabItem.Header>
-			<TabControl Padding="0">
-				<TabItem Header="History"><Decorator x:Name="HistoryHost"/></TabItem>
-				<TabItem Header="Backup"><Decorator x:Name="BackupHost"/></TabItem>
-			</TabControl>
-		</ctl:NavTabItem>
-	</TabControl>
-	<!-- the About box, over sidebar and page; height-neutral so the window stays fitted to the nav -->
-	<ctl:HeightNeutral>
-		<views:AboutView IsVisible="{Binding IsAboutOpen}"/>
-	</ctl:HeightNeutral>
+	<!-- the About box, over the bar and page -->
+	<views:AboutView IsVisible="{Binding IsAboutOpen}"/>
 	</Panel>
 </UserControl>

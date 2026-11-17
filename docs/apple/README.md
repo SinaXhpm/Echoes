@@ -9,11 +9,11 @@ to paste into App Store Connect is in [app-store-listing.md](app-store-listing.m
 | Piece | State |
 | :--- | :--- |
 | macOS `.dmg` on GitHub, signed with Developer ID, notarized and stapled | **Shipped** since v0.4.3 (Intel and Apple Silicon): Gatekeeper accepts both as "Notarized Developer ID", and both were opened on a real Mac. Without the secrets below the build is signed ad hoc, as before. |
-| macOS `.pkg` for the Mac App Store | **Built and uploaded** (1.0.0, build 2, universal) by `macos-appstore.yml`: sandboxed, tested under the sandbox in CI, validated by Apple; see "Mac App Store". |
-| iOS / iPadOS app | **On TestFlight** (`Echoes.iOS/`, built and started on iPhone and iPad simulators by `.github/workflows/ios.yml`, signed builds by `ios-testflight.yml`). Not tried on a real iPhone yet; see "iOS: what works and what is left". |
+| macOS `.pkg` for the Mac App Store | **On the Mac App Store** (the README links it since 2026-10-25). Built and uploaded (1.0.0, build 2, universal) by `macos-appstore.yml`: sandboxed, tested under the sandbox in CI, validated by Apple; see "Mac App Store". |
+| iOS / iPadOS app | **On the App Store** and TestFlight (`Echoes.iOS/`, built and started on iPhone and iPad simulators by `.github/workflows/ios.yml`, signed builds by `ios-testflight.yml`). Not tried on a real iPhone yet; see "iOS: what works and what is left". |
 | App Store build mode | `AppInfo.IsStoreBuild` (true on iOS, or on the desktop head with `-p:StoreBuild=true`): no update check, no Releases link. The About box has a Privacy policy link in every build. |
 | Privacy policy, store text | Done. |
-| App Store Connect record (iOS 1.0.0) | **Submitted for App Review on 2026-10-21** (state "Waiting for Review"; release is automatic after approval). Filled in through the API (an App Manager key): texts, URLs, copyright, categories (Utilities, Developer Tools), age rating (4+; the chat is declared as messaging), content rights, price Free, availability in 173 countries (China mainland and France off), the App Review notes, seven iPhone and seven iPad screenshots, and build 1.0.0 (4). The owner entered the App Privacy answers, the EU trader status and the review contact (private to Apple; no personal details are kept in this repository). TestFlight: an internal group "Team", and an external group "Public testers" with a public link (100 people at most), whose build goes through Beta App Review first. |
+| App Store Connect record (iOS 1.0.0) | **Approved and released** (submitted for App Review on 2026-10-21 and released automatically after approval; the README links the store page since 2026-10-25). Filled in through the API (an App Manager key): texts, URLs, copyright, categories (Utilities, Developer Tools), age rating (4+; the chat is declared as messaging), content rights, price Free, availability in 173 countries (China mainland and France off), the App Review notes, seven iPhone and seven iPad screenshots, and build 1.0.0 (4). The owner entered the App Privacy answers, the EU trader status and the review contact (private to Apple; no personal details are kept in this repository). TestFlight: an internal group "Team", and an external group "Public testers" with a public link (100 people at most), whose build goes through Beta App Review first. |
 
 ## Identifiers
 
@@ -25,7 +25,7 @@ to paste into App Store Connect is in [app-store-listing.md](app-store-listing.m
   be listed in the app's entitlements, or signing fails.
 - **Team ID:** Developer account > Membership details. The signing identity's name is
   `Developer ID Application: <name> (<TEAM ID>)`; CI finds it by itself.
-- **SKU** `echoes`, **App Store name** `Echoes Network Toolkit` (`Echoes` alone is taken). The name shown under the icon on
+- **SKU** `echoes`, **App Store name** `Echoes: Network Tools & Ping` from 1.0.1 (1.0.0 was `Echoes Network Toolkit`; `Echoes` alone is taken). The name shown under the icon on
   a Mac or iPhone comes from `CFBundleDisplayName` and stays `Echoes`.
 
 ## Certificates and keys
@@ -114,9 +114,6 @@ Build and sign one locally (Mac): `dotnet publish Echoes.csproj -c Release -r os
 
 If notarization is rejected, the job log has the reasons. The usual ones: a binary inside the bundle that is not signed
 (add it to the signing loop), a missing secure timestamp, or an entitlement the hardened runtime doesn't accept.
-
-When the first notarized release is verified, update the README's "First launch" note for macOS (it still says the app is
-not notarized) and drop the `xattr` advice.
 
 ## Mac App Store
 
@@ -213,7 +210,7 @@ Then ship it (`.github/workflows/ios-testflight.yml` does steps 2 and 3 when you
 ## App Store Connect checklist
 
 1. Identifiers: register `com.sinaxhpm.echoes` with no capabilities.
-2. Apps > **+** > New App: iOS and macOS, name `Echoes Network Toolkit`, SKU `echoes`, Full access.
+2. Apps > **+** > New App: iOS and macOS, name `Echoes Network Toolkit` (`Echoes: Network Tools & Ping` from 1.0.1), SKU `echoes`, Full access.
 3. App Information: category, content rights, age rating, Privacy Policy URL (all in [app-store-listing.md](app-store-listing.md)).
 4. App Privacy: Data Not Collected. Pricing: free. Availability: your countries (see the encryption note for France).
 5. A version: text, keywords, URLs, screenshots, the build from TestFlight, review notes, export compliance answers.

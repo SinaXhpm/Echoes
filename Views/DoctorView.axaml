@@ -326,10 +326,6 @@
         <Style Selector="TextBox#OverrideBox">
             <Setter Property="Padding" Value="8,0,12,0"/>
         </Style>
-        <Style Selector="Grid#DocRoot.wide TextBox#OverrideBox">
-            <Setter Property="Width" Value="250"/>
-            <Setter Property="HorizontalAlignment" Value="Left"/>
-        </Style>
         <!-- a field's own name inside its left edge ("IP"), so a filled-in value still says what it is -->
         <Style Selector="TextBlock.inLabel">
             <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
@@ -379,6 +375,34 @@
         </Style>
 
         <!-- the proxy row: address | user | password on a wide page; address over user | password on a phone -->
+        <!-- the output card's bar: wide, the switch then Details and Copy at the end; narrow, the switch across the card
+             (its segments sharing the width) and Details · Copy on a line under it, at either end -->
+        <Style Selector="Grid#DocRoot.wide Grid#OutputBar > :is(Control).barDetails"><Setter Property="Grid.Column" Value="2"/></Style>
+        <Style Selector="Grid#DocRoot.wide Grid#OutputBar > :is(Control).barCopy"><Setter Property="Grid.Column" Value="3"/></Style>
+        <Style Selector="Grid#DocRoot.narrow Grid#OutputBar > ListBox#ViewSwitch">
+            <Setter Property="Grid.ColumnSpan" Value="4"/><Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Grid#DocRoot.narrow Grid#OutputBar > :is(Control).barDetails">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/><Setter Property="Margin" Value="0,6,0,0"/>
+        </Style>
+        <Style Selector="Grid#DocRoot.narrow Grid#OutputBar > :is(Control).barCopy">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Margin" Value="0,6,0,0"/>
+        </Style>
+        <!-- the options row, by its own width: wide, Proxy · interface · IP · Import on one line, the interface taking what
+             the others leave; narrow (a small window, a phone), the interface gets a line of its own under the others, where
+             the IP box stretches -->
+        <Style Selector="Grid#OptionsRow.wide > :is(Control).optIface"><Setter Property="Grid.Column" Value="1"/></Style>
+        <Style Selector="Grid#OptionsRow.wide > :is(Control).optIp">
+            <Setter Property="Grid.Column" Value="2"/><Setter Property="Width" Value="210"/>
+        </Style>
+        <Style Selector="Grid#OptionsRow.narrow > :is(Control).optIp">
+            <Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#OptionsRow.narrow > :is(Control).optIface">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.ColumnSpan" Value="4"/><Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
         <Style Selector="Grid#DocRoot.wide Grid#ProxyRow > :is(Control).proxyAddr"><Setter Property="Grid.ColumnSpan" Value="2"/></Style>
         <Style Selector="Grid#DocRoot.wide Grid#ProxyRow > :is(Control).proxyUser"><Setter Property="Grid.Column" Value="2"/></Style>
         <Style Selector="Grid#DocRoot.wide Grid#ProxyRow > :is(Control).proxyPass"><Setter Property="Grid.Column" Value="3"/></Style>
@@ -436,12 +460,35 @@
                     </Grid>
                 </StackPanel>
 
-                <!-- the options: a proxy to test through as well, an IP to connect to instead of the DNS answer, a request
-                     copied from the browser -->
-                <Grid x:Name="OptionsRow" ColumnDefinitions="Auto, *, Auto" ColumnSpacing="12">
+                <!-- the options: a proxy to test through as well, the interface the checks leave from, an IP to connect
+                     to instead of the DNS answer, a request copied from the browser. The interface and the IP are placed
+                     by the styles above (wide / narrow), not here, so either layout can win. -->
+                <Grid x:Name="OptionsRow" helpers:Responsive.BreakWidth="680" ColumnDefinitions="Auto, *, Auto, Auto"
+                      RowDefinitions="Auto, Auto" ColumnSpacing="12">
                     <CheckBox x:Name="ProxyToggle" Content="Proxy" IsChecked="{Binding UseProxy}"
                               ToolTip.Tip="Also run the checks through a proxy: http://, https://, socks4:// or socks5://"/>
-                    <TextBox Grid.Column="1" x:Name="OverrideBox" Classes="field" Text="{Binding OverrideIp}"
+                    <ComboBox x:Name="IfaceBox" Classes="field optIface" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                              ItemsSource="{Binding Iface.Options}" SelectedItem="{Binding Iface.Selected}"
+                              IsEnabled="{Binding !IsRunning}" DropDownOpened="IfaceBox_DropDownOpened"
+                              AutomationProperties.Name="Interface"
+                              ToolTip.Tip="The network interface every check leaves from (Wi-Fi, Ethernet, a VPN). With one chosen, the lookups the system's resolver would make go to that interface's DNS servers, through it. Default route: the system chooses">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:IfaceOption">
+                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Tip}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                        <!-- closed, it says what it is, as the IP box does: "Interface  Wi-Fi · 192.168.1.2" -->
+                        <ComboBox.SelectionBoxItemTemplate>
+                            <DataTemplate x:DataType="vm:IfaceOption">
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <TextBlock Classes="inLabel" Margin="0,0,8,0" Text="Interface"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Label}" TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ComboBox.SelectionBoxItemTemplate>
+                    </ComboBox>
+                    <TextBox x:Name="OverrideBox" Classes="field optIp" Text="{Binding OverrideIp}"
                              helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Ip"
                              PlaceholderText="from DNS"
                              ToolTip.Tip="Connect to this IP instead of the DNS answer (like curl --resolve); TLS and HTTP still use the site's name"
@@ -453,7 +500,7 @@
                             <KeyBinding Gesture="Enter" Command="{Binding ToggleRunCommand}"/>
                         </TextBox.KeyBindings>
                     </TextBox>
-                    <Button Grid.Column="2" x:Name="ImportButton" Classes="ghost" Command="{Binding OpenImportCommand}"
+                    <Button Grid.Column="3" x:Name="ImportButton" Classes="ghost" Command="{Binding OpenImportCommand}"
                             ToolTip.Tip="Send a request copied from the browser (developer tools › Network › Copy as cURL, fetch, PowerShell or HAR) with all its headers"
                             AutomationProperties.Name="Import a request">
                         <TextBlock Classes="importLabel"/>
@@ -538,19 +585,24 @@
         <!-- ===== the checks behind it, or the run log ===== -->
         <Border Grid.Row="2" Classes="card output">
             <Grid RowDefinitions="Auto, Auto, *">
-                <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto, Auto" Margin="12,6,8,6" ColumnSpacing="8">
+                <!-- [Checks | Log | Response] … Details · Copy; on a phone the switch takes the whole width and the other two go
+                     under it (placed by the OutputBar styles, not here, so either layout can win) -->
+                <Grid Grid.Row="0" x:Name="OutputBar" ColumnDefinitions="Auto, *, Auto, Auto" RowDefinitions="Auto, Auto"
+                      Margin="12,6,8,6" ColumnSpacing="8">
                     <ListBox x:Name="ViewSwitch" Classes="modeSwitch" SelectedIndex="{Binding ViewIndex}" AutomationProperties.Name="Show">
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
                         </ListBox.ItemsPanel>
                         <ListBoxItem ToolTip.Tip="Every check, its finding and its steps">Checks</ListBoxItem>
                         <ListBoxItem ToolTip.Tip="Every step of the last run with its time, as text you can select and copy">Log</ListBoxItem>
+                        <ListBoxItem ToolTip.Tip="What the site sent back to the HTTP and HTTPS checks: the page, a block page, an error, as it came">Response</ListBoxItem>
                     </ListBox>
-                    <CheckBox Grid.Column="2" x:Name="DetailsToggle" Content="Details" IsChecked="{Binding ShowDetails}"
-                              VerticalAlignment="Center" MinHeight="0" IsVisible="{Binding !ShowLog}"
+                    <CheckBox x:Name="DetailsToggle" Classes="barDetails" Content="Details" IsChecked="{Binding ShowDetails}"
+                              VerticalAlignment="Center" MinHeight="0" IsVisible="{Binding ShowChecks}"
                               ToolTip.Tip="Show every step of every check (a problem check opens on its own)"/>
-                    <Button Grid.Column="3" x:Name="CopyButton" Classes="ghost" Content="{Binding CopyText}"
-                            Command="{Binding CopyCommand}" IsEnabled="{Binding CanCopy}" ToolTip.Tip="{Binding CopyTip}"/>
+                    <Button x:Name="CopyButton" Classes="ghost barCopy" Content="{Binding CopyText}"
+                            Command="{Binding CopyCommand}" IsEnabled="{Binding CanCopy}" ToolTip.Tip="{Binding CopyTip}"
+                            IsVisible="{Binding !ShowResponse}"/>
                 </Grid>
                 <Border Grid.Row="1" Classes="divider"/>
                 <!-- the run log: built the first time it is shown -->
@@ -564,7 +616,30 @@
                         </Panel>
                     </DataTemplate></ctl:Deferred>
                 </ScrollViewer>
-                <ScrollViewer Grid.Row="2" x:Name="StepScroll" IsVisible="{Binding !ShowLog}"
+                <!-- the HTTP answers of the last run, one at a time in the shared viewer: built the first time it is shown -->
+                <ctl:Deferred Grid.Row="2" IsVisible="{Binding ShowResponse}">
+                    <DataTemplate x:DataType="vm:DoctorViewModel">
+                        <Grid Margin="12,8,12,12" RowDefinitions="Auto, *" RowSpacing="8">
+                            <ComboBox Classes="field" ItemsSource="{Binding Responses}" SelectedItem="{Binding SelectedResponse}"
+                                      IsVisible="{Binding HasManyResponses}" HorizontalAlignment="Stretch" MaxWidth="560"
+                                      AutomationProperties.Name="Which answer">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:HttpResponseViewModel">
+                                        <TextBlock Text="{Binding PickText}" TextTrimming="CharacterEllipsis"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Classes="hint" Text="{Binding SelectedResponse.Title, FallbackValue=''}"
+                                       IsVisible="{Binding !HasManyResponses}" FontWeight="SemiBold"/>
+                            <Panel Grid.Row="1" IsVisible="{Binding HasResponses}">
+                                <ctl:ResponseView DataContext="{Binding SelectedResponse}"/>
+                            </Panel>
+                            <TextBlock Grid.Row="1" Classes="hint" IsVisible="{Binding !HasResponses}" VerticalAlignment="Top"
+                                       Text="Run a diagnosis: what the site sends back to the HTTP and HTTPS checks shows here (its body and its headers)."/>
+                        </Grid>
+                    </DataTemplate>
+                </ctl:Deferred>
+                <ScrollViewer Grid.Row="2" x:Name="StepScroll" IsVisible="{Binding ShowChecks}"
                               HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <ItemsControl ItemsSource="{Binding Items}" Margin="0,4,0,6">
                         <ItemsControl.DataTemplates>

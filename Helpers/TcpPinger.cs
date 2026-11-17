@@ -47,11 +47,16 @@ public static class TcpPinger
     }
 
     /// <summary>One TCP connect to <paramref name="addr"/>:<paramref name="port"/>, closed again at once (a normal FIN
-    /// close). Never throws except <see cref="OperationCanceledException"/> when <paramref name="ct"/> is cancelled.</summary>
-    public static async Task<Result> ConnectAsync(IPAddress addr, int port, int timeoutMs, CancellationToken ct)
+    /// close). Never throws except <see cref="OperationCanceledException"/> when <paramref name="ct"/> is cancelled.
+    /// <paramref name="via"/>: the interface the SYN leaves from (null = the routing table's choice); when the socket
+    /// can't be tied to it, nothing is sent (<see cref="Status.LocalError"/>, with the reason).</summary>
+    public static async Task<Result> ConnectAsync(IPAddress addr, int port, int timeoutMs, CancellationToken ct, NetIface? via = null)
     {
         ct.ThrowIfCancellationRequested();
         timeoutMs = Math.Max(1, timeoutMs);
+        // An interface with no address of the target's kind: no SYN can leave from it. Said here, because the systems
+        // differ in what their connect reports then (unreachable, refused by loopback, a timeout).
+        if (via?.Missing(addr) is { } missing) return new Result(Status.LocalError, 0, null, missing);
         Socket? socket = null;
         try
         {
@@ -62,6 +67,8 @@ public static class TcpPinger
             {
                 // Created inside the try: new Socket(InterNetworkV6) throws without IPv6 (and EMFILE when out of fds).
                 socket = new Socket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                if (via is not null && !via.TryBind(socket, out string? unbound))
+                    return new Result(Status.LocalError, 0, null, unbound ?? $"can't send through {via.Name}");
                 // One SYN per probe: a lost SYN is a lost probe, as with an ICMP echo. On Windows this also makes a
                 // RST surface at once (it otherwise retries the SYN and reports the refusal only after ~1 s).
                 ScanSocket.DisableSynRetransmissions(socket, timeoutMs);
@@ -96,6 +103,11 @@ public static class TcpPinger
                 case SocketError.AddressFamilyNotSupported or SocketError.ProtocolNotSupported or SocketError.ProtocolFamilyNotSupported:
                     return new Result(Status.Unsupported, 0, null,
                         addr.AddressFamily == AddressFamily.InterNetworkV6 ? "this computer has no IPv6" : "this address type isn't supported here");
+                case SocketError.AddressNotAvailable when via is not null && OperatingSystem.IsWindows():
+                    // A socket tied to an interface that Windows can't connect from it: seen when a VPN or proxy
+                    // program on this computer redirects connections to itself (127.0.0.1), which such a socket
+                    // can't follow. No SYN left.
+                    return new Result(Status.LocalError, 0, null, via.ConnectProblem(err, addr.ToString()) ?? "address not available");
                 case var e when ScanSocket.IsLocalExhaustion(e):
                     return new Result(Status.LocalError, 0, null, "out of sockets or ports on this computer: no SYN was sent");
                 case SocketError.AccessDenied:

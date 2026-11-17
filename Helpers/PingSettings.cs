@@ -78,7 +78,7 @@ public sealed record PingSettings
 
     private static readonly string[] IpNames = { "auto", "ipv4", "ipv6" };
 
-    public static PingSettings Load(ProfileService ps) => new PingSettings
+    public static PingSettings Load(ISettings ps) => new PingSettings
     {
         Size = ps.GetInt(KeySize, DefaultSize),
         IntervalMs = ps.GetInt(KeyInterval, DefaultIntervalMs),
@@ -90,7 +90,7 @@ public sealed record PingSettings
     }.Clamped();
 
     /// <summary>Writes the values that differ from what is stored (the profile writes behind, off the UI thread).</summary>
-    public void Save(ProfileService ps)
+    public void Save(ISettings ps)
     {
         var inv = CultureInfo.InvariantCulture;
         var changes = new List<(string, string?)>(7);

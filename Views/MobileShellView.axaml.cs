@@ -256,7 +256,16 @@ public partial class MobileShellView : UserControl
     private int? _returnTo;
     private bool _jumping;
 
-    private void SelectTool(string tag)
+    // The phone has one page per tool, made with the tool's main view-model: a request's hand-off goes to that one. A tool
+    // that started by itself (the Monitor at launch) needs nothing here: every tool is always in the drawer.
+    private void SelectTool(ToolRequest request)
+    {
+        if (request.Background) return;
+        Show(request.Tag);
+        if (request.Apply is { } apply && _vm?.MainTool(request.Tag) is { } tool) apply(tool);
+    }
+
+    private void Show(string tag)
     {
         for (int i = 0; i < Nav.ItemCount; i++)
         {

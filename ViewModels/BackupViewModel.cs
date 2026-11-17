@@ -131,6 +131,7 @@ public partial class BackupViewModel : ObservableObject
         ["checkhost.useProxy"] = "Check-Host proxy",
         ["cf.useProxy"] = "Cloudflare proxy",
         ["tg.useProxy"] = "Telegram proxy",
+        ["proxy.useProxy"] = "Proxy server's upstream proxy",
         ["monitor.tg.useProxy"] = "Monitor's Telegram proxy",
         ["monitor.tg.enabled"] = "Monitor's Telegram alerts",
         ["monitor.autoStart"] = "Monitor's start with Echoes",

@@ -19,24 +19,31 @@ public interface IToolLinks
     void Whois(string query);
 }
 
+/// <summary>A tool to show (its nav tag). <paramref name="Apply"/>: what to hand it once its page is there, given the
+/// view-model of the tab (or phone page) that shows it. <paramref name="Background"/>: the tool started on its own (the
+/// Monitor at launch); the desktop gives it a tab if it has none, without switching to it.</summary>
+public sealed record ToolRequest(string Tag, Action<object>? Apply = null, bool Background = false);
+
 public partial class MainViewModel : IToolLinks
 {
-    /// <summary>A tool asked for another tool's page (its nav tag). Both shells select that entry, which builds the page
-    /// on a first visit the way a click does.</summary>
-    public event Action<string>? ToolRequested;
+    /// <summary>A tool asked for another tool's page. Both shells select it (the desktop: the tool's most recently used
+    /// tab, or a new one), which builds the page on a first visit the way a click does, then run the request's Apply.</summary>
+    public event Action<ToolRequest>? ToolRequested;
 
-    public void OpenTool(string tag) => ToolRequested?.Invoke(tag);
+    public void OpenTool(string tag) => ToolRequested?.Invoke(new ToolRequest(tag));
 
-    // The page first: selecting it makes the view and, through the lazy getter, the view-model it is then handed to.
-    public void LookUpIp(string ip)
+    /// <summary>A tool started by itself (the Monitor at launch): its tab is there whenever it runs.</summary>
+    public void ShowToolStarted(string tag) => ToolRequested?.Invoke(new ToolRequest(tag, null, Background: true));
+
+    public void LookUpIp(string ip) => Hand("IP INFO", tool => (tool as IpInfoViewModel)?.LookUp(ip));
+
+    public void Whois(string query) => Hand("DNS", tool => (tool as DnsViewModel)?.Whois(query));
+
+    // The page first: the shell shows it (making its view-model) and hands that view-model over. With no shell listening
+    // (a test harness), the main view-model gets it.
+    private void Hand(string tag, Action<object> apply)
     {
-        OpenTool("IP INFO");
-        IpInfoVM.LookUp(ip);
-    }
-
-    public void Whois(string query)
-    {
-        OpenTool("DNS");
-        DnsVM.Whois(query);
+        if (ToolRequested is { } requested) requested(new ToolRequest(tag, apply));
+        else if (MainTool(tag) is { } tool) apply(tool);
     }
 }

@@ -57,6 +57,8 @@ public sealed class WsClientSession
 public static class WebSocketClient
 {
     private const int MaxHeadBytes = 16 * 1024;
+    /// <summary>The most of a refusal's body kept (an error page, a JSON error) for the response viewer.</summary>
+    private const int RefusalBodyBytes = 64 * 1024;
     public const int MaxHeaders = 50;
 
     private static readonly string UserAgent =
@@ -391,7 +393,17 @@ public static class WebSocketClient
             throw new SocketFailure(SocketErrors.Describe(ex, SocketAction.Receive, target), ex);
         }
 
-        if (head.Status != 101) throw new SocketFailure(Refusal(head, target, tls));
+        if (head.Status != 101)
+            throw new SocketFailure(Refusal(head, target, tls))
+            {
+                Response = head.Answer is { } a
+                    ? new HttpResponseSnapshot(a.StatusLine, a.Headers, a.Body, a.Length, a.Cut, a.Cap)
+                    {
+                        Url = uri.GetLeftPart(UriPartial.Path),
+                        About = "The server's answer to the WebSocket handshake, instead of switching protocols.",
+                    }
+                    : null,
+            };
 
         if (!WsProtocol.HasToken(head.Get("Upgrade"), "websocket"))
             throw new SocketFailure($"{target} answered 101 but not with \"Upgrade: websocket\" — it switched to something else.");
@@ -584,6 +596,8 @@ public static class WebSocketClient
         public readonly List<KeyValuePair<string, string>> Headers = new();
         public byte[] Leftover = Array.Empty<byte>();
         public string? BodyExcerpt;
+        /// <summary>A refusal as it came (status line, headers, the start of the body).</summary>
+        public HttpResponseSnapshot? Answer;
         public string? Get(string name)
         {
             foreach (var h in Headers) if (h.Key.Equals(name, StringComparison.OrdinalIgnoreCase)) return h.Value;
@@ -627,20 +641,31 @@ public static class WebSocketClient
         head.Leftover = buf.AsSpan(bodyStart, len - bodyStart).ToArray();
         if (readBody && head.Status != 101)
         {
-            // the start of a refusal's body: what's already here, or what arrives within a moment
-            byte[] body = head.Leftover;
-            if (body.Length == 0)
+            // A refusal's body (an error page, a JSON error): what's already here, and what arrives within a moment — up
+            // to its Content-Length, the end of a chunked body or the connection's close, at most RefusalBodyBytes. For
+            // the message's excerpt and the response viewer.
+            var raw = new MemoryStream();
+            raw.Write(buf, 0, len);
+            long declared = head.Get("Content-Length") is { } cl && long.TryParse(cl.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out long d) ? d : -1;
+            long want = declared >= 0 ? Math.Min(declared, RefusalBodyBytes) : RefusalBodyBytes;
+            bool chunked = head.Get("Transfer-Encoding")?.Contains("chunked", StringComparison.OrdinalIgnoreCase) == true;
+            try
             {
-                try
+                using var quick = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                quick.CancelAfter(1000);
+                var chunk = new byte[8192];
+                while (raw.Length - bodyStart < want && !(chunked && EndsChunked(raw)))
                 {
-                    using var quick = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                    quick.CancelAfter(400);
-                    var more = new byte[2048];
-                    int n = await s.ReadAsync(more, quick.Token).ConfigureAwait(false);
-                    body = more.AsSpan(0, Math.Max(0, n)).ToArray();
+                    int n = await s.ReadAsync(chunk, quick.Token).ConfigureAwait(false);
+                    if (n <= 0) break;
+                    raw.Write(chunk, 0, n);
                 }
-                catch { /* nothing more */ }
             }
+            catch { /* what came in time is kept */ }
+            // cut: it said it was longer than the cap, or it went on past the cap without saying
+            bool more = declared > RefusalBodyBytes || (declared < 0 && raw.Length - bodyStart >= RefusalBodyBytes);
+            head.Answer = HttpResponseSnapshot.Parse(raw.GetBuffer(), (int)raw.Length, RefusalBodyBytes, more);
+            byte[] body = head.Answer is { } answer ? answer.Body.AsSpan(0, answer.Length).ToArray() : head.Leftover;
             if (body.Length > 0 && SocketPayload.LooksLikeText(body.AsSpan(0, Math.Min(body.Length, 512))))
             {
                 string t = Clean(Encoding.UTF8.GetString(body, 0, Math.Min(body.Length, 512))).Trim();
@@ -649,6 +674,10 @@ public static class WebSocketClient
         }
         return head;
     }
+
+    // a chunked body's last chunk ("0\r\n\r\n") has come
+    private static bool EndsChunked(MemoryStream raw)
+        => raw.Length >= 5 && raw.GetBuffer().AsSpan((int)raw.Length - 5, 5).SequenceEqual("0\r\n\r\n"u8);
 
     // Server text going into a message: control characters, line / paragraph separators and bidi controls replaced.
     internal static string Clean(string s)

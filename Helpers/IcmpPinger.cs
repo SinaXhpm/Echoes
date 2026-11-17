@@ -17,8 +17,11 @@ public enum PingMethod { Auto, Icmp, Udp }
 /// <summary>The packet one probe is asked to go out as (the Ping tab's options): <paramref name="PayloadSize"/> data
 /// bytes (0-<see cref="IcmpPinger.MaxPayloadSize"/>), <paramref name="Ttl"/> (0 = the system's default) and the Don't
 /// fragment flag. Only the <see cref="IcmpPinger.SendAsync(IPAddress, int, IcmpProbeOptions, CancellationToken, PingMethod, int)"/>
-/// overload takes it; the classic overload keeps sending exactly what it always did.</summary>
-public readonly record struct IcmpProbeOptions(int PayloadSize = IcmpPinger.PayloadSize, int Ttl = 0, bool DontFragment = false);
+/// overload takes it; the classic overload keeps sending exactly what it always did.
+/// <paramref name="Via"/>: the interface the probe leaves from (null = wherever the routing table points), which both
+/// overloads take; a probe that can't be sent from it fails with the reason, it never takes another way.</summary>
+public readonly record struct IcmpProbeOptions(int PayloadSize = IcmpPinger.PayloadSize, int Ttl = 0, bool DontFragment = false,
+                                               NetIface? Via = null);
 
 /// <summary>Which of the requested <see cref="IcmpProbeOptions"/> the path that sent a probe really applied (the
 /// system ping utility can't send a custom size, IPv6 has no DF flag, …). <see cref="IcmpPinger.PingResult.Note"/> says why.</summary>
@@ -53,7 +56,8 @@ public static class IcmpPinger
         PingMethod Method = PingMethod.Icmp,    // what actually went out: Icmp, or Udp (Auto's fallback)
         IcmpApplied Applied = IcmpApplied.None, // which requested options the path applied (the IcmpProbeOptions overload)
         int Mtu = 0,                            // Error == PacketTooBig: the MTU the error reported (0 = not known)
-        string? Note = null);                   // why a requested option couldn't be applied here (the options overload)
+        string? Note = null,                    // why a requested option couldn't be applied here (the options overload)
+        bool NotSent = false);                  // the probe never left (the chosen interface can't be used right now): Error says why
 
     /// <summary>The error text of a probe bigger than the path allows with Don't fragment set (ICMP "fragmentation
     /// needed" / ICMPv6 "packet too big", or this computer's own link MTU). Windows reports it as the IPStatus name
@@ -101,8 +105,9 @@ public static class IcmpPinger
     private static volatile bool _customSizeRefused;
 
     private const string SizeNote = "This system's ping can't send a custom size without raw-socket rights (it uses the ping program), so 32 bytes were sent.";
-    private const string Df6Note = "Don't fragment is an IPv4 flag: over IPv6 routers never split packets (they answer \"packet too big\"), but this system may split one bigger than its own link MTU.";
+    internal const string Df6Note = "Don't fragment is an IPv4 flag: over IPv6 routers never split packets (they answer \"packet too big\"), but this system may split one bigger than its own link MTU.";
     private const string DfSocketNote = "Don't fragment couldn't be set on this system's socket, so packets may be split.";
+    private const string ViaUtilityError = "the interface can't be chosen here: ICMP sockets aren't permitted for this user, and the system's ping program can't be told which one to use";
 
     private static int _seq;
 
@@ -133,10 +138,11 @@ public static class IcmpPinger
     }
 
     /// <summary>The classic probe (Monitor, Scanner, Doctor, traceroute, MTR): 32 bytes, the system TTL or
-    /// <paramref name="ttl"/> (then with Don't fragment on the managed path, as tracert does).</summary>
+    /// <paramref name="ttl"/> (then with Don't fragment on the managed path, as tracert does). <paramref name="via"/>:
+    /// the interface it leaves from (traceroute and MTR with one chosen).</summary>
     public static Task<PingResult> SendAsync(IPAddress addr, int timeoutMs, CancellationToken token, int ttl = 0,
-                                             PingMethod method = PingMethod.Auto, int udpPort = DefaultUdpPort)
-        => SendCoreAsync(addr, timeoutMs, new IcmpProbeOptions(PayloadSize, ttl, ttl > 0), custom: false, token, method, udpPort);
+                                             PingMethod method = PingMethod.Auto, int udpPort = DefaultUdpPort, NetIface? via = null)
+        => SendCoreAsync(addr, timeoutMs, new IcmpProbeOptions(PayloadSize, ttl, ttl > 0, via), custom: false, token, method, udpPort);
 
     /// <summary>
     /// A probe with the Ping tab's packet settings: payload size, TTL and Don't fragment (clamped to what every path
@@ -159,6 +165,8 @@ public static class IcmpPinger
     private static async Task<PingResult> SendCoreAsync(IPAddress addr, int timeoutMs, IcmpProbeOptions o, bool custom,
                                                         CancellationToken token, PingMethod method, int udpPort)
     {
+        // An interface with no address of the target's kind: nothing can leave from it, on any path below.
+        if (o.Via?.Missing(addr) is { } missing) return Unsent(missing, method == PingMethod.Udp ? PingMethod.Udp : PingMethod.Icmp);
         if (method == PingMethod.Udp) return await SendUdpAsync(addr, udpPort, timeoutMs, o, custom, token);
 
         // A TTL-limited UDP probe can only be timed where routers' "time exceeded" reaches the socket (a trace); the
@@ -187,9 +195,12 @@ public static class IcmpPinger
         // Windows: managed Ping is privilege-free (IcmpSendEcho) and gives us the reply TTL. macOS goes the datagram way
         // below, like iOS and Linux: there managed Ping runs /sbin/ping, a process per probe (an MTR started ~20 a second, a
         // sweep hundreds), and the Mac App Store sandbox would have to allow the child process. Managed Ping stays the
-        // fallback where the socket is refused.
+        // fallback where the socket is refused. With an interface chosen, Windows gets the call the managed class wraps,
+        // given the source address (WinIcmp): the managed class always leaves the source to the system.
         if (OperatingSystem.IsWindows())
-            return await SendManagedAsync(addr, timeoutMs, o, custom, token);
+            return o.Via is { } from
+                ? await WinIcmp.SendAsync(addr, from, timeoutMs, o, custom, custom ? Payload(o.PayloadSize) : DefaultPayload, token)
+                : await SendManagedAsync(addr, timeoutMs, o, custom, token);
 
         if (addr.AddressFamily != AddressFamily.InterNetwork)
         {
@@ -204,7 +215,9 @@ public static class IcmpPinger
             }
             // No ICMPv6 ping socket here: managed Ping — a raw socket when privileged, else the system ping utility.
             // Where neither works it reports every probe as TimedOut, so settle once, with a loopback ping, whether it
-            // can; if not, that's a permission result (the hint, Auto's UDP fallback).
+            // can; if not, that's a permission result (the hint, Auto's UDP fallback). Managed Ping can't be given an
+            // interface: with one chosen it is a permission result at once (the UDP fallback takes the interface).
+            if (o.Via is not null) return new PingResult(false, 0, null, -1, ViaUtilityError, true);
             if (_managedFallback6 == 0)
                 _managedFallback6 = (await SendManagedAsync(IPAddress.IPv6Loopback, 1000, Classic, false, token)).Success ? 1 : -1;
             return _managedFallback6 > 0 ? await SendManagedAsync(addr, timeoutMs, o, custom, token)
@@ -213,6 +226,7 @@ public static class IcmpPinger
 
         var r = await SendDatagramAsync(addr, timeoutMs, o, custom, token);
         if (!r.PermissionDenied) return r;
+        if (o.Via is not null) return r with { Error = ViaUtilityError };   // managed Ping can't be given an interface
 
         // The ping socket needs the caller's gid in net.ipv4.ping_group_range. Where that's off (the kernel default
         // "1 0": non-systemd distros, minimal containers) it's refused even for root, so the "launch with sudo" hint
@@ -327,6 +341,7 @@ public static class IcmpPinger
         {
             bool v6 = addr.AddressFamily == AddressFamily.InterNetworkV6;
             sock = new Socket(addr.AddressFamily, SocketType.Dgram, v6 ? ProtocolType.IcmpV6 : ProtocolType.Icmp);
+            if (NotVia(o.Via, sock, ref note) is { } unbound) return Unsent(unbound, PingMethod.Icmp);
             bool df = custom && o.DontFragment;
             if (o.Ttl > 0)
             {
@@ -336,7 +351,7 @@ public static class IcmpPinger
             if (df)
             {
                 if (TrySetDontFragment(sock)) applied |= IcmpApplied.DontFragment;
-                else note = DfSocketNote;
+                else note ??= DfSocketNote;
             }
             bool recvErr = false;
             // Traceroute: the kernel drops ICMP "time exceeded" for a ping socket unless IP_RECVERR (IPv6:
@@ -480,6 +495,7 @@ public static class IcmpPinger
         try
         {
             sock = new Socket(addr.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            if (NotVia(o.Via, sock, ref note) is { } unbound) return Unsent(unbound, PingMethod.Udp);
             if (o.Ttl > 0)
             {
                 sock.Ttl = (short)o.Ttl;   // IPv6: the hop limit
@@ -488,7 +504,7 @@ public static class IcmpPinger
             if (custom && o.DontFragment)
             {
                 if (TrySetDontFragment(sock)) applied |= IcmpApplied.DontFragment;
-                else note = DfSocketNote;
+                else note ??= DfSocketNote;
             }
             // Linux / Android: with IP_RECVERR every ICMP error for the probe reaches the socket, with the sender's
             // address — the routers' "time exceeded" for a trace, and a router's "host unreachable" (reported fast,
@@ -579,6 +595,23 @@ public static class IcmpPinger
         PingResult Result(bool ok, long ms, IPAddress? from, string? error, int mtu = 0)
             => new(ok, ms, from, -1, error, false, PingMethod.Udp, applied, mtu, note);
     }
+
+    // Ties the probe's socket to the chosen interface (none chosen: nothing to do). Null when it now sends from there
+    // (note: only the source address could be set); else why it can't, and the probe isn't sent at all.
+    private static string? NotVia(NetIface? via, Socket sock, ref string? note)
+    {
+        if (via is null) return null;
+        if (via.TryBind(sock, out string? said))
+        {
+            note = said;
+            return null;
+        }
+        return said ?? $"can't send through {via.Name}";
+    }
+
+    /// <summary>A probe that never left, with the reason (<see cref="PingResult.NotSent"/>).</summary>
+    internal static PingResult Unsent(string why, PingMethod method = PingMethod.Icmp)
+        => new(false, 0, null, -1, why, false, method, NotSent: true);
 
     // Don't fragment on a datagram socket: IPv4's DF bit (IP_MTU_DISCOVER = DO on Linux / Android); for IPv6, which has
     // no such bit, IPV6_DONTFRAG (+ IPV6_MTU_DISCOVER = DO on Linux) stops this computer splitting the packet itself.

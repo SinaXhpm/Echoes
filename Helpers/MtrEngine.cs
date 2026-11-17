@@ -88,6 +88,10 @@ public sealed class MtrSnapshot
 
     /// <summary>No probe can work here (ICMP refused, the UDP fallback too): the session stopped with this error.</summary>
     public string? Fatal { get; init; }
+
+    /// <summary>Why the latest probe couldn't be sent at all (the chosen interface is down or gone, no route right now);
+    /// null once one goes out again. Such probes count as lost: this says why.</summary>
+    public string? SendError { get; init; }
 }
 
 /// <summary>
@@ -113,7 +117,7 @@ public sealed class MtrSession
     private readonly HashSet<Task> _pending = new();
     private int _destTtl, _unreachTtl, _lastAnswered, _round = -1, _destMisses, _unreachMisses;
     private bool _udp;
-    private string? _fatal;
+    private string? _fatal, _sendError;
     private CancellationTokenSource? _run;
 
     // A responder this many rounds old no longer counts as a current multipath branch.
@@ -123,14 +127,15 @@ public sealed class MtrSession
     // ...and at the TTL of an "unreachable": the dead end is gone.
     private const int UnreachableMissesToReprobe = 3;
 
-    public MtrSession(IPAddress target, MtrOptions? options = null)
+    /// <param name="via">The interface every probe leaves from (mtr -I); null = wherever the routing table points.</param>
+    public MtrSession(IPAddress target, MtrOptions? options = null, NetIface? via = null)
     {
         Target = target;
         Options = options ?? new MtrOptions();
         int max = Math.Clamp(Options.MaxTtl, 1, 64);
         _hops = new Hop[max];
         for (int i = 0; i < max; i++) _hops[i] = new Hop(Options.HistoryLength);
-        _probe = Options.Probe ?? ((addr, ttl, timeout, ct) => IcmpPinger.SendAsync(addr, timeout, ct, ttl));
+        _probe = Options.Probe ?? ((addr, ttl, timeout, ct) => IcmpPinger.SendAsync(addr, timeout, ct, ttl, via: via));
     }
 
     public IPAddress Target { get; }
@@ -287,6 +292,8 @@ public sealed class MtrSession
     // Caller holds _gate.
     private void Classify(int ttl, Hop hop, IcmpPinger.PingResult r, double rtt)
     {
+        // a probe that never left (no responder, and not a timeout) says why; any that did clears it
+        _sendError = !r.Success && !MtrReply.IsHop(r.Address) && !MtrReply.IsTimeout(r.Error) ? r.Error : null;
         if (r.Success)
         {
             // The destination itself: an echo reply, or (UDP) its "port unreachable".
@@ -420,6 +427,7 @@ public sealed class MtrSession
                 DestinationReached = _destTtl > 0,
                 UsesUdp = _udp,
                 Fatal = _fatal,
+                SendError = _sendError,
             };
         }
     }

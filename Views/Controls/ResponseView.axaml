@@ -1,0 +1,151 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             xmlns:ctl="using:Echoes.Views.Controls"
+             x:Class="Echoes.Views.Controls.ResponseView"
+             x:DataType="vm:HttpResponseViewModel">
+    <!-- One HTTP response: [Body | Headers], the body pretty or raw (cURL's code view: coloured JSON / XML, only the lines
+         on screen laid out), an image, wrap, copy and save. Shared by Doctor, Monitor, Check Host, the proxy checker and
+         the Socket tool (a refused WebSocket handshake). Its DataContext is an HttpResponseViewModel. -->
+
+    <UserControl.Resources>
+        <StreamGeometry x:Key="RvGlyphCopy">M6 5.5 H12 A1.5 1.5 0 0 1 13.5 7 V13 A1.5 1.5 0 0 1 12 14.5 H6 A1.5 1.5 0 0 1 4.5 13 V7 A1.5 1.5 0 0 1 6 5.5 Z M2.5 10.5 V4 A1.5 1.5 0 0 1 4 2.5 H10.5</StreamGeometry>
+        <StreamGeometry x:Key="RvGlyphSave">M8 2.5 V10 M4.75 6.75 L8 10 L11.25 6.75 M2.5 10.5 V12 A1.5 1.5 0 0 0 4 13.5 H12 A1.5 1.5 0 0 0 13.5 12 V10.5</StreamGeometry>
+        <StreamGeometry x:Key="RvGlyphWrap">M2.5 4 H13.5 M2.5 8 H11 A2 2 0 0 1 11 12 H8 M9.5 10.5 L8 12 L9.5 13.5 M2.5 12 H5.5</StreamGeometry>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="Path.rvGlyph">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button:disabled Path.rvGlyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
+        <Style Selector="ToggleButton.rvTool:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedHover}"/>
+        </Style>
+        <!-- on: a soft tint behind an accent glyph (Fluent's solid accent hid the glyph) -->
+        <Style Selector="ToggleButton.rvTool:checked /template/ ContentPresenter#PART_ContentPresenter,
+                         ToggleButton.rvTool:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+        </Style>
+        <Style Selector="ToggleButton.rvTool:checked Path.rvGlyph">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <!-- a quiet square icon button: no fill until hovered, Control.Height square (a 44 px touch target on phones) -->
+        <Style Selector="Button.rvTool, ToggleButton.rvTool">
+            <Setter Property="Width" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.rvHint">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.rvStatus">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.rvBox">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="ClipToBounds" Value="True"/>
+        </Style>
+        <Style Selector="ctl|CurlCodeView">
+            <Setter Property="Background" Value="{DynamicResource Bg.Inset}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="LineNumberBrush" Value="{DynamicResource Text.Disabled}"/>
+            <Setter Property="GutterBorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="KeyBrush" Value="{DynamicResource Info}"/>
+            <Setter Property="StringBrush" Value="{DynamicResource Success}"/>
+            <Setter Property="NumberBrush" Value="{DynamicResource Warning}"/>
+            <Setter Property="LiteralBrush" Value="{DynamicResource Violet}"/>
+            <Setter Property="PunctBrush" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TagBrush" Value="{DynamicResource Info}"/>
+            <Setter Property="AttrBrush" Value="{DynamicResource Violet}"/>
+            <Setter Property="CommentBrush" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="SelectionBrush" Value="{DynamicResource Selection}"/>
+            <Setter Property="MatchBrush" Value="{DynamicResource Warning.Soft}"/>
+            <Setter Property="CurrentMatchBrush" Value="{DynamicResource Warning.Border}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto, Auto, Auto, *" RowSpacing="6">
+        <!-- the status line, and what the tool says about this answer -->
+        <TextBlock Classes="rvStatus" Text="{Binding StatusLine}" ToolTip.Tip="{Binding StatusLine}"/>
+        <TextBlock Grid.Row="1" Classes="rvHint" Text="{Binding About}" IsVisible="{Binding HasAbout}"/>
+
+        <!-- [Body | Headers] [Pretty | Raw] what it is · wrap, copy, save (the switches wrap under each other when narrow) -->
+        <Grid Grid.Row="2" ColumnDefinitions="*, Auto" ColumnSpacing="6">
+            <WrapPanel ItemSpacing="6" LineSpacing="6" VerticalAlignment="Center">
+                <ListBox Classes="modeSwitch" SelectedIndex="{Binding SectionIndex}" AutomationProperties.Name="Show">
+                    <ListBoxItem ToolTip.Tip="What came back after the headers">Body</ListBoxItem>
+                    <ListBoxItem ToolTip.Tip="The status line and every header, as they came">Headers</ListBoxItem>
+                </ListBox>
+                <ListBox Classes="modeSwitch" SelectedIndex="{Binding BodyViewIndex}" IsVisible="{Binding ShowPrettySwitch}"
+                         AutomationProperties.Name="Body view">
+                    <ListBoxItem ToolTip.Tip="Formatted (JSON / XML)">Pretty</ListBoxItem>
+                    <ListBoxItem ToolTip.Tip="As it came">Raw</ListBoxItem>
+                </ListBox>
+                <TextBlock Classes="rvHint" Text="{Binding KindText}" IsVisible="{Binding !HasFlash}" VerticalAlignment="Center"
+                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Classes="rvHint" Text="{Binding Flash}" IsVisible="{Binding HasFlash}" VerticalAlignment="Center"
+                           TextWrapping="NoWrap" Foreground="{DynamicResource Success}"/>
+            </WrapPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
+                <ToggleButton Classes="rvTool" IsChecked="{Binding Wrap}" ToolTip.Tip="Wrap long lines" AutomationProperties.Name="Wrap lines">
+                    <Path Classes="rvGlyph" Data="{StaticResource RvGlyphWrap}"/>
+                </ToggleButton>
+                <Button Classes="rvTool" Command="{Binding CopyCommand}" ToolTip.Tip="Copy what is shown (the body, or the headers)"
+                        AutomationProperties.Name="Copy">
+                    <Path Classes="rvGlyph" Data="{StaticResource RvGlyphCopy}"/>
+                </Button>
+                <Button Classes="rvTool" Click="OnSave" IsEnabled="{Binding CanSave}" ToolTip.Tip="Save the body to a file"
+                        AutomationProperties.Name="Save the body">
+                    <Path Classes="rvGlyph" Data="{StaticResource RvGlyphSave}"/>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="3" RowDefinitions="Auto, *" RowSpacing="6">
+            <TextBlock Classes="rvHint" Text="{Binding Note}" IsVisible="{Binding HasNote}"/>
+            <Panel Grid.Row="1">
+                <Border Classes="rvBox" IsVisible="{Binding ShowText}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                        <ctl:CurlCodeView Document="{Binding Document}" Wrap="{Binding Wrap}"/>
+                    </ScrollViewer>
+                </Border>
+                <Border Classes="rvBox" IsVisible="{Binding ShowImage}" Padding="12">
+                    <Image Source="{Binding Image}" Stretch="Uniform" StretchDirection="DownOnly"
+                           RenderOptions.BitmapInterpolationMode="HighQuality"/>
+                </Border>
+                <TextBlock Classes="rvHint" IsVisible="{Binding ShowEmpty}" Text="The response has no body: see its headers."
+                           HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"/>
+                <TextBlock Classes="rvHint" IsVisible="{Binding IsLoading}" Text="Reading the body…"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Panel>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -62,6 +62,9 @@ public sealed class CheckHostResult
     // HTTP
     public int? HttpCode { get; init; }
     public string HttpReason { get; init; } = "";
+    /// <summary>A Globalping probe's answer (status line, headers, the first 10 KB of the body), for the response viewer;
+    /// null for check-host.net, which sends no bodies.</summary>
+    public HttpResponseSnapshot? Response { get; init; }
 
     // UDP: the port stayed silent (open or filtered — UDP can't tell)
     public bool NoReply { get; init; }

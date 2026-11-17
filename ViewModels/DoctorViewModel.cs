@@ -17,11 +17,13 @@ public enum DoctorCard { Idle, Running, Works, Problem, Down, Unknown, Stopped, 
 
 /// <summary>
 /// The Doctor ("why doesn't this site work for me"): one input, one button, a verdict card with one sentence and what to
-/// do, and the checks behind it, live. The options are a proxy to test through as well and an IP to connect to instead
-/// of the DNS answer; everything else follows from the target (see <see cref="DoctorEngine"/>).
+/// do, and the checks behind it, live. The options are a proxy to test through as well, the interface the checks leave
+/// from, and an IP to connect to instead of the DNS answer; everything else follows from the target (see
+/// <see cref="DoctorEngine"/>).
 /// </summary>
 public partial class DoctorViewModel : ObservableObject
 {
+    private readonly ToolStore Store = ToolStore.Current;   // this instance's settings: its own copy when it is one of several tabs (ToolStore)
     private const string HistoryKey = "doctor";
     private const string ProxyHistoryKey = "ip.proxy";   // shared with IP Info / Check Host (addresses without credentials)
 
@@ -52,8 +54,13 @@ public partial class DoctorViewModel : ObservableObject
     /// <summary>Expand every check's sub-steps (off: only the ones with a problem open automatically). Persisted.</summary>
     [ObservableProperty] private bool _showDetails;
 
-    public ObservableCollection<string> TargetHistory => HistoryService.Instance.Get(HistoryKey);
-    public ObservableCollection<string> ProxyHistory => HistoryService.Instance.Get(ProxyHistoryKey);
+    /// <summary>The interface every check leaves from (Wi-Fi, Ethernet, a VPN), its DNS lookups included; "Default route"
+    /// lets the system choose. Saved by the interface's name (IfacePicker).</summary>
+    public IfacePicker Iface { get; }
+    private const string IfaceKey = "doctor.iface";
+
+    public ObservableCollection<string> TargetHistory => Store.History.Get(HistoryKey);
+    public ObservableCollection<string> ProxyHistory => Store.History.Get(ProxyHistoryKey);
 
     /// <summary>Every check's row (the proxy's ones are shown only with a proxy).</summary>
     public IReadOnlyList<DoctorStepRow> Steps { get; } = Enum.GetValues<DoctorCheck>().Select(c => new DoctorStepRow(c)).ToList();
@@ -88,6 +95,7 @@ public partial class DoctorViewModel : ObservableObject
     private string? _reportTarget;
     private string? _reportProxy;
     private string? _reportOverride;
+    private string? _reportIface;
     private string? _reportRequest;
     private DoctorVerdict? _verdict;
     private DateTime _ranAt;
@@ -98,8 +106,9 @@ public partial class DoctorViewModel : ObservableObject
 
     public DoctorViewModel()
     {
-        if (HistoryService.Instance.Last(HistoryKey) is { } last) Target = last;
-        var ps = ProfileService.Instance;
+        Iface = new IfacePicker(Store.Profile, IfaceKey, "Default route", "The system chooses the interface (its routing table)");
+        if (Store.History.Last(HistoryKey) is { } last) Target = last;
+        var ps = Store.Profile;
         UseProxy = ps.GetBool("doctor.useProxy");
         ProxyAddress = ps.GetSetting("doctor.proxyAddr") ?? string.Empty;
         ProxyUser = ps.GetSetting("doctor.proxyUser") ?? string.Empty;
@@ -181,7 +190,7 @@ public partial class DoctorViewModel : ObservableObject
                 return;
             }
             if (ProxyTrustRoots != null) proxy!.TrustRoots = ProxyTrustRoots;
-            HistoryService.Instance.Add(ProxyHistoryKey, CheckHostProxy.Clean(ProxyAddress));
+            Store.History.Add(ProxyHistoryKey, CheckHostProxy.Clean(ProxyAddress));
         }
         System.Net.IPAddress? overrideIp = null;
         if (OverrideIp.Trim().Length > 0 && !DoctorIp.TryParseOverride(OverrideIp, out overrideIp, out string oerr))
@@ -189,12 +198,20 @@ public partial class DoctorViewModel : ObservableObject
             ShowInputError("Check the IP", oerr);
             return;
         }
+        // the interface as it is now (its addresses and DNS servers); a chosen one that is down stops the run here rather
+        // than every check failing on it, or quietly taking the default route
+        NetIface? via = null;
+        if (Iface.Name is { } chosen && (via = Iface.Resolve()) is null)
+        {
+            ShowInputError("Choose another interface", $"{chosen} isn't connected: choose another interface, or Default route.");
+            return;
+        }
         FlushPendingSave();
 
         // the box and the history keep the clean target: no user info, no query string (it may carry a token)
         string clean = HistoryValue(t);
         Target = clean;
-        HistoryService.Instance.Add(HistoryKey, clean);
+        Store.History.Add(HistoryKey, clean);
 
         _cts?.Cancel();
         _cts?.Dispose();
@@ -209,11 +226,13 @@ public partial class DoctorViewModel : ObservableObject
             row.Time = "";
             row.ClearTrace();
         }
+        ClearResponses();
         _verdict = null;
         _reportTarget = t.Display();
         _reportProxy = proxy?.Display;
         // an IP target has no DNS answer for the override to stand in for: the engine leaves it out, and so does the report
         _reportOverride = t.IsIp ? null : overrideIp?.ToString();
+        _reportIface = via?.Label;
         // the imported request goes only to its own site
         var request = RequestApplies ? _request : null;
         _reportRequest = request?.Describe();
@@ -229,7 +248,7 @@ public partial class DoctorViewModel : ObservableObject
 
         var token = _cts.Token;
         var env = Env;
-        var options = new DoctorOptions { Proxy = proxy, Override = overrideIp, Request = request };
+        var options = new DoctorOptions { Proxy = proxy, Override = overrideIp, Request = request, Interface = via };
         RunTask = Task.Run(() => RunAsync(t, env, options, sink, run, token));
     }
 
@@ -354,6 +373,7 @@ public partial class DoctorViewModel : ObservableObject
     {
         string target = _reportTarget ?? "";
         if (_reportOverride != null) target += $" at {_reportOverride} (the override IP)";
+        if (_reportIface != null) target += $" from {_reportIface}";
         if (_reportProxy != null) target += $" (also through {_reportProxy})";
         string? about = _reportRequest != null ? "Imported request: " + _reportRequest.Replace("\n", "\n  ") : null;
         string text = DoctorVerdicts.Report(target, _verdict,
@@ -413,7 +433,7 @@ public partial class DoctorViewModel : ObservableObject
         MoveProxyCredentials(whileTyping: true);
         _persistCts?.Cancel();
         _persistPending = false;
-        ProfileService.Instance.SetMany(
+        Store.Profile.SetMany(
             ("doctor.useProxy", UseProxy ? "true" : "false"),
             ("doctor.proxyAddr", CheckHostProxy.Clean(ProxyAddress)),
             ("doctor.proxyUser", ProxyUser),
@@ -464,6 +484,9 @@ public partial class DoctorViewModel : ObservableObject
             double at = _clock.Elapsed.TotalMilliseconds;
             Dispatcher.UIThread.Post(() => { if (_vm._run == _run) _vm.AddLog(at, check, "", "  " + text); });
         }
+
+        public void Response(DoctorCheck check, HttpResponseSnapshot response)
+            => Dispatcher.UIThread.Post(() => { if (_vm._run == _run) _vm.AddResponse(check, response); });
     }
 }
 

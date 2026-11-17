@@ -89,6 +89,10 @@ public static class DoctorVerdicts
         string? at = f.Override is { } ovr ? $"{ovr}{OverrideTag}" : null;
 
         // ---- this device and its network
+        // a chosen interface that nothing can leave from: that is the finding (its reason names it), not "no internet"
+        if (f.InterfaceProblem is { Length: > 0 } fault)
+            return Problem(char.ToUpperInvariant(fault[0]) + fault[1..] + ".",
+                           "Choose Default route, or another interface (a VPN's own, when one is on), and run the diagnosis again.");
         if (f.Local?.HasNetwork == false && f.InternetTcp != true)
             return Problem("This device isn't connected to any network.",
                            "Connect to Wi-Fi or plug in the cable, then run the diagnosis again.");

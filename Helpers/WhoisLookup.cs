@@ -40,6 +40,10 @@ public static class WhoisLookup
     // A WHOIS chain takes a second or two: the next source gets a fair head start's wait before it starts too.
     private static readonly TimeSpan HeadStart = TimeSpan.FromSeconds(2.5);
     private static readonly TimeSpan PerSource = TimeSpan.FromSeconds(15);
+    // A classic WHOIS chain's own deadline, a second inside its source's share: a chain can need three or four hops of up
+    // to 8 s each, and a server still to answer when this runs out leaves the answers before it, with a note. The source's
+    // own cancellation would end the chain and take those answers with it.
+    private static readonly TimeSpan ChainTimeout = PerSource - TimeSpan.FromSeconds(1);
 
     /// <summary>The first source's answer for <paramref name="query"/> (a domain, an address, or an AS number written
     /// "13335" or "AS13335"), with the reasons of the sources that failed before it; or none, and every source's reason.
@@ -54,7 +58,7 @@ public static class WhoisLookup
         // not the holder: another source goes on, and it is shown only when none answers.
         sources.Add(new("WHOIS", async t =>
         {
-            var a = await Whois43.LookUpAsync(kind == Whois43.Kind.Asn ? "AS" + key : query, kind, t).ConfigureAwait(false);
+            var a = await Whois43.LookUpAsync(kind == Whois43.Kind.Asn ? "AS" + key : query, kind, t, ChainTimeout).ConfigureAwait(false);
             if (a.Servers.Count == 1 && a.Note != null)
             {
                 ianaOnly = a;
@@ -66,7 +70,7 @@ public static class WhoisLookup
         if (kind == Whois43.Kind.Domain)
         {
             if (Whois43.RegistryServer(query) is { } registry)
-                sources.Add(new("WHOIS " + registry, async t => Classic(await Whois43.LookUpAsync(query, kind, t, firstServer: registry).ConfigureAwait(false))));
+                sources.Add(new("WHOIS " + registry, async t => Classic(await Whois43.LookUpAsync(query, kind, t, ChainTimeout, firstServer: registry).ConfigureAwait(false))));
             sources.Add(RdapSource("rdap.org", $"https://rdap.org/domain/{key}"));
             sources.Add(RdapSource("ARIN's RDAP bootstrap", $"https://rdap-bootstrap.arin.net/bootstrap/domain/{key}"));
             sources.Add(new("registry RDAP", t => DirectRdap("dns", key, "domain", t)));
@@ -92,7 +96,7 @@ public static class WhoisLookup
                 return text == null ? null : new Answer("% via RIPEstat (the registry's WHOIS)", Clean(text));
             }));
             // ARIN's server answers for any address or AS, pointing at the registry that holds it
-            sources.Add(new("WHOIS " + Whois43.Arin, async t => Classic(await Whois43.LookUpAsync(key, kind, t, firstServer: Whois43.Arin).ConfigureAwait(false))));
+            sources.Add(new("WHOIS " + Whois43.Arin, async t => Classic(await Whois43.LookUpAsync(key, kind, t, ChainTimeout, firstServer: Whois43.Arin).ConfigureAwait(false))));
             sources.Add(WebSource("ip.guide", "https://ip.guide/" + (kind == Whois43.Kind.Asn ? "AS" + key : Uri.EscapeDataString(key)), root =>
                 root.TryGetProperty(kind == Whois43.Kind.Asn ? "asn" : "network", out var n) && n.ValueKind != JsonValueKind.Null,
                 "the network and its AS only"));

@@ -22,9 +22,10 @@ public partial class DoctorViewModel
     private bool _logRefreshPending;
     private int _logVersion, _logShownVersion;   // changes since the text was last handed to the view
 
-    /// <summary>What the lower card shows: 0 the checks, 1 the run log. Persisted.</summary>
+    /// <summary>What the lower card shows: 0 the checks, 1 the run log, 2 the HTTP answers (DoctorViewModel.Response).
+    /// The checks or the log are persisted (the answers are gone at the next start).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowLog), nameof(CopyText), nameof(CopyTip))]
+    [NotifyPropertyChangedFor(nameof(ShowLog), nameof(ShowChecks), nameof(ShowResponse), nameof(CopyText), nameof(CopyTip))]
     private int _viewIndex;
 
     public bool ShowLog => ViewIndex == 1;

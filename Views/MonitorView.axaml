@@ -267,9 +267,11 @@
         <Style Selector="Grid#MonRoot StackPanel.st6"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="7"/></Style>
         <Style Selector="Grid#MonRoot StackPanel.st7"><Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="8"/></Style>
         <Style Selector="Grid#MonRoot.phone StackPanel.stat">
-            <Setter Property="MinWidth" Value="78"/>
+            <Setter Property="MinWidth" Value="0"/>
             <Setter Property="Margin" Value="0,0,8,0"/>
         </Style>
+        <!-- a caption too long for its quarter of a small phone goes onto a second line ("Avg / response") -->
+        <Style Selector="Grid#MonRoot.phone TextBlock.statCap"><Setter Property="TextWrapping" Value="Wrap"/></Style>
         <!-- phone: Monitors · Up · Down · Pending / Uptime · Avg · Paused · Warning -->
         <Style Selector="Grid#MonRoot.phone StackPanel.st4"><Setter Property="Grid.Column" Value="3"/></Style>
         <Style Selector="Grid#MonRoot.phone StackPanel.stw"><Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="3"/><Setter Property="Margin" Value="0,8,8,0"/></Style>
@@ -1050,8 +1052,8 @@
                             <StackPanel x:Name="TgChatField" Spacing="4">
                                 <TextBlock Classes="fieldLabel" Margin="0" Text="Chat"/>
                                 <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
-                                    <TextBox Classes="field mono" Text="{Binding TgChatId}" MaxLength="64"
-                                             PlaceholderText="Chat ID or @channel" AutomationProperties.Name="Chat ID"/>
+                                    <TextBox x:Name="TgChatBox" Classes="field mono" Text="{Binding TgChatId}" MaxLength="64"
+                                             PlaceholderText="Chat ID or @channel" helpers:InputAssist.PhonePlaceholder="ID or @channel" AutomationProperties.Name="Chat ID"/>
                                     <Button Grid.Column="1" Classes="secondary" Content="Find my chat" Command="{Binding FindTgChatCommand}"
                                             IsEnabled="{Binding CanFindTgChat}"
                                             ToolTip.Tip="Send your bot any message in Telegram first; this picks up the chat it came from"/>
@@ -1442,6 +1444,9 @@
                                                    Text="{Binding Detail.PingResult}" IsVisible="{Binding Detail.ShowPing}"/>
                                     </Grid>
                                     <TextBlock Classes="sectionDesc" Text="{Binding Detail.LastError, StringFormat='Last error: {0}'}"/>
+                                    <Button x:Name="LastPageBtn" Classes="linkBtn" HorizontalAlignment="Left" MinHeight="0" Padding="6,1" Margin="-6,-2,0,0"
+                                            Content="Show the page it got" Click="OnShowLastResponse" IsVisible="{Binding Detail.HasLastResponse}"
+                                            ToolTip.Tip="What the failing HTTP check got back: its status, headers and the first 64 KB of the page"/>
                                 </StackPanel>
 
                                 <Border Classes="divider"/>

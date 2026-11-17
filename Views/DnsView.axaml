@@ -57,9 +57,13 @@
         <Style Selector="Grid#DnsForm.wide Panel#DnsResHead">
             <Setter Property="MinHeight" Value="{DynamicResource Control.Height}"/>
         </Style>
-        <!-- stacked (phone): the list shows about three rows and scrolls past that -->
+        <!-- stacked: the list shows about three rows and scrolls past that; the rows are finger size on a phone (touch,
+             below), and stay 20 high in a narrow desktop window, where the results below need the height -->
         <Style Selector="Grid#DnsForm.narrow Border#ResolverListBox">
             <Setter Property="MinHeight" Value="40"/>
+            <Setter Property="MaxHeight" Value="64"/>
+        </Style>
+        <Style Selector="Grid#DnsRoot.touch Grid#DnsForm.narrow Border#ResolverListBox">
             <Setter Property="MaxHeight" Value="112"/>
         </Style>
 
@@ -68,14 +72,24 @@
             <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="1"/>
         </Style>
         <Style Selector="Grid#DnsQuery.narrow > StackPanel#DnsDomain">
-            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
         </Style>
         <Style Selector="Grid#DnsQuery.wide > StackPanel#DnsTypes">
             <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="1"/>
             <Setter Property="Margin" Value="0"/>
         </Style>
         <Style Selector="Grid#DnsQuery.narrow > StackPanel#DnsTypes">
-            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <!-- the interface the queries leave from: a third box beside domain + type, or a row of its own when stacked -->
+        <Style Selector="Grid#DnsQuery.wide > StackPanel#DnsIface">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Width" Value="156"/>
+        </Style>
+        <Style Selector="Grid#DnsQuery.narrow > StackPanel#DnsIface">
+            <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="3"/>
             <Setter Property="Margin" Value="0,12,0,0"/>
         </Style>
         <!-- email check: no type picker, the domain takes the whole row -->
@@ -258,15 +272,15 @@
         <Style Selector="Panel.resSlot">
             <Setter Property="Width" Value="20"/>
         </Style>
-        <!-- stacked (phone): rows and buttons at finger size -->
-        <Style Selector="Grid#DnsForm.narrow Grid.resRow">
+        <!-- stacked on a phone: rows and buttons at finger size (a narrow desktop window keeps the mouse sizes) -->
+        <Style Selector="Grid#DnsRoot.touch Grid#DnsForm.narrow Grid.resRow">
             <Setter Property="MinHeight" Value="36"/>
         </Style>
-        <Style Selector="Grid#DnsForm.narrow Button.resBtn, Grid#DnsForm.narrow Panel.resSlot">
+        <Style Selector="Grid#DnsRoot.touch Grid#DnsForm.narrow Button.resBtn, Grid#DnsRoot.touch Grid#DnsForm.narrow Panel.resSlot">
             <Setter Property="Width" Value="36"/>
             <Setter Property="Height" Value="36"/>
         </Style>
-        <Style Selector="Grid#DnsForm.narrow Button.resBtn > Path">
+        <Style Selector="Grid#DnsRoot.touch Grid#DnsForm.narrow Button.resBtn > Path">
             <Setter Property="Width" Value="12"/>
             <Setter Property="Height" Value="12"/>
         </Style>
@@ -601,8 +615,23 @@
                 </ListBox>
 
                 <!-- domain + record type(s) -->
-                <Grid x:Name="DnsQuery" helpers:Responsive.BreakWidth="300" Classes.email="{Binding IsEmailMode}"
-                      ColumnDefinitions="*, 132" RowDefinitions="Auto, Auto" ColumnSpacing="8">
+                <Grid x:Name="DnsQuery" helpers:Responsive.BreakWidth="440" Classes.email="{Binding IsEmailMode}"
+                      ColumnDefinitions="*, 132, Auto" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="8">
+                    <!-- taken when a run starts, so locked while one goes on; the list is read again whenever it opens -->
+                    <StackPanel x:Name="DnsIface">
+                        <TextBlock Classes="fieldLabel" Text="Interface"/>
+                        <ComboBox x:Name="IfaceBox" Classes="field" HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding Iface.Options}" SelectedItem="{Binding Iface.Selected}"
+                                  IsEnabled="{Binding !IsWorking}" DropDownOpened="IfaceBox_DropDownOpened"
+                                  AutomationProperties.Name="Interface"
+                                  ToolTip.Tip="The network interface the queries leave from (Wi-Fi, Ethernet, a VPN). With one chosen, &quot;system&quot; in the resolver list means the DNS servers of that interface (on Linux and macOS: the system's servers), asked through it. Default route: the system chooses. WHOIS isn't affected">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:IfaceOption">
+                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Tip}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
                     <StackPanel x:Name="DnsDomain">
                         <TextBlock Classes="fieldLabel" Text="Domain"/>
                         <AutoCompleteBox Classes="field" x:Name="DomainBox" helpers:InputAssist.SelectAllOnFocus="True" helpers:InputAssist.PasteMode="Domain" helpers:InputAssist.PasteButton="True" Text="{Binding DomainName}" PlaceholderText="example.com"

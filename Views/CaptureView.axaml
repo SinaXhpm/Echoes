@@ -1,0 +1,323 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             xmlns:h="using:Echoes.Helpers"
+             xmlns:ctl="using:Echoes.Views.Controls"
+             x:Class="Echoes.Views.CaptureView"
+             x:DataType="vm:CaptureViewModel"
+             x:CompileBindings="True">
+
+    <UserControl.Resources>
+        <StreamGeometry x:Key="CapGlyphSave">M12 3.5 V14.5 M7.5 10 L12 14.5 L16.5 10 M4 15.5 V18.5 A2 2 0 0 0 6 20.5 H18 A2 2 0 0 0 20 18.5 V15.5</StreamGeometry>
+        <StreamGeometry x:Key="CapGlyphOpen">M3.5 7.5 V18 a1.5 1.5 0 0 0 1.5 1.5 h14 a1.5 1.5 0 0 0 1.5 -1.5 V9.5 a1.5 1.5 0 0 0 -1.5 -1.5 h-7 l-2 -2.5 h-5 a1.5 1.5 0 0 0 -1.5 1.5 Z</StreamGeometry>
+        <StreamGeometry x:Key="CapGlyphClose">M7 7 L17 17 M17 7 L7 17</StreamGeometry>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="Path.btnIco">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.7"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button:pointerover Path.btnIco">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.ghost.tool">
+            <Setter Property="Padding" Value="10,0"/>
+        </Style>
+
+        <!-- what the filter box didn't understand, under it -->
+        <Style Selector="TextBlock.filterError">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="2,4,0,0"/>
+        </Style>
+        <Style Selector="TextBlock.count">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="12,1,12,0"/>
+        </Style>
+
+        <!-- ===== the packet table: the captions and every row share these columns ===== -->
+        <Style Selector="Grid.pkt > TextBlock:not(.head)">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+        </Style>
+        <Style Selector="Grid.pkt > TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style Selector="Grid.pkt > TextBlock.head">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Grid.pkt > TextBlock.num">
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Grid.pkt > TextBlock.addr">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <!-- the protocol in the colour of its kind: names, encrypted, control, something wrong -->
+        <Style Selector="Grid.pkt > TextBlock.proto">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Grid.pkt > TextBlock.proto.names"><Setter Property="Foreground" Value="{DynamicResource Info}"/></Style>
+        <Style Selector="Grid.pkt > TextBlock.proto.secure"><Setter Property="Foreground" Value="{DynamicResource Accent.Text}"/></Style>
+        <Style Selector="Grid.pkt > TextBlock.proto.control"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
+        <Style Selector="Grid.pkt > TextBlock.proto.bad"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+        <Style Selector="Grid.pkt > TextBlock.info.bad"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+
+        <Style Selector="ListBox#PacketList">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0,2"/>
+        </Style>
+        <Style Selector="ListBox#PacketList ListBoxItem">
+            <Setter Property="Padding" Value="12,2"/>
+            <Setter Property="Margin" Value="4,0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="ListBox#PacketList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+        </Style>
+        <Style Selector="ListBox#PacketList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox#PacketList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Selected}"/>
+        </Style>
+
+        <!-- ===== the selected packet: its layers beside its bytes ===== -->
+        <Style Selector="Border.detail">
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+            <Setter Property="Height" Value="188"/>
+        </Style>
+        <Style Selector="TextBlock.layer">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="Margin" Value="0,6,0,2"/>
+        </Style>
+        <Style Selector="TextBlock.fieldName">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="Width" Value="128"/>
+            <Setter Property="Margin" Value="10,0,8,0"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.fieldValue">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="ctl|HexDumpView">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="OffsetBrush" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="HexBrush" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="AsciiBrush" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+
+        <!-- the status strip at the foot of the card -->
+        <Style Selector="Border.foot">
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+            <Setter Property="CornerRadius" Value="0,0,9,9"/>
+            <Setter Property="Padding" Value="16,8"/>
+        </Style>
+        <Style Selector="TextBlock.footText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.footText.error"><Setter Property="Foreground" Value="{DynamicResource Danger}"/></Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto, *" RowSpacing="12">
+
+        <!-- ===== where to listen · what to show · Start ===== -->
+        <Border Grid.Row="0" Classes="card" Padding="12">
+            <Grid ColumnDefinitions="190, *, Auto, Auto" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="10">
+                <TextBlock Classes="fieldLabel" Text="Interface"/>
+                <TextBlock Grid.Column="1" Classes="fieldLabel" Text="Filter"/>
+
+                <!-- taken at Start, so locked while a capture runs; the list is read again whenever it opens -->
+                <ComboBox Grid.Row="1" x:Name="IfaceBox" Classes="field" HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding Iface.Options}" SelectedItem="{Binding Iface.Selected}"
+                          IsEnabled="{Binding CanChoose}" DropDownOpened="IfaceBox_DropDownOpened"
+                          AutomationProperties.Name="Interface"
+                          ToolTip.Tip="The network interface to capture on. Stop to change">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:IfaceOption">
+                            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Tip}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <!-- a display filter: it chooses what the table shows (and what Save writes), not what is captured -->
+                <AutoCompleteBox Grid.Row="1" Grid.Column="1" x:Name="FilterBox" Classes="field" h:InputAssist.SelectAllOnFocus="True"
+                                 Text="{Binding FilterText}" ItemsSource="{Binding FilterHistory}"
+                                 FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                 PlaceholderText="tcp · port 443 · host 1.1.1.1 · dns and not 8.8.8.8 · any text"
+                                 AutomationProperties.Name="Filter"
+                                 ToolTip.Tip="Which packets to show. A protocol (tcp, udp, dns, tls, arp …), host / net / port as in tcpdump (host 1.1.1.1, net 10.0.0.0/8, port 443), fields as in Wireshark (ip.addr == 1.1.1.1, tcp.port == 443, frame.len &gt; 1000, tcp.flags.syn), or any text; joined with and, or, not and brackets. Enter keeps it in the list">
+                    <AutoCompleteBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding ApplyFilterCommand}"/>
+                    </AutoCompleteBox.KeyBindings>
+                </AutoCompleteBox>
+
+                <CheckBox Grid.Row="1" Grid.Column="2" IsChecked="{Binding Promiscuous}" Content="Promiscuous" VerticalAlignment="Center"
+                          IsEnabled="{Binding CanChoose}"
+                          ToolTip.Tip="Also capture frames addressed to other devices, where the network card and the network let them through (on a switch or Wi-Fi that is little more than broadcasts). Off: this device's own traffic"/>
+
+                <Button Grid.Row="1" Grid.Column="3" x:Name="StartBtn" Classes="toggle" MinWidth="96"
+                        Command="{Binding ToggleCaptureCommand}" Classes.active="{Binding IsCapturing}" IsEnabled="{Binding CanCapture}">
+                    <Panel>
+                        <TextBlock Text="Start" IsVisible="{Binding !IsCapturing}"/>
+                        <TextBlock Text="Stop" IsVisible="{Binding IsCapturing}"/>
+                    </Panel>
+                </Button>
+
+                <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Classes="filterError" Text="{Binding FilterError}"
+                           IsVisible="{Binding HasFilterError}"/>
+            </Grid>
+        </Border>
+
+        <!-- ===== packets: header (count, files) / table / the selected packet / status ===== -->
+        <Border Grid.Row="1" Classes="card output">
+            <Grid RowDefinitions="Auto, Auto, Auto, Auto, *, Auto, Auto">
+                <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto, Auto, Auto" Margin="16,8,8,8">
+                    <TextBlock Classes="cardHeader" Text="Packets" Margin="0" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Classes="count" Text="{Binding CountText}"/>
+                    <Button Grid.Column="2" Classes="ghost tool" Click="Open_Click" IsEnabled="{Binding !IsLoading}" Margin="0,0,8,0"
+                            ToolTip.Tip="Open a capture file (pcap or pcapng, from Wireshark, tcpdump or Echoes)">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <Path Classes="btnIco" Data="{StaticResource CapGlyphOpen}"/>
+                            <TextBlock Text="Open" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="3" x:Name="SaveBtn" Classes="ghost tool" Margin="0,0,8,0"
+                            ToolTip.Tip="Save the packets shown (with a filter: the ones it shows)">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <Path Classes="btnIco" Data="{StaticResource CapGlyphSave}"/>
+                            <TextBlock Text="Save" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                <MenuItem Header="Capture file (pcap, opens in Wireshark)…" Click="SavePcap_Click"/>
+                                <MenuItem Header="CSV (one line per packet)…" Click="SaveCsv_Click"/>
+                                <MenuItem Header="Text (the table)…" Click="SaveText_Click"/>
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                    <Button Grid.Column="4" Classes="ghost" Command="{Binding ClearCommand}" Content="Clear"
+                            ToolTip.Tip="Empty the table (a running capture goes on)"/>
+                </Grid>
+                <Border Grid.Row="1" Classes="divider"/>
+
+                <!-- column captions -->
+                <Grid Grid.Row="2" Classes="pkt" Margin="16,6,16,6" ColumnDefinitions="52, 84, 128, 128, 72, 52, *">
+                    <TextBlock Classes="head num" Text="No."/>
+                    <TextBlock Grid.Column="1" Classes="head" Text="Time" ToolTip.Tip="Seconds since the first packet"/>
+                    <TextBlock Grid.Column="2" Classes="head" Text="Source"/>
+                    <TextBlock Grid.Column="3" Classes="head" Text="Destination"/>
+                    <TextBlock Grid.Column="4" Classes="head" Text="Protocol"/>
+                    <TextBlock Grid.Column="5" Classes="head num" Text="Length" ToolTip.Tip="Bytes on the wire"/>
+                    <TextBlock Grid.Column="6" Classes="head" Text="Info"/>
+                </Grid>
+                <Border Grid.Row="3" Classes="divider"/>
+
+                <Panel Grid.Row="4">
+                    <ListBox x:Name="PacketList" ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected}"
+                             AutomationProperties.Name="Packets">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel/>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="h:PacketRecord">
+                                <Grid Classes="pkt" ColumnDefinitions="52, 84, 128, 128, 72, 52, *">
+                                    <TextBlock Classes="num" Text="{Binding NumberText}"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding TimeText}"/>
+                                    <TextBlock Grid.Column="2" Classes="addr" Text="{Binding Source}"/>
+                                    <TextBlock Grid.Column="3" Classes="addr" Text="{Binding Destination}"/>
+                                    <TextBlock Grid.Column="4" Classes="proto" Classes.names="{Binding ToneNames}" Classes.secure="{Binding ToneSecure}"
+                                               Classes.control="{Binding ToneControl}" Classes.bad="{Binding Alert}" Text="{Binding Protocol}"/>
+                                    <TextBlock Grid.Column="5" Classes="num" Text="{Binding LengthText}"/>
+                                    <TextBlock Grid.Column="6" Classes="info" Classes.bad="{Binding Alert}" Text="{Binding Info}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- empty state: what to do, and what capturing needs on this system -->
+                    <TextBlock Classes="muted" IsHitTestVisible="False" IsVisible="{Binding ShowHint}" Text="{Binding Hint}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                               TextWrapping="Wrap" MaxWidth="420" Margin="24"/>
+                </Panel>
+
+                <!-- the selected packet: every layer with its fields, and its bytes -->
+                <Border Grid.Row="5" Classes="detail" IsVisible="{Binding HasSelection}">
+                    <Grid ColumnDefinitions="*, Auto, *">
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding Layers}" Margin="16,2,8,10">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="h:PacketLayer">
+                                        <StackPanel>
+                                            <TextBlock Classes="layer" Text="{Binding Title}"/>
+                                            <ItemsControl ItemsSource="{Binding Fields}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="h:PacketField">
+                                                        <DockPanel Margin="0,1">
+                                                            <TextBlock Classes="fieldName" DockPanel.Dock="Left" Text="{Binding Name}"/>
+                                                            <SelectableTextBlock Classes="fieldValue" Text="{Binding Value}"/>
+                                                        </DockPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <Border Grid.Column="1" Width="1" Background="{DynamicResource Border.Subtle}"/>
+                        <Grid Grid.Column="2" RowDefinitions="Auto, *">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="2" Margin="0,4,6,0">
+                                <Button Classes="ghost" Command="{Binding CopyPacketCommand}" Content="Copy"
+                                        ToolTip.Tip="Copy this packet: its line, its layers and a hex dump"/>
+                                <Button Classes="icon" Click="CloseDetail_Click" ToolTip.Tip="Close the details" AutomationProperties.Name="Close the details">
+                                    <Path Classes="btnIco" Data="{StaticResource CapGlyphClose}"/>
+                                </Button>
+                            </StackPanel>
+                            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+                                <!-- as many bytes a line as its half of the pane fits: 8 at the default width, 16 in a wider window -->
+                                <ctl:HexDumpView Data="{Binding SelectedBytes}" HorizontalAlignment="Stretch" Margin="12,2,12,10"/>
+                            </ScrollViewer>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="6" Classes="foot" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Classes="footText" Classes.error="{Binding StatusIsError}" Text="{Binding Status}"/>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

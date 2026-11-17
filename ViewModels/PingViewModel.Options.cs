@@ -55,7 +55,7 @@ public partial class PingViewModel
 
     private void LoadSettings()
     {
-        var ps = ProfileService.Instance;
+        var ps = Store.Profile;
         var s = PingSettings.Load(ps);
         _loadingSettings = true;
         try
@@ -101,7 +101,7 @@ public partial class PingViewModel
     {
         if (_loadingSettings || !TryPort(value, out int p)) return;
         string text = p.ToString(CultureInfo.InvariantCulture);
-        if (ProfileService.Instance.GetSetting(PingSettings.KeyTcpPort) != text) ProfileService.Instance.SetSetting(PingSettings.KeyTcpPort, text);
+        if (Store.Profile.GetSetting(PingSettings.KeyTcpPort) != text) Store.Profile.SetSetting(PingSettings.KeyTcpPort, text);
     }
 
     private void ApplySettings()
@@ -118,7 +118,7 @@ public partial class PingViewModel
             Ip = (IpPreference)Math.Clamp(IpVersionIndex, 0, 2),
         }.Clamped();
         _settings = s;
-        s.Save(ProfileService.Instance);
+        s.Save(Store.Profile);
         RefreshSummary();
     }
 

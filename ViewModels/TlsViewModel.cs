@@ -262,6 +262,7 @@ public sealed partial class TlsBulkRow : ObservableObject
 /// </summary>
 public partial class TlsViewModel : ObservableObject
 {
+    private readonly ToolStore Store = ToolStore.Current;   // this instance's settings: its own copy when it is one of several tabs (ToolStore)
     private const string HTarget = "tls.target";
     private const string KBulk = "tls.bulk", KTab = "tls.tab", KSni = "tls.sni", KStartTls = "tls.starttls";
     private const int BulkConcurrency = 8;
@@ -278,7 +279,7 @@ public partial class TlsViewModel : ObservableObject
     [ObservableProperty] private string _sni = string.Empty;
     [ObservableProperty] private int _startTlsIndex;
     public string[] StartTlsOptions { get; } = { "Automatic", "None", "SMTP", "IMAP", "POP3", "FTP" };
-    public ObservableCollection<string> TargetHistory => HistoryService.Instance.Get(HTarget);
+    public ObservableCollection<string> TargetHistory => Store.History.Get(HTarget);
 
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _progress = string.Empty;
@@ -310,10 +311,10 @@ public partial class TlsViewModel : ObservableObject
     public TlsViewModel()
     {
         _restoring = true;
-        var p = ProfileService.Instance;
+        var p = Store.Profile;
         TabIndex = Math.Clamp(p.GetInt(KTab, 0), 0, 1);
         BulkInput = p.GetSetting(KBulk) ?? string.Empty;
-        if (HistoryService.Instance.Last(HTarget) is { } last) Target = last;
+        if (Store.History.Last(HTarget) is { } last) Target = last;
         Sni = p.GetSetting(KSni) ?? string.Empty;
         StartTlsIndex = Math.Clamp(p.GetInt(KStartTls, 0), 0, StartTlsOptions.Length - 1);
         _restoring = false;
@@ -322,12 +323,12 @@ public partial class TlsViewModel : ObservableObject
     // The SNI override (a host name: at most 253 characters are worth keeping) and the STARTTLS choice are remembered.
     partial void OnSniChanged(string value)
     {
-        if (!_restoring) ProfileService.Instance.SetSetting(KSni, (value ?? string.Empty).Length <= 253 ? value : string.Empty);
+        if (!_restoring) Store.Profile.SetSetting(KSni, (value ?? string.Empty).Length <= 253 ? value : string.Empty);
     }
 
     partial void OnStartTlsIndexChanged(int value)
     {
-        if (!_restoring && value >= 0) ProfileService.Instance.SetSetting(KStartTls, value.ToString(CultureInfo.InvariantCulture));
+        if (!_restoring && value >= 0) Store.Profile.SetSetting(KStartTls, value.ToString(CultureInfo.InvariantCulture));
     }
 
     public bool IsIdle => !IsBusy;
@@ -375,7 +376,7 @@ public partial class TlsViewModel : ObservableObject
 
     partial void OnTabIndexChanged(int value)
     {
-        if (!_restoring) ProfileService.Instance.SetSetting(KTab, value.ToString(CultureInfo.InvariantCulture));
+        if (!_restoring) Store.Profile.SetSetting(KTab, value.ToString(CultureInfo.InvariantCulture));
     }
 
     partial void OnBulkInputChanged(string value)
@@ -396,7 +397,7 @@ public partial class TlsViewModel : ObservableObject
             return;
         }
         string normalized = port == TlsInspector.DefaultPort ? host : SocketNet.Target(host, port);
-        HistoryService.Instance.Add(HTarget, normalized);
+        Store.History.Add(HTarget, normalized);
 
         StartTlsKind? starttls = StartTlsIndex switch
         {
@@ -570,7 +571,7 @@ public partial class TlsViewModel : ObservableObject
             .ToList();
         if (lines.Count == 0) { BulkError = "Paste host names, host:port or URLs — one per line."; return; }
         if (lines.Count > BulkMax) { BulkError = $"That's {lines.Count} hosts — the bulk check takes up to {BulkMax} at a time."; return; }
-        if ((BulkInput ?? "").Length <= 64 * 1024) ProfileService.Instance.SetSetting(KBulk, BulkInput);
+        if ((BulkInput ?? "").Length <= 64 * 1024) Store.Profile.SetSetting(KBulk, BulkInput);
 
         BulkRows.Clear();
         _sortColumn = string.Empty;

@@ -20,7 +20,7 @@ public partial class DnsViewModel
     partial void OnCompareServersTextChanged(string value)
     {
         if (IsCompareMode) { OnPropertyChanged(nameof(ResolverText)); RefreshPresetMarks(); RebuildResolverRows(); }
-        if (_loaded) ProfileService.Instance.SetSetting("dns.compare", value);
+        if (_loaded) Store.Profile.SetSetting("dns.compare", value);
     }
 
     public IReadOnlyList<string> CompareTypes { get; } = new[] { "A", "AAAA", "MX", "TXT", "NS", "CNAME", "SOA", "CAA" };
@@ -29,7 +29,7 @@ public partial class DnsViewModel
 
     partial void OnCompareTypeChanged(string value)
     {
-        if (_loaded && value != null) ProfileService.Instance.SetSetting("dns.compareType", value);
+        if (_loaded && value != null) Store.Profile.SetSetting("dns.compareType", value);
     }
 
     public ObservableCollection<CompareRow> CompareRows { get; } = new();
@@ -59,12 +59,17 @@ public partial class DnsViewModel
         }
 
         var token = NewRun();
-        HistoryService.Instance.Add("dns.domain", DomainName);
+        Store.History.Add("dns.domain", DomainName);
         var skipped = new List<(string line, string reason)>();
         var specs = ResolverSpec.ParseList(CompareServersText, skipped);
         if (specs.Count == 0)
         {
             ShowCompareMessage("No valid resolver in the list — add some from Presets, or type one in (1.1.1.1, https://…/dns-query, tls://…).", bad: true);
+            return;
+        }
+        if (!TryVia(out var via, out string viaProblem))
+        {
+            ShowCompareMessage(viaProblem, bad: true);
             return;
         }
         bool cut = specs.Count > DnsCompare.MaxResolvers;
@@ -104,7 +109,7 @@ public partial class DnsViewModel
                     if (i >= 0 && i < rows.Count) rows[i].Update(st, final: false);
                     CompareProgress = $"{Math.Min(n, total)} of {total} queries";
                 });
-            }, token), token);
+            }, token, via), token);
 
             finished = true;
             _compareStats = stats;

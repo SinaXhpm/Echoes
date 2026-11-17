@@ -103,8 +103,9 @@ public static class DnsCompare
 
     /// <summary>Runs <see cref="Rounds"/> rounds against every resolver (each resolver's rounds in order, several
     /// resolvers at once), reporting each result as it lands, then sets every verdict (<see cref="Analyze"/>).</summary>
+    /// <param name="via">The interface every query leaves from (the DNS tool's Interface choice); null = the routing table's.</param>
     public static async Task<List<CompareStats>> RunAsync(IReadOnlyList<ResolverSpec> specs, string name, QueryType type,
-                                                          Action<CompareStats, int>? onRound, CancellationToken ct)
+                                                          Action<CompareStats, int>? onRound, CancellationToken ct, NetIface? via = null)
     {
         var stats = specs.Take(MaxResolvers).Select(s => new CompareStats(s)).ToList();
         string typeName = type.ToString();
@@ -115,7 +116,7 @@ public static class DnsCompare
             try
             {
                 // plain: 2.5 s is generous for one UDP round trip; encrypted: the first round also connects + handshakes
-                using var session = new DnsSession(st.Spec, st.Spec.IsEncrypted ? TimeSpan.FromSeconds(4) : TimeSpan.FromSeconds(2.5));
+                using var session = new DnsSession(st.Spec, st.Spec.IsEncrypted ? TimeSpan.FromSeconds(4) : TimeSpan.FromSeconds(2.5), via);
                 for (int round = 1; round <= Rounds; round++)
                 {
                     ct.ThrowIfCancellationRequested();

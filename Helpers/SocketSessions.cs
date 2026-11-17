@@ -41,6 +41,8 @@ public sealed class SocketFailure : Exception
     /// <summary>SHA-256 of the server certificate when the TLS certificate was the problem (for "connect anyway").</summary>
     public string? CertSha256 { get; init; }
     public IReadOnlyList<TlsProblem>? CertProblems { get; init; }
+    /// <summary>A refused WebSocket handshake's answer (status, headers, the start of its body), for the response viewer.</summary>
+    public HttpResponseSnapshot? Response { get; init; }
 }
 
 /// <summary>A TCP client of the server mode, or a UDP sender seen by the UDP server.</summary>

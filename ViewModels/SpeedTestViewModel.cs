@@ -24,6 +24,12 @@ public partial class SpeedTestViewModel : ObservableObject
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
     internal const string Intro = "Pick a server, then press Start.";
     internal const string ConnectionsKey = "speed.connections";
+    internal const string IfaceKey = "speed.iface";
+
+    /// <summary>The interface the test runs over: "Default route" lets the system choose, as it always did. Taken when
+    /// a test starts; locked while it runs.</summary>
+    public IfacePicker Iface { get; } = new(ProfileService.Instance, IfaceKey, "Default route",
+                                            "The system chooses the interface (its routing table)");
 
     /// <summary>Tests / screenshots: shorten the engine's phases (the connection count still comes from the tab).</summary>
     public SpeedTestOptions? Options { get; set; }
@@ -168,7 +174,14 @@ public partial class SpeedTestViewModel : ObservableObject
         var servers = new List<SpeedTestDestination> { SelectedDestination };
         if (SelectedDestination.Id == SpeedTestDestinations.Cloudflare.Id)
             servers.AddRange(SpeedTestDestinations.AutomaticFallbacks(TimeZoneInfo.Local.GetUtcOffset(DateTime.Now)));
-        var options = (Options ?? new SpeedTestOptions()) with { Connections = Connections };
+        // The chosen interface as it is now. Not up: said at once, instead of quietly testing the default route.
+        NetIface? via = null;
+        if (Iface.Name is { } chosen && (via = Iface.Resolve()) is null)
+        {
+            Fail($"{chosen} isn't connected: choose another interface, or Default route.");
+            return;
+        }
+        var options = (Options ?? new SpeedTestOptions()) with { Connections = Connections, Via = via };
         int run = ++_run;
         _cts?.Dispose();
         _cts = new CancellationTokenSource();
@@ -198,6 +211,7 @@ public partial class SpeedTestViewModel : ObservableObject
                     var result = await Task.Run(() => engine.RunAsync(p => Report(attempt, p), token), token);
                     if (attempt != _run) return;
                     ApplyFinal(result, destination);
+                    if (via is not null) Status += $" · over {via.Name}";
                     if (_switchNote is { } why) Status += $" · {why}, so {destination.Name} was used";
                     Remember(result, destination);
                     return;

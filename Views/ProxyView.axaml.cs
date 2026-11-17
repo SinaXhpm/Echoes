@@ -27,6 +27,19 @@ public partial class ProxyView : UserControl
         InitializeComponent();
     }
 
+    // interfaces come and go (Wi-Fi, a VPN): the picker lists the current ones whenever it opens
+    private void OutIfaceBox_DropDownOpened(object? sender, EventArgs e)
+    {
+        if (DataContext is ProxyViewModel { IsRunning: false } vm) vm.OutIface.Refresh();
+    }
+
+    // the answer the request through a proxy got, in the shared response viewer
+    private void OnShowCheckResponse(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: ProxyCheckRow { Response: { } answer } row } anchor)
+            Controls.ResponseView.ShowFlyout(anchor, new HttpResponseViewModel(answer, row.Display), row.Display);
+    }
+
     // ---------- the proxy checker's exports ----------
 
     private async void OnExportWorking(object? sender, RoutedEventArgs e)

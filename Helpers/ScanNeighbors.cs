@@ -21,14 +21,16 @@ public static class ScanNeighbors
     /// "reachable"); a stale entry only says it was there once — not proof it is up now.</summary>
     public readonly record struct Entry(string Mac, bool Confirmed);
 
-    /// <summary>IP literal → entry, for unicast host MACs only (no broadcast / multicast / all-zero entries).</summary>
-    public static Dictionary<string, Entry> Snapshot()
+    /// <summary>IP literal → entry, for unicast host MACs only (no broadcast / multicast / all-zero entries).
+    /// <paramref name="via"/>: only the neighbors seen on that interface (a scan or a device search from a chosen
+    /// interface: what another adapter's network knows about an address proves nothing about this one).</summary>
+    public static Dictionary<string, Entry> Snapshot(NetIface? via = null)
     {
         var map = new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
         try
         {
-            if (OperatingSystem.IsWindows()) ReadWindows(map);
-            else if (OperatingSystem.IsLinux() && !OperatingSystem.IsAndroid()) ReadLinux(map);
+            if (OperatingSystem.IsWindows()) ReadWindows(map, via?.Index ?? 0);
+            else if (OperatingSystem.IsLinux() && !OperatingSystem.IsAndroid()) ReadLinux(map, via?.Name);
         }
         catch { /* best-effort: no table, no MACs */ }
         return map;
@@ -61,7 +63,7 @@ public static class ScanNeighbors
         return map;
     }
 
-    private static void ReadLinux(Dictionary<string, Entry> map)
+    private static void ReadLinux(Dictionary<string, Entry> map, string? device)
     {
         const string path = "/proc/net/arp";
         if (!File.Exists(path)) return;
@@ -70,6 +72,7 @@ public static class ScanNeighbors
         {
             var c = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
             if (c.Length < 6 || c[2] == "0x0" || !ScanOui.IsHostMac(c[3])) continue;
+            if (device is not null && !string.Equals(c[5], device, StringComparison.Ordinal)) continue;
             map[c[0]] = new Entry(ScanOui.Format(c[3]), Confirmed: false);
         }
     }
@@ -88,7 +91,7 @@ public static class ScanNeighbors
     [DllImport("iphlpapi.dll")]
     private static extern void FreeMibTable(IntPtr memory);
 
-    private static void ReadWindows(Dictionary<string, Entry> map)
+    private static void ReadWindows(Dictionary<string, Entry> map, int interfaceIndex)
     {
         if (GetIpNetTable2(0 /* AF_UNSPEC */, out IntPtr table) != 0 || table == IntPtr.Zero) return;
         try
@@ -105,6 +108,7 @@ public static class ScanNeighbors
                 else if (family == WinAfInet6) addr = new IPAddress(row.AsSpan(8, 16), BitConverter.ToUInt32(row, 24));
                 else continue;
 
+                if (interfaceIndex > 0 && BitConverter.ToInt32(row, 28) != interfaceIndex) continue;   // another adapter's neighbor
                 int macLen = BitConverter.ToInt32(row, 72);
                 int state = BitConverter.ToInt32(row, 76);
                 bool unreachable = (row[80] & 0x02) != 0;

@@ -21,6 +21,7 @@ public enum PingMode { Ping = 0, Traceroute = 1, Mtr = 2, Tcp = 3 }
 
 public partial class PingViewModel : ObservableObject
 {
+    private readonly ToolStore Store = ToolStore.Current;   // this instance's settings: its own copy when it is one of several tabs (ToolStore)
     [ObservableProperty] private string _targetHost = string.Empty;
     [ObservableProperty] private bool _isPinging;
     [ObservableProperty] private bool _notifyOnline;
@@ -75,7 +76,7 @@ public partial class PingViewModel : ObservableObject
     partial void OnModeIndexChanged(int value)
     {
         string name = ModeNames[(int)Mode];
-        if (ProfileService.Instance.GetSetting(ModeKey) != name) ProfileService.Instance.SetSetting(ModeKey, name);
+        if (Store.Profile.GetSetting(ModeKey) != name) Store.Profile.SetSetting(ModeKey, name);
         RefreshSummary();   // TCP shows only what it uses
     }
 
@@ -84,9 +85,9 @@ public partial class PingViewModel : ObservableObject
     partial void OnNotifyOnlineChanged(bool value) => SaveSwitch(AlertUpKey, value);
     partial void OnNotifyOfflineChanged(bool value) => SaveSwitch(AlertDownKey, value);
 
-    private static void SaveSwitch(string key, bool value)
+    private void SaveSwitch(string key, bool value)
     {
-        if (ProfileService.Instance.GetBool(key) != value) ProfileService.Instance.SetBool(key, value);
+        if (Store.Profile.GetBool(key) != value) Store.Profile.SetBool(key, value);
     }
 
     // Probes are ICMP echo, and UDP datagrams to a closed port wherever ICMP isn't permitted (IcmpPinger.SendAsync,
@@ -95,7 +96,13 @@ public partial class PingViewModel : ObservableObject
 
     public ObservableCollection<string> LogItems { get; } = new();
 
-    public ObservableCollection<string> TargetHostHistory => HistoryService.Instance.Get("ping.host");
+    public ObservableCollection<string> TargetHostHistory => Store.History.Get("ping.host");
+
+    /// <summary>The interface the probes leave from, in all four modes (ping -I / -S, tracert -S, mtr -I): "Default
+    /// route" lets the system choose, as it always did. Taken at Start; the picker is locked while a run goes on.</summary>
+    public IfacePicker Iface { get; }
+
+    private const string IfaceKey = "ping.iface";
 
     /// <summary>Replaces the network in Ping mode (tests): (address, timeoutMs, packet options, token) → result.</summary>
     internal Func<IPAddress, int, IcmpProbeOptions, CancellationToken, Task<IcmpPinger.PingResult>>? IcmpProbe { get; set; }
@@ -103,12 +110,14 @@ public partial class PingViewModel : ObservableObject
     public PingViewModel(IToolLinks? links = null)
     {
         Mtr = new MtrViewModel(links);
-        if (HistoryService.Instance.Last("ping.host") is { } last) TargetHost = last;
+        Iface = new IfacePicker(Store.Profile, IfaceKey, "Default route",
+                                "The system chooses the interface (its routing table)");
+        if (Store.History.Last("ping.host") is { } last) TargetHost = last;
         LoadSettings();
-        int saved = Array.IndexOf(ModeNames, ProfileService.Instance.GetSetting(ModeKey));
+        int saved = Array.IndexOf(ModeNames, Store.Profile.GetSetting(ModeKey));
         if (saved > 0) ModeIndex = saved;
-        NotifyOnline = ProfileService.Instance.GetBool(AlertUpKey);
-        NotifyOffline = ProfileService.Instance.GetBool(AlertDownKey);
+        NotifyOnline = Store.Profile.GetBool(AlertUpKey);
+        NotifyOffline = Store.Profile.GetBool(AlertDownKey);
     }
 
     private CancellationTokenSource? _cts;
@@ -173,7 +182,7 @@ public partial class PingViewModel : ObservableObject
             return;
         }
 
-        HistoryService.Instance.Add("ping.host", TargetHost);
+        Store.History.Add("ping.host", TargetHost);
 
         Stop();
 
@@ -197,10 +206,11 @@ public partial class PingViewModel : ObservableObject
         // otherwise label every line with whatever is typed there now ("Request timeout from <new text>").
         string host = TargetHost;
         var ip = _settings.Ip;   // picks the address: fixed for the run (the switch is locked meanwhile)
+        string? iface = Iface.Name;   // the interface the probes leave from: fixed for the run too
         _logMode = mode;
         _summaryLogged = false;
         IsPinging = true;
-        Task.Run(() => RunProcess(host, mode, port, ip, mtrRun, token), token);
+        Task.Run(() => RunProcess(host, mode, port, ip, iface, mtrRun, token), token);
     }
 
     private void Stop()
@@ -211,14 +221,25 @@ public partial class PingViewModel : ObservableObject
         IsPinging = false;
     }
 
-    private async Task RunProcess(string host, PingMode mode, int port, IpPreference ip, int mtrRun, CancellationToken token)
+    private async Task RunProcess(string host, PingMode mode, int port, IpPreference ip, string? iface, int mtrRun, CancellationToken token)
     {
         try
         {
-            if (mode == PingMode.Mtr) await Mtr.RunAsync(host, mtrRun, token);
-            else if (mode == PingMode.Traceroute) await RunTraceRoute(host, token);
-            else if (mode == PingMode.Tcp) await RunTcpLoop(host, port, ip, token);
-            else await RunPingLoop(host, ip, token);
+            // The chosen interface as it is now (its address may have changed since it was picked). Not up: the run
+            // says so instead of quietly taking the default route.
+            NetIface? via = null;
+            if (iface is not null && (via = NetIfaces.Find(iface)) is null)
+            {
+                string gone = $"{iface} isn't connected: choose another interface, or Default route.";
+                if (mode == PingMode.Mtr) Mtr.Fail(mtrRun, gone);
+                else UpdateLog("Error: " + gone, token);
+                return;
+            }
+
+            if (mode == PingMode.Mtr) await Mtr.RunAsync(host, mtrRun, token, via);
+            else if (mode == PingMode.Traceroute) await RunTraceRoute(host, via, token);
+            else if (mode == PingMode.Tcp) await RunTcpLoop(host, port, ip, via, token);
+            else await RunPingLoop(host, ip, via, token);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -247,12 +268,12 @@ public partial class PingViewModel : ObservableObject
         }
     }
 
-    private async Task RunPingLoop(string host, IpPreference ip, CancellationToken token)
+    private async Task RunPingLoop(string host, IpPreference ip, NetIface? via, CancellationToken token)
     {
         IPAddress addr;
         try
         {
-            addr = await PingTarget.ResolveAsync(host, ip, token);
+            addr = await ResolveVia(host, ip, via, token);
         }
         catch (OperationCanceledException) { return; }
         catch (Exception ex)
@@ -264,7 +285,8 @@ public partial class PingViewModel : ObservableObject
         bool v6 = addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6;
         int header = v6 ? 48 : 28;   // ICMP + IP header, classic ping accounting
         var used = _settings;
-        UpdateLog($"PING {host} ({addr}) {used.Size}({used.Size + header}) bytes of data{PacketExtras(used)}.", token);
+        // with an interface, ping -I's own line: "PING host (addr) from 192.168.1.2 Wi-Fi: 32(60) bytes of data."
+        UpdateLog($"PING {host} ({addr}){From(via, addr)} {used.Size}({used.Size + header}) bytes of data{PacketExtras(used)}.", token);
         NoteIpMismatch(host, addr, ip, token);
 
         var probe = IcmpProbe ?? ((a, t, o, ct) => IcmpPinger.SendAsync(a, t, o, ct));
@@ -287,7 +309,7 @@ public partial class PingViewModel : ObservableObject
             long t0 = Stopwatch.GetTimestamp();
             _sent++;
 
-            var r = await probe(addr, s.TimeoutMs, s.Icmp, token);
+            var r = await probe(addr, s.TimeoutMs, s.Icmp with { Via = via }, token);
             if (token.IsCancellationRequested) break;
 
             // Neither ICMP nor the UDP fallback can work here: the error says why (both reasons), then how to allow ICMP.
@@ -353,6 +375,8 @@ public partial class PingViewModel : ObservableObject
                         UpdateLog("Note: Windows Firewall drops incoming ICMPv4 port-unreachable messages by default, so UDP ping can't hear remote IPv4 hosts.", token);
                     }
                 }
+                else if (r.NotSent)
+                    UpdateLog($"Not sent: {seqLabel}={seq} ({r.Error})", token);   // the chosen interface can't be used right now
                 else if (IsHop(r.Address))
                     UpdateLog($"From {r.Address}: {seqLabel}={seq} {Describe(r.Error)}", token);   // a router's verdict, like ping's "From …"
                 else
@@ -388,6 +412,23 @@ public partial class PingViewModel : ObservableObject
         return sb.ToString();
     }
 
+    // The address to probe. With an interface chosen: of the kind that interface has (a name with both; an interface
+    // with IPv6 only turns Auto into IPv6), a link-local address gets the interface as its zone, and an address the
+    // interface has no way to (no IPv6 on it) is an error here rather than a run of probes that can't be sent.
+    private static async Task<IPAddress> ResolveVia(string host, IpPreference ip, NetIface? via, CancellationToken token)
+    {
+        if (via is null) return await PingTarget.ResolveAsync(host, ip, token);
+        var addr = via.Scoped(await PingTarget.ResolveAsync(host, via.Prefer(ip), token));
+        if (via.Missing(addr) is { } missing)
+            throw new PingTargetException($"{missing}, so {addr} can't be reached from it", dnsFailure: false);
+        return addr;
+    }
+
+    // " from 192.168.1.2 Wi-Fi:" for the first line of a run with an interface chosen (ping -I's wording).
+    private static string From(NetIface? via, IPAddress target)
+        => via is null ? string.Empty
+            : $" from {(via.SourceFor(target) is { } source ? new IPAddress(source.GetAddressBytes()) + " " : string.Empty)}{via.Name}:";
+
     // An IP literal of the other kind than the options ask for: it's used as given, and the log says why.
     private void NoteIpMismatch(string host, IPAddress addr, IpPreference ip, CancellationToken token)
     {
@@ -405,15 +446,15 @@ public partial class PingViewModel : ObservableObject
         if (left >= 1) await Task.Delay(TimeSpan.FromMilliseconds(left), token);
     }
 
-    private async Task RunTraceRoute(string host, CancellationToken token)
+    private async Task RunTraceRoute(string host, NetIface? via, CancellationToken token)
     {
-        UpdateLog($"Tracing route to {host} over a maximum of 30 hops:", token);
+        UpdateLog($"Tracing route to {host} over a maximum of 30 hops{(via is null ? string.Empty : " from " + via.Name)}:", token);
         bool udpNoted = false;
 
         System.Net.IPAddress target;
         try
         {
-            target = await IcmpPinger.ResolveAsync(host, token);
+            target = via is null ? await IcmpPinger.ResolveAsync(host, token) : await ResolveVia(host, IpPreference.Auto, via, token);
         }
         catch (OperationCanceledException) { return; }
         catch (Exception ex)
@@ -432,9 +473,17 @@ public partial class PingViewModel : ObservableObject
                 // Unprivileged ICMP that also works on Android/Linux without root (raw Ping needs it);
                 // there the router's "time exceeded" is read back via IP_RECVERR (see IcmpPinger). Where ICMP isn't
                 // permitted Linux / Android trace with UDP datagrams instead, the same way.
-                r = await IcmpPinger.SendAsync(target, 2000, token, ttl);
+                r = await IcmpPinger.SendAsync(target, 2000, token, ttl, via: via);
             }
             catch (OperationCanceledException) { break; }
+
+            if (r.NotSent)
+            {
+                // the chosen interface can't be used: no higher TTL would fare better
+                UpdateLog($"{ttl}\t*\tNot sent: {r.Error}", token);
+                UpdateLog("Trace stopped: the probes can't be sent from " + (via?.Name ?? "this interface") + ".", token);
+                break;
+            }
 
             if (r.PermissionDenied)
             {

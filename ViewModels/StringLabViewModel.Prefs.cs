@@ -49,7 +49,7 @@ public partial class StringLabViewModel
     /// <summary>Called by the constructor, before anything is shown.</summary>
     private void RestorePrefs()
     {
-        var ps = ProfileService.Instance;
+        var ps = Store.Profile;
         string? S(string key, int max) => ps.GetSetting(key) is { } v && v.Length <= max ? v : null;
 
         CategoryIndex = Math.Clamp(ps.GetInt("lab.cat", 0), 0, 3);
@@ -125,7 +125,7 @@ public partial class StringLabViewModel
         var inv = CultureInfo.InvariantCulture;
         static string B(bool b) => b ? "true" : "false";
         static string T(string? s, int max) => s is { } v && v.Length <= max ? v : string.Empty;
-        ProfileService.Instance.SetMany(
+        Store.Profile.SetMany(
             ("lab.cat", Math.Max(CategoryIndex, 0).ToString(inv)), ("lab.encodeTool", Math.Max(EncodeToolIndex, 0).ToString(inv)),
             ("lab.textTool", Math.Max(TextToolIndex, 0).ToString(inv)), ("lab.dataTool", Math.Max(DataToolIndex, 0).ToString(inv)),
             ("lab.devTool", Math.Max(DevToolIndex, 0).ToString(inv)),

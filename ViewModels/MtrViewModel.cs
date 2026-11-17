@@ -21,6 +21,7 @@ namespace Echoes.ViewModels;
 /// </summary>
 public sealed partial class MtrViewModel : ObservableObject
 {
+    private readonly ToolStore Store = ToolStore.Current;   // this instance's settings: its own copy when it is one of several tabs (ToolStore)
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
     private const int FlushIntervalMs = 250;
 
@@ -52,6 +53,7 @@ public sealed partial class MtrViewModel : ObservableObject
     private int _runId;
     private bool _active;
     private string _label = string.Empty;
+    private string _from = string.Empty;   // " from Wi-Fi" with an interface chosen
     private DateTimeOffset _startedAt;
     private MtrSnapshot? _last;
     private readonly Dictionary<IPAddress, string?> _names = new();
@@ -77,30 +79,40 @@ public sealed partial class MtrViewModel : ObservableObject
     }
 
     /// <summary>Resolves <paramref name="host"/> and runs MTR to it until <paramref name="token"/> is cancelled or no probe can
-    /// work here. Off the UI thread; never throws. Returns false when the run ended by itself (an error).</summary>
-    public async Task<bool> RunAsync(string host, int runId, CancellationToken token)
+    /// work here. Off the UI thread; never throws. Returns false when the run ended by itself (an error).
+    /// <paramref name="via"/>: the interface the probes leave from (null = the routing table's choice).</summary>
+    public async Task<bool> RunAsync(string host, int runId, CancellationToken token, NetIface? via = null)
     {
         IPAddress target;
         try
         {
             if (!IPAddress.TryParse(host, out _)) Post(runId, () => Status = $"Resolving {host}…");
-            target = await IcmpPinger.ResolveAsync(host, token).ConfigureAwait(false);
+            // with an interface: the kind of address it can reach (a name with both; IPv4 first, as without one)
+            target = via is null ? await IcmpPinger.ResolveAsync(host, token).ConfigureAwait(false)
+                : via.Scoped(await PingTarget.ResolveAsync(host, via.Prefer(IpPreference.Auto), token).ConfigureAwait(false));
         }
         catch (OperationCanceledException) { return true; }
-        catch (Exception)
+        catch (Exception ex)
         {
-            Post(runId, () => SetError($"Host not found: {host}"));
+            Post(runId, () => SetError(ex is PingTargetException ? ex.Message : $"Host not found: {host}"));
+            return false;
+        }
+        if (via?.Missing(target) is { } missing)
+        {
+            Post(runId, () => SetError($"{missing}, so {target} can't be reached from it."));
             return false;
         }
 
-        var session = new MtrSession(target, Options);
+        var session = new MtrSession(target, Options, via);
         string label = IPAddress.TryParse(host, out _) ? target.ToString() : $"{host} ({target})";
+        string from = via is null ? string.Empty : $" from {via.Name}";
         Post(runId, () =>
         {
             _active = true;
             _label = label;
+            _from = from;
             _startedAt = DateTimeOffset.Now;
-            Status = $"Discovering the hops to {label}…";
+            Status = $"Discovering the hops to {label}{from}…";
             StatusIsError = false;
         });
         session.Changed += () => QueueFlush(runId, session);
@@ -123,6 +135,9 @@ public sealed partial class MtrViewModel : ObservableObject
         });
         return final.Fatal is null;
     }
+
+    /// <summary>The run couldn't start (the chosen interface isn't connected): the reason, in place of the table.</summary>
+    public void Fail(int runId, string message) => Post(runId, () => SetError(message));
 
     private void SetError(string message)
     {
@@ -209,6 +224,8 @@ public sealed partial class MtrViewModel : ObservableObject
               .Append(answered == 1 ? " · 1 hop answered" : answered > 1 ? $" · {answered} hops answered" : string.Empty);
         }
         sb.Append(_active ? $" · round {snap.Rounds}" : $" · stopped after {rounds}");
+        if (_from.Length > 0) sb.Append(" ·").Append(_from);
+        if (snap.SendError is { } unsent && _active) sb.Append(" · not sent: ").Append(unsent);
         return sb.ToString();
     }
 
@@ -281,7 +298,8 @@ public sealed partial class MtrViewModel : ObservableObject
         }
 
         var sb = new StringBuilder();
-        sb.Append("MTR to ").Append(_label).Append(snap.UsesUdp ? " (UDP probes to port " + IcmpPinger.DefaultUdpPort + ")" : " (ICMP)").AppendLine();
+        sb.Append("MTR to ").Append(_label).Append(snap.UsesUdp ? " (UDP probes to port " + IcmpPinger.DefaultUdpPort + ")" : " (ICMP)")
+          .Append(_from).AppendLine();
         sb.Append("Start: ").Append(_startedAt.ToString("yyyy-MM-dd'T'HH:mm:ssK", Inv)).AppendLine();
         sb.Append("HOST: ").Append(Environment.MachineName.PadRight(width + 2))
           .Append(" Loss%   Snt   Last    Avg   Best   Wrst  StDev").AppendLine();

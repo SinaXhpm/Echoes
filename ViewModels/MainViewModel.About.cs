@@ -8,7 +8,7 @@ namespace Echoes.ViewModels;
 
 public enum UpdateCheckState { NotChecked, Checking, UpToDate, Available, Failed }
 
-// The About box (the ⓘ in the desktop sidebar, "About" in the phone drawer): version, the update check, links, and the
+// The About box (the ⓘ in the desktop top bar, "About" in the phone drawer): version, the update check, links, and the
 // platform details a bug report needs. Both shells host the same AboutView over their content.
 public partial class MainViewModel
 {

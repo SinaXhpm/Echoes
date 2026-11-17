@@ -110,7 +110,8 @@ public static class DoctorTls
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(6000);
-            using var s = new Socket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+            using var s = DoctorNet.NewSocket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            s.NoDelay = true;
             await s.ConnectAsync(new IPEndPoint(addr, port), cts.Token).ConfigureAwait(false);
             await using var ns = new NetworkStream(s, ownsSocket: false);
             failure = await HandshakeAsync(ns, sni, sni ?? addr.ToString(), roots, res, cts.Token).ConfigureAwait(false);
@@ -273,7 +274,8 @@ public static class DoctorTls
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(timeoutMs);
-            using var s = new Socket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+            using var s = DoctorNet.NewSocket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            s.NoDelay = true;
             await s.ConnectAsync(new IPEndPoint(addr, port), cts.Token).ConfigureAwait(false);
             await using var ns = new NetworkStream(s, ownsSocket: false);
             await using var ssl = new SslStream(ns, false, (_, cert, _, _) =>
@@ -298,7 +300,11 @@ public static class DoctorTls
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(timeoutMs);
-        using var s = new Socket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+        Socket created;
+        try { created = DoctorNet.NewSocket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp); }
+        catch (NetIfaceException) { return (DoctorHello.NoConnect, null); }   // the chosen interface can't reach it at all
+        using var s = created;
+        s.NoDelay = true;
         try
         {
             await s.ConnectAsync(new IPEndPoint(addr, port), cts.Token).ConfigureAwait(false);

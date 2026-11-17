@@ -54,6 +54,9 @@ public partial class ProxyCheckRow : ObservableObject
     [ObservableProperty] private bool _isWarn;
     [ObservableProperty] private bool _isBad;
     [ObservableProperty] private bool _isBusy;
+    /// <summary>The answer the request through it got: the row offers to show it.</summary>
+    [ObservableProperty] private bool _hasResponse;
+    public HttpResponseSnapshot? Response { get; private set; }
 
     public string Tip => Detail.Length > 0 ? Display + " — " + Detail : Display;
 
@@ -88,6 +91,8 @@ public partial class ProxyCheckRow : ObservableObject
             ? "A plain-HTTP proxy: it relays http:// requests but refuses CONNECT (no HTTPS tunnels)."
             : r.Detail;
         StatusText = Label(r.Status);
+        Response = r.Response;
+        HasResponse = r.Response is not null;
         IsBusy = false;
         IsOk = r.Status == ProxyCheckStatus.Working;
         IsWarn = r.Status is ProxyCheckStatus.AuthRequired or ProxyCheckStatus.AuthFailed;
@@ -128,14 +133,33 @@ public partial class ProxyCheckRow : ObservableObject
 }
 
 /// <summary>
-/// The "Check proxies" view: paste a list in any common format, test them all (16 at a time, cancellable) for
-/// reachability, protocol, login, connect time, time to first byte and exit IP / country (<see cref="ProxyCheckEngine"/>),
-/// then sort, copy the working ones as they were written, or export the results.
+/// The "Check proxies" view: paste a list in any common format, test them all (16 at a time unless set otherwise,
+/// cancellable) for reachability, protocol, login, connect time, time to first byte and exit IP / country
+/// (<see cref="ProxyCheckEngine"/>), then sort, copy the working ones as they were written, or export the results.
 /// </summary>
 public partial class ProxyViewModel
 {
+    /// <summary>How many proxies are checked at once, unless set otherwise.</summary>
     public const int MaxParallelChecks = 16;
     public const int MaxInputChars = 200_000;
+    /// <summary>Seconds a proxy gets to take the connection, unless set otherwise (an attempt through it gets twice that).</summary>
+    public const int DefaultCheckTimeout = 6;
+
+    /// <summary>The two options of a check, read when it starts: seconds to wait for a proxy (2 to 60), and how many
+    /// are checked at once (1 to 64).</summary>
+    [ObservableProperty] private int _checkTimeout = DefaultCheckTimeout;
+    [ObservableProperty] private int _checkParallel = MaxParallelChecks;
+
+    private const string KCheckTimeout = "proxy.checkTimeout", KCheckParallel = "proxy.checkParallel";
+
+    private void RestoreCheckOptions(ProfileService p)
+    {
+        CheckTimeout = Math.Clamp(p.GetInt(KCheckTimeout, DefaultCheckTimeout), 2, 60);
+        CheckParallel = Math.Clamp(p.GetInt(KCheckParallel, MaxParallelChecks), 1, 64);
+    }
+
+    partial void OnCheckTimeoutChanged(int value) { if (!_restoring && value is >= 2 and <= 60) SaveInt(KCheckTimeout, value); }
+    partial void OnCheckParallelChanged(int value) { if (!_restoring && value is >= 1 and <= 64) SaveInt(KCheckParallel, value); }
 
     /// <summary>0 = Server, 1 = Check proxies.</summary>
     [ObservableProperty] private int _viewIndex;
@@ -265,7 +289,9 @@ public partial class ProxyViewModel
         var cts = _checkCts = new CancellationTokenSource();
         var ct = cts.Token;
 
-        using var gate = new SemaphoreSlim(MaxParallelChecks);
+        // (a box left empty or out of range keeps its last good value in the field: clamped here all the same)
+        var options = ProxyCheckOptions.ForSeconds(Math.Clamp(CheckTimeout, 2, 60));
+        using var gate = new SemaphoreSlim(Math.Clamp(CheckParallel, 1, 64));
         var tasks = rows.Select(row => Task.Run(async () =>
         {
             await gate.WaitAsync(ct).ConfigureAwait(false);
@@ -273,7 +299,7 @@ public partial class ProxyViewModel
             {
                 Dispatcher.UIThread.Post(row.MarkChecking);
                 ProxyCheckResult r;
-                try { r = await ProxyCheckEngine.CheckAsync(row.Entry, ct).ConfigureAwait(false); }
+                try { r = await ProxyCheckEngine.CheckAsync(row.Entry, ct, options).ConfigureAwait(false); }
                 catch (OperationCanceledException) { return; }
                 catch (Exception ex) { r = new ProxyCheckResult { Status = ProxyCheckStatus.Failed, Detail = "Unexpected error: " + ex.Message }; }
                 if (ct.IsCancellationRequested) return;

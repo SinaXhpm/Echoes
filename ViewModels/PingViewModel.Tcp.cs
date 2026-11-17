@@ -14,12 +14,12 @@ public partial class PingViewModel
     /// <summary>Replaces the network in TCP mode (tests): (address, port, timeoutMs, token) → result.</summary>
     internal Func<IPAddress, int, int, CancellationToken, Task<TcpPinger.Result>>? TcpProbe { get; set; }
 
-    private async Task RunTcpLoop(string host, int port, IpPreference ip, CancellationToken token)
+    private async Task RunTcpLoop(string host, int port, IpPreference ip, NetIface? via, CancellationToken token)
     {
         IPAddress addr;
         try
         {
-            addr = await PingTarget.ResolveAsync(host, ip, token);
+            addr = await ResolveVia(host, ip, via, token);
         }
         catch (OperationCanceledException) { return; }
         catch (Exception ex)
@@ -30,10 +30,10 @@ public partial class PingViewModel
 
         string ep = PingTarget.Endpoint(addr, port);
         string label = host + ":" + port;
-        UpdateLog($"TCP PING {host} ({addr}) port {port}: connect time, SYN to SYN/ACK", token);
+        UpdateLog($"TCP PING {host} ({addr}) port {port}{From(via, addr).TrimEnd(':')}: connect time, SYN to SYN/ACK", token);
         NoteIpMismatch(host, addr, ip, token);
 
-        var probe = TcpProbe ?? TcpPinger.ConnectAsync;
+        var probe = TcpProbe ?? ((a, p, timeout, ct) => TcpPinger.ConnectAsync(a, p, timeout, ct, via));
         bool finished = false;
         for (long seq = 1; !token.IsCancellationRequested; seq++)
         {
@@ -65,8 +65,8 @@ public partial class PingViewModel
                     UpdateLog($"Timeout {ep}: seq={seq} (no answer in {PingSettings.Seconds(Math.Max(100, waited))}: dropped or filtered)", token);
                     break;
                 case TcpPinger.Status.Unreachable:
-                    UpdateLog(r.From is { } via
-                        ? $"From {via}: seq={seq} {r.Detail} (to {ep})"
+                    UpdateLog(r.From is { } router
+                        ? $"From {router}: seq={seq} {r.Detail} (to {ep})"
                         : $"Unreachable {ep}: seq={seq} ({r.Detail})", token);
                     break;
                 case TcpPinger.Status.LocalError:

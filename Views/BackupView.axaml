@@ -26,10 +26,10 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style Selector="Button.primary Path.glyph">
-            <Setter Property="Stroke" Value="{DynamicResource Text.OnAccent}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
         </Style>
         <Style Selector="Button.primary:disabled Path.glyph">
-            <Setter Property="Stroke" Value="{DynamicResource Text.OnAccentDisabled}"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
         </Style>
         <Style Selector="Button.secondary Path.glyph">
             <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>

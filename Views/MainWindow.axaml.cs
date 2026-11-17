@@ -14,67 +14,33 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // Windows / Linux: the title bar Avalonia draws its caption buttons in is as tall as MainView's top bar (44), and
+        // so are the buttons (CaptionButtonHeight, Styles/Tokens.axaml), in one row with About and the theme switch.
+        // macOS keeps its own title bar for the traffic lights.
+        if (!OperatingSystem.IsMacOS()) ExtendClientAreaTitleBarHeightHint = 44;
         // The UI lives in MainView (shared with the Android single-view head);
         // it triggers the update check on Loaded.
     }
 
-    // The window is 828 wide to start (the sidebar always shows its labels; the width stays the user's) and exactly as
-    // tall as the nav list, always: never shorter (the sidebar would scroll) and never taller (empty space under it).
-    // It opens fitted (SizeToContent = Height; the page area asks for no height, see HeightNeutral), then the height is
-    // locked there (MinHeight = MaxHeight, no maximize) and re-fitted when the sidebar grows (the update pill) or the
-    // window moves to a screen with another scale. On a screen shorter than the list it stops at the work area, where
-    // the list scrolls: the only case it does.
+    // The window opens 828 x 607: every tool's page fits there without scrolling (the tools sit in a top bar, so the
+    // page has the full width), and so does a new tab's launcher, with its search box and every card (its cards are
+    // compact for that). Its edges resize it. No maximize (MainView hides the greyed-out full-screen button Avalonia
+    // draws beside the caption buttons, and keeps their width free at the end of the top bar). On a screen shorter
+    // than 607 it opens at the work area's height instead.
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
-        // Opened can come again after the window is hidden to the tray and shown: subscribe once, not on every show.
-        if (!_fitHooked)
-        {
-            _fitHooked = true;
-            ScalingChanged += (_, _) => PostFit();
-            if (DataContext is MainViewModel vm)
-                vm.PropertyChanged += (_, a) => { if (a.PropertyName == nameof(MainViewModel.IsUpdateAvailable)) PostFit(); };
-        }
-        PostFit();
-    }
-
-    private bool _fitPending, _fitHooked;
-
-    private void PostFit()
-        => Avalonia.Threading.Dispatcher.UIThread.Post(FitHeightToNav, Avalonia.Threading.DispatcherPriority.Background);
-
-    // Avalonia measures and sizes the frame itself (SizeToContent); the result is then pinned with MinHeight = MaxHeight.
-    private void FitHeightToNav()
-    {
-        if (_closed) return;
-        if (!IsVisible || WindowState != WindowState.Normal) { _fitPending = true; return; }   // when it's back
-        _fitPending = false;
-        MinHeight = 0;   // free first, or the old lock would clamp the new fit
-        MaxHeight = double.PositiveInfinity;
-        SizeToContent = SizeToContent.Height;
-        Avalonia.Threading.Dispatcher.UIThread.Post(LockHeight, Avalonia.Threading.DispatcherPriority.Background);
-    }
-
-    private void LockHeight()
-    {
-        if (_closed || SizeToContent != SizeToContent.Height) return;
-        double fit = ClientSize.Height;
-        SizeToContent = SizeToContent.Manual;
-        if (fit <= 0) return;
-        // A screen shorter than the list: stop at its work area (the list scrolls there — the one case it does).
+        if (_sized) return;   // Opened comes again after the window is hidden to the tray and shown
+        _sized = true;
         if (Screens.ScreenFromWindow(this) is { } screen && screen.Scaling > 0)
         {
-            double frame = Math.Max(0, (FrameSize?.Height ?? fit) - fit);
+            double frame = Math.Max(0, (FrameSize?.Height ?? Height) - ClientSize.Height);
             double room = Math.Floor(screen.WorkingArea.Height / screen.Scaling - frame);
-            if (fit > room && room > 200) { Height = room; fit = room; }
+            if (Height > room && room > 200) Height = room;
         }
-        // With the client area extended into the title bar, Avalonia on Windows adds the decoration margin to
-        // Min/MaxHeight once more when it builds the window's track size (measured: a lock at the fitted height let the
-        // window grow by the title bar's 30 DIP). So the lock leaves it out; the window then sits exactly at the fit.
-        double margin = OperatingSystem.IsWindows() && IsExtendedIntoWindowDecorations
-            ? WindowDecorationMargin.Top + WindowDecorationMargin.Bottom : 0;
-        MinHeight = MaxHeight = Math.Max(0, fit - margin);
     }
+
+    private bool _sized;
 
     /// <summary>
     /// Set by the desktop head (Desktop/TrayService): whether closing should keep Echoes running in the tray instead of
@@ -117,16 +83,14 @@ public partial class MainWindow : Window
         if (change.Property == WindowStateProperty)
         {
             var state = change.GetNewValue<WindowState>();
-            // The height is the nav list's: maximized / full screen (Win+Up, a shell command) go straight back.
+            // No maximize (see OnOpened): maximized / full screen (Win+Up, a shell command) go straight back.
             if (state is WindowState.Maximized or WindowState.FullScreen)
             {
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => WindowState = WindowState.Normal);
                 return;
             }
             if (state != WindowState.Minimized) _restoreState = state;
-            if (state == WindowState.Normal && _fitPending) PostFit();
         }
-        else if (change.Property == IsVisibleProperty && change.GetNewValue<bool>() && _fitPending) PostFit();
     }
 
     /// <summary>

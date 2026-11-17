@@ -3,11 +3,12 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -60,8 +61,10 @@ public sealed class DoctorHttpResult
     public double? TlsMs { get; set; }
     /// <summary>From the first request out to the end of the body (as far as it was read).</summary>
     public double TotalMs { get; set; }
-    /// <summary>The body as read (decoded; at most 64 KB) and whether there was more.</summary>
+    /// <summary>The body as read (decoded; at most 512 KB) and whether there was more (or it broke off).</summary>
     public int BodyBytes { get; set; }
+    /// <summary>The body's bytes as read: <see cref="BodyBytes"/> of them (the response viewer shows them).</summary>
+    public byte[] Body { get; set; } = Array.Empty<byte>();
     public bool BodyCut { get; set; }
     public string? ContentType { get; set; }
     /// <summary>The body's encoding when it couldn't be decoded here (zstd …): its size is then the encoded one.</summary>
@@ -82,8 +85,9 @@ public sealed class DoctorHttpResult
 public static class DoctorHttp
 {
     private const int MaxHops = 5;
-    private const int BodyCap = 64 * 1024;
-    private const int WireCap = 256 * 1024;
+    /// <summary>The most of a body kept (decoded): enough for a block page, an error page, an API's answer, most pages.</summary>
+    public const int BodyCap = 512 * 1024;
+    private const int WireCap = 2 * 1024 * 1024;
 
     // a block page names the filter: Iran's (peyvandha.ir, the 10.10.34.34 iframe), Russia's, Turkey's
     private static readonly string[] FilterMarkers =
@@ -99,11 +103,12 @@ public static class DoctorHttp
     /// <summary>The request to <paramref name="url"/> at <paramref name="pinned"/>: <paramref name="request"/> (imported
     /// from the browser) when given, else a plain GET. A redirect's other host is looked up by <paramref name="resolveOther"/>.</summary>
     public static async Task<DoctorHttpResult> GetAsync(Uri url, IPAddress pinned, Func<string, CancellationToken, Task<IPAddress?>> resolveOther,
-                                                        DoctorRequest? request, CancellationToken ct)
+                                                        DoctorRequest? request, CancellationToken ct, X509Certificate2Collection? roots = null)
     {
         var known = new ConcurrentDictionary<string, IPAddress>(StringComparer.OrdinalIgnoreCase) { [url.IdnHost] = pinned };
         var st = new Stages();
-        using var handler = NewHandler(st);
+        using var handler = NewHandler(st, carriesSecrets: request != null, roots);
+        var via = DoctorNet.From;   // the run's interface, kept here: the callback may run outside the run's flow
         handler.ConnectCallback = async (ctx, token) =>
         {
             string host = ctx.DnsEndPoint.Host.Trim('[', ']');
@@ -112,9 +117,10 @@ public static class DoctorHttp
                 : await resolveOther(host, token).ConfigureAwait(false);
             if (ip == null) throw new SocketException((int)SocketError.HostNotFound);
             known[host] = ip;
-            var s = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+            var s = DoctorNet.NewSocket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp, via);
             try
             {
+                s.NoDelay = true;
                 st.Connecting();
                 await s.ConnectAsync(new IPEndPoint(ip, ctx.DnsEndPoint.Port), token).ConfigureAwait(false);
                 st.Connected(DoctorIp.EndPoint(ip, ctx.DnsEndPoint.Port));
@@ -153,10 +159,10 @@ public static class DoctorHttp
     /// when <paramref name="dial"/> (the override IP) is set: its tunnels go to that address. An http:// request through
     /// an HTTP proxy names the site and the proxy connects to it, so the override can't apply there.</summary>
     public static async Task<DoctorHttpResult> GetViaProxyAsync(Uri url, DoctorProxy proxy, IPAddress? dial, DoctorRequest? request,
-                                                                CancellationToken ct)
+                                                                CancellationToken ct, X509Certificate2Collection? roots = null)
     {
         var st = new Stages();
-        using var handler = NewHandler(st);
+        using var handler = NewHandler(st, carriesSecrets: request != null, roots);
         string site = url.IdnHost.Trim('[', ']');
         if (proxy.Kind == DoctorProxyKind.Http && (dial == null || url.Scheme == Uri.UriSchemeHttp))
         {
@@ -166,6 +172,8 @@ public static class DoctorHttp
                 BypassProxyOnLocal = false,
             };
             handler.UseProxy = true;
+            // from a chosen interface, the connection to the proxy is made from it as well
+            if (proxy.From is { } from) handler.ConnectCallback = DoctorNet.ConnectFrom(from);
         }
         else
             handler.ConnectCallback = async (ctx, token) =>
@@ -190,7 +198,12 @@ public static class DoctorHttp
 
     // Decoding is done here, not by the handler: its automatic decoding drops Content-Encoding and Content-Length from
     // the headers shown, and those are part of what the server said.
-    private static SocketsHttpHandler NewHandler(Stages st)
+    // The Doctor's own GET carries nothing secret, so it goes on whatever certificate the server shows: a filter's or an
+    // expired one is what is being diagnosed, and the TLS check says what is wrong with it. A request imported from the
+    // browser carries the user's cookies and tokens: its connection has to pass the normal certificate check (against
+    // roots when given: the test harness's), else it fails as a TLS error and nothing of it is sent. The engine already
+    // leaves an imported request out when the TLS check didn't trust the certificate; this holds on the connection itself.
+    private static SocketsHttpHandler NewHandler(Stages st, bool carriesSecrets = false, X509Certificate2Collection? roots = null)
     {
         var handler = new SocketsHttpHandler
         {
@@ -201,7 +214,13 @@ public static class DoctorHttp
             MaxResponseHeadersLength = 64,
             UseCookies = false,
         };
-        handler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+        if (!carriesSecrets) handler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+        else if (roots is { Count: > 0 })
+        {
+            var policy = new X509ChainPolicy { TrustMode = X509ChainTrustMode.CustomRootTrust, RevocationMode = X509RevocationMode.NoCheck };
+            policy.CustomTrustStore.AddRange(roots);
+            handler.SslOptions.CertificateChainPolicy = policy;
+        }
         // called once a new connection is ready to carry requests: after the TLS handshake on an https:// one
         handler.PlaintextStreamFilter = (ctx, _) =>
         {
@@ -339,9 +358,10 @@ public static class DoctorHttp
                     continue;
                 }
 
-                // the body: a little of it — to show its start, and to look for a block page
-                var (buf, n, cut, undecoded) = await ReadBodyAsync(resp.Content, cts.Token).ConfigureAwait(false);
+                // the body, up to a cap: to show it, and to look for a block page. What came before the time ran out is kept.
+                var (buf, n, cut, undecoded) = await HttpBodyReader.ReadAsync(resp.Content, BodyCap, WireCap, cts.Token).ConfigureAwait(false);
                 res.TotalMs = total.Elapsed.TotalMilliseconds;
+                res.Body = buf;
                 res.BodyBytes = n;
                 res.BodyCut = cut;
                 res.Undecoded = undecoded;
@@ -459,57 +479,6 @@ public static class DoctorHttp
             return parts.Length >= 2 ? parts[^2] + "." + parts[^1] : h;
         }
         return Tail(a) == Tail(b);
-    }
-
-    // The body's start: at most 256 KB off the wire, decoded (gzip, deflate, br) to at most 64 KB. Undecoded: an encoding
-    // that can't be decoded here (zstd …), whose bytes are then the encoded ones.
-    private static async Task<(byte[] Buf, int Length, bool Cut, string? Undecoded)> ReadBodyAsync(HttpContent content, CancellationToken ct)
-    {
-        var buf = new byte[BodyCap];
-        try
-        {
-            string? coding = content.Headers.ContentEncoding.LastOrDefault()?.Trim().ToLowerInvariant();
-            if (coding is "identity" or "") coding = null;
-            await using var stream = await content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-            if (coding is null or not ("gzip" or "x-gzip" or "deflate" or "br"))
-            {
-                var (n, cut) = await FillAsync(stream, buf, ct).ConfigureAwait(false);
-                return (buf, n, cut, coding);
-            }
-            var wire = new byte[WireCap];
-            var (got, _) = await FillAsync(stream, wire, ct).ConfigureAwait(false);
-            using var raw = new MemoryStream(wire, 0, got);
-            // HTTP's "deflate" is meant to be zlib-wrapped; some servers send it bare
-            await using Stream decoder = coding switch
-            {
-                "br" => new BrotliStream(raw, CompressionMode.Decompress),
-                "deflate" when got >= 2 && (wire[0] & 0x0F) == 8 && ((wire[0] << 8) | wire[1]) % 31 == 0 => new ZLibStream(raw, CompressionMode.Decompress),
-                "deflate" => new DeflateStream(raw, CompressionMode.Decompress),
-                _ => new GZipStream(raw, CompressionMode.Decompress),
-            };
-            var (len, more) = await FillAsync(decoder, buf, ct).ConfigureAwait(false);
-            return (buf, len, more || got == WireCap, null);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { return (buf, 0, false, null); }
-        catch { return (buf, 0, false, null); }
-    }
-
-    // Reads into buf until it is full or the stream ends; Cut: there was more. A stream that breaks off (a reset, or a
-    // compressed body cut at the wire cap) keeps what was read.
-    private static async Task<(int Length, bool Cut)> FillAsync(Stream s, byte[] buf, CancellationToken ct)
-    {
-        int n = 0;
-        try
-        {
-            while (n < buf.Length)
-            {
-                int got = await s.ReadAsync(buf.AsMemory(n), ct).ConfigureAwait(false);
-                if (got == 0) return (n, false);
-                n += got;
-            }
-            return (n, await s.ReadAsync(new byte[1], ct).ConfigureAwait(false) > 0);
-        }
-        catch (Exception e) when (e is IOException or InvalidDataException or HttpRequestException) { return (n, true); }
     }
 
     // The start of a text body on one line: its charset (UTF-8 unless it names a Latin one), runs of white space folded,

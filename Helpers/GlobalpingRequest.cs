@@ -17,7 +17,9 @@ public sealed record GlobalpingLocation(string Field, string Value, string? City
 /// A Check Host check as a Globalping measurement. The checks map to the closest measurement:
 /// <list type="bullet">
 /// <item>Ping: an ICMP ping of 4 packets, like check-host.net's 4 pings.</item>
-/// <item>HTTP: a HEAD request to the URL (a host alone is http://, as check-host.net reads it); redirects aren't followed.</item>
+/// <item>HTTP: a GET of the URL (a host alone is http://, as check-host.net reads it); redirects aren't followed. Each
+/// probe sends back the first 10 KB of the body, which the node's details show (a block page in one country, the real
+/// page in another).</item>
 /// <item>TCP: a TCP ping (three connects) to the port.</item>
 /// <item>DNS: an A query through each probe's own resolver (check-host.net also returns AAAA).</item>
 /// <item>UDP: none — Globalping has no UDP check, so UDP stays with check-host.net.</item>
@@ -304,7 +306,7 @@ public sealed class GlobalpingRequest
                     j.WriteString("protocol", Protocol);
                     if (Port is int port) j.WriteNumber("port", port);
                     j.WriteStartObject("request");
-                    j.WriteString("method", "HEAD");
+                    j.WriteString("method", "GET");
                     j.WriteString("path", Path);
                     if (Query.Length > 0) j.WriteString("query", Query);
                     j.WriteEndObject();

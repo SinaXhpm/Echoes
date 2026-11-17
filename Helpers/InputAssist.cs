@@ -81,6 +81,12 @@ public static class InputAssist
     public static readonly AttachedProperty<string?> PortTargetProperty =
         AvaloniaProperty.RegisterAttached<Control, string?>("PortTarget", typeof(InputAssist));
 
+    /// <summary>The placeholder a phone shows instead of the box's own (a TextBox or AutoCompleteBox): a phone's box is
+    /// short, and a placeholder can't end in "…" there (a box's text scrolls sideways, so it is cut mid-letter). It may
+    /// come before or after PlaceholderText in the XAML.</summary>
+    public static readonly AttachedProperty<string?> PhonePlaceholderProperty =
+        AvaloniaProperty.RegisterAttached<Control, string?>("PhonePlaceholder", typeof(InputAssist));
+
     // Set by the pointer press that moves focus into the field; consumed by the matching release.
     private static readonly AttachedProperty<bool> PendingSelectAllProperty =
         AvaloniaProperty.RegisterAttached<Control, bool>("PendingSelectAll", typeof(InputAssist));
@@ -105,6 +111,8 @@ public static class InputAssist
     public static string? GetUserTarget(Control c) => c.GetValue(UserTargetProperty);
     public static void SetPortTarget(Control c, string? v) => c.SetValue(PortTargetProperty, v);
     public static string? GetPortTarget(Control c) => c.GetValue(PortTargetProperty);
+    public static void SetPhonePlaceholder(Control c, string? v) => c.SetValue(PhonePlaceholderProperty, v);
+    public static string? GetPhonePlaceholder(Control c) => c.GetValue(PhonePlaceholderProperty);
 
     // Above this the clipboard is pasted untouched: cleaning runs on the UI thread.
     private const int MaxCleanLength = 2_000_000;
@@ -114,6 +122,18 @@ public static class InputAssist
 
     static InputAssist()
     {
+        PhonePlaceholderProperty.Changed.AddClassHandler<Control>((c, e) =>
+        {
+            if (!AppPlatform.IsMobile || e.NewValue is not string phone) return;
+            void Apply()
+            {
+                if (c is TextBox box) box.PlaceholderText = phone;
+                else if (c is AutoCompleteBox auto) auto.PlaceholderText = phone;
+            }
+            Apply();
+            Dispatcher.UIThread.Post(Apply);   // again once the XAML has set the box's own placeholder, if that came later
+        });
+
         SelectAllOnFocusProperty.Changed.AddClassHandler<Control>((c, e) =>
         {
             // handledEventsToo: TextBox marks its pointer events handled (caret placement / capture).

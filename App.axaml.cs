@@ -86,7 +86,11 @@ public partial class App : Avalonia.Application
         {
             Dispatcher.UIThread.Post(() =>
             {
-                try { viewModel.MonitorVM.StartAtLaunch(); }
+                try
+                {
+                    viewModel.MonitorVM.StartAtLaunch();
+                    viewModel.ShowToolStarted("MONITOR");   // desktop: a running monitor always has a tab (closing it stops it)
+                }
                 catch (Exception ex) { Helpers.CrashLog.Write("Monitor.StartAtLaunch", ex); }
             }, DispatcherPriority.Background);
         }

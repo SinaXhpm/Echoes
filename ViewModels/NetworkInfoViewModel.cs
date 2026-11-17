@@ -56,7 +56,7 @@ public partial class NetworkInfoViewModel : ObservableObject
     [ObservableProperty] private bool _routesHasRows;
     [ObservableProperty] private string _routesNote = string.Empty;
 
-    /// <summary>The sub-tab shown (0 Interfaces · 1 Wi-Fi · 2 Neighbors · 3 Ports · 4 Routing): the one used last, unless
+    /// <summary>The sub-tab shown (0 Interfaces · 1 Wi-Fi · 2 Devices · 3 Ports · 4 Routing): the one used last, unless
     /// this platform doesn't show it.</summary>
     [ObservableProperty] private int _tabIndex = ShownTab(ProfileService.Instance.GetInt(TabKey, 0));
     private const string TabKey = "net.tab";
@@ -95,6 +95,7 @@ public partial class NetworkInfoViewModel : ObservableObject
         _ = RefreshAsync();
         if (ShowPortsTab) _ = RefreshPorts();
         if (ShowNeighborsTab) _ = RefreshNeighbors();
+        WatchDeviceIface();
         if (ShowRoutesTab) _ = RefreshRoutes();
     }
 
@@ -113,12 +114,10 @@ public partial class NetworkInfoViewModel : ObservableObject
     [RelayCommand]
     private async Task RefreshNeighbors()
     {
+        if (IsFindingDevices) return;   // a search fills the table itself
         var r = await Task.Run(NetTables.GetNeighbors);
         Neighbors = new ObservableCollection<Neighbor>(r.Rows);
-        NeighborsHasRows = r.Supported && r.Rows.Count > 0;
-        NeighborsNote = !r.Supported
-            ? (r.Note ?? "Not available on this platform.")
-            : "No neighbors in the ARP cache yet — ping a device on your LAN, then refresh.";
+        ShowCache(r);   // the Devices tab's rows, its count and its empty-state line (NetworkInfoViewModel.Devices)
     }
 
     [RelayCommand]

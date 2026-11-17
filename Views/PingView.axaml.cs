@@ -14,6 +14,9 @@ public partial class PingView : UserControl
     // MTR: a hop opens to show who runs its address, by click, tap or Enter
     private void Hop_Tapped(object? sender, TappedEventArgs e) => ((sender as Control)?.DataContext as MtrHopRow)?.ToggleWho();
 
+    // interfaces come and go (Wi-Fi, a VPN): the picker lists the current ones whenever it opens
+    private void IfaceBox_DropDownOpened(object? sender, EventArgs e) => (DataContext as PingViewModel)?.Iface.Refresh();
+
     private void Hops_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter || (sender as ListBox)?.SelectedItem is not MtrHopRow row) return;

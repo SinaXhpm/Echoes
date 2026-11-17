@@ -87,7 +87,8 @@ public static class CheckHostRun
             {
                 // a blip: keep the results so far and try again; enough of them in a row end the run
                 if (++failures >= polling.MaxFailures)
-                    throw new CheckHostException("Lost contact with check-host.net while collecting results — " + Lower(ex.Message), ex, ex.RateLimited);
+                    throw new CheckHostException("Lost contact with check-host.net while collecting results — " + Lower(ex.Message), ex, ex.RateLimited)
+                        { UserSide = ex.UserSide };
                 sink.PollProblem(ex.Message);
                 wait = ex.RateLimited ? polling.RateLimitBackoff : polling.Interval;
             }

@@ -1,6 +1,6 @@
 # Echoes — Free Network Tools for iPhone, iPad, Mac, Windows, Linux and Android
 
-**Connection doctor, ping, traceroute and MTR, internet speed test, port scanner, SSH and SFTP client, cURL / HTTP client, DNS over HTTPS and WHOIS lookup, SSL/TLS checker, Cloudflare manager with dynamic DNS, uptime monitor with Telegram alerts, Wi-Fi analyzer, proxy server, and HTTPS file sharing with chat for any browser: 20 network and developer tools in one free, open-source app. Now on the App Store for iPhone, iPad and Mac.**
+**Connection doctor, ping, traceroute and MTR, internet speed test, port scanner, SSH and SFTP client, cURL / HTTP client, DNS over HTTPS and WHOIS lookup, SSL/TLS checker, Cloudflare manager with dynamic DNS, uptime monitor with Telegram alerts, Wi-Fi analyzer, proxy server, and HTTPS file sharing with chat for any browser: 21 network and developer tools in one free, open-source app. Now on the App Store for iPhone, iPad and Mac.**
 
 [![License: MIT](https://img.shields.io/github/license/SinaXhpm/Echoes)](https://github.com/SinaXhpm/Echoes/blob/master/LICENSE)
 ![Platforms: iOS, iPadOS, macOS, Windows, Linux, Android](https://img.shields.io/badge/platform-iOS%20%7C%20iPadOS%20%7C%20macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Android-blue)
@@ -24,12 +24,12 @@
 
 Echoes is a free, open-source network toolkit with a simple graphical interface. It brings the tools you would normally run one by one (ping, traceroute, MTR, nmap, curl, PuTTY, netcat, dig, whois, a speed-test website, the Cloudflare dashboard) into one small app.
 
-- **One app, 20 tools.** Test a connection, find the problem, fix your DNS and share a file without switching windows.
+- **One app, 22 tools.** Test a connection, find the problem, fix your DNS and share a file without switching windows.
 - **Finds the cause for you.** The Doctor tells you in one sentence why a site won't open: DNS tampering, SNI filtering, a blocked IP, a filter page, or a server that is down for everyone.
 - **Connects your devices.** Send files and chat between a PC and a phone, a laptop or any other device over HTTPS: scan a QR code, and the other side needs only a browser.
 - **Runs everywhere.** iPhone and iPad ([App Store](https://apps.apple.com/app/id6824582968)), Mac ([Mac App Store](https://apps.apple.com/app/id6824582968?platform=mac), or a notarized download for Intel and Apple Silicon), Windows, Linux and Android, from one codebase.
 - **Nothing extra to install.** Desktop builds are self-contained native apps: no .NET runtime, fast start-up, low memory use.
-- **No admin rights needed.** Where the system blocks normal (ICMP) ping, Echoes switches to UDP by itself.
+- **No admin rights needed.** Where the system blocks normal (ICMP) ping, Echoes switches to UDP by itself. The one exception is [packet capture](#packet-capture), which every system guards.
 - **Private.** No account, no ads, no telemetry. Your data stays on your device and secrets are encrypted.
 - **Nothing runs by itself.** The web server, proxy, request catcher and socket listeners start only when you press Start, and stop when you stop them or quit.
 - **Easy on the eyes.** Dark and light themes, a compact window, and layouts that also fit phone screens.
@@ -75,7 +75,7 @@ First launch:
 - **Linux:** needs glibc 2.35 or newer (Ubuntu 22.04+, Debian 12+, Fedora 36+). The tray icon needs a StatusNotifierItem host (KDE Plasma, or GNOME with the AppIndicator extension).
 - **iPhone and iPad:** allow **Local Network** access when the port scanner, LAN ping or file sharing first asks (or later in Settings › Privacy & Security › Local Network), or devices on your Wi-Fi look unreachable.
 
-The App Store versions update through the App Store. The downloaded versions show a small notice in the sidebar when a new version is out. The **About** box (the ⓘ button next to the name, or **About** in the phone menu) shows your version, checks for updates on demand, links to GitHub, the releases and the issue tracker, and copies your version and platform details for a bug report.
+The App Store versions update through the App Store. The downloaded versions show a small notice in the top bar when a new version is out. The **About** box (the ⓘ button in the top bar, or **About** in the phone menu) shows your version, checks for updates on demand, links to GitHub, the releases and the issue tracker, and copies your version and platform details for a bug report.
 
 <p align="center">
   <img src="docs/screenshots/about-box.png" width="640" alt="Echoes About box: version, update check against GitHub releases, platform and runtime details, data folder, and links to GitHub, releases and bug reports">
@@ -91,7 +91,8 @@ The App Store versions update through the App Store. The downloaded versions sho
 | [Port Scanner](#port-scanner) | Finds open TCP / UDP ports and the services behind them | nmap, Zenmap, Angry IP Scanner |
 | [Check Host](#check-host-from-around-the-world) | Ping, HTTP, TCP, UDP and DNS checks from servers worldwide | check-host.net, Globalping |
 | [Monitor](#uptime-monitor) | Watches servers and websites, certificate and domain expiry, with Telegram alerts | Uptime Kuma, UptimeRobot |
-| [Network](#network-info) | Your adapters, Wi-Fi networks and channels, ARP neighbors, open ports and routing table | ipconfig, arp, netstat, Wi-Fi analyzers |
+| [Network](#network-info) | Your adapters, Wi-Fi networks and channels, the devices on your network, open ports and routing table | ipconfig, arp, arp-scan, netstat, Wi-Fi analyzers, Fing |
+| [Capture](#packet-capture) | The packets on an interface as they pass, with filters, each packet's layers and bytes, and pcap files | Wireshark, tcpdump |
 | [Device](#device-info) | Every part of this computer or phone: model, processor, memory modules, GPUs, displays, disks, battery health, cameras and sensors | CPU-Z, HWiNFO, Speccy, CPU-X |
 | [Speed Test](#internet-speed-test) | Internet speed, latency, jitter and bufferbloat to the server you pick | Speedtest, fast.com |
 | [cURL](#curl-http-client) | Builds and sends HTTP requests, imports curl commands | curl, Postman, Insomnia |
@@ -102,7 +103,7 @@ The App Store versions update through the App Store. The downloaded versions sho
 | [SSH](#ssh-client) | SSH terminal, SFTP files, port forwarding and server health | PuTTY, WinSCP, ssh |
 | [Socket](#tcp-udp-and-websocket-tool) | Raw TCP / UDP client and server, and a WebSocket client | netcat (nc), telnet, wscat |
 | [Web Server](#file-sharing-web-server-and-request-catcher) | Chat and swap files with any browser on your network, or catch webhook requests | python -m http.server, Snapdrop, webhook.site |
-| [Proxy](#socks5-and-http-proxy-server-and-proxy-checker) | SOCKS5 + HTTP proxy server, and a checker for proxy lists | 3proxy, microsocks, proxy checkers |
+| [Proxy](#socks5-and-http-proxy-server-and-proxy-checker) | SOCKS5 (with UDP), SOCKS4 and HTTP proxy server with a choice of outgoing interface and an upstream proxy, and a checker for proxy lists | 3proxy, microsocks, proxy checkers |
 | [String Lab](#string-lab) | Encoding, hashes, JWT, JSON / YAML, regex, subnets, cron, strong password generator with time to crack | CyberChef, jwt.io, password strength checkers |
 | [Notes](#encrypted-notes) | Notes locked with a master password | encrypted notepad |
 | [History & Backup](#history-and-encrypted-backup) | Recent inputs per tool, and one encrypted backup file | — |
@@ -206,6 +207,7 @@ See whether a host is up, how fast it answers, which route your traffic takes, a
 - **TCP ping:** connects to a port (443, or the port in a pasted host:port or URL) every interval and times it (SYN to SYN/ACK). Works where ICMP is blocked and on Android, and tells a closed port (refused), a silent drop (timeout) and a DNS failure apart.
 - **Traceroute:** the classic hop-by-hop route.
 - **MTR:** a live table for every hop (loss, last / avg / best / worst, jitter, reverse DNS, multiple paths) that shows exactly where a problem starts. Click a hop to see who runs it: network, organization, AS, country, address range and abuse contact, with WHOIS and IP Info one click away.
+- **Choose the interface:** send the probes from Wi-Fi, Ethernet or a VPN adapter instead of wherever the routing table points, in all four modes (like `ping -I` / `-S` and `mtr -I`). For a computer with two connections, or to test a line that isn't the default route. The run's first line says where it went out from, and a probe that can't leave from there says why instead of taking another way.
 - **Works without admin rights:** where ICMP isn't allowed (locked-down Linux, containers), Echoes uses UDP datagrams by itself, for traceroute and MTR too on Linux and Android. If neither works, it tells you why.
 - Optional alerts when a host comes online or goes offline.
 
@@ -222,8 +224,9 @@ Type a site or server and press Diagnose. Echoes checks everything between you a
 - **Connection and TLS:** TCP, ping and path MTU (not on macOS) to the real address, and TLS with and without the site's name, which tells apart SNI filtering, a blocked IP and a cut handshake. Certificate problems are reported separately.
 - **HTTP and HTTPS together:** both are tested side by side (status, redirects, filter block pages, country blocks 403 / 451), so you see when only one of them is cut.
 - **Through a proxy (optional):** run the same connection, TLS, HTTP and HTTPS checks through an HTTP, HTTPS or SOCKS proxy and compare: "blocked on your network, works through the proxy", or the proxy itself refusing the login.
+- **Choose the interface (optional):** run every check from Wi-Fi, Ethernet or a VPN adapter instead of wherever the routing table points, to see which of your connections a site is blocked on. DNS goes with it: the lookups your system resolver would make are asked of that interface's own DNS servers, through it. A check that can't leave from there says why instead of taking another way.
 - **Override IP (optional):** connect to an address you give instead of the DNS answer, like `curl --resolve` or a hosts-file line. TCP, ping, path MTU, TLS (with the site's name) and HTTP all go there, DNS is still asked, and the verdict says how they compare: "your DNS gives 10.10.34.35, the override works: DNS is the problem".
-- **Import a browser request (optional):** paste a request copied from the browser's developer tools (Copy as cURL in bash or cmd, Copy as fetch, Copy as PowerShell, or a HAR entry). The HTTPS (or HTTP) check sends it exactly, with its method, path and query, every header and cookie, and its body, through the proxy and to the override IP when set. Its cookies are stored encrypted and masked in the report.
+- **Import a browser request (optional):** paste a request copied from the browser's developer tools (Copy as cURL in bash or cmd, Copy as fetch, Copy as PowerShell, or a HAR entry). The HTTPS (or HTTP) check sends it exactly, with its method, path and query, every header and cookie, and its body, through the proxy and to the override IP when set. Its cookies are stored encrypted and masked in the report. Over HTTPS it goes only to a server whose certificate is trusted: with an untrusted one (a filter or proxy that intercepts TLS), the Doctor's own request goes instead, so its cookies and tokens never reach it.
 - **Response details:** each HTTP and HTTPS check shows the request it sent, the redirects, the status line and HTTP version, connect / TLS / first-byte timing, the body's size and type, every response header (cookie and token values masked) and the start of the body.
 - **Step-by-step trace:** expand any check (or turn on **Details**) to see exactly where it stops, with timings: each resolver's addresses, every TCP connect per address and port (answered, refused or dropped) and the one used, the TLS handshake stage by stage (version, cipher and ALPN, the certificate's names, issuer and validity), each HTTP stage, every path MTU probe, and a proxy's handshake (reach, TLS, login, tunnel).
 - **Run log:** the **Log** view lists every step of the run with its time from the start, including every request header sent and every probe. Copy it on its own, or as the end of the report.
@@ -242,6 +245,7 @@ Type a site or server and press Diagnose. Echoes checks everything between you a
 - **Compare resolvers:** query one name through many resolvers at once: median speed, success rate and answers, with tampered or filtered answers flagged and the fastest trustworthy resolver recommended.
 - **Email check:** MX, SPF (with the 10-lookup limit), DMARC, DKIM (common selectors), MTA-STS, TLS-RPT and spam blocklists (Spamhaus, SpamCop, Barracuda, PSBL and DroneBL) for a domain, each with a one-line fix.
 - **WHOIS that keeps working:** domain registration details through classic WHOIS (from IANA to the registry and the registrar), RDAP and two WHOIS web services; addresses and AS numbers through RDAP, RIPEstat, WHOIS and ip.guide. Sources are asked one after another until one answers, so a blocked or down service doesn't end the lookup, and country domains without RDAP, such as `.ir`, work too.
+- **Choose the interface:** send the queries from Wi-Fi, Ethernet or a VPN adapter (like `dig -b`), in lookups, comparisons and the email check. With an interface chosen, `system` in the resolver list means the DNS servers that interface was given, so you can ask each connection's own resolver (Windows keeps a list per interface; Linux and macOS keep one for the whole system, which is then asked through the interface you chose). WHOIS stays on the default route.
 - Paste a full URL and Echoes takes the host name out of it.
 
 ### Port scanner
@@ -257,6 +261,7 @@ A fast and accurate TCP / UDP port scanner that reports ports the way nmap does.
 - **Clear results:** open, closed or filtered, with the reason for each.
 - **Service and version detection** (`-sV`), real UDP probes (DNS, NTP, SNMP, SSDP, NetBIOS, SIP, STUN, …), reverse DNS, and the device maker (from the MAC address, on Windows and Linux) on your local network.
 - Host discovery before scanning (`-Pn` to skip it), ping-only sweeps (`-sn`) and nmap-style timing templates.
+- **Choose the interface** (`-e`): every probe (discovery, TCP, UDP, version detection) leaves from the adapter you pick, to scan the network behind Wi-Fi, Ethernet or a VPN. A probe that can't leave from it is reported as undetermined with the reason, never as filtered.
 - **No fake open ports:** tarpits, proxies and antivirus interception are detected and flagged.
 - Live progress with speed and time left, a repeat mode that highlights what changed, an nmap-style report, and JSON / CSV export.
 
@@ -298,11 +303,36 @@ Keep an eye on your servers and websites, and hear when something changes.
 
 - **Interfaces:** every adapter with its IPv4 / IPv6 addresses, MAC, gateway, DNS servers and link speed.
 - **Wi-Fi analyzer:** your connection (signal in % and dBm, channel and width, band, link rate, security), nearby networks, and a channel chart per band (2.4 / 5 / 6 GHz) with a hint about the clearest channel. Windows and Linux.
-- **Neighbors:** the devices your computer has talked to (the ARP cache, IP ↔ MAC).
+- **Devices:** the devices on your network, with their IP and MAC address, maker and name. The list starts with the ones your computer has talked to (the ARP cache); **Find devices** searches the network of the interface you pick in a few seconds:
+  - every address of the subnet is asked by ARP, which finds a device even when its firewall drops ping and every port;
+  - mDNS (Bonjour) and SSDP (UPnP) find what announces itself: AirPlay and Chromecast devices, printers, TVs, routers, NAS boxes, with the services they offer and a UPnP device's friendly name and model;
+  - names come from the router's DNS (its DHCP clients), mDNS, NetBIOS and LLMNR;
+  - the gateway and this device are marked, and a private (randomised) MAC address is said to be one. **Copy** takes the table as text.
+  - a router that answers for every address (proxy ARP, as cloud networks and some hotspots do) is recognised, and its answers aren't listed as devices.
 - **Ports:** listening ports and active TCP / UDP connections, like `netstat`.
 - **Routing:** the routing table.
 
-Interfaces work everywhere. Open ports are listed on every desktop system; neighbors, routing and the Wi-Fi analyzer on Windows and Linux.
+Interfaces work everywhere. Open ports are listed on every desktop system; devices, routing and the Wi-Fi analyzer on Windows and Linux.
+
+### Packet capture
+
+A quick look at what is on the wire without leaving Echoes: a simple packet viewer in the spirit of Wireshark and tcpdump.
+
+- **Live table:** every packet on the interface you pick, one line each: time, source, destination, protocol, length and what it is (`51234 → 443 [SYN]`, `Standard query A example.com`, `Client Hello (SNI=example.com)`, `Who has 192.168.1.1?`). The table follows new packets until you scroll up or pick one.
+- **Reads the common protocols:** Ethernet (with VLAN tags), ARP, IPv4 and IPv6, TCP, UDP, ICMP and ICMPv6, DNS / mDNS / LLMNR, TLS (the server name of a Client Hello), HTTP, SSH, QUIC, DHCP, NTP, SSDP, STUN and WireGuard. Resets, ICMP errors and malformed packets are marked in red.
+- **Filters the way you already type them:** a protocol (`tcp`, `dns`, `arp`), tcpdump style (`host 1.1.1.1`, `net 10.0.0.0/8`, `port 443`, `src port 53`), Wireshark style (`ip.addr == 1.1.1.1`, `tcp.port == 443`, `frame.len > 1000`, `tcp.flags.syn`, `dns.name contains google`) or any text, joined with `and`, `or`, `not` and brackets. The filter applies as you type, and what it doesn't understand is said in a few words.
+- **Every packet in detail:** click one for its layers with their fields and a hex dump; **Copy** takes all of it as text.
+- **Save and open:** save what the table shows as a **pcap** file (Wireshark and tcpdump open it), CSV or text, and open pcap and pcapng files from other tools to look at them here.
+- **Bounded:** the newest 100,000 packets (128 MB) are kept; older ones go, and the count says so.
+
+What does the capturing depends on the system, and nothing is bundled:
+
+- **Windows:** [Npcap](https://npcap.com) when it is installed (it comes with Wireshark): whole frames, both directions, the loopback adapter, and no administrator rights. Without Npcap, start Echoes as administrator to capture IPv4 packets through a raw socket.
+- **Linux:** needs root or the `CAP_NET_RAW` capability (`sudo setcap cap_net_raw+ep <path to Echoes>`).
+- **macOS:** uses the system's libpcap and needs access to `/dev/bpf*` (root, or Wireshark's ChmodBPF). Not possible in the Mac App Store version (the sandbox).
+- **iPhone, iPad and Android** give an app no way to see other apps' packets, so Capture is a desktop tool.
+
+Nothing is reassembled or decrypted: it shows packets, not conversations. For that, save the pcap and open it in Wireshark.
 
 ### Device info
 
@@ -331,6 +361,7 @@ Measure your connection the way it feels in real use.
 - **Pick where to test:** Cloudflare's nearest data center, or public test files from DataPacket, Leaseweb, Linode, Scaleway, Selectel and Tele2 in over 20 cities across Europe (Istanbul, Frankfurt, Amsterdam, London, Paris, Vienna, Stockholm and more), Asia and the Americas, or your own server or file. Search by city, country or provider. Plain test files measure download and latency; Cloudflare and Tele2 also measure upload.
 - **Keeps working when Cloudflare doesn't:** when Cloudflare can't be reached or refuses the test, the automatic choice moves on to a test-file host in your part of the world and says which one it used and why. A server you pick yourself is never swapped.
 - **Connections:** 1 to 16 parallel connections (6 by default, like web speed tests); the upload uses half.
+- **Pick the connection:** run the test over Wi-Fi, Ethernet or a VPN adapter instead of the default route, to see what each of your links gives. When the test can't leave from the interface you chose, it says why and measures nothing else.
 - Keeps your last 20 results; copy a result with one click.
 
 ## Web and API tools
@@ -443,10 +474,14 @@ Chat and swap files with any phone or computer on your network. The other side o
   <img src="docs/screenshots/proxy-checker.png" width="640" alt="Echoes proxy checker: a SOCKS5 and HTTP proxy list tested for type, connect time, first byte, exit IP and country">
 </p>
 
-- A SOCKS5 and HTTP proxy on a single port; the protocol is detected for each connection.
-- Optional username and password, a live connection log and traffic stats.
+- A SOCKS5, SOCKS4 / 4a and HTTP proxy on a single port; the protocol is detected for each connection, and each one can be switched off.
+- Optional username and password, a live connection log, and upload and download totals with the current speed.
+- **Outgoing interface:** choose the network interface the proxy's connections leave from (Wi-Fi, Ethernet, a VPN adapter), so devices come in on one network and go out through another, over IPv4, IPv6 or whichever a site has. While that interface is down nothing is connected: the proxy never falls back to another route.
+- **Upstream proxy:** send every connection on through another SOCKS5, SOCKS4a, HTTP or HTTPS proxy (a proxy program on this computer, a company proxy, a server elsewhere), with its login. An HTTPS proxy is reached over TLS, with its certificate checked as a browser checks a site's. Site names can go to it as names, so they don't show in this network's DNS lookups, and plain http:// requests reach an HTTP upstream as proxy requests, which works where it only tunnels to port 443.
+- **UDP for SOCKS5 clients** (DNS, QUIC, games, calls), when switched on: only the client may use its relay port, and only hosts it has sent to can answer. With an upstream proxy, UDP goes on through it too when it is a SOCKS5 proxy.
+- **Advanced options:** connect and idle time-outs, a connection limit per device, a speed limit, allowed clients (addresses, subnets, ranges), allowed ports, and blocked hosts (names with wildcards, addresses, subnets).
 - **Safe by default:** other devices can't reach this device's own services through it, and while it has no password they reach only the internet and their own local network, not the private networks behind this device (WSL, Docker, virtual machines, VPN ranges), and never mail ports (25, 465, 587), so it can't be used to send spam.
-- **Check proxies:** paste a list in any common format; each proxy is tested (SOCKS5, SOCKS4 or HTTP detected automatically) for speed, exit IP and country. When Cloudflare's answer doesn't come through a proxy, other IP services are asked through it, so a working proxy isn't marked failed. Copy the working ones or export them.
+- **Check proxies:** paste a list in any common format; each proxy is tested (SOCKS5, SOCKS4 or HTTP detected automatically) for speed, exit IP and country. When Cloudflare's answer doesn't come through a proxy, other IP services are asked through it, so a working proxy isn't marked failed. Set the timeout and how many are checked at once; copy the working ones or export them.
 - Built in, no extra software: works on desktop and Android.
 
 ## Workspace and developer tools
@@ -487,8 +522,9 @@ Everyday developer text tools in one place.
   <img src="docs/screenshots/doctor-sni-filtering-light.png" width="640" alt="Echoes in the light theme: the connection doctor's SNI filtering verdict with the sidebar of all 20 tools">
 </p>
 
-- **Dark and light themes,** built only from solid colors (no blur or transparency), so they stay light on older computers. Switch with the sun / moon button next to the Echoes logo (in the drawer on Android). The change is instant and remembered.
-- **Compact window:** the sidebar groups the tools (Diagnose, Web & API, Serve & Connect, Workspace) and always shows their names; the window opens just tall enough for the list.
+- **Dark and light themes,** flat and built only from solid colors (no blur or transparency), so they stay light on older computers: near-black surfaces with hairline borders and one blue accent in the dark theme, light greys in the light one. Switch with the sun / moon button at the end of the top bar (in the slide-out menu on phones and tablets). The change is instant and remembered.
+- **Tabs, like a browser:** each tool you open is a tab in the bar at the top. **+** (or **Ctrl+T**) opens a new tab with every tool as a card, grouped (Diagnose, Web & API, Serve & Connect, Workspace), each with a line on what it does and a **!** for the details. The groups sit side by side in even rows, as many columns as the window is wide, with no gaps between them. The first start, or a start with no tabs saved, opens on these cards. Ping, DNS, cURL, SSH and the other tools that make sense twice run in as many tabs as you like, each with its own inputs (right-click a tab to duplicate it). Closing a tab (**Ctrl+W**, a middle click, or its ×) stops what runs in it, after asking if something is running. Your tabs come back at the next start, each with its inputs. **Ctrl+Tab** and **Ctrl+Shift+Tab** move between them, **Ctrl+1** to **Ctrl+8** go straight to a tab and **Ctrl+9** to the last one. Drag a tab along the bar to put it somewhere else (or **Ctrl+Shift+PageUp** / **PageDown**). While something runs in a tab, a dot takes the place of its icon: green while it runs, amber while it waits (SSH connecting, the monitor checking a host again), red while a monitored host is down, and blue when a run finished while you were on another tab. When the bar is full, tabs get narrower, then the row scrolls: **‹** and **›** at its ends (or the mouse wheel) show the tabs past them, and a button after **+** lists every tab by name.
+- **Find a tool by typing:** a new tab starts in its search box. Type a name, a task or a tool you already know (`dig`, `nmap`, `Postman`, `netcat`) and the cards narrow to the tools that answer; **Enter** opens the best match, the arrow keys walk the cards. The tool opens with the cursor in its main field (Ping's host, DNS's domain, the scanner's targets), so `ping`, **Enter**, an address, **Enter** runs it without the mouse.
 - **Runs in the system tray:** closing the window keeps the web server, proxy, monitor and scans running. Reopen Echoes from the tray icon or by launching it again; quit from the tray menu, where "Close to tray" can also be turned off.
 - **Smart paste:** every host, URL and proxy field cleans what you paste. It takes the host out of a URL, log line, e-mail address, `user@host:port` or defanged link (`hxxps://evil[.]com`), and the addresses out of a block of text for the scanner. A short hint says what was cleaned; **Ctrl+Z** undoes it, and **Ctrl+Shift+V** pastes the raw text.
 - The Inter font on every platform.
@@ -507,11 +543,11 @@ Echoes is on the App Store as **[Echoes: Network Tools & Ping](https://apps.appl
   <img src="docs/screenshots/mac-app-store-doctor.png" width="640" alt="Echoes on the Mac App Store: the connection doctor beside the sidebar of all 20 network tools">
 </p>
 
-- **Made for touch:** a slide-out menu with all 20 tools, finger-sized controls, pages that scroll in landscape or with the keyboard open, and press-and-hold to see what a button does.
+- **Made for touch:** a slide-out menu with all 21 tools, finger-sized controls, pages that scroll in landscape or with the keyboard open, and press-and-hold to see what a button does.
 - **Easy typing:** host and URL fields have no autocorrect and use the URL keyboard, ports get the number pad, and digits typed in Persian, Arabic or other scripts are read as normal digits.
 - **Share files with any device:** the Web Server shows a QR code for its page, and every shared file gets its own download link and QR code. Files you receive appear in Files › On My iPhone › Echoes.
 - **While Echoes is on screen:** iOS pauses apps in the background, so the Web Server, proxy, uptime monitor, scans and dynamic DNS run while Echoes is on screen (it keeps the screen on while one of them runs), and pick up again when you come back.
-- **What iOS keeps from apps:** the Network tool shows your interfaces and addresses only (no Wi-Fi scan, ARP table, open ports or routing table), and the scanner can't show MAC addresses or vendors. cURL uses the built-in engine.
+- **What iOS keeps from apps:** the Network tool shows your interfaces and addresses only (no Wi-Fi scan, ARP table, open ports or routing table), and the scanner can't show MAC addresses or vendors. There is no packet capture. cURL uses the built-in engine.
 - **Mac App Store:** the same desktop app as the download, inside Apple's sandbox. Files you receive go to Downloads › Echoes (or a folder you pick), and updates come through the App Store.
 
 ## Android
@@ -522,7 +558,7 @@ The Android app has the same tools, made for touch: a slide-out menu, bigger tou
   <img src="docs/screenshots/android-screens.png" width="640" alt="Echoes on Android: the slide-out tool menu, the connection doctor and the file sharing chat on a phone">
 </p>
 
-Not available on Android: the system curl engine (the built-in engine is used instead), the Wi-Fi analyzer, and the Neighbors / Ports / Routing views of the Network tool. Dynamic DNS updates run while the app is running.
+Not available on Android: packet capture, the system curl engine (the built-in engine is used instead), the Wi-Fi analyzer, and the Devices / Ports / Routing views of the Network tool. Dynamic DNS updates run while the app is running.
 
 ## Privacy and security
 
@@ -550,7 +586,7 @@ Either: it's the same app. The Mac App Store version updates through the App Sto
 Yes. It is MIT-licensed, with no ads, no paid version, no in-app purchases and no account, on every platform.
 
 **Do I need admin or root rights?**
-No. Echoes runs as a normal user. Where the system doesn't allow normal (ICMP) ping, it switches to UDP by itself.
+No. Echoes runs as a normal user. Where the system doesn't allow normal (ICMP) ping, it switches to UDP by itself. Only the Capture tool needs more, because every system guards packet capture: Npcap (or administrator rights) on Windows, root or `CAP_NET_RAW` on Linux, access to `/dev/bpf*` on macOS.
 
 **Do I need to install .NET?**
 No. The desktop builds are self-contained native apps: download and run.
@@ -598,7 +634,7 @@ None by itself. The web server, request catcher, proxy and socket servers listen
 Yes. [Submarine](#also-by-the-developer-submarine) is a free, open-source SSH and SFTP client for Windows, macOS, Linux and Android.
 
 **Is Echoes a replacement for nmap, Postman, PuTTY or Wireshark?**
-It covers the everyday tasks of nmap, curl / Postman, PuTTY, WinSCP and netcat in one app. For deep, specialized work the dedicated tools still go further, and Echoes doesn't capture packets the way Wireshark does.
+It covers the everyday tasks of nmap, curl / Postman, PuTTY, WinSCP and netcat in one app, and its Capture tool gives a quick look at the packets on an interface. For deep, specialized work the dedicated tools still go further: Wireshark reassembles streams, decrypts TLS and knows thousands of protocols, and Echoes saves a pcap you can open there.
 
 **Does Echoes collect any data?**
 No. There is no telemetry and no account, and everything is stored locally. See [Privacy and security](#privacy-and-security).
@@ -620,6 +656,10 @@ dotnet publish Echoes.csproj -c Release -r win-x64 --self-contained true -p:Publ
 # Android APK
 dotnet workload install android
 dotnet build Echoes.Android/Echoes.Android.csproj -c Release -f net10.0-android
+
+# the tests of the shared code (the same suite on Windows, Linux and macOS; a test that needs
+# root or Npcap, like live capture, is reported as skipped where they are missing)
+dotnet test Echoes.Tests
 ```
 
 Native AOT on Windows also needs Visual Studio's "Desktop development with C++" tools.
@@ -700,11 +740,11 @@ Echoes is released under the **[MIT License](LICENSE)**. You are free to use, co
 
 **Diagnosis:** connection doctor, why won't a website open, website not loading, internet troubleshooting, DNS tampering test, DNS hijacking check, DNS poisoning check, SNI filtering test, SNI blocking checker, DPI test, anti-DPI test, TLS fragment test, QUIC blocked test, HTTP/3 blocked test, internet censorship test, blocked website checker, filtered website test, OONI alternative, captive portal detection, path MTU test, MTU finder, packet too big, is it down for everyone or just me.
 
-**Network tools:** network toolkit, network tools, network utility, network diagnostic tool, network troubleshooting, Wi-Fi analyzer, WiFi channel scanner, Wi-Fi signal strength, ping tool, ping GUI, ping graph, IPv6 ping, ping without admin, UDP ping, TCP ping, tcping, ping with don't fragment, traceroute, tracert GUI, visual traceroute, MTR, WinMTR alternative, PingPlotter alternative, packet loss test, latency test, jitter test, internet speed test, speedtest alternative, bandwidth test, bufferbloat test, latency under load, port scanner, TCP port scanner, UDP port scanner, open port checker, nmap GUI, nmap alternative, Zenmap alternative, Angry IP Scanner alternative, IP scanner, LAN scanner, network scanner, ARP scan, MAC vendor lookup, service version detection, host checker, check-host, website down checker, global ping, ping from multiple locations, DNS lookup, DNS checker, dig GUI, nslookup GUI, reverse DNS, WHOIS lookup, RDAP, DNS propagation, DNS over HTTPS client, DoH, DNS over TLS, DoT, DNS benchmark, fastest DNS server, DNS resolver comparison, SPF checker, DKIM checker, DMARC checker, MTA-STS, email deliverability check, MX lookup, blacklist check, DNSBL, ARP table, netstat GUI, routing table, network interfaces, uptime monitor, Uptime Kuma alternative, UptimeRobot alternative, server monitor, website monitor, ping monitor, latency monitor, SSL expiry monitor, domain expiry monitor, Telegram uptime alerts.
+**Network tools:** network toolkit, network tools, network utility, network diagnostic tool, network troubleshooting, Wi-Fi analyzer, WiFi channel scanner, Wi-Fi signal strength, ping tool, ping GUI, ping graph, IPv6 ping, ping without admin, UDP ping, TCP ping, tcping, ping with don't fragment, traceroute, tracert GUI, visual traceroute, MTR, WinMTR alternative, PingPlotter alternative, packet loss test, latency test, jitter test, internet speed test, speedtest alternative, bandwidth test, bufferbloat test, latency under load, port scanner, TCP port scanner, UDP port scanner, open port checker, nmap GUI, nmap alternative, Zenmap alternative, Angry IP Scanner alternative, IP scanner, LAN scanner, network scanner, ARP scan, MAC vendor lookup, service version detection, host checker, check-host, website down checker, global ping, ping from multiple locations, DNS lookup, DNS checker, dig GUI, nslookup GUI, reverse DNS, WHOIS lookup, RDAP, DNS propagation, DNS over HTTPS client, DoH, DNS over TLS, DoT, DNS benchmark, fastest DNS server, DNS resolver comparison, SPF checker, DKIM checker, DMARC checker, MTA-STS, email deliverability check, MX lookup, blacklist check, DNSBL, ARP table, netstat GUI, routing table, network interfaces, uptime monitor, Uptime Kuma alternative, UptimeRobot alternative, server monitor, website monitor, ping monitor, latency monitor, SSL expiry monitor, domain expiry monitor, Telegram uptime alerts, ping from interface, ping source interface, DNS lookup from interface, scan from interface, find devices on network, LAN scanner, ARP scanner, network device discovery, mDNS browser, SSDP UPnP discovery, packet capture, packet sniffer, pcap viewer, pcapng viewer, Wireshark alternative, tcpdump GUI.
 
 **Web and API:** cURL GUI, curl client, curl import, Copy as cURL, HTTP client, REST client, API tester, Postman alternative, Insomnia alternative, HTTP/3 client, HTTP request timing, SSL checker, TLS checker, SSL certificate checker, certificate expiry checker, TLS inspector, STARTTLS test, OCSP, HSTS, what is my IP, IP lookup, GeoIP lookup, IP geolocation, ASN lookup, proxy checker, Cloudflare manager, Cloudflare DNS manager, Cloudflare API client, Cloudflare DNS backup, Cloudflare zone export, BIND zone file, Cloudflare WAF rules, Cloudflare cache purge, Cloudflare SSL mode, Cloudflare ECH, DNSSEC, Cloudflare DDNS, dynamic DNS client, DDNS updater, ddclient alternative, Telegram Bot API tester, Telegram bot tool, WebSocket client, WebSocket tester, wscat alternative, webhook tester, webhook.site alternative, request bin, request catcher, HTTP request inspector.
 
-**Servers and connections:** SSH client, SSH terminal, PuTTY alternative, SFTP client, WinSCP alternative, SSH key login, SSH port forwarding, SSH local and remote forwarding, server monitoring over SSH, SSH tunnel, SOCKS5 tunnel, SSH dynamic port forwarding, Submarine SSH client, netcat GUI, TCP client, UDP client, TCP server, socket tester, hex sender, telnet alternative, web server, HTTP file server, LAN file sharing, LAN chat, local network chat, HTTPS file sharing, share files over Wi-Fi, phone to PC file transfer, send files from phone to PC without a cable, browser-based file sharing, QR code file sharing, AirDrop alternative for Windows and Android, LocalSend alternative, Snapdrop alternative, PairDrop alternative, SOCKS5 proxy server, HTTP proxy server, local proxy server, proxy checker, proxy list tester, SOCKS5 checker, bulk proxy checker.
+**Servers and connections:** SSH client, SSH terminal, PuTTY alternative, SFTP client, WinSCP alternative, SSH key login, SSH port forwarding, SSH local and remote forwarding, server monitoring over SSH, SSH tunnel, SOCKS5 tunnel, SSH dynamic port forwarding, Submarine SSH client, netcat GUI, TCP client, UDP client, TCP server, socket tester, hex sender, telnet alternative, web server, HTTP file server, LAN file sharing, LAN chat, local network chat, HTTPS file sharing, share files over Wi-Fi, phone to PC file transfer, send files from phone to PC without a cable, browser-based file sharing, QR code file sharing, AirDrop alternative for Windows and Android, LocalSend alternative, Snapdrop alternative, PairDrop alternative, SOCKS5 proxy server, SOCKS5 UDP relay, HTTP proxy server, local proxy server, upstream proxy, proxy chaining, proxy checker, proxy list tester, SOCKS5 checker, bulk proxy checker.
 
 **Developer tools:** developer toolbox, CyberChef alternative, Base64 encoder decoder, URL encoder decoder, hash generator, hash identifier, MD5, SHA-256, HMAC, file checksum, regex tester, JSON formatter, JSON validator, JSON to YAML, JSON to CSV, XML formatter, JWT decoder, JWT verifier, subnet calculator, CIDR calculator, IP converter, Unix timestamp converter, epoch converter, cron expression parser, base converter, text diff, case converter, UUID generator, ULID generator, NanoID generator, password generator, password generator, strong password generator, password strength checker, password entropy calculator, how long to crack a password, time to crack password, brute force time calculator, random token generator, PIN generator, encrypted notes, encrypted backup, AES-256-GCM.
 

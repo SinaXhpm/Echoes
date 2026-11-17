@@ -53,6 +53,24 @@ public sealed class ProxyCheckResult
     /// <summary>Two-letter country code of the exit IP (as the IP service sees it), upper case.</summary>
     public string Country { get; init; } = string.Empty;
     public string Detail { get; init; } = string.Empty;
+    /// <summary>The answer the request through it got, as it came (the IP service's page, or an error page in its place:
+    /// the proxy's own, a captive portal's), for the results' viewer; null when no HTTP answer came.</summary>
+    public HttpResponseSnapshot? Response { get; init; }
+}
+
+/// <summary>How patient a check is: the time for the TCP connection to the proxy, and for each attempt through it
+/// (the handshake plus the request to the IP service).</summary>
+public sealed record ProxyCheckOptions(TimeSpan ConnectTimeout, TimeSpan StepTimeout)
+{
+    public static readonly ProxyCheckOptions Default = new(ProxyCheckEngine.ConnectTimeout, ProxyCheckEngine.StepTimeout);
+
+    /// <summary>The checker's one "Timeout" box: that many seconds to connect, twice as long for an attempt through
+    /// the proxy (the default 6 gives the engine's own 6 s and 12 s).</summary>
+    public static ProxyCheckOptions ForSeconds(int seconds)
+    {
+        seconds = Math.Clamp(seconds, 1, 120);
+        return new ProxyCheckOptions(TimeSpan.FromSeconds(seconds), TimeSpan.FromSeconds(seconds * 2));
+    }
 }
 
 /// <summary>
@@ -196,6 +214,8 @@ public static class ProxyCheckEngine
         /// <summary>Why the IP service's answer didn't come, in a few words ("HTTP 403", "timed out").</summary>
         public string Brief = string.Empty;
         public bool AfterTimeout;
+        /// <summary>The HTTP answer a failed request got (the result's own carries a working one's).</summary>
+        public HttpResponseSnapshot? Answer;
     }
 
     /// <summary>How long a probe waits for the FIRST answer: a server of another protocol often just waits for more.</summary>
@@ -212,9 +232,11 @@ public static class ProxyCheckEngine
 
     private static Step NotThis(string why, bool sawHttp = false) => new() { Verdict = Verdict.NotThis, Why = why, SawHttp = sawHttp };
 
-    /// <summary>Check one proxy. Never throws except an <see cref="OperationCanceledException"/> for <paramref name="ct"/>.</summary>
-    public static async Task<ProxyCheckResult> CheckAsync(ProxyCheckEntry entry, CancellationToken ct)
+    /// <summary>Check one proxy. Never throws except an <see cref="OperationCanceledException"/> for <paramref name="ct"/>.
+    /// <paramref name="options"/>: its time-outs (null = <see cref="ProxyCheckOptions.Default"/>).</summary>
+    public static async Task<ProxyCheckResult> CheckAsync(ProxyCheckEntry entry, CancellationToken ct, ProxyCheckOptions? options = null)
     {
+        var o = options ?? ProxyCheckOptions.Default;
         IPAddress[] addrs;
         if (IPAddress.TryParse(entry.Host, out var literal)) addrs = new[] { literal };
         else
@@ -222,7 +244,7 @@ public static class ProxyCheckEngine
             try
             {
                 using var dns = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                dns.CancelAfter(ConnectTimeout);
+                dns.CancelAfter(o.ConnectTimeout);
                 addrs = await Dns.GetHostAddressesAsync(entry.Host, dns.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
@@ -257,21 +279,21 @@ public static class ProxyCheckEngine
         {
             var kind = order[i];
             if (sawHttp && kind != ProxyKind.Http) continue;   // it speaks HTTP: SOCKS won't answer either
-            var (socket, ms, fail) = await ConnectAsync(addrs, entry.Port, ct).ConfigureAwait(false);
+            var (socket, ms, fail) = await ConnectAsync(addrs, entry.Port, o, ct).ConfigureAwait(false);
             if (socket is null) return fail!;   // not reachable at all: the protocol doesn't matter
             connectMs ??= ms;
             Step step;
             using (var stream = new NetworkStream(socket, ownsSocket: true))
             {
                 using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                deadline.CancelAfter(StepTimeout);
+                deadline.CancelAfter(o.StepTimeout);
                 try
                 {
                     step = kind switch
                     {
                         ProxyKind.Socks5 => await Socks5Async(stream, entry, TunnelEcho, deadline.Token).ConfigureAwait(false),
                         ProxyKind.Socks4 or ProxyKind.Socks4a => await Socks4Async(stream, entry, kind, TunnelEcho, deadline.Token).ConfigureAwait(false),
-                        _ => await HttpAsync(stream, entry, addrs, deadline.Token).ConfigureAwait(false),
+                        _ => await HttpAsync(stream, entry, addrs, o, deadline.Token).ConfigureAwait(false),
                     };
                 }
                 catch (OperationCanceledException) when (!ct.IsCancellationRequested)
@@ -297,11 +319,11 @@ public static class ProxyCheckEngine
             {
                 var r = step.Result!;
                 // outside the attempt's deadline: the other IP services have their own
-                if (step.TryOthers is { } via) r = await OtherEchoesAsync(via, entry, addrs, step, ct).ConfigureAwait(false);
+                if (step.TryOthers is { } via) r = await OtherEchoesAsync(via, entry, addrs, step, o, ct).ConfigureAwait(false);
                 return new ProxyCheckResult
                 {
                     Status = r.Status, Protocol = r.Protocol, ConnectMs = connectMs, FirstByteMs = r.FirstByteMs,
-                    ExitIp = r.ExitIp, Country = r.Country, Detail = r.Detail,
+                    ExitIp = r.ExitIp, Country = r.Country, Detail = r.Detail, Response = r.Response ?? step.Answer,
                 };
             }
             sawHttp |= step.SawHttp;
@@ -345,7 +367,7 @@ public static class ProxyCheckEngine
     // Cloudflare's trace didn't come through a proxy that took the request: the other IP services through it, the same
     // way, each on a connection of its own (Fallback: the first answer wins). Their result, or the failed one with why
     // they didn't answer either.
-    private static async Task<ProxyCheckResult> OtherEchoesAsync(Via via, ProxyCheckEntry e, IPAddress[] addrs, Step failed, CancellationToken ct)
+    private static async Task<ProxyCheckResult> OtherEchoesAsync(Via via, ProxyCheckEntry e, IPAddress[] addrs, Step failed, ProxyCheckOptions o, CancellationToken ct)
     {
         var r = failed.Result!;
         var echoes = OtherEchoes(via);
@@ -354,7 +376,7 @@ public static class ProxyCheckEngine
         var sources = echoes.Select(echo => new Fallback.Source<ProxyCheckResult>(echo.Name, async t =>
         {
             Step s;
-            try { s = await ThroughAsync(via, e, addrs, echo, t).ConfigureAwait(false); }
+            try { s = await ThroughAsync(via, e, addrs, echo, o, t).ConfigureAwait(false); }
             catch (StepTimeoutException) { t.ThrowIfCancellationRequested(); throw new TimeoutException(); }
             catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException) { throw new InvalidDataException("the connection dropped"); }
             if (s.Result is { Status: ProxyCheckStatus.Working } ok) return ok;
@@ -372,6 +394,7 @@ public static class ProxyCheckEngine
                 return new ProxyCheckResult
                 {
                     Status = ok.Status, Protocol = ok.Protocol, FirstByteMs = ok.FirstByteMs, ExitIp = ok.ExitIp, Country = ok.Country,
+                    Response = ok.Response,
                     Detail = (via == Via.Plain ? "Relays http:// only (no CONNECT). " : string.Empty)
                              + $"Exit IP from {got.Source}: Cloudflare's trace didn't come through ({(failed.Brief.Length > 0 ? failed.Brief : "failed")}).",
                 };
@@ -382,14 +405,14 @@ public static class ProxyCheckEngine
         return new ProxyCheckResult
         {
             Status = r.Status, Protocol = r.Protocol, FirstByteMs = r.FirstByteMs, ExitIp = r.ExitIp, Country = r.Country,
-            Detail = r.Detail + " Other IP services through it: " + why + ".",
+            Detail = r.Detail + " Other IP services through it: " + why + ".", Response = r.Response,
         };
     }
 
     // One IP service through the proxy as the check found it works: a new connection, the same handshake.
-    private static async Task<Step> ThroughAsync(Via via, ProxyCheckEntry e, IPAddress[] addrs, Echo echo, CancellationToken ct)
+    private static async Task<Step> ThroughAsync(Via via, ProxyCheckEntry e, IPAddress[] addrs, Echo echo, ProxyCheckOptions o, CancellationToken ct)
     {
-        var (socket, _, fail) = await ConnectAsync(addrs, e.Port, ct).ConfigureAwait(false);
+        var (socket, _, fail) = await ConnectAsync(addrs, e.Port, o, ct).ConfigureAwait(false);
         if (socket is null) return Done(fail!.Status, string.Empty, fail.Detail, "the proxy didn't take the connection");
         using var stream = new NetworkStream(socket, ownsSocket: true);
         switch (via)
@@ -408,10 +431,10 @@ public static class ProxyCheckEngine
 
     // ---------------------------------------------------------------- TCP
 
-    private static async Task<(Socket? Socket, int Ms, ProxyCheckResult? Fail)> ConnectAsync(IPAddress[] addrs, int port, CancellationToken ct)
+    private static async Task<(Socket? Socket, int Ms, ProxyCheckResult? Fail)> ConnectAsync(IPAddress[] addrs, int port, ProxyCheckOptions o, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(ConnectTimeout);
+        cts.CancelAfter(o.ConnectTimeout);
         SocketException? last = null;
         foreach (var a in addrs)
         {
@@ -425,7 +448,7 @@ public static class ProxyCheckEngine
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
                 s.Dispose();
-                return (null, 0, new ProxyCheckResult { Status = ProxyCheckStatus.Timeout, Detail = $"No answer to the connection within {ConnectTimeout.TotalSeconds:0} s." });
+                return (null, 0, new ProxyCheckResult { Status = ProxyCheckStatus.Timeout, Detail = $"No answer to the connection within {o.ConnectTimeout.TotalSeconds:0} s." });
             }
             catch (SocketException ex)
             {
@@ -607,7 +630,7 @@ public static class ProxyCheckEngine
 
     // ---------------------------------------------------------------- HTTP CONNECT, then plain HTTP
 
-    private static async Task<Step> HttpAsync(NetworkStream s, ProxyCheckEntry e, IPAddress[] addrs, CancellationToken ct)
+    private static async Task<Step> HttpAsync(NetworkStream s, ProxyCheckEntry e, IPAddress[] addrs, ProxyCheckOptions o, CancellationToken ct)
     {
         var (code, notHttp) = await SendConnectAsync(s, e, TunnelEcho, ct).ConfigureAwait(false);
         if (notHttp != null) return notHttp;
@@ -617,7 +640,7 @@ public static class ProxyCheckEngine
                         e.HasLogin ? "Wrong username or password (407)." : "It needs a username and password (407).");
 
         // No CONNECT (or not to this port): a plain-HTTP proxy still forwards "GET http://…" — on a new connection.
-        var (socket, _, _) = await ConnectAsync(addrs, e.Port, ct).ConfigureAwait(false);
+        var (socket, _, _) = await ConnectAsync(addrs, e.Port, o, ct).ConfigureAwait(false);
         Step step;
         if (socket is null) step = Done(ProxyCheckStatus.Failed, "HTTP", $"It refused CONNECT (HTTP {code}) and then the connection.");
         else
@@ -630,6 +653,7 @@ public static class ProxyCheckEngine
                     ? Done(ProxyCheckStatus.Failed, "HTTP", "It refuses to relay to the IP service (HTTP 403).")
                     : Done(ProxyCheckStatus.NotProxy, string.Empty,
                            $"A web server, not a proxy: it answers HTTP {code} to CONNECT and HTTP {step.HttpCode} to a proxy request.");
+                verdict.Answer = step.Answer;   // what it is, in its own words (its page)
                 // its own gateway error: a proxy that couldn't reach the IP service, perhaps; another may come through
                 if (step.TryOthers != null) { verdict.TryOthers = Via.Plain; verdict.Brief = step.Brief; }
                 step = verdict;
@@ -758,9 +782,17 @@ public static class ProxyCheckEngine
 
             string text = Encoding.Latin1.GetString(buf, 0, got);
             int code = text.StartsWith("HTTP/", StringComparison.Ordinal) ? StatusCode(text) : 0;
+            // the answer as it came (status line, headers, body), for the results' viewer
+            string url = $"{(echo.Tls ? "https" : "http")}://{echo.Host}{(echo.Port is 80 or 443 ? "" : ":" + echo.Port)}{echo.Path}";
+            var answer = HttpResponseSnapshot.Parse(buf, got, MaxBodyBytes, more: got >= buf.Length, url,
+                                                    $"The answer to GET {url}, through the proxy.");
             if (plainViaHttpProxy && code == 407)
-                return Done(e.HasLogin ? ProxyCheckStatus.AuthFailed : ProxyCheckStatus.AuthRequired, proto,
-                            e.HasLogin ? "Wrong username or password (407)." : "It needs a username and password (407).");
+            {
+                var login = Done(e.HasLogin ? ProxyCheckStatus.AuthFailed : ProxyCheckStatus.AuthRequired, proto,
+                                 e.HasLogin ? "Wrong username or password (407)." : "It needs a username and password (407).");
+                login.Answer = answer;
+                return login;
+            }
             int bodyAt = text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
             string body = bodyAt >= 0 ? text[(bodyAt + 4)..] : string.Empty;
             if (bodyAt >= 0 && IsChunked(text[..bodyAt])) body = Dechunk(body);
@@ -772,6 +804,7 @@ public static class ProxyCheckEngine
                     : $"The answer through it was HTTP {code}, not the IP service's page.",
                     code == 0 ? "not HTTP" : code == 200 ? "no address in the answer" : $"HTTP {code}");
                 failed.HttpCode = code;
+                failed.Answer = answer;
                 failed.Relayed = bodyAt > 0 && text.AsSpan(0, bodyAt).Contains("\r\ncf-ray:", StringComparison.OrdinalIgnoreCase);
                 // Through a tunnel the proxy did its part. A plain-HTTP proxy did when the IP service answered (relayed),
                 // or when it answers with a gateway error of its own (it tried); otherwise it may be no proxy at all.
@@ -788,6 +821,7 @@ public static class ProxyCheckEngine
                     FirstByteMs = firstByte,
                     ExitIp = exit.ToString(),
                     Country = country,
+                    Response = answer,
                 },
             };
         }

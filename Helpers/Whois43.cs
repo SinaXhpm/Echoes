@@ -23,8 +23,13 @@ public static class Whois43
     public enum Kind { Domain, Ip, Asn }
 
     /// <summary>The deepest answer along the chain (cleaned for display), the servers asked in order, and a note when a
-    /// later server didn't answer (its predecessor's answer is the text then).</summary>
-    public sealed record Answer(string Text, IReadOnlyList<string> Servers, string? Note);
+    /// later server didn't answer or wasn't asked (its predecessor's answer is the text then).</summary>
+    public sealed record Answer(string Text, IReadOnlyList<string> Servers, string? Note)
+    {
+        /// <summary>Each server's answer as it came, in the order of <see cref="Servers"/>: a thin registry's own answer
+        /// (where its expiry is) stays readable after the registrar's server answered.</summary>
+        public IReadOnlyList<string> Replies { get; init; } = Array.Empty<string>();
+    }
 
     public const string Iana = "whois.iana.org";
     /// <summary>ARIN's server: it answers for any address or AS number by pointing at the registry that holds it.</summary>
@@ -33,6 +38,10 @@ public static class Whois43
     private const int MaxBytes = 512 * 1024;
     private const int MaxHops = 4;
     private static readonly TimeSpan HopTimeout = TimeSpan.FromSeconds(8);
+
+    /// <summary>Test hook: answers in place of the servers (server, query, the hop's token → the answer), so a chain can
+    /// be followed without the network. Never set by the app.</summary>
+    internal static Func<string, string, CancellationToken, Task<string>>? AskHook { get; set; }
 
     // The registries' servers, from IANA's records (2026-10-28), for when IANA's own server is out of reach: the TLDs
     // whose server isn't whois.nic.<tld>. IANA lists none for .uk; Nominet's answers at whois.nic.uk.
@@ -57,8 +66,11 @@ public static class Whois43
 
     /// <summary>
     /// Asks IANA (or <paramref name="firstServer"/>), then the servers each answer points to. Throws for a network failure
-    /// of the first server, and <see cref="OperationCanceledException"/> when <paramref name="ct"/> is cancelled or
-    /// <paramref name="timeout"/> (the whole chain) runs out.
+    /// of the first server, and <see cref="OperationCanceledException"/> when <paramref name="ct"/> is cancelled, or when
+    /// <paramref name="timeout"/> (the whole chain) runs out before the first server answered. A later server that
+    /// doesn't answer in time leaves its predecessor's answer with a note, so a caller with a deadline of its own (a
+    /// <see cref="Fallback"/> source's share) passes it as <paramref name="timeout"/>: a cancelled <paramref name="ct"/>
+    /// ends the whole chain, and the answers so far with it.
     /// </summary>
     public static async Task<Answer> LookUpAsync(string query, Kind kind, CancellationToken ct, TimeSpan? timeout = null,
                                                  string? firstServer = null)
@@ -71,17 +83,28 @@ public static class Whois43
         var servers = new List<string> { first };
         bool iana = first == Iana;
         string text = await AskAsync(first, iana ? query : QueryFor(first, query, kind), token).ConfigureAwait(false);
+        var replies = new List<string> { text };
 
         // IANA's own record is the answer for what it holds itself (example.com, a reserved block); otherwise its
         // "refer:" (or "whois:") names the next server. A TLD it lists no server for may still have whois.nic.<tld>.
         // Any other server's answer points on as its successors' do.
         string? next = iana ? Field(text, "refer") ?? Field(text, "whois") : Field(text, "Registrar WHOIS Server") ?? Field(text, "ReferralServer");
-        if (iana && next == null && kind == Kind.Domain && query.LastIndexOf('.') is int dot and > 0)
-            next = "whois.nic." + query[(dot + 1)..];
+        string name = query.TrimEnd('.');
+        if (iana && next == null && kind == Kind.Domain && name.LastIndexOf('.') is int dot and > 0)
+            next = "whois.nic." + name[(dot + 1)..];
         string? note = null;
         for (int hop = 1; hop < MaxHops && next != null; hop++)
         {
-            if (!IsHostName(next) || servers.Contains(next, StringComparer.OrdinalIgnoreCase)) break;
+            // A server as it was written ("whois.nic.UK" from the query, "whois.example.com." in an answer). One that still
+            // isn't a plain host name isn't asked, and the note says so: the answer before it (IANA's record alone, which
+            // only names the registry) mustn't pass for the whole chain's.
+            next = next.TrimEnd('.').ToLowerInvariant();
+            if (servers.Contains(next, StringComparer.OrdinalIgnoreCase)) break;
+            if (!IsHostName(next))
+            {
+                note = $"{RemoteText.Clean(next, 80)} wasn't asked (not a host name)";
+                break;
+            }
             string answer;
             try { answer = await AskAsync(next, QueryFor(next, query, kind), token).ConfigureAwait(false); }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
@@ -91,13 +114,14 @@ public static class Whois43
                 break;
             }
             servers.Add(next);
+            replies.Add(answer);
             text = answer;
             // a thin registry's pointer to the registrar, or ARIN's to the registry that holds the block now
             next = Field(answer, "Registrar WHOIS Server") ?? Field(answer, "ReferralServer");
         }
         // servers end lines with CRLF; Clean would show each CR as '?'
         string clean = RemoteText.Clean(text.ReplaceLineEndings("\n").Trim(), keepNewlines: true).ReplaceLineEndings();
-        return new Answer(TextLimit.Cap(clean), servers, note);
+        return new Answer(TextLimit.Cap(clean), servers, note) { Replies = replies };
     }
 
     /// <summary>The answer's "key: value" objects (a blank line between objects, % and # lines are comments), what the
@@ -141,6 +165,7 @@ public static class Whois43
     {
         using var hop = CancellationTokenSource.CreateLinkedTokenSource(ct);
         hop.CancelAfter(HopTimeout);
+        if (AskHook is { } hook) return await hook(server, query, hop.Token).ConfigureAwait(false);
         // ServiceDns: the system's answer, or public DoH's when the system's resolver blocks the name; public addresses only
         var addresses = (await ServiceDns.ResolveAsync(server, hop.Token).ConfigureAwait(false))
             .OrderBy(a => a.AddressFamily == AddressFamily.InterNetworkV6)   // IPv4 first: some servers' IPv6 drops it

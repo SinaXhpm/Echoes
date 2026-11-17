@@ -28,7 +28,7 @@ Speed test, DNS & port scanner
 
 **Promotional text (max 170, can change without a new build):**
 ```
-Website not opening? Echoes finds out why in one tap. Ping, test your speed, look up DNS, scan ports and share files: 20 network tools in one free app. No ads.
+Website not opening? Echoes finds out why in one tap. Ping, test your speed, look up DNS, scan ports and share files: 21 network tools in one free app. No ads.
 ```
 
 **Keywords (max 100, comma-separated, no spaces after commas):**
@@ -38,7 +38,7 @@ traceroute,mtr,wifi,ip,whois,ssl,certificate,ssh,curl,http,api,monitor,uptime,la
 
 **Description (max 4000):**
 ```
-Echoes puts 20 network tools in one free app. Find out why a website won't open, test your internet speed, ping a server, look up a domain, check a website's security certificate, or send files to another phone or computer on your Wi-Fi. No account, no ads, no tracking.
+Echoes puts 21 network tools in one free app. Find out why a website won't open, test your internet speed, ping a server, look up a domain, check a website's security certificate, or send files to another phone or computer on your Wi-Fi. No account, no ads, no tracking.
 
 WEBSITE NOT OPENING?
 Tap Doctor and Echoes checks everything for you: your connection, DNS, the server and its certificate. Then it tells you in plain words what is wrong and what you can do about it.
@@ -183,8 +183,8 @@ device frames. App Store Connect shows the exact current sizes next to the uploa
 and an iPad Pro 13-inch simulator, and takes a native-size screenshot of ten scenes with the simulator's own status bar
 (9:41, full battery): Doctor on `example.com`, the tool menu, a TCP ping of `1.1.1.1`, the speed test (caught mid-download on
 Leaseweb Washington: Cloudflare refuses tests from CI's data-centre addresses), the monitor with five public targets, the Web
-Server with a chat, a DNS lookup, the TLS Inspector, cURL's timing and the password generator. The Mac pictures (nine, no menu:
-the sidebar shows the tools) come from `macos-appstore.yml` (artifact `Echoes-mac-store-screenshots`, the `window-*.png`
+Server with a chat, a DNS lookup, the TLS Inspector, cURL's timing and the password generator. The Mac pictures (nine; the top
+bar shows the tools opened so far as tabs, and there is no picture of the full tool list yet) come from `macos-appstore.yml` (artifact `Echoes-mac-store-screenshots`, the `window-*.png`
 renders). Everything is real: the checks run against the real network, and the only addresses on screen are public ones and
 the runner's own. A scene that fails is written to `errors.txt` and skipped.
 
@@ -193,8 +193,8 @@ store size (opaque PNG). App Store search reads these headlines, so they use the
 
 | # | Scene | Headline | Line under it |
 | :--- | :--- | :--- | :--- |
-| 1 | Menu (iPhone, iPad) | 20 network tools in one free app | Ping, speed test, DNS, port scan, SSH and more |
-| 2 | Doctor | Website not opening? Find out why | One tap checks your connection, DNS and security (Mac: Plus 19 more network tools, all in one free app) |
+| 1 | Menu (iPhone, iPad) | 21 network tools in one free app | Ping, speed test, DNS, port scan, SSH and more |
+| 2 | Doctor | Website not opening? Find out why | One tap checks your connection, DNS and security (Mac: Plus 20 more network tools, all in one free app) |
 | 3 | Ping | Ping any website or server | Live delay, packet loss, traceroute and MTR |
 | 4 | Speed test | Test your internet speed | Download speed, ping and jitter in seconds |
 | 5 | Monitor | Know when a site goes down | Uptime alerts with sound or Telegram |

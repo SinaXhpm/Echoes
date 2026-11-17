@@ -57,6 +57,8 @@ public sealed partial class MonitorTarget : ObservableObject
     internal DateTime? LastChecked;
     internal string? LastError;
     internal DateTime? LastErrorAt;
+    /// <summary>The page the last failing HTTP check got (null when that failure had none: a timeout, a refused port).</summary>
+    internal HttpResponseSnapshot? LastErrorResponse;
 
     public MonitorHistory History { get; } = new();
     public string Address => Endpoint.Address;
@@ -112,7 +114,7 @@ public sealed partial class MonitorTarget : ObservableObject
         LastChecked = now;
         double ms = r.ResponseMs;
         if (!double.IsNaN(ms)) { LatencySum += ms; LatencyCount++; }
-        if (!r.Ok) { LastError = r.Reason(Endpoint); LastErrorAt = now; }
+        if (!r.Ok) { LastError = r.Reason(Endpoint); LastErrorAt = now; LastErrorResponse = r.Http.Response; }
 
         // Amber = not settled yet: failing below "mark down after", or answering below "mark up again after".
         var beat = Tracker.State switch
@@ -329,6 +331,9 @@ public sealed partial class MonitorDetail : ObservableObject
     [ObservableProperty] private bool _httpFailed;
     [ObservableProperty] private string _lastError = "None this session";
     [ObservableProperty] private bool _hasLastError;
+    /// <summary>The last error came with a page (an HTTP check's answer): the panel offers to show it.</summary>
+    [ObservableProperty] private bool _hasLastResponse;
+    internal HttpResponseSnapshot? LastResponse { get; private set; }
 
     internal void Update(MonitorTarget t, DateTime now, MonitorCheckOptions o, MonitorThresholds rules)
     {
@@ -376,6 +381,8 @@ public sealed partial class MonitorDetail : ObservableObject
 
         HasLastError = t.LastError is not null;
         LastError = t.LastError is { } e && t.LastErrorAt is { } at ? $"{e} · {MonitorFormat.Clock(at, now)}" : "None this session";
+        LastResponse = t.LastErrorResponse;
+        HasLastResponse = LastResponse is not null;
     }
 
     /// <summary>Durations and clock times only (the 1-second tick).</summary>

@@ -94,7 +94,7 @@ public sealed class ScanEngine : IDisposable
             // ---- host discovery (skipped with -Pn) ----
             if (!_o.SkipDiscovery)
             {
-                var neighborsBefore = ScanNeighbors.Snapshot();
+                var neighborsBefore = ScanNeighbors.Snapshot(_o.Via);
                 Progress.StartPhase(ScanProgress.Stage.Discovery, targets.Count);
                 await DiscoverAsync(targets, ct).ConfigureAwait(false);
                 if (!ct.IsCancellationRequested) RescueByArp(targets, neighborsBefore);
@@ -158,11 +158,11 @@ public sealed class ScanEngine : IDisposable
         {
             await Parallel.ForEachAsync(targets, options, async (h, c) =>
             {
-                var st = await ScanDiscovery.DiscoverAsync(h.Address, h.Rtt, _sweepRtt, ceiling, c, smallSweep).ConfigureAwait(false);
+                var st = await ScanDiscovery.DiscoverAsync(h.Address, h.Rtt, _sweepRtt, ceiling, c, smallSweep, _o.Via).ConfigureAwait(false);
                 Interlocked.Add(ref _sent, ScanDiscovery.ProbesPerHost);
                 if (!st.Up && c.IsCancellationRequested) return;   // an aborted check isn't evidence of anything
                 if (st.Up) MarkUp(h, st.Reason, st.LatencyMs);
-                else if (st.LocalError) { h.Status = HostStatus.Unknown; h.Reason = "socket-limit"; Interlocked.Increment(ref Progress.HostErrors); }
+                else if (st.LocalError) { h.Status = HostStatus.Unknown; h.Reason = st.Reason; Interlocked.Increment(ref Progress.HostErrors); }
                 else { h.Status = HostStatus.Down; h.Reason = "no-response"; }
                 Interlocked.Increment(ref Progress.Done);
             }).ConfigureAwait(false);
@@ -176,7 +176,7 @@ public sealed class ScanEngine : IDisposable
     private void RescueByArp(IReadOnlyList<ScanHost> targets, Dictionary<string, ScanNeighbors.Entry> before)
     {
         if (targets.All(h => h.Status == HostStatus.Up)) return;
-        var after = ScanNeighbors.Snapshot();
+        var after = ScanNeighbors.Snapshot(_o.Via);
         if (after.Count == 0) return;
         foreach (var h in targets)
         {
@@ -255,7 +255,7 @@ public sealed class ScanEngine : IDisposable
                 if (_o.ServiceDetection && !h.AcceptsAll && !ct.IsCancellationRequested)
                 {
                     var info = await ServiceScanner.ProbeAsync(h.Address, port, socket, h.Name ?? "",
-                                                               Math.Max(_o.TimeoutMs, 1500), ct).ConfigureAwait(false);
+                                                               Math.Max(_o.TimeoutMs, 1500), ct, _o.Via).ConfigureAwait(false);
                     if (info.ServiceLabel is { Length: > 0 } and not "unknown") f.Service = info.ServiceLabel;
                     f.Version = info.VersionText;
                     f.Detail = info.Detail;
@@ -294,6 +294,7 @@ public sealed class ScanEngine : IDisposable
                 {
                     socket = new Socket(h.Address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                     _sockets.TryAdd(socket, 0);
+                    ScanSocket.Tie(socket, _o.Via);
                     // Fast templates turn SYN retransmissions off so a Windows RST surfaces at once and a lost SYN is
                     // covered by our own retry; the slow ones keep them to wait past Windows' ~3 s RTO ceiling.
                     if (_o.Timing.Level >= 2) ScanSocket.DisableSynRetransmissions(socket, timeout);
@@ -324,6 +325,8 @@ public sealed class ScanEngine : IDisposable
                         return new Probe(PortState.Closed, "conn-refused", ms);
                     case SocketError.TimedOut or SocketError.OperationAborted:
                         break;   // no response: maybe retry
+                    case var e when ScanSocket.IfaceProblem(e, _o.Via) is { } unusable:
+                        return Unknown(unusable);   // the scan's interface couldn't send it: says nothing about the port
                     case var e when ScanSocket.IsLocalExhaustion(e):
                         // Our side is out of fds / ports: the SYN never left. Back off and retry without spending one
                         // of the port's own retries; still failing → undetermined, never "filtered".
@@ -417,6 +420,7 @@ public sealed class ScanEngine : IDisposable
         {
             socket = new Socket(h.Address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             _sockets.TryAdd(socket, 0);
+            ScanSocket.Tie(socket, _o.Via);
             int timeout = Math.Clamp(h.Rtt.ProbeTimeout(_o.TimeoutMs, 1), 400, 3000);
             if (_o.Timing.Level >= 2) ScanSocket.DisableSynRetransmissions(socket, timeout);
             Interlocked.Increment(ref _sent);
@@ -490,6 +494,7 @@ public sealed class ScanEngine : IDisposable
                 {
                     socket = new Socket(h.Address.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
                     _sockets.TryAdd(socket, 0);
+                    ScanSocket.Tie(socket, _o.Via);
                     ScanIcmp.Enable(socket);
                     // A connected UDP socket gets the ICMP errors for its flow: that's how closed is told apart.
                     // (Connecting sends nothing; it can only fail on a missing route — a fact about the target.)
@@ -528,6 +533,9 @@ public sealed class ScanEngine : IDisposable
                         return Answered(h, port, attempt, ms, buffer.AsSpan(0, err == SocketError.Success ? received : 0));
                     case SocketError.TimedOut or SocketError.OperationAborted:
                         break;   // silence: maybe retry
+                    case var e when ScanSocket.IfaceProblem(e, _o.Via) is { } unusable:
+                        Interlocked.Increment(ref _unknownProbes);
+                        return new PortFinding(h, port, ScanProto.Udp) { State = PortState.Unknown, Reason = unusable };
                     case var e when ScanSocket.IsLocalExhaustion(e):
                         // Out of fds, or ENOBUFS from a send queue a fast sweep filled: the datagram never left.
                         if (localRetries >= ScanSocket.MaxLocalRetries)
@@ -728,7 +736,7 @@ public sealed class ScanEngine : IDisposable
                     : h.Count(ScanProto.Udp, PortState.Closed) > 0 ? "port-unreach" : "icmp-error";
                 Interlocked.Increment(ref Progress.HostsUp);
             }
-            else if (h.Status == HostStatus.Unknown && scanned.Contains(h) && h.Reason != "socket-limit")
+            else if (h.Status == HostStatus.Unknown && scanned.Contains(h) && h.Reason != "socket-limit" && !ScanText.IsIfaceReason(h.Reason))
             {
                 h.Status = HostStatus.Down;
                 h.Reason = "no-response";
@@ -766,7 +774,7 @@ public sealed class ScanEngine : IDisposable
     {
         var up = targets.Where(h => h.Status == HostStatus.Up && !h.IsLoopback).ToList();
         if (up.Count == 0) return;
-        var table = ScanNeighbors.Snapshot();
+        var table = ScanNeighbors.Snapshot(_o.Via);
         var local = ScanNeighbors.LocalMacs();
         foreach (var h in up)
         {

@@ -373,10 +373,20 @@ public sealed class DnsSession : IDisposable
     /// <summary>Test hook (the harness): answers every query instead of the network. Internal on purpose.</summary>
     internal static Func<ResolverSpec, string, QueryType, CancellationToken, Task<DnsResult>>? TestHook { get; set; }
 
-    public DnsSession(ResolverSpec spec, TimeSpan? timeout = null)
+    // The interface every query of this session leaves from (the DNS tool's Interface choice); null = the routing table's.
+    private readonly NetIface? _via;
+    // With an interface, DoH gets a client of the session's own (the shared one's connections take the default route).
+    private readonly Lazy<HttpClient>? _ownDoh;
+
+    /// <param name="via">The interface the queries leave from; null = wherever the routing table points. With one,
+    /// "system" means that interface's DNS servers (<see cref="NetIface.DnsServers"/>), and a query that can't leave
+    /// from it fails with the reason instead of taking another way.</param>
+    public DnsSession(ResolverSpec spec, TimeSpan? timeout = null, NetIface? via = null)
     {
         Spec = spec;
         _timeout = timeout ?? (spec.IsEncrypted ? TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(3));
+        _via = via;
+        if (via is not null) _ownDoh = new Lazy<HttpClient>(() => CreateDohClient(via));
     }
 
     /// <summary>One query. Never throws for a network / protocol failure (that is a result with
@@ -424,6 +434,7 @@ public sealed class DnsSession : IDisposable
 
     private async Task<DnsResult> PlainAsync(string name, QueryType type, Stopwatch sw, CancellationToken ct)
     {
+        if (_via is not null) return await PlainViaAsync(_via, name, type, sw, ct).ConfigureAwait(false);
         LookupClient? client;
         lock (_plainGate)   // the email check asks one session from many tasks at once
         {
@@ -464,6 +475,110 @@ public sealed class DnsSession : IDisposable
             Answers = answers, AnswerCount = resp.Answers.Count, RttMs = ms,
             Via = Spec.Transport == DnsTransport.System ? _systemVia : "plain",
         };
+    }
+
+    // ------------------------------------------------------------ plain / system, from a chosen interface
+    // DnsClient can't be told which interface to use, so with one chosen the query goes out on a socket of the
+    // session's own, tied to it: UDP, and TCP when the answer comes back truncated. "system" is then that interface's
+    // DNS servers (NetIface.DnsServers: its own list on Windows, the system's one list on Linux and macOS), asked in
+    // order until one answers.
+
+    private async Task<DnsResult> PlainViaAsync(NetIface via, string name, QueryType type, Stopwatch sw, CancellationToken ct)
+    {
+        IPEndPoint[] servers;
+        string label = "plain";
+        if (Spec.Transport == DnsTransport.Plain) servers = new[] { Spec.Endpoint! };
+        else
+        {
+            servers = via.DnsServers.Where(a => via.SourceFor(a) is not null).Select(a => new IPEndPoint(via.Scoped(a), 53)).ToArray();
+            if (servers.Length == 0)
+            {
+                _systemVia = "system (" + via.Name + ")";
+                return Failed(name, type, sw, _systemVia,
+                              via.DnsIsLocalOnly
+                                  ? $"This system's DNS is a program on this computer, which can't be asked through {via.Name}: name a resolver instead of \"system\""
+                                  : $"{via.Name} has no DNS servers of its own: name a resolver instead of \"system\"",
+                              "no DNS here");
+            }
+            label = _systemVia = $"{via.Name}'s DNS ({servers[0].Address}" + (servers.Length > 1 ? $" +{servers.Length - 1}" : "") + ")";
+        }
+
+        for (int i = 0; ; i++)
+        {
+            bool last = i == servers.Length - 1;
+            // every server but the last gets its share of the time; the last one what is left of the query's deadline
+            using var attempt = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            if (!last) attempt.CancelAfter(TimeSpan.FromMilliseconds(Math.Max(800, _timeout.TotalMilliseconds / servers.Length)));
+            try { return await ExchangeAsync(via, servers[i], name, type, sw, label, attempt.Token).ConfigureAwait(false); }
+            catch (Exception ex) when (!last && !ct.IsCancellationRequested && ex is OperationCanceledException or SocketException or IOException
+                                       && ex is not NetIfaceException)
+            {
+                // this server is silent or refused: the next one
+            }
+        }
+    }
+
+    private async Task<DnsResult> ExchangeAsync(NetIface via, IPEndPoint server, string name, QueryType type, Stopwatch sw, string label,
+                                                CancellationToken ct)
+    {
+        if (via.Missing(server.Address) is { } missing)
+            throw NetIfaceException.From(via, $"{missing}, so {server.Address} can't be asked from it");
+        ushort id = (ushort)RandomNumberGenerator.GetInt32(1, 65536);
+        byte[] query = DnsWire.BuildQuery(name, (ushort)type, id, padBlock: 0);
+        sw.Restart();
+        byte[] answer;
+        using (var udp = new Socket(server.AddressFamily, SocketType.Dgram, ProtocolType.Udp))
+        {
+            Tie(udp, via);
+            await udp.ConnectAsync(server, ct).ConfigureAwait(false);   // sends nothing: only this server's datagrams come back
+            await udp.SendAsync(query, SocketFlags.None, ct).ConfigureAwait(false);
+            byte[] buffer = new byte[4096];   // the query advertises 1232 bytes (EDNS0)
+            while (true)
+            {
+                int n = await udp.ReceiveAsync(buffer, SocketFlags.None, ct).ConfigureAwait(false);
+                // (an answer to an earlier query that came late has another ID: not this one's)
+                if (n >= 12 && buffer[0] == (byte)(id >> 8) && buffer[1] == (byte)id) { answer = buffer.AsSpan(0, n).ToArray(); break; }
+            }
+        }
+        string how = label;
+        if ((answer[2] & 0x02) != 0)
+        {
+            // truncated: the whole answer over TCP, as every resolver library does
+            answer = await TcpExchangeAsync(via, server, query, ct).ConfigureAwait(false);
+            how += " (TCP)";
+        }
+        return FromWire(name, type, answer, id, sw.Elapsed.TotalMilliseconds, how);
+    }
+
+    private static async Task<byte[]> TcpExchangeAsync(NetIface via, IPEndPoint server, byte[] query, CancellationToken ct)
+    {
+        using var tcp = new Socket(server.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+        Tie(tcp, via);
+        try { await tcp.ConnectAsync(server, ct).ConfigureAwait(false); }
+        catch (SocketException se) when (via.ConnectProblem(se.SocketErrorCode, server.Address.ToString()) is { } problem)
+        {
+            throw NetIfaceException.From(via, problem, se);
+        }
+        await using var stream = new NetworkStream(tcp, ownsSocket: false);
+        byte[] framed = new byte[query.Length + 2];
+        framed[0] = (byte)(query.Length >> 8);
+        framed[1] = (byte)query.Length;
+        query.CopyTo(framed, 2);
+        await stream.WriteAsync(framed, ct).ConfigureAwait(false);
+        byte[] lenBuf = new byte[2];
+        await stream.ReadExactlyAsync(lenBuf, ct).ConfigureAwait(false);
+        int len = lenBuf[0] << 8 | lenBuf[1];
+        if (len < 12) throw new DnsWireException("the answer is shorter than a DNS header");
+        byte[] msg = new byte[len];   // ≤ 65535 by the 2-byte frame
+        await stream.ReadExactlyAsync(msg, ct).ConfigureAwait(false);
+        return msg;
+    }
+
+    // Ties a socket of this session to its interface; one that can't be tied is not used at all.
+    private static void Tie(Socket socket, NetIface? via)
+    {
+        if (via is not null && !via.TryBind(socket, out string? why))
+            throw NetIfaceException.From(via, why ?? $"can't send through {via.Name}");
     }
 
     private LookupClientOptions Options(params NameServer[] servers) => new(servers)
@@ -526,7 +641,9 @@ public sealed class DnsSession : IDisposable
 
     // ------------------------------------------------------------ DNS-over-HTTPS (RFC 8484)
 
-    private static readonly Lazy<HttpClient> DohClient = new(() =>
+    private static readonly Lazy<HttpClient> DohClient = new(() => CreateDohClient(null));
+
+    private static HttpClient CreateDohClient(NetIface? via)
     {
         var handler = new SocketsHttpHandler
         {
@@ -540,7 +657,7 @@ public sealed class DnsSession : IDisposable
             PooledConnectionIdleTimeout = TimeSpan.FromSeconds(60),
             PooledConnectionLifetime = TimeSpan.FromMinutes(5),
             MaxResponseHeadersLength = 32,   // KB
-            ConnectCallback = ConnectAsync,
+            ConnectCallback = via is null ? ConnectAsync : (ctx, ct) => ConnectAsync(ctx, via, ct),
         };
         var client = new HttpClient(handler)
         {
@@ -549,7 +666,7 @@ public sealed class DnsSession : IDisposable
         };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Echoes");
         return client;
-    });
+    }
 
     private static readonly MediaTypeHeaderValue DnsMessageType = new("application/dns-message");
 
@@ -597,7 +714,7 @@ public sealed class DnsSession : IDisposable
     // same deadline. No proxy lookup (UseProxy = false), so SendAsync doesn't block the calling thread.
     private async Task<HttpResponseMessage> SendDohAsync(byte[] query, bool get, Stopwatch sw, CancellationToken ct)
     {
-        var client = DohClient.Value;
+        var client = _ownDoh?.Value ?? DohClient.Value;
         sw.Restart();
         try { return await client.SendAsync(get ? Get(query) : Post(query), HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false); }
         catch (HttpRequestException e) when (!ct.IsCancellationRequested && IsConnectionFailure(e))
@@ -658,33 +775,65 @@ public sealed class DnsSession : IDisposable
 
     /// <summary>Connects HTTP (DoH) sockets: a well-known provider's host goes straight to its published addresses,
     /// so a poisoned system resolver can't redirect it (the certificate is still checked against the name).</summary>
-    private static async ValueTask<Stream> ConnectAsync(SocketsHttpConnectionContext ctx, CancellationToken ct)
+    private static ValueTask<Stream> ConnectAsync(SocketsHttpConnectionContext ctx, CancellationToken ct) => ConnectAsync(ctx, null, ct);
+
+    private static async ValueTask<Stream> ConnectAsync(SocketsHttpConnectionContext ctx, NetIface? via, CancellationToken ct)
     {
         var ep = ctx.DnsEndPoint;
-        Socket socket = await ConnectSocketAsync(ep.Host, ep.Port, ct).ConfigureAwait(false);
+        Socket socket = await ConnectSocketAsync(ep.Host, ep.Port, ct, via).ConfigureAwait(false);
         return new NetworkStream(socket, ownsSocket: true);
     }
 
-    private static async Task<Socket> ConnectSocketAsync(string host, int port, CancellationToken ct)
+    // (via: the interface the connection is made from. Only addresses of a kind it has are tried, and a connect that
+    // can't leave from it ends with the reason: the next address would go the same way.)
+    private static async Task<Socket> ConnectSocketAsync(string host, int port, CancellationToken ct, NetIface? via = null)
     {
         var candidates = new List<IPAddress>();
         if (IPAddress.TryParse(host.Trim('[', ']'), out var literal)) candidates.Add(literal);
         else candidates.AddRange(ResolverPresets.Bootstrap(host));
 
         Exception? last = null;
-        foreach (var ip in candidates.Take(4))
+        async Task<Socket?> TryAsync(IEnumerable<IPAddress> addresses)
         {
-            var s = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-            try { await s.ConnectAsync(new IPEndPoint(ip, port), ct).ConfigureAwait(false); return s; }
-            catch (Exception ex) when (!ct.IsCancellationRequested) { s.Dispose(); last = ex; }
-            catch { s.Dispose(); throw; }
+            foreach (var ip in addresses)
+            {
+                if (via?.Missing(ip) is { } missing)
+                {
+                    last ??= NetIfaceException.From(via, $"{missing}, so {host} can't be reached from it");
+                    continue;
+                }
+                var s = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+                try
+                {
+                    Tie(s, via);
+                    await s.ConnectAsync(new IPEndPoint(via?.Scoped(ip) ?? ip, port), ct).ConfigureAwait(false);
+                    return s;
+                }
+                catch (NetIfaceException) { s.Dispose(); throw; }
+                catch (SocketException se) when (via?.ConnectProblem(se.SocketErrorCode, host) is { } problem)
+                {
+                    s.Dispose();
+                    throw NetIfaceException.From(via!, problem, se);
+                }
+                catch (Exception ex) when (!ct.IsCancellationRequested) { s.Dispose(); last = ex; }
+                catch { s.Dispose(); throw; }
+            }
+            return null;
         }
+
+        if (await TryAsync(candidates.Take(4)).ConfigureAwait(false) is { } connected) return connected;
         if (literal != null) throw last ?? new SocketException((int)SocketError.HostUnreachable);
 
         // any other name: the system resolver (dual stack, every address in turn)
-        var sock = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-        try { await sock.ConnectAsync(new DnsEndPoint(host, port), ct).ConfigureAwait(false); return sock; }
-        catch { sock.Dispose(); throw; }
+        if (via is null)
+        {
+            var sock = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+            try { await sock.ConnectAsync(new DnsEndPoint(host, port), ct).ConfigureAwait(false); return sock; }
+            catch { sock.Dispose(); throw; }
+        }
+        var resolved = await Dns.GetHostAddressesAsync(host, ct).ConfigureAwait(false);
+        return await TryAsync(resolved.OrderBy(a => a.AddressFamily == AddressFamily.InterNetworkV6).Take(6)).ConfigureAwait(false)
+               ?? throw last ?? new SocketException((int)SocketError.HostNotFound);
     }
 
     // ------------------------------------------------------------ DNS-over-TLS (RFC 7858)
@@ -701,7 +850,7 @@ public sealed class DnsSession : IDisposable
         byte[] answer;
         try
         {
-            conn ??= await DotConnection.OpenAsync(Spec, ct).ConfigureAwait(false);
+            conn ??= await DotConnection.OpenAsync(Spec, ct, _via).ConfigureAwait(false);
             answer = await conn.ExchangeAsync(query, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested && ex is IOException or SocketException or ObjectDisposedException or AuthenticationException
@@ -714,7 +863,7 @@ public sealed class DnsSession : IDisposable
             sw.Restart();
             try
             {
-                conn = await DotConnection.OpenAsync(Spec, ct).ConfigureAwait(false);
+                conn = await DotConnection.OpenAsync(Spec, ct, _via).ConfigureAwait(false);
                 answer = await conn.ExchangeAsync(query, ct).ConfigureAwait(false);
             }
             catch { conn?.Dispose(); throw; }
@@ -748,16 +897,27 @@ public sealed class DnsSession : IDisposable
             Protocol = ssl.SslProtocol switch { SslProtocols.Tls13 => "TLS 1.3", SslProtocols.Tls12 => "TLS 1.2", _ => "" };
         }
 
-        public static async Task<DotConnection> OpenAsync(ResolverSpec spec, CancellationToken ct)
+        public static async Task<DotConnection> OpenAsync(ResolverSpec spec, CancellationToken ct, NetIface? via = null)
         {
             Socket socket;
             if (spec.Endpoint is { } ep)
             {
+                if (via?.Missing(ep.Address) is { } missing)
+                    throw NetIfaceException.From(via, $"{missing}, so {ep.Address} can't be reached from it");
                 socket = new Socket(ep.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-                try { await socket.ConnectAsync(ep, ct).ConfigureAwait(false); }
+                try
+                {
+                    Tie(socket, via);
+                    await socket.ConnectAsync(via is null ? ep : new IPEndPoint(via.Scoped(ep.Address), ep.Port), ct).ConfigureAwait(false);
+                }
+                catch (SocketException se) when (via?.ConnectProblem(se.SocketErrorCode, ep.Address.ToString()) is { } problem)
+                {
+                    socket.Dispose();
+                    throw NetIfaceException.From(via!, problem, se);
+                }
                 catch { socket.Dispose(); throw; }
             }
-            else socket = await ConnectSocketAsync(spec.Host, spec.Port, ct).ConfigureAwait(false);
+            else socket = await ConnectSocketAsync(spec.Host, spec.Port, ct, via).ConfigureAwait(false);
 
             string? nameError = null;
             bool Validate(object sender, X509Certificate? cert, X509Chain? chain, SslPolicyErrors errors)
@@ -868,6 +1028,10 @@ public sealed class DnsSession : IDisposable
     /// <summary>One sentence + a word or two for an exception from any transport.</summary>
     private (string full, string brief) Describe(Exception ex, bool timedOut)
     {
+        // the chosen interface's own sentence, wherever in the chain it sits (the HTTP client wraps it, and unwrapping
+        // would go past it to the socket error it explains)
+        for (Exception? x = ex; x is not null; x = x.InnerException)
+            if (x is NetIfaceException chosen) return (chosen.Message.TrimEnd('.'), "interface");
         string target = Spec.Short;
         var e = SocketErrors.Unwrap(ex);
         if (e is HttpRequestException { InnerException: { } inner }) e = SocketErrors.Unwrap(inner);
@@ -922,6 +1086,7 @@ public sealed class DnsSession : IDisposable
             _disposed = true;
             while (_dotIdle.Count > 0) _dotIdle.Pop().Dispose();   // one still in use is closed when it comes back
         }
+        if (_ownDoh is { IsValueCreated: true }) _ownDoh.Value.Dispose();
     }
 }
 
@@ -929,9 +1094,10 @@ public sealed class DnsSession : IDisposable
 /// <see cref="DnsSession"/>: DoT then pays one handshake for all of them.</summary>
 public static class SecureDns
 {
-    public static async Task<DnsResult> QueryAsync(ResolverSpec spec, string name, QueryType type, CancellationToken ct, TimeSpan? timeout = null)
+    public static async Task<DnsResult> QueryAsync(ResolverSpec spec, string name, QueryType type, CancellationToken ct, TimeSpan? timeout = null,
+                                                   NetIface? via = null)
     {
-        using var session = new DnsSession(spec, timeout);
+        using var session = new DnsSession(spec, timeout, via);
         return await session.QueryAsync(name, type, ct).ConfigureAwait(false);
     }
 

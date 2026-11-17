@@ -273,15 +273,31 @@ public static class MonitorChecks
                 var answer = await Whois43.LookUpAsync(domain, Whois43.Kind.Domain, ct, RdapTimeout * 2, first).ConfigureAwait(false);
                 if (first != null || answer.Servers.Count > 1)   // the registry answered (IANA alone only names it)
                 {
-                    var expiry = WhoisExpiry(answer.Text);
-                    if (expiry == null && WhoisNotFound.IsMatch(answer.Text)) return new(MonitorRdapOutcome.NoData, null);
-                    return new(MonitorRdapOutcome.Found, expiry);
+                    if (WhoisVerdict(answer) is { } verdict) return verdict;
+                    // Neither an expiry nor "not registered" (a rate limit, a format not read here): no verdict, so what was
+                    // known stays, as when the registry can't be asked. "No expiry listed" would wipe a known expiry and
+                    // its warning.
+                    outcome = MonitorRdapOutcome.Failed;
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception) { /* the next; silent */ }
         }
         return new(outcome, null);
+    }
+
+    /// <summary>What a classic WHOIS chain says about the domain: the expiry in the registry's answer, else in the
+    /// registrar's after it (a thin registry, .com or .net, states its own "Registry Expiry Date", while the registrar's
+    /// server may write it otherwise or not at all); "not registered" when the registry says so. Null when neither is
+    /// there. IANA's record, when the chain started there, only names the registry.</summary>
+    internal static MonitorRdapResult? WhoisVerdict(Whois43.Answer answer)
+    {
+        bool viaIana = answer.Servers.Count > 0 && answer.Servers[0].Equals(Whois43.Iana, StringComparison.OrdinalIgnoreCase);
+        var replies = answer.Replies.Skip(viaIana ? 1 : 0).ToList();
+        if (replies.Count == 0) return null;
+        foreach (string reply in replies)
+            if (WhoisExpiry(reply) is { } expiry) return new(MonitorRdapOutcome.Found, expiry);
+        return WhoisNotFound.IsMatch(replies[0]) ? new(MonitorRdapOutcome.NoData, null) : null;
     }
 
     // Registries write the expiry their own way: "Registry Expiry Date: 2027-08-13T04:00:00Z" (gTLDs), "Registrar

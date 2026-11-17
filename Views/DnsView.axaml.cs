@@ -2,6 +2,7 @@ using System;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Threading;
+using Echoes.Helpers;
 using Echoes.ViewModels;
 
 namespace Echoes.Views;
@@ -10,9 +11,16 @@ public partial class DnsView : UserControl
 {
     // Paste-to-host and select-all-on-focus for the domain box are declared in XAML via
     // helpers:InputAssist (HostPaste / SelectAllOnFocus).
+    // interfaces come and go (Wi-Fi, a VPN): the picker lists the current ones whenever it opens
+    private void IfaceBox_DropDownOpened(object? sender, EventArgs e)
+    {
+        if (DataContext is DnsViewModel { IsWorking: false } vm) vm.Iface.Refresh();
+    }
+
     public DnsView()
     {
         InitializeComponent();
+        if (AppPlatform.IsMobile) DnsRoot.Classes.Add("touch");   // finger-size resolver rows (styles in the XAML)
 
         // The resolver box's MaxHeight follows the action row's bottom edge (see DnsResolvers in the XAML), which it takes
         // from the layout before. Coming back from the stacked layout it started from the stacked value (~250 px), the

@@ -20,6 +20,7 @@ namespace Echoes.ViewModels;
 /// </summary>
 public partial class PortScannerViewModel : ObservableObject
 {
+    private readonly ToolStore Store = ToolStore.Current;   // this instance's settings: its own copy when it is one of several tabs (ToolStore)
     // ---- setup ----
     [ObservableProperty] private string _targetInput = "";
     [ObservableProperty] private string _portInput = "top-100";
@@ -50,10 +51,17 @@ public partial class PortScannerViewModel : ObservableObject
     /// <summary>Raised when a scan starts, so the view can bring the results forward.</summary>
     public event Action? ScanStarted;
 
+    /// <summary>The interface every probe leaves from (nmap's -e): "Default route" lets the system choose, as it
+    /// always did. Taken when a scan starts.</summary>
+    public IfacePicker Iface { get; }
+
+    private const string IfaceKey = "portscan.iface";
+
     public PortScannerViewModel()
     {
-        if (HistoryService.Instance.Last("portscan.target") is { } t) TargetInput = t;
-        if (HistoryService.Instance.Last("portscan.ports") is { } p) PortInput = p;
+        Iface = new IfacePicker(Store.Profile, IfaceKey, "Default route", "The system chooses the interface (its routing table)");
+        if (Store.History.Last("portscan.target") is { } t) TargetInput = t;
+        if (Store.History.Last("portscan.ports") is { } p) PortInput = p;
         RestoreOptions();
         _loaded = true;
     }
@@ -68,7 +76,7 @@ public partial class PortScannerViewModel : ObservableObject
 
     private void RestoreOptions()
     {
-        var ps = ProfileService.Instance;
+        var ps = Store.Profile;
         UseTcp = ps.GetBool("portscan.tcp", true);
         UseUdp = ps.GetBool("portscan.udp");
         ServiceDetection = ps.GetBool("portscan.sv", true);
@@ -87,7 +95,7 @@ public partial class PortScannerViewModel : ObservableObject
         base.OnPropertyChanged(e);
         if (!_loaded || e.PropertyName is not { } n || !PersistProps.Contains(n)) return;
         var inv = System.Globalization.CultureInfo.InvariantCulture;
-        ProfileService.Instance.SetMany(
+        Store.Profile.SetMany(
             ("portscan.tcp", UseTcp ? "true" : "false"), ("portscan.udp", UseUdp ? "true" : "false"),
             ("portscan.sv", ServiceDetection ? "true" : "false"), ("portscan.pingOnly", PingScanOnly ? "true" : "false"),
             ("portscan.skipDiscovery", SkipDiscovery ? "true" : "false"), ("portscan.repeat", Repeat ? "true" : "false"),
@@ -159,10 +167,18 @@ public partial class PortScannerViewModel : ObservableObject
         // Snapshot every setting the workers read: a box ticked mid-scan must not change a scan half-way. (Repeat and
         // its interval stay live on purpose: unticking Repeat ends the loop after this pass.)
         var timing = SelectedTiming;
+        // The chosen interface as it is now. Not up: said at once, instead of quietly scanning over the default route.
+        NetIface? via = null;
+        if (Iface.Name is { } chosen && (via = Iface.Resolve()) is null)
+        {
+            Fail($"{chosen} isn't connected: choose another interface, or Default route.");
+            IsScanning = false;
+            return;
+        }
         var options = new ScanOptions(
             Tcp: UseTcp, Udp: UseUdp, ServiceDetection: ServiceDetection, PingOnly: PingScanOnly,
             SkipDiscovery: SkipDiscovery && !PingScanOnly, TimeoutMs: Math.Clamp(TimeoutMs, 50, 120_000),
-            Concurrency: Math.Clamp(timing.Concurrency, 1, ScanEngine.MaxParallelism), Timing: timing);
+            Concurrency: Math.Clamp(timing.Concurrency, 1, ScanEngine.MaxParallelism), Timing: timing, Via: via);
         string targetText = TargetInput, portText = PortInput;
 
         ScanEngine? engine = null;
@@ -182,8 +198,8 @@ public partial class PortScannerViewModel : ObservableObject
 
             // T:/U: prefixes can name a protocol whose box is unticked: what's scanned is what the ports say.
             options = options with { Tcp = ports.Tcp.Count > 0, Udp = ports.Udp.Count > 0 };
-            HistoryService.Instance.Add("portscan.target", targetText);
-            if (!options.PingOnly) HistoryService.Instance.Add("portscan.ports", portText);
+            Store.History.Add("portscan.target", targetText);
+            if (!options.PingOnly) Store.History.Add("portscan.ports", portText);
 
             if (parsed.Hostnames.Count > 0) StatusMessage = $"Resolving {parsed.Hostnames.Count:N0} name(s)…";
             var cts = new CancellationTokenSource();
@@ -195,6 +211,13 @@ public partial class PortScannerViewModel : ObservableObject
             if (targets.Count == 0)
             {
                 Fail("Couldn't resolve " + string.Join(", ", parsed.Errors.Take(4)) + (parsed.Errors.Count > 4 ? $" (+{parsed.Errors.Count - 4} more)" : "") + ".");
+                return;
+            }
+            // An interface with no address of the targets' kind can't send a single probe: one sentence now, not a
+            // listing of undetermined ports.
+            if (via is not null && targets.All(h => via.Missing(h.Address) is not null))
+            {
+                Fail($"{via.Missing(targets[0].Address)}, so {(targets.Count == 1 ? targets[0].Ip : "these targets")} can't be scanned from it.");
                 return;
             }
 
@@ -240,7 +263,8 @@ public partial class PortScannerViewModel : ObservableObject
                 await FinishPassAsync(pass, diff, portsText);
                 if (!pass.Stopped) previous = snapshot;
 
-                string done = Summary(pass) + (diff is null ? "" : diff.Any ? $" · changed: {diff.Summary}" : " · no changes")
+                string done = Summary(pass) + (options.Via is { } from ? $" · from {from.Name}" : "")
+                              + (diff is null ? "" : diff.Any ? $" · changed: {diff.Summary}" : " · no changes")
                               + skipped + capped;
                 StatusMessage = done;
                 if (pass.Stopped || !Repeat) break;

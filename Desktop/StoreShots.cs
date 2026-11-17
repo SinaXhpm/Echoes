@@ -239,15 +239,14 @@ internal static class StoreShots
         }
     }
 
-    // Selects a tool in the sidebar (the TabControl "MainTabs", items tagged with the tool's name) and lets the page build.
+    // Opens a tool (the shell's tab for it, made when it has none) and lets the page build.
     private static async Task Open(string tag)
     {
         await Ui(() =>
         {
-            var tabs = _window.GetVisualDescendants().OfType<TabControl>().First(t => t.Name == "MainTabs");
-            var item = tabs.Items.OfType<TabItem>().FirstOrDefault(i => i.Tag as string == tag)
-                       ?? throw new InvalidOperationException("no sidebar entry " + tag);
-            tabs.SelectedItem = item;
+            var shell = _window.GetVisualDescendants().OfType<Views.MainView>().FirstOrDefault()
+                        ?? throw new InvalidOperationException("no desktop shell");
+            shell.OpenTool(tag);
         });
         await Task.Delay(1500);
     }

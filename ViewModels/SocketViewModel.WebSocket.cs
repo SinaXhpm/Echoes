@@ -35,7 +35,7 @@ public partial class SocketViewModel
     [ObservableProperty] private bool _isWsOptionsOpen;
     [ObservableProperty] private bool _inputIsJson;
 
-    public ObservableCollection<string> WsUrlHistory => HistoryService.Instance.Get(HWsUrl);
+    public ObservableCollection<string> WsUrlHistory => Store.History.Get(HWsUrl);
 
     private WsClientSession? _ws;
     private bool _wsClosing;
@@ -62,25 +62,25 @@ public partial class SocketViewModel
         }
     }
 
-    private void RestoreWsSettings(ProfileService p)
+    private void RestoreWsSettings(ISettings p)
     {
         WsSubprotocols = p.GetSetting(KWsProto) ?? string.Empty;
         WsHeaders = Open(p.GetSetting(KWsHeaders));
         WsProxy = Open(p.GetSetting(KWsProxy));
-        WsUrl = HistoryService.Instance.Last(HWsUrl) ?? string.Empty;
+        WsUrl = Store.History.Last(HWsUrl) ?? string.Empty;
 
         static string Open(string? stored) => SecretProtector.IsProtected(stored) ? SecretProtector.Unprotect(stored) : stored ?? string.Empty;
     }
 
     // Headers can hold tokens (Authorization, Cookie) and a proxy address a password: both are sealed at rest.
-    partial void OnWsSubprotocolsChanged(string value) { if (!_restoring) ProfileService.Instance.SetSetting(KWsProto, (value ?? string.Empty).Trim()); }
+    partial void OnWsSubprotocolsChanged(string value) { if (!_restoring) Store.Profile.SetSetting(KWsProto, (value ?? string.Empty).Trim()); }
     partial void OnWsHeadersChanged(string value)
     {
-        if (!_restoring) ProfileService.Instance.SetSetting(KWsHeaders, string.IsNullOrWhiteSpace(value) ? null : SecretProtector.Protect(value));
+        if (!_restoring) Store.Profile.SetSetting(KWsHeaders, string.IsNullOrWhiteSpace(value) ? null : SecretProtector.Protect(value));
     }
     partial void OnWsProxyChanged(string value)
     {
-        if (!_restoring) ProfileService.Instance.SetSetting(KWsProxy, string.IsNullOrWhiteSpace(value) ? null : value.Contains('@') ? SecretProtector.Protect(value.Trim()) : value.Trim());
+        if (!_restoring) Store.Profile.SetSetting(KWsProxy, string.IsNullOrWhiteSpace(value) ? null : value.Contains('@') ? SecretProtector.Protect(value.Trim()) : value.Trim());
     }
 
     [RelayCommand]
@@ -140,7 +140,7 @@ public partial class SocketViewModel
                          + (s.Subprotocol != null ? " · " + s.Subprotocol : string.Empty)
                          + (s.CertificateOverridden ? " · untrusted certificate" : string.Empty);
             s.Connection.Start();
-            HistoryService.Instance.Add(HWsUrl, ForHistory(url));
+            Store.History.Add(HWsUrl, ForHistory(url));
             SessionStarted();
         }
         catch (SocketFailure f) when (f.CertSha256 != null)
@@ -148,6 +148,12 @@ public partial class SocketViewModel
             if (gen != _gen) return;
             State = SocketState.Idle;
             Commit(new List<SocketEntry> { new(SocketEntryKind.Error, DateTime.Now, null, f.Message, null) { CertSha256 = f.CertSha256 } });
+        }
+        catch (SocketFailure f) when (f.Response != null)
+        {
+            if (gen != _gen) return;
+            State = SocketState.Idle;
+            Commit(new List<SocketEntry> { new(SocketEntryKind.Error, DateTime.Now, null, f.Message, null) { Response = f.Response } });
         }
         catch (OperationCanceledException)
         {

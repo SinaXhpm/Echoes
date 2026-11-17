@@ -40,6 +40,7 @@ public static class DoctorMtu
         if (addr.AddressFamily != AddressFamily.InterNetwork) return new(null, false, "measured for IPv4 targets only");
         if (!(OperatingSystem.IsWindows() || OperatingSystem.IsLinux() || OperatingSystem.IsAndroid()))
             return new(null, false, "not measured on this system");
+        if (DoctorNet.From?.Missing(addr) is { } missing) return new(null, false, missing);   // the chosen interface has no IPv4
 
         var clock = Stopwatch.StartNew();
         int timeout = 1000;
@@ -81,9 +82,21 @@ public static class DoctorMtu
 
     private static Task<Probe> SendAsync(IPAddress addr, int size, int timeout, CancellationToken ct)
     {
-        if (OperatingSystem.IsWindows()) return WindowsAsync(addr, size, timeout, ct);
+        if (OperatingSystem.IsWindows())
+            return DoctorNet.From is { } via ? FromAsync(via, addr, size, timeout, ct) : WindowsAsync(addr, size, timeout, ct);
         if (OperatingSystem.IsLinux() || OperatingSystem.IsAndroid()) return DatagramAsync(addr, size, timeout, ct);
         return Task.FromResult(Probe.Denied);
+    }
+
+    // Windows, from a chosen interface: the managed Ping can't send from one, the pinger can (with the same size and
+    // Don't-Fragment, as an ICMP probe only: a UDP fallback measures nothing here)
+    private static async Task<Probe> FromAsync(NetIface via, IPAddress addr, int size, int timeout, CancellationToken ct)
+    {
+        var r = await IcmpPinger.SendAsync(addr, timeout, new IcmpProbeOptions(size - Headers, 64, DontFragment: true, Via: via), ct,
+                                           PingMethod.Icmp).ConfigureAwait(false);
+        if (r.Success) return Probe.Fits;
+        if (r.Error == IcmpPinger.PacketTooBig) return Probe.TooBig;
+        return r.PermissionDenied ? Probe.Denied : Probe.Lost;
     }
 
     [SupportedOSPlatform("windows")]
@@ -114,9 +127,10 @@ public static class DoctorMtu
         Socket s;
         try
         {
-            s = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Icmp);
+            s = DoctorNet.NewSocket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Icmp);
         }
         catch (SocketException) { return Probe.Denied; }
+        catch (NetIfaceException) { return Probe.Lost; }   // the chosen interface went away meanwhile
         using (s)
         {
             try { s.SetRawSocketOption(SolIp, IpMtuDiscover, BitConverter.GetBytes(IpPmtuDiscDo)); }

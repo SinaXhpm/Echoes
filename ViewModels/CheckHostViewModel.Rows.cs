@@ -106,6 +106,8 @@ public sealed partial class CheckHostNodeRow : CheckHostRow
     public bool AnswerDiffers => CheckHostFormat.AnswerDiffers(Entry, Majority);
     public IReadOnlyList<CheckHostReply> Replies => Result?.Replies ?? Array.Empty<CheckHostReply>();
     public bool HasAddress => Result?.Address.Length > 0;
+    /// <summary>The node sent back the answer it got (Globalping's HTTP check): the details offer to show it.</summary>
+    public bool HasResponse => Result?.Response is not null;
 
     [ObservableProperty] private bool _isExpanded;
 
@@ -182,6 +184,9 @@ public sealed partial class CheckHostNodeRow : CheckHostRow
                 case CheckHostKind.Http:
                     list.Add(new("Status", r.HttpCode is not null ? r.Status : r.Error.Length > 0 ? r.Error : r.Status, tone: tone));
                     if (r.LatencyMs is not null) list.Add(new("Time", CheckHostFormat.Ms(r.LatencyMs)));
+                    if (r.Response is { } answer)
+                        list.Add(new("Body", answer.Length == 0 ? "empty"
+                                     : answer.SizeText + (answer.ContentType is { Length: > 0 } ct ? " · " + RemoteText.Clean(ct, 80) : "")));
                     break;
                 case CheckHostKind.Tcp:
                     list.Add(new("Result", r.State == CheckHostState.Ok ? $"Connected in {CheckHostFormat.Ms(r.LatencyMs)}" : r.Error, tone: tone));

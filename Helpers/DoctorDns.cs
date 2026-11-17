@@ -171,16 +171,46 @@ public static class DoctorDns
         return ans;
     }
 
+    // ------------------------------------------------------------------ "system", from a chosen interface
+
+    /// <summary>
+    /// What stands in for the system's resolver in a run from a chosen interface: that interface's own DNS servers
+    /// (<see cref="NetIface.DnsServers"/>: its own list on Windows, the system's one list on Linux and macOS), asked in
+    /// turn over UDP from the interface, so a lookup takes the path the checks take. It answers as
+    /// <c>Dns.GetHostAddressesAsync</c> does: the addresses, or a <see cref="SocketException"/> (HostNotFound for a name
+    /// that doesn't exist, NoData for one without addresses, TryAgain when no server answered). An interface whose DNS
+    /// can't be asked through it throws a <see cref="NetIfaceException"/> that says why.
+    /// </summary>
+    public static async Task<IPAddress[]> ResolveFromAsync(NetIface via, string host, CancellationToken ct)
+    {
+        var servers = via.DnsServers.Where(a => via.SourceFor(a) is not null).Select(a => new IPEndPoint(via.Scoped(a), 53)).ToList();
+        if (servers.Count == 0)
+            throw NetIfaceException.From(via, via.DnsIsLocalOnly
+                ? $"this system's DNS is a program on this computer, which can't be asked through {via.Name}"
+                : $"{via.Name} has no DNS servers of its own");
+        foreach (var server in servers)
+        {
+            var ans = await UdpAsync(server, host, 2500, ct, via).ConfigureAwait(false);
+            if (!ans.Answered || ans.Rcode is not (0 or 3)) continue;   // silent, refused, SERVFAIL: the next server
+            if (ans.NoSuchName) throw new SocketException((int)SocketError.HostNotFound);
+            if (ans.Addresses.Count == 0) throw new SocketException((int)SocketError.NoData);
+            return ans.Addresses.ToArray();
+        }
+        throw new SocketException((int)SocketError.TryAgain);
+    }
+
     // ------------------------------------------------------------------ plain UDP
 
     /// <summary>A and AAAA from <paramref name="server"/> over UDP. A lost datagram is sent again once; after the first
     /// reply the socket listens a little longer, because an on-path forger races the real server: two different replies
-    /// to one query prove it (<see cref="DoctorDnsAnswer.Injected"/>).</summary>
-    public static async Task<DoctorDnsAnswer> UdpAsync(IPEndPoint server, string name, int timeoutMs, CancellationToken ct)
+    /// to one query prove it (<see cref="DoctorDnsAnswer.Injected"/>). <paramref name="via"/>: the interface it leaves
+    /// from, for a caller outside the run's own flow (<see cref="DoctorNet.From"/> otherwise).</summary>
+    public static async Task<DoctorDnsAnswer> UdpAsync(IPEndPoint server, string name, int timeoutMs, CancellationToken ct,
+                                                       NetIface? via = null)
     {
         var ans = new DoctorDnsAnswer { Source = server.Port == 53 ? server.Address.ToString() : server.ToString() };
-        var a = UdpQueryAsync(server, name, TypeA, timeoutMs, ct);
-        var aaaa = UdpQueryAsync(server, name, TypeAaaa, timeoutMs, ct);
+        var a = UdpQueryAsync(server, name, TypeA, timeoutMs, via, ct);
+        var aaaa = UdpQueryAsync(server, name, TypeAaaa, timeoutMs, via, ct);
         var r4 = await a.ConfigureAwait(false);
         var r6 = await aaaa.ConfigureAwait(false);
         Merge(ans, r4, r6);
@@ -210,7 +240,8 @@ public static class DoctorDns
         ans.Ms = a.Answered ? a.Ms : b.Answered ? b.Ms : Math.Max(a.Ms, b.Ms);
     }
 
-    private static async Task<Reply> UdpQueryAsync(IPEndPoint server, string name, ushort type, int timeoutMs, CancellationToken ct)
+    private static async Task<Reply> UdpQueryAsync(IPEndPoint server, string name, ushort type, int timeoutMs, NetIface? via,
+                                                   CancellationToken ct)
     {
         var r = new Reply();
         ushort id = (ushort)RandomNumberGenerator.GetInt32(1, 65535);
@@ -218,7 +249,14 @@ public static class DoctorDns
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(timeoutMs);
         var sw = Stopwatch.StartNew();
-        using var s = new Socket(server.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+        Socket created;
+        try { created = DoctorNet.NewSocket(server.AddressFamily, SocketType.Dgram, ProtocolType.Udp, via); }
+        catch (NetIfaceException e)
+        {
+            r.Error = e.Message;   // the chosen interface can't ask this server (no address of its kind): not sent at all
+            return r;
+        }
+        using var s = created;
         var buf = new byte[4096];
         try
         {
@@ -303,10 +341,13 @@ public static class DoctorDns
             PooledConnectionLifetime = TimeSpan.FromSeconds(30),
             MaxResponseHeadersLength = 64,
         };
-        // through a proxy: the Doctor's own tunnel to the resolver's IP (no DNS needed on either side)
+        // through a proxy: the Doctor's own tunnel to the resolver's IP (no DNS needed on either side); from a chosen
+        // interface: a connection tied to it (made here, in the run's flow, so the callback has it whenever it runs)
         if (proxy != null)
             handler.ConnectCallback = async (ctx, token) =>
                 (await proxy.OpenAsync(ctx.DnsEndPoint.Host.Trim('[', ']'), ctx.DnsEndPoint.Port, 6000, token).ConfigureAwait(false)).Stream;
+        else if (DoctorNet.From is { } via)
+            handler.ConnectCallback = DoctorNet.ConnectFrom(via);
         return new HttpClient(handler)
         {
             Timeout = Timeout.InfiniteTimeSpan,   // each query has its own deadline
@@ -493,6 +534,9 @@ public static class DoctorDns
         if (DoctorProxy.Find(ex) is { } proxyFailure) return proxyFailure.Message;   // the proxy said why, in its own words
         for (var e = ex; e != null; e = e.InnerException)
         {
+            // the chosen interface can't be used for it: its own words ("Wi-Fi has no IPv6 address"), not "connection reset",
+            // without the sentence's full stop (this goes into lists and clauses)
+            if (e is NetIfaceException fromInterface) return fromInterface.Message.TrimEnd('.');
             if (e is AuthenticationException) return "TLS failed";
             if (e is SocketException s)
             {

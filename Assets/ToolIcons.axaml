@@ -1,7 +1,7 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <!--
-      One glyph per tool, shared by both shells (desktop tab rail + mobile drawer).
+      One glyph per tool, shared by both shells (desktop tabs and launcher + mobile drawer).
 
       Each is an outline geometry drawn in a 24x24 box and *stroked* rather than filled, so a single
       set reads correctly on any background and its colour can follow the row/tab state. Consumers
@@ -14,6 +14,8 @@
     <StreamGeometry x:Key="IcoScanner">M11 4 A7 7 0 1 0 11 18 A7 7 0 1 0 11 4 Z M16 16 L21 21</StreamGeometry>
     <StreamGeometry x:Key="IcoNetwork">M9.5 3 h5 v4 h-5 Z M2.5 17 h5 v4 h-5 Z M16.5 17 h5 v4 h-5 Z M12 7 v3.5 M5 17 v-2.5 h14 v2.5 M12 10.5 v4</StreamGeometry>
     <StreamGeometry x:Key="IcoDevice">M8 6.5 h8 a1.5 1.5 0 0 1 1.5 1.5 v8 a1.5 1.5 0 0 1 -1.5 1.5 h-8 a1.5 1.5 0 0 1 -1.5 -1.5 v-8 a1.5 1.5 0 0 1 1.5 -1.5 Z M10 10 h4 v4 h-4 Z M10 3.5 V6.5 M14 3.5 V6.5 M10 17.5 V20.5 M14 17.5 V20.5 M3.5 10 H6.5 M3.5 14 H6.5 M17.5 10 H20.5 M17.5 14 H20.5</StreamGeometry>
+    <!-- capture: packets (lines of a table) under a magnifier -->
+    <StreamGeometry x:Key="IcoCapture">M3.5 6 H16.5 M3.5 10.5 H9.5 M3.5 15 H8.5 M3.5 19.5 H11.5 M12 14.5 a3.5 3.5 0 1 0 7 0 a3.5 3.5 0 1 0 -7 0 M18 17 L20.5 19.5</StreamGeometry>
     <StreamGeometry x:Key="IcoProxy">M3 8.5 H17 M14 5.5 L17 8.5 L14 11.5 M21 15.5 H7 M10 12.5 L7 15.5 L10 18.5</StreamGeometry>
     <StreamGeometry x:Key="IcoWebServer">M3.5 4.5 h17 v5 h-17 Z M3.5 14.5 h17 v5 h-17 Z M6.5 7 m-0.8 0 a0.8 0.8 0 1 0 1.6 0 a0.8 0.8 0 1 0 -1.6 0 M6.5 17 m-0.8 0 a0.8 0.8 0 1 0 1.6 0 a0.8 0.8 0 1 0 -1.6 0</StreamGeometry>
     <StreamGeometry x:Key="IcoIpInfo">M12 21 C12 21 18.5 14.4 18.5 10 A6.5 6.5 0 1 0 5.5 10 C5.5 14.4 12 21 12 21 Z M12 12.5 A2.5 2.5 0 1 0 12 7.5 A2.5 2.5 0 1 0 12 12.5</StreamGeometry>
@@ -34,5 +36,8 @@
     <StreamGeometry x:Key="IcoTls">M5.5 11 h13 v9.5 h-13 Z M8.5 11 V7.5 a3.5 3.5 0 0 1 7 0 V11 M12 14.5 v2.5</StreamGeometry>
     <!-- socket tool: a plug -->
     <StreamGeometry x:Key="IcoSocket">M9 3 v4 M15 3 v4 M6.5 7 h11 v4 a5.5 5.5 0 0 1 -11 0 Z M12 16.5 V21</StreamGeometry>
+    <!-- desktop top bar: the launcher (all tools, a grid of four tiles) and a tab's close cross -->
+    <StreamGeometry x:Key="IcoTools">M4.5 4.5 h5.5 v5.5 h-5.5 Z M14 4.5 h5.5 v5.5 h-5.5 Z M4.5 14 h5.5 v5.5 h-5.5 Z M14 14 h5.5 v5.5 h-5.5 Z</StreamGeometry>
+    <StreamGeometry x:Key="IcoClose">M7 7 L17 17 M17 7 L7 17</StreamGeometry>
     <!-- (the light / dark switch's sun / moon is IcoThemeToggle in Styles/Tokens.axaml: a per-theme resource) -->
 </ResourceDictionary>

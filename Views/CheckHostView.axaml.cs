@@ -46,6 +46,13 @@ public partial class CheckHostView : UserControl
     // The picker opened: load check-host.net's node list (once a session) and tick the current choice.
     private void NodesFlyout_Opened(object? sender, EventArgs e) => _ = Vm?.EnsureCatalogAsync();
 
+    // a node's answer (Globalping's HTTP check) in the shared response viewer
+    private void ShowNodeResponse_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: CheckHostNodeRow { Result.Response: { } answer } row } anchor)
+            Controls.ResponseView.ShowFlyout(anchor, new HttpResponseViewModel(answer, row.Location), $"{row.Location} · {row.NodeText}");
+    }
+
     private void SaveText_Click(object? sender, RoutedEventArgs e) => Export("txt");
     private void SaveCsv_Click(object? sender, RoutedEventArgs e) => Export("csv");
     private void SaveJson_Click(object? sender, RoutedEventArgs e) => Export("json");

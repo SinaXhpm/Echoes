@@ -35,7 +35,7 @@ public partial class DnsViewModel
     partial void OnNewResolverTextChanged(string value)
     {
         NewResolverError = "";   // it was about the text before this edit
-        if (_loaded) ProfileService.Instance.SetSetting(ResolverDraftKey, value);
+        if (_loaded) Store.Profile.SetSetting(ResolverDraftKey, value);
     }
 
     /// <summary>Resolvers were added from the box: at the end of the list, where the view scrolls.</summary>

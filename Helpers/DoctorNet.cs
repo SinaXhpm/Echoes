@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -26,8 +27,11 @@ public sealed class DoctorLocal
     public string? SystemProxy { get; set; }
 }
 
-/// <summary>One TCP connect attempt.</summary>
-public sealed record DoctorConnectAttempt(IPAddress Address, int Port, bool Ok, double Ms, string? Error, SocketError? Code);
+/// <summary>One TCP connect attempt. <paramref name="InterfaceFault"/>: it failed for a reason that is the chosen
+/// interface's own (no address of that kind, no route from it, a VPN program's redirect a socket tied to it can't follow),
+/// which says nothing about the target.</summary>
+public sealed record DoctorConnectAttempt(IPAddress Address, int Port, bool Ok, double Ms, string? Error, SocketError? Code,
+                                          bool InterfaceFault = false);
 
 /// <summary>The connection check: which address and port took the connection, and what every attempt got.</summary>
 public sealed class DoctorConnect
@@ -59,6 +63,81 @@ public sealed record DoctorPing(int Sent, int Received, double? Avg, double? Min
 /// <summary>Local network facts, quick TCP connects and ping for the Doctor.</summary>
 public static class DoctorNet
 {
+    // ------------------------------------------------------------------ the interface a run leaves from
+
+    // The tab's Interface choice for the run in progress (DoctorOptions.Interface), set once at its start
+    // (DoctorEngine.RunAsync): everything the run awaits sees it, so every probe's socket is tied to that interface and
+    // the checks say what its path does. Null: the system's routing table decides, as it always did. An HTTP handler's
+    // connection callback may run outside the run's flow, so the handlers capture it when they are made.
+    private static readonly AsyncLocal<NetIface?> s_from = new();
+
+    /// <summary>The interface the run in progress sends from; null = wherever the routing table points.</summary>
+    public static NetIface? From => s_from.Value;
+
+    /// <summary>Sets <see cref="From"/> for the rest of the calling run (an async method's setting ends with it).</summary>
+    internal static void SendFrom(NetIface? via) => s_from.Value = via;
+
+    /// <summary>A socket for one of the run's probes, tied to <paramref name="via"/> (<see cref="From"/> when null). It
+    /// throws a <see cref="NetIfaceException"/> saying why when it can't be tied: a probe never goes out another way.</summary>
+    public static Socket NewSocket(AddressFamily family, SocketType type, ProtocolType protocol, NetIface? via = null)
+    {
+        via ??= From;
+        var s = new Socket(family, type, protocol);
+        if (via is null || via.TryBind(s, out string? note)) return s;
+        s.Dispose();
+        throw NetIfaceException.From(via, note ?? $"can't send through {via.Name}");
+    }
+
+    /// <summary><see cref="Routes"/> for a chosen interface: the kinds of address it has (a link-local IPv6 address
+    /// reaches its own link only).</summary>
+    public static (bool V4, bool V6) RoutesOf(NetIface via) => (via.V4 is not null, via.V6 is not null);
+
+    /// <summary>An HTTP handler's connections made from <paramref name="via"/>: a name is looked up with the interface's
+    /// own DNS servers (<see cref="DoctorDns.ResolveFromAsync"/>), and its addresses are tried in turn.</summary>
+    public static Func<SocketsHttpConnectionContext, CancellationToken, ValueTask<Stream>> ConnectFrom(NetIface via)
+        => async (ctx, token) =>
+        {
+            string host = ctx.DnsEndPoint.Host.Trim('[', ']');
+            var addrs = IPAddress.TryParse(host, out var literal) ? new[] { literal }
+                : await DoctorDns.ResolveFromAsync(via, host, token).ConfigureAwait(false);
+            Exception? last = null;
+            foreach (var a in DoctorIp.Ordered(addrs))
+            {
+                if (via.Missing(a) is { } missing)
+                {
+                    last ??= NetIfaceException.From(via, missing);
+                    continue;
+                }
+                var s = NewSocket(a.AddressFamily, SocketType.Stream, ProtocolType.Tcp, via);
+                try
+                {
+                    s.NoDelay = true;
+                    await s.ConnectAsync(new IPEndPoint(a, ctx.DnsEndPoint.Port), token).ConfigureAwait(false);
+                    return new NetworkStream(s, ownsSocket: true);
+                }
+                catch (SocketException e)
+                {
+                    s.Dispose();
+                    last = via.ConnectProblem(e.SocketErrorCode, host) is { } why ? NetIfaceException.From(via, why, e) : e;
+                }
+                catch
+                {
+                    s.Dispose();
+                    throw;
+                }
+            }
+            throw last ?? new SocketException((int)SocketError.HostNotFound);
+        };
+
+    /// <summary><see cref="Local"/> for a chosen interface: its own name, gateway and kind, not the system's first.</summary>
+    public static DoctorLocal LocalOf(NetIface via) => new()
+    {
+        HasNetwork = via.V4 is not null || via.V6 is not null,
+        Interface = via.Name,
+        Gateway = via.Gateway4?.ToString(),
+        Vpn = IsVpn(via.Name, via.Description, NetworkInterfaceType.Unknown) ? via.Name : null,
+    };
+
     // ------------------------------------------------------------------ this device
 
     /// <summary>Whether the system has a route to the internet over IPv4 and over IPv6. A UDP socket "connected" to a
@@ -149,16 +228,18 @@ public static class DoctorNet
     private static readonly string[] VpnWords =
         { "tap-windows", "wintun", "wireguard", "openvpn", "tailscale", "zerotier", "vpn", "warp", "tun", "v2ray", "clash", "sing-box", "hiddify" };
 
-    private static bool IsVpn(NetworkInterface n)
+    private static bool IsVpn(NetworkInterface n) => IsVpn(n.Name, n.Description, n.NetworkInterfaceType);
+
+    private static bool IsVpn(string interfaceName, string description, NetworkInterfaceType type)
     {
-        string name = n.Name.ToLowerInvariant(), desc = n.Description.ToLowerInvariant();
+        string name = interfaceName.ToLowerInvariant(), desc = description.ToLowerInvariant();
         if (desc.Contains("teredo") || desc.Contains("isatap") || desc.Contains("6to4") || name.Contains("teredo")) return false;
-        if (n.NetworkInterfaceType is NetworkInterfaceType.Ppp) return true;
+        if (type is NetworkInterfaceType.Ppp) return true;
         if (name.StartsWith("tun") || name.StartsWith("wg") || name.StartsWith("utun") || name.StartsWith("ppp")
             || name.StartsWith("tap") || name.StartsWith("ipsec")) return true;
         foreach (var w in VpnWords)
             if (desc.Contains(w) || (w.Length > 3 && name.Contains(w))) return true;
-        return n.NetworkInterfaceType == NetworkInterfaceType.Tunnel;
+        return type == NetworkInterfaceType.Tunnel;
     }
 
     /// <summary>The system proxy for web traffic, or null. Reading it can mean a WPAD lookup, so it gets a short budget.</summary>
@@ -187,9 +268,10 @@ public static class DoctorNet
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(timeoutMs);
         var sw = Stopwatch.StartNew();
-        using var s = new Socket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
         try
         {
+            using var s = NewSocket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            s.NoDelay = true;
             await s.ConnectAsync(new IPEndPoint(addr, port), cts.Token).ConfigureAwait(false);
             return new DoctorConnectAttempt(addr, port, true, sw.Elapsed.TotalMilliseconds, null, null);
         }
@@ -200,7 +282,14 @@ public static class DoctorNet
         catch (OperationCanceledException) { throw; }
         catch (SocketException e)
         {
-            return new DoctorConnectAttempt(addr, port, false, sw.Elapsed.TotalMilliseconds, DoctorDns.Short(e), e.SocketErrorCode);
+            // from a chosen interface, an error that is the interface's (no route from it, a VPN driver's redirect) says so
+            string? fault = From?.ConnectProblem(e.SocketErrorCode, addr.ToString());
+            return new DoctorConnectAttempt(addr, port, false, sw.Elapsed.TotalMilliseconds, fault ?? DoctorDns.Short(e), e.SocketErrorCode,
+                                            InterfaceFault: fault != null);
+        }
+        catch (NetIfaceException e)
+        {
+            return new DoctorConnectAttempt(addr, port, false, sw.Elapsed.TotalMilliseconds, DoctorDns.Short(e), null, InterfaceFault: true);
         }
         catch (Exception e)
         {
@@ -250,8 +339,10 @@ public static class DoctorNet
         for (int i = 0; i < count; i++)
         {
             if (i > 0) await Task.Delay(200, ct).ConfigureAwait(false);
-            var r = await IcmpPinger.SendAsync(addr, 1200, ct).ConfigureAwait(false);
+            var r = await IcmpPinger.SendAsync(addr, 1200, ct, via: From).ConfigureAwait(false);
             if (r.PermissionDenied) return new DoctorPing(sent, 0, null, null, null, true, false, r.Error, replies);
+            // the chosen interface can't send it (no address of that kind, gone): no probe left, and it says why
+            if (r.NotSent) return new DoctorPing(sent, 0, null, null, null, false, false, r.Error, replies);
             sent++;
             udp |= r.Method == PingMethod.Udp;
             if (r.Success) rtts.Add(Math.Max(r.RoundtripMs, 0));
@@ -282,6 +373,7 @@ public static class DoctorNet
             AllowAutoRedirect = false,
             ConnectTimeout = TimeSpan.FromMilliseconds(timeoutMs),
         };
+        if (From is { } via) handler.ConnectCallback = ConnectFrom(via);
         using var http = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };   // each check has its own deadline
         var caught = new ConcurrentQueue<string>();
         var sources = checks.Select(c => new Fallback.Source<string>(c.Url.Host, async token =>

@@ -53,6 +53,23 @@ public partial class MainViewModel : ObservableObject
     // Held here (still created on the first visit) so its debounced proxy-settings save is flushed on exit / backgrounding.
     public DoctorViewModel DoctorVM => _doctorVM ??= new();
 
+    /// <summary>A tool's main view-model (the one its first tab and the phone show), by nav tag; null for the tools whose
+    /// view makes its own (TLS, Socket, Telegram Bot, Speed Test, Device).</summary>
+    public object? MainTool(string tag) => tag switch
+    {
+        "PING" => PingVM, "DOCTOR" => DoctorVM, "DNS" => DnsVM, "CURL" => CurlVM, "IP INFO" => IpInfoVM,
+        "CHECK-HOST" => CheckHostVM, "CLOUDFLARE" => CloudflareVM, "SCANNER" => PortScannerVM,
+        "WEB SERVER" => WebServerVM, "PROXY" => ProxyVM, "NETWORK" => NetworkVM, "MONITOR" => MonitorVM,
+        "SSH" => SshVM, "STRING LAB" => StringTool, "NOTES" => NoteVM, "HISTORY" => HistoryVM, "BACKUP" => BackupVM,
+        _ => null,
+    };
+
+    // The view-models of a tool's further tabs (a second Ping, a third SSH session): the desktop shell adds and removes
+    // them, and the exit flush reaches them. UI thread.
+    private readonly System.Collections.Generic.List<object> _tabTools = new();
+    public void TrackTool(object tool) { if (!_tabTools.Contains(tool)) _tabTools.Add(tool); }
+    public void UntrackTool(object tool) => _tabTools.Remove(tool);
+
     // Flush debounced persistence + release the file-share listening socket on shutdown.
     public void FlushOnExit()
     {
@@ -78,6 +95,9 @@ public partial class MainViewModel : ObservableObject
         try { _doctorVM?.FlushPendingSave(); } catch (Exception ex) { CrashLog.Write("Flush.Doctor", ex); }
         try { _stringTool?.FlushPendingSave(); } catch (Exception ex) { CrashLog.Write("Flush.StringLab", ex); }
         try { TgViewModel.FlushAll(); } catch (Exception ex) { CrashLog.Write("Flush.Telegram", ex); }
+        foreach (var tool in _tabTools.ToArray())   // the further tabs' own settings (ToolStore)
+            if (tool is IPendingSave pending)
+                try { pending.FlushPendingSave(); } catch (Exception ex) { CrashLog.Write("Flush.Tab", ex); }
         // LAST: the flushes above only hand their values to the profile, which writes behind — put it on disk now.
         try { ProfileService.Instance.Flush(); } catch (Exception ex) { CrashLog.Write("Flush.Profile", ex); }
     }
@@ -119,7 +139,7 @@ public partial class MainViewModel : ObservableObject
     // The request and the JSON parse run on the thread pool, not on the UI thread the shell's Loaded calls this from at
     // startup: starting the request there looked up the system proxy on it (a WPAD discovery can take seconds, see
     // HttpHelper), and an answer of any size used to be read and parsed there whole (it's capped now). Only the results
-    // are set back here. A failure (offline, GitHub blocked, rate limited) shows only in the About box (the sidebar stays
+    // are set back here. A failure (offline, GitHub blocked, rate limited) shows only in the About box (the top bar stays
     // quiet) and is written to the crash log. Runs at startup and from the About box; a second call while one runs is a no-op.
     public async Task CheckForUpdatesAsync()
     {
@@ -247,7 +267,7 @@ public partial class MainViewModel : ObservableObject
             ? new LatestRelease(version, page) : null;
     }
 
-    // "v1.0.1" → "1.0.1", null when empty. Shown in the sidebar pill only when it parses as a version anyway; capped and
+    // "v1.0.1" → "1.0.1", null when empty. Shown in the update pill only when it parses as a version anyway; capped and
     // cleaned, as it is the server's text.
     private static string? CleanTag(string tag)
     {
@@ -265,7 +285,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void OpenGitHub() => OpenUrl("https://github.com/SinaXhpm/Echoes");
 
-    // Light / dark, live (sidebar footer on desktop, the drawer on phones).
+    // Light / dark, live (the top bar on desktop, the drawer on phones).
     [RelayCommand]
     private void ToggleTheme() => Helpers.ThemeService.Toggle();
 

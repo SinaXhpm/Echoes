@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -73,8 +74,29 @@ public sealed class CurlRecentItem : CurlToneItem
 
 public partial class CurlViewModel
 {
-    public ObservableCollection<CurlSavedItem> SavedRequests { get; } = new();
-    public ObservableCollection<CurlRecentItem> RecentRequests { get; } = new();
+    // One library for every cURL tab (the tool may be open in several, see ToolStore): each shows the same Saved and History
+    // lists and writes them to the same profile keys, so one tab's save never overwrites another's. Everything else a tab
+    // holds (the request being edited, which saved request is open) is its own. UI thread.
+    private static readonly ObservableCollection<CurlSavedItem> s_saved = new();
+    private static readonly ObservableCollection<CurlRecentItem> s_recent = new();
+    public ObservableCollection<CurlSavedItem> SavedRequests => s_saved;
+    public ObservableCollection<CurlRecentItem> RecentRequests => s_recent;
+
+    // another tab changed a list: the counts and empty states here follow
+    private void OnLibraryChanged(object? sender, NotifyCollectionChangedEventArgs e) => LibraryCountsChanged();
+
+    /// <summary>The tab was closed: the shared lists stop calling it (and keeping it alive).</summary>
+    internal void DetachLibrary()
+    {
+        s_saved.CollectionChanged -= OnLibraryChanged;
+        s_recent.CollectionChanged -= OnLibraryChanged;
+    }
+
+    /// <summary>The tab is shown again: another tab may have marked a different saved request as the open one.</summary>
+    internal void MarkCurrentSaved()
+    {
+        foreach (var s in SavedRequests) s.IsCurrent = s.Id == _currentSavedId;
+    }
 
     /// <summary>0 Saved · 1 History.</summary>
     [ObservableProperty] private int _libraryIndex;
@@ -288,11 +310,16 @@ public partial class CurlViewModel
 
     private const string SavedKey = "curl.saved";
     private const string RecentKey = "curl.recent";
-    private readonly object _libraryGate = new();
-    private string? _pendingSaved, _pendingRecent;
+    private static readonly object s_libraryGate = new();
+    private static string? s_pendingSaved, s_pendingRecent;
+    private static bool s_loadStarted;
 
     private void LoadLibrary()
     {
+        s_saved.CollectionChanged += OnLibraryChanged;
+        s_recent.CollectionChanged += OnLibraryChanged;
+        if (s_loadStarted) return;   // the first cURL tab loads the shared lists; the others show them
+        s_loadStarted = true;
         _ = Task.Run(() =>
         {
             List<CurlSavedItem> saved = new();
@@ -346,26 +373,26 @@ public partial class CurlViewModel
                 foreach (var s in saved) SavedRequests.Add(s);
                 // the session's own sends (made before the load finished) stay first
                 foreach (var r in recent.Take(MaxRecent - RecentRequests.Count)) RecentRequests.Add(r);
-                _savedLocked = locked;
-                _libraryLoaded = true;
+                s_savedLocked = locked;
+                s_libraryLoaded = true;
                 LibraryCountsChanged();
                 // anything saved / sent meanwhile is written now — together with what was loaded, never instead of it
-                if (_savedDirty) PersistSaved();
-                if (_recentDirty) PersistRecent();
+                if (s_savedDirty) PersistSaved();
+                if (s_recentDirty) PersistRecent();
             });
         });
     }
 
-    private bool _libraryLoaded, _savedDirty, _recentDirty;
+    private static bool s_libraryLoaded, s_savedDirty, s_recentDirty;
     // The saved list on disk couldn't be opened this run (no readable key file, see LoadLibrary): this session's saves
     // stay in memory, and the stored list is never replaced by them. UI thread.
-    private bool _savedLocked;
+    private static bool s_savedLocked;
 
     private void PersistSaved()
     {
-        if (!_libraryLoaded) { _savedDirty = true; return; }
-        _savedDirty = false;
-        if (_savedLocked)
+        if (!s_libraryLoaded) { s_savedDirty = true; return; }
+        s_savedDirty = false;
+        if (s_savedLocked)
         {
             ShowNote("Changes to Saved last for this session only: the requests saved before can't be unlocked right now "
                      + "(Echoes couldn't read its key file), so they are left as they are. Restart Echoes to try again.", isError: true);
@@ -391,14 +418,14 @@ public partial class CurlViewModel
             w.WriteEndObject();
         }
         string json = Encoding.UTF8.GetString(ms.ToArray());
-        lock (_libraryGate) _pendingSaved = json;
+        lock (s_libraryGate) s_pendingSaved = json;
         _ = Task.Run(WriteLibrary);
     }
 
     private void PersistRecent()
     {
-        if (!_libraryLoaded) { _recentDirty = true; return; }
-        _recentDirty = false;
+        if (!s_libraryLoaded) { s_recentDirty = true; return; }
+        s_recentDirty = false;
         using var ms = new MemoryStream();
         using (var w = new Utf8JsonWriter(ms))
         {
@@ -416,25 +443,25 @@ public partial class CurlViewModel
             w.WriteEndArray();
         }
         string json = Encoding.UTF8.GetString(ms.ToArray());
-        lock (_libraryGate) _pendingRecent = json;
+        lock (s_libraryGate) s_pendingRecent = json;
         _ = Task.Run(WriteLibrary);
     }
 
-    private void WriteLibrary()
+    private static void WriteLibrary()
     {
-        lock (_libraryGate)
+        lock (s_libraryGate)
         {
             try
             {
-                if (_pendingSaved is { } saved)
+                if (s_pendingSaved is { } saved)
                 {
                     ProfileService.Instance.SetSetting(SavedKey, saved.Length == 0 || saved.Contains("\"items\":[]") ? string.Empty : SecretProtector.Protect(saved));
-                    _pendingSaved = null;
+                    s_pendingSaved = null;
                 }
-                if (_pendingRecent is { } recent)
+                if (s_pendingRecent is { } recent)
                 {
                     ProfileService.Instance.SetSetting(RecentKey, recent == "[]" ? string.Empty : recent);
-                    _pendingRecent = null;
+                    s_pendingRecent = null;
                 }
             }
             catch (Exception ex) { CrashLog.Write("Curl.WriteLibrary", ex); }

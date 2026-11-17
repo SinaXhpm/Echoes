@@ -36,14 +36,41 @@ public static class ScanText
 
     public static string Status(HostStatus s) => s switch { HostStatus.Up => "up", HostStatus.Down => "down", _ => "unknown" };
 
+    /// <summary>A probe (or host check) the scan's own interface couldn't send: its reason is one of ScanSocket's
+    /// "iface-…" names.</summary>
+    public static bool IsIfaceReason(string? reason) => reason is ScanSocket.IfaceUnusable or ScanSocket.IfaceRedirected;
+
+    /// <summary>
+    /// Why some probes of a pass are undetermined, as one sentence: the scan's interface couldn't send them (a VPN /
+    /// proxy program redirected them away, or the interface was unusable), or the OS ran out of sockets.
+    /// <paramref name="count"/>: "12 probe(s) and 3 host check(s)".
+    /// </summary>
+    public static string UnknownNote(ScanPass pass, string count)
+    {
+        if (pass.Options.Via is { } via)
+        {
+            bool Has(string reason) => pass.Targets.Any(h => h.Status == HostStatus.Unknown && h.Reason == reason)
+                                       || pass.Findings.Any(f => f.State == PortState.Unknown && f.Reason == reason);
+            if (Has(ScanSocket.IfaceRedirected))
+                return $"{count} couldn't be sent from {via.Name}: Windows can't connect from it while a VPN or proxy program redirects "
+                       + "this computer's connections, so their state is unknown. Turn that program off, or scan over the default route.";
+            if (Has(ScanSocket.IfaceUnusable))
+                return $"{count} couldn't be sent from {via.Name} (it is down, or has no address or route for those targets), "
+                       + "so their state is unknown.";
+        }
+        return $"The OS ran out of sockets: {count} couldn't be sent, so their state is unknown — try a slower timing template.";
+    }
+
     /// <summary>"0.4 ms", "12 ms", "1.2 s"; "" when there's no measurement.</summary>
     public static string Latency(double ms) => ms <= 0 ? "" : ms < 10 ? $"{ms:0.0} ms" : ms < 1000 ? $"{ms:0} ms" : $"{ms / 1000:0.0} s";
 }
 
-/// <summary>Every setting a scan reads, captured once at Start — the workers never touch bound properties.</summary>
+/// <summary>Every setting a scan reads, captured once at Start — the workers never touch bound properties.
+/// <paramref name="Via"/>: the interface every probe leaves from (nmap's -e); null = wherever the routing table
+/// points. A probe that can't leave from it is undetermined ("iface-unusable"), never filtered or down.</summary>
 public sealed record ScanOptions(
     bool Tcp, bool Udp, bool ServiceDetection, bool PingOnly, bool SkipDiscovery,
-    int TimeoutMs, int Concurrency, TimingTemplate Timing);
+    int TimeoutMs, int Concurrency, TimingTemplate Timing, NetIface? Via = null);
 
 /// <summary>A scan target: its address, the name it was typed as (if any), and what a pass learned about it.</summary>
 public sealed class ScanHost

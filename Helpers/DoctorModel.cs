@@ -62,6 +62,10 @@ public interface IDoctorSink
     /// <summary>A line for the run log only (what a row would be too long for: every header sent, every probe), already
     /// free of secrets. Default: ignored.</summary>
     void Log(DoctorCheck check, string text) { }
+
+    /// <summary>The answer an HTTP check got (its status line, its headers with secrets masked, the start of its body),
+    /// for the response viewer. Never in the log or the report. Default: ignored.</summary>
+    void Response(DoctorCheck check, HttpResponseSnapshot response) { }
 }
 
 /// <summary>The one-sentence answer: what is wrong (or that nothing is), and what to do about it.</summary>
@@ -247,9 +251,10 @@ public sealed record DoctorCaptiveCheck(Uri Url, string? Expect = null);
 
 /// <summary>
 /// Where the Doctor's checks go. <see cref="Default"/> is the real world; the test harness builds its own (loopback
-/// servers, a fake resolver). Nothing here is a user setting: the Doctor has none.
+/// servers, a fake resolver). Nothing here is a user setting; a run from a chosen interface makes a copy with that
+/// interface's resolver and routes (<c>with</c>, in DoctorEngine.RunAsync).
 /// </summary>
-internal sealed class DoctorEnvironment
+internal sealed record DoctorEnvironment
 {
     public static DoctorEnvironment Default { get; } = new();
 

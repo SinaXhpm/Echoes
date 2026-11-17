@@ -151,7 +151,10 @@ public static class SocketErrors
         if (Has("frame size") || Has("corrupted frame") || Has("wrong version number") || Has("unknown protocol")
             || Has("packet length too long") || Has("record layer failure") || Has("http request") || Has("not a TLS")
             || Has("invalid record") || Has("SEC_E_INVALID_TOKEN") || Has("message received was unexpected or badly formatted"))
-            return $"{target} isn't speaking TLS on this port (it answered with something else — plain text, or another protocol).";
+            // Not always the server's doing: a filtering network answers TLS to blocked resolvers and sites in their place
+            // (seen on a phone, 2026-11-16: DoT to 1.1.1.1 / 8.8.8.8 got non-TLS bytes back at once). ("isn't speaking TLS"
+            // is what DoctorTls and TlsInspector look for in this sentence.)
+            return $"{target} isn't speaking TLS on this port: what came back was something else (another service, or a filter on the network answering in its place).";
 
         if (Has("unexpected EOF") || Has("0 bytes from the transport") || Has("unexpected eof") || Has("connection closed"))
             return $"{target} closed the connection during the TLS handshake (it may not speak TLS here, or it rejected this client's TLS versions / ciphers).";

@@ -65,6 +65,9 @@ public sealed partial class SocketEntry : ObservableObject
 
     /// <summary>SHA-256 of a rejected TLS certificate: the entry offers "Connect anyway".</summary>
     public string? CertSha256 { get; init; }
+    /// <summary>A refused WebSocket handshake's answer: the entry offers to show it.</summary>
+    public HttpResponseSnapshot? Response { get; init; }
+    public bool HasResponse => Response != null;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasAction))] private bool _actionUsed;
     public bool HasAction => CertSha256 != null && !ActionUsed;
 
@@ -159,6 +162,7 @@ public sealed partial class SocketPeerRow : ObservableObject
 /// </summary>
 public partial class SocketViewModel : ObservableObject
 {
+    private readonly ToolStore Store = ToolStore.Current;   // this instance's settings: its own copy when it is one of several tabs (ToolStore)
     private const string KMode = "socket.mode", KPort = "socket.port", KListenPort = "socket.listenPort",
         KBind = "socket.bind", KTls = "socket.tls", KHex = "socket.hex", KEol = "socket.eol", KView = "socket.view";
     private const string HTarget = "socket.target";
@@ -183,7 +187,7 @@ public partial class SocketViewModel : ObservableObject
     [ObservableProperty] private string _listenPort = "9000";
     [ObservableProperty] private BindOption? _selectedBind;
     public ObservableCollection<BindOption> BindOptions { get; } = new();
-    public ObservableCollection<string> TargetHistory => HistoryService.Instance.Get(HTarget);
+    public ObservableCollection<string> TargetHistory => Store.History.Get(HTarget);
 
     // ---------------- session ----------------
     [ObservableProperty] private SocketState _state;
@@ -228,7 +232,7 @@ public partial class SocketViewModel : ObservableObject
     public SocketViewModel()
     {
         _restoring = true;
-        var p = ProfileService.Instance;
+        var p = Store.Profile;
         ModeIndex = Math.Clamp(p.GetInt(KMode, 0), 0, 4);
         UseTls = p.GetBool(KTls);
         InputIsHex = p.GetBool(KHex);
@@ -238,7 +242,7 @@ public partial class SocketViewModel : ObservableObject
         ViewIndex = Math.Clamp(p.GetInt(KView, 0), 0, 2);
         ListenPort = p.GetSetting(KListenPort) is { Length: > 0 } lp ? lp : "9000";
         Port = p.GetSetting(KPort) ?? string.Empty;
-        if (HistoryService.Instance.Last(HTarget) is { } last && SplitTarget(last, out var h, out int pt))
+        if (Store.History.Last(HTarget) is { } last && SplitTarget(last, out var h, out int pt))
         {
             Host = h;
             if (pt > 0) Port = pt.ToString(CultureInfo.InvariantCulture);
@@ -323,9 +327,9 @@ public partial class SocketViewModel : ObservableObject
             Dispatcher.UIThread.Post(() => { if (State != SocketState.Idle) ModeIndex = _sessionMode; });
             return;
         }
-        ProfileService.Instance.SetSetting(KMode, value.ToString(CultureInfo.InvariantCulture));
+        Store.Profile.SetSetting(KMode, value.ToString(CultureInfo.InvariantCulture));
         InputError = null;
-        if (IsServerMode) RebuildBindOptions(ProfileService.Instance.GetSetting(KBind));
+        if (IsServerMode) RebuildBindOptions(Store.Profile.GetSetting(KBind));
         ResetPeers();
         UpdateIdleStatus();
     }
@@ -357,18 +361,19 @@ public partial class SocketViewModel : ObservableObject
     }
 
     public string InputPlaceholder => InputIsHex
-        ? IsWsMode ? "Hex, e.g. 48 65 6c 6c 6f" : "Hex, e.g. 48 65 6c 6c 6f 0d 0a"
+        ? AppPlatform.IsMobile ? "Hex: 48 65 6c 6c 6f"   // a phone's box is short
+        : IsWsMode ? "Hex, e.g. 48 65 6c 6c 6f" : "Hex, e.g. 48 65 6c 6c 6f 0d 0a"
         : InputIsJson && IsWsMode ? "JSON, e.g. {\"type\":\"ping\"}"
         : AppPlatform.IsMobile ? "Message" : "Message (Enter sends)";
 
-    partial void OnUseTlsChanged(bool value) { if (!_restoring) ProfileService.Instance.SetBool(KTls, value); }
+    partial void OnUseTlsChanged(bool value) { if (!_restoring) Store.Profile.SetBool(KTls, value); }
 
     partial void OnInputIsHexChanged(bool value)
     {
         OnPropertyChanged(nameof(InputModeIndex));
         OnPropertyChanged(nameof(InputPlaceholder));
         OnPropertyChanged(nameof(ShowLineEnding));
-        if (!_restoring) ProfileService.Instance.SetBool(KHex, value);
+        if (!_restoring) Store.Profile.SetBool(KHex, value);
         InputError = null;
     }
 
@@ -377,23 +382,23 @@ public partial class SocketViewModel : ObservableObject
         OnPropertyChanged(nameof(InputModeIndex));
         OnPropertyChanged(nameof(InputPlaceholder));
         OnPropertyChanged(nameof(ShowJsonFormat));
-        if (!_restoring) ProfileService.Instance.SetBool(KJson, value);
+        if (!_restoring) Store.Profile.SetBool(KJson, value);
         InputError = null;
     }
-    partial void OnLineEndingIndexChanged(int value) { if (!_restoring) ProfileService.Instance.SetSetting(KEol, value.ToString(CultureInfo.InvariantCulture)); }
+    partial void OnLineEndingIndexChanged(int value) { if (!_restoring) Store.Profile.SetSetting(KEol, value.ToString(CultureInfo.InvariantCulture)); }
     partial void OnInputChanged(string value) { if (InputError != null) InputError = null; }
 
     partial void OnViewIndexChanged(int value)
     {
         OnPropertyChanged(nameof(IsHexView));
         OnPropertyChanged(nameof(IsBothView));
-        if (!_restoring) ProfileService.Instance.SetSetting(KView, value.ToString(CultureInfo.InvariantCulture));
+        if (!_restoring) Store.Profile.SetSetting(KView, value.ToString(CultureInfo.InvariantCulture));
     }
 
     partial void OnSelectedBindChanged(BindOption? value)
     {
         if (_restoring || _rebuildingBinds || value is null) return;
-        ProfileService.Instance.SetSetting(KBind, value.Kind == "iface" ? value.Address.ToString() : value.Kind);
+        Store.Profile.SetSetting(KBind, value.Kind == "iface" ? value.Address.ToString() : value.Kind);
     }
 
     private void UpdateIdleStatus()
@@ -512,8 +517,8 @@ public partial class SocketViewModel : ObservableObject
                     AddNote(SocketEntryKind.Info, $"Ready — datagrams go to udp {SocketNet.Label(u.Remote)} from local port {u.Local.Port}; replies show up here.");
                     u.Start();
                 }
-                HistoryService.Instance.Add(HTarget, target);
-                ProfileService.Instance.SetSetting(KPort, port.ToString(CultureInfo.InvariantCulture));
+                Store.History.Add(HTarget, target);
+                Store.Profile.SetSetting(KPort, port.ToString(CultureInfo.InvariantCulture));
                 SessionStarted();
             }
             catch (SocketFailure f) when (f.CertSha256 != null)
@@ -570,7 +575,7 @@ public partial class SocketViewModel : ObservableObject
                 AddNote(SocketEntryKind.Info, $"Listening on udp {where} — try: nc -u {example} {lport}");
                 srv.Start();
             }
-            ProfileService.Instance.SetSetting(KListenPort, lport.ToString(CultureInfo.InvariantCulture));
+            Store.Profile.SetSetting(KListenPort, lport.ToString(CultureInfo.InvariantCulture));
             ResetPeers();
             SessionStarted();
             UpdateServerStatus();

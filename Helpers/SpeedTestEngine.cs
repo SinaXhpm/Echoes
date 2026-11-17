@@ -38,6 +38,10 @@ public sealed record SpeedTestOptions
     /// TCP window), 1..16.</summary>
     public int Connections { get; init; } = DefaultConnections;
 
+    /// <summary>The interface every connection of the test is made from (the tab's Interface choice); null = wherever
+    /// the routing table points. A test that can't leave from it fails with the reason and tries no other server.</summary>
+    public NetIface? Via { get; init; }
+
     public int DownloadStreams => Math.Clamp(Connections, MinConnections, MaxConnections);
     public int UploadStreams => UploadStreamsFor(Connections);
 
@@ -191,6 +195,8 @@ public sealed class SpeedTestEngine
     private SpeedTestServer? _fromHeaders;
     private double _halfRttMs;   // half the idle latency: how long an upload's acknowledgement travels back
     private long _maxUpload;     // shrinks when the server refuses a body that large
+    // (the connect callback of the test's clients: one, so a family the network drops is waited for once per test)
+    private Func<SocketsHttpConnectionContext, CancellationToken, ValueTask<Stream>>? _connect;
 
     public SpeedTestEngine(SpeedTestDestination destination, SpeedTestOptions? options = null)
     {
@@ -385,8 +391,11 @@ public sealed class SpeedTestEngine
             UseProxy = false,            // the link itself is measured, never a proxy's
         };
         // the listed servers are services the tab is built on: a resolver that blocks one's name doesn't end the test. Not
-        // the user's own, which may be a name only the local network knows (a NAS), with a private address.
-        if (!Destination.Saved) handler.ConnectCallback = ServiceDns.ConnectAsync;
+        // the user's own, which may be a name only the local network knows (a NAS), with a private address. The addresses
+        // go in the system's order, not IPv4 first as for the app's services: the test measures the path the device's
+        // own traffic takes (IPv6 on most dual-stack networks). The test's clients share one callback.
+        if (Options.Via is not null || !Destination.Saved)
+            handler.ConnectCallback = _connect ??= ServiceDns.ConnectMeasured(Options.Via, serviceDns: !Destination.Saved);
         var client = new HttpClient(Options.WrapHandler?.Invoke(handler) ?? handler, disposeHandler: true)
         {
             Timeout = Timeout.InfiniteTimeSpan,   // every request has its own deadline / the phase's token
@@ -943,13 +952,21 @@ public sealed class SpeedTestEngine
     private SpeedTestException Explain(Exception ex, string during, CancellationToken ct)
     {
         var e = Sentence(ex, during, ct);
-        if (during is "connect" or "latency" || Refused(ex)) e.ServerSide = true;
+        // (the chosen interface's doing is neither: another server would be asked from the same interface)
+        if ((during is "connect" or "latency" || Refused(ex)) && !FromInterface(ex)) e.ServerSide = true;
         return e;
 
         static bool Refused(Exception? x)
         {
             for (; x is not null; x = x.InnerException)
                 if (x is SpeedTestHttpException) return true;
+            return false;
+        }
+
+        static bool FromInterface(Exception? x)
+        {
+            for (; x is not null; x = x.InnerException)
+                if (x is NetIfaceException) return true;
             return false;
         }
     }
@@ -965,6 +982,8 @@ public sealed class SpeedTestEngine
             {
                 case SpeedTestException inner:
                     return new(inner.Message, ex);
+                case NetIfaceException chosen:   // the interface picked for the test can't be used: its own sentence
+                    return new(chosen.Message, ex);
                 case SpeedTestHttpException hs when hs.Status == HttpStatusCode.TooManyRequests:
                     return new(_p?.RateLimitMessage ?? $"{name} is limiting tests from this address (HTTP 429): try again in a minute, or pick another server.", ex);
                 case SpeedTestHttpException hs when hs.Status == HttpStatusCode.ServiceUnavailable:

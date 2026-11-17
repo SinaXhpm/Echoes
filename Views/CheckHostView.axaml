@@ -20,6 +20,7 @@
         <!-- the panel under an expanded node: everything it reported, as selectable text (built only when opened) -->
         <DataTemplate x:Key="ChNodeDetails" x:DataType="vm:CheckHostNodeRow">
             <Border Classes="detail">
+                <StackPanel>
                 <ItemsControl ItemsSource="{Binding Details}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:CheckHostDetail">
@@ -32,6 +33,11 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <!-- the answer this node got (Globalping's HTTP check), in the shared response viewer -->
+                <Button Classes="link" HorizontalAlignment="Left" Margin="-4,0,0,6" IsVisible="{Binding HasResponse}"
+                        Content="Show the response" Click="ShowNodeResponse_Click"
+                        ToolTip.Tip="What this node got back: the status, the headers and the first 10 KB of the body"/>
+                </StackPanel>
             </Border>
         </DataTemplate>
     </UserControl.Resources>

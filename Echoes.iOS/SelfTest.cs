@@ -113,6 +113,40 @@ internal static class SelfTest
             return $"192.0.2.1 silent ({s.Error}), loopback {l.RoundtripMs} ms, TTL {l.Ttl}";
         });
 
+        // Choosing the interface a probe leaves from (the pickers of Ping, DNS and the scanner): the list the pickers
+        // show, then a datagram and a ping through the loopback interface, which every device has (IP_BOUND_IF, by the
+        // interface's index).
+        await Check("interfaces listed", _ =>
+        {
+            var all = NetIfaces.Up(withLoopback: true);
+            if (all.Count == 0) throw new InvalidOperationException("no interface is listed: the pickers would be empty");
+            if (all.FirstOrDefault(i => i.Index <= 0) is { } unindexed) throw new InvalidOperationException($"{unindexed.Name} has no interface index");
+            return Task.FromResult(string.Join(", ", all.Select(i => $"{i.Label} #{i.Index}")));
+        });
+
+        await Check("udp through the loopback interface", async ct =>
+        {
+            var lo = NetIfaces.Up(withLoopback: true).FirstOrDefault(i => i.IsLoopback && i.V4 is not null)
+                     ?? throw new InvalidOperationException("no loopback interface is listed");
+            using var server = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            server.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            using var client = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            if (!lo.TryBind(client, out string? note)) throw new InvalidOperationException(note ?? "the socket couldn't be tied to " + lo.Name);
+            await client.SendToAsync(new byte[] { 1, 2, 3 }, SocketFlags.None, server.LocalEndPoint!, ct).ConfigureAwait(false);
+            var buffer = new byte[8];
+            var got = await server.ReceiveFromAsync(buffer, SocketFlags.None, new IPEndPoint(IPAddress.Any, 0), ct).ConfigureAwait(false);
+            return $"{got.ReceivedBytes} bytes from {got.RemoteEndPoint} through {lo.Name}{(note is null ? "" : " (" + note + ")")}";
+        });
+
+        await Check("ping through the loopback interface", async ct =>
+        {
+            var lo = NetIfaces.Up(withLoopback: true).FirstOrDefault(i => i.IsLoopback && i.V4 is not null)
+                     ?? throw new InvalidOperationException("no loopback interface is listed");
+            var r = await IcmpPinger.SendAsync(IPAddress.Loopback, 3000, new IcmpProbeOptions(Via: lo), ct).ConfigureAwait(false);
+            if (!r.Success) throw new InvalidOperationException($"{r.Method}: {r.Error}{(r.NotSent ? " (not sent)" : "")}");
+            return $"{r.Method}, {r.RoundtripMs} ms through {lo.Name}";
+        });
+
         // The runner's network may drop ICMP, so a failed echo is reported, not counted: the point is which method works here.
         await Check("icmp ping 1.1.1.1 (info)", async ct =>
         {

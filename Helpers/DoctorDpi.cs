@@ -98,7 +98,8 @@ public static class DoctorDpi
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(4500);
-            using var s = new Socket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+            using var s = DoctorNet.NewSocket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            s.NoDelay = true;
             await s.ConnectAsync(new IPEndPoint(addr, port), cts.Token).ConfigureAwait(false);
             await using var ns = new NetworkStream(s, ownsSocket: false);
 
@@ -210,7 +211,7 @@ public static class DoctorDpi
         cts.CancelAfter(timeoutMs);
         try
         {
-            using var s = new Socket(addr.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            using var s = DoctorNet.NewSocket(addr.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
             await s.ConnectAsync(new IPEndPoint(addr, port), cts.Token).ConfigureAwait(false);
             await s.SendAsync(BuildInitial(), SocketFlags.None, cts.Token).ConfigureAwait(false);
             var buf = new byte[2048];

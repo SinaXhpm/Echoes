@@ -51,17 +51,19 @@ public static class ScanDiscovery
     /// <param name="timeoutMs">The ceiling — the user's timeout.</param>
     /// <param name="smallSweep">At most <see cref="LanFloorMaxHosts"/> targets: a host on the local network then gets the
     /// longer floor (power-save devices).</param>
+    /// <param name="via">The interface the probes leave from (the scan's -e); null = the routing table's choice.</param>
     public static async Task<HostState> DiscoverAsync(IPAddress addr, HostRtt hostRtt, HostRtt sweepRtt, int timeoutMs, CancellationToken ct,
-                                                      bool smallSweep = false)
+                                                      bool smallSweep = false, NetIface? via = null)
     {
         int timeout = sweepRtt.AdaptiveTimeout(timeoutMs, WarmSamples, smallSweep && IsLocalNetwork(addr) ? LanFloorMs : FloorMs);
 
         // A private linked source so the first positive can cancel the probes still running.
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var tasks = new List<Task<HostState>>(Ports.Length + 1) { IcmpProbe(addr, sweepRtt, timeout, linked.Token) };
-        foreach (int p in Ports) tasks.Add(TcpProbe(addr, p, hostRtt, sweepRtt, timeout, linked.Token));
+        var tasks = new List<Task<HostState>>(Ports.Length + 1) { IcmpProbe(addr, sweepRtt, timeout, linked.Token, via) };
+        foreach (int p in Ports) tasks.Add(TcpProbe(addr, p, hostRtt, sweepRtt, timeout, linked.Token, via));
 
         bool localError = false;
+        string? localReason = null;   // why a probe couldn't be sent, when it says ("iface-unusable")
         int noRoute = 0;   // TCP probes that had no route to the host
         try
         {
@@ -71,14 +73,18 @@ public static class ScanDiscovery
                 tasks.Remove(done);
                 HostState st = await done.ConfigureAwait(false);   // probes never throw
                 if (st.Up) return st;
-                localError |= st.LocalError;
+                if (st.LocalError)
+                {
+                    localError = true;
+                    if (st.Reason.StartsWith("iface", StringComparison.Ordinal)) localReason = st.Reason;
+                }
                 if (st.Reason == "host-unreach") noRoute++;
             }
         }
         finally { try { linked.Cancel(); } catch { } }
 
         // "Down" only when every probe actually went out: the one that couldn't may have been the one that answers.
-        if (localError) return new HostState(false, "socket-limit", 0, LocalError: true);
+        if (localError) return new HostState(false, localReason ?? "socket-limit", 0, LocalError: true);
         bool unreachable = noRoute == Ports.Length;
         if (!ct.IsCancellationRequested && IsLocalNetwork(addr))
         {
@@ -88,7 +94,7 @@ public static class ScanDiscovery
         return new HostState(false, unreachable ? "host-unreach" : "no-response", 0);
     }
 
-    private static async Task<HostState> IcmpProbe(IPAddress addr, HostRtt sweepRtt, int timeoutMs, CancellationToken ct)
+    private static async Task<HostState> IcmpProbe(IPAddress addr, HostRtt sweepRtt, int timeoutMs, CancellationToken ct, NetIface? via)
     {
         try
         {
@@ -96,7 +102,9 @@ public static class ScanDiscovery
             // for every probe.
             using var to = CancellationTokenSource.CreateLinkedTokenSource(ct);
             to.CancelAfter(timeoutMs);
-            var ping = await IcmpPinger.SendAsync(addr, timeoutMs, to.Token).ConfigureAwait(false);
+            var ping = await IcmpPinger.SendAsync(addr, timeoutMs, to.Token, via: via).ConfigureAwait(false);
+            // the chosen interface couldn't send it: no evidence about the host
+            if (ping.NotSent) return new HostState(false, ScanSocket.IfaceUnusable, 0, LocalError: true);
             // The reply must come from the target: an echo to a subnet's broadcast address is answered by its
             // neighbours, which made x.x.x.255 look like a live host.
             if (ping.Success && (ping.Address is null || SameAddress(ping.Address, addr)))
@@ -113,7 +121,7 @@ public static class ScanDiscovery
     }
 
     private static async Task<HostState> TcpProbe(IPAddress addr, int port, HostRtt hostRtt, HostRtt sweepRtt,
-                                                  int timeoutMs, CancellationToken ct)
+                                                  int timeoutMs, CancellationToken ct, NetIface? via)
     {
         for (int retry = 0; ; retry++)
         {
@@ -126,6 +134,7 @@ public static class ScanDiscovery
                 {
                     // Created inside the try: new Socket(InterNetworkV6) throws without IPv6 (and EMFILE when out of fds).
                     socket = new Socket(addr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                    ScanSocket.Tie(socket, via);
                     ScanSocket.DisableSynRetransmissions(socket, timeoutMs);   // else a Windows RST takes ~1 s to surface
                     ScanIcmp.Enable(socket);
                     using var op = new ScanOp();
@@ -154,6 +163,8 @@ public static class ScanDiscovery
                 }
                 // No route to the host (a router said so, or iOS without Local Network access): no proof, but the reason.
                 if (err == SocketError.HostUnreachable) return new HostState(false, "host-unreach", 0);
+                // The scan's interface couldn't send the SYN: undetermined, like a probe our side had no socket for.
+                if (ScanSocket.IfaceProblem(err, via) is { } unusable) return new HostState(false, unusable, 0, LocalError: true);
                 // Out of sockets / ports on our side: no evidence either way — retried below. Anything else: no proof.
                 if (!ScanSocket.IsLocalExhaustion(err) || ct.IsCancellationRequested) return new HostState(false, "tcp", 0);
             }
@@ -193,6 +204,29 @@ public static class ScanSocket
 {
     /// <summary>Retries after a local socket error (<see cref="IsLocalExhaustion"/>) before a probe is given up as undetermined.</summary>
     public const int MaxLocalRetries = 3;
+
+    /// <summary>The reason of a probe the scan's interface couldn't send (it is down, lost its address, or has none
+    /// of the target's kind), and of one a program on this computer redirected away from it.</summary>
+    public const string IfaceUnusable = "iface-unusable", IfaceRedirected = "iface-redirected";
+
+    /// <summary>Ties a probe's socket to the scan's interface (none chosen: nothing). A socket that can't be tied
+    /// must not send at all (it would take the default route): that is a <see cref="SocketError.NetworkDown"/>, which
+    /// the callers read through <see cref="IfaceProblem"/>.</summary>
+    public static void Tie(Socket socket, NetIface? via)
+    {
+        if (via is not null && !via.TryBind(socket, out _)) throw new SocketException((int)SocketError.NetworkDown);
+    }
+
+    /// <summary>The reason name when <paramref name="error"/> is the scan's interface's doing rather than the
+    /// target's; null otherwise (and always without an interface).</summary>
+    public static string? IfaceProblem(SocketError error, NetIface? via)
+    {
+        if (via is null) return null;
+        if (error is SocketError.NetworkDown) return IfaceUnusable;
+        // Windows: a socket tied to an interface whose connect a VPN / proxy client's driver redirects to 127.0.0.1
+        if (error is SocketError.AddressNotAvailable && OperatingSystem.IsWindows()) return IfaceRedirected;
+        return null;
+    }
 
     /// <summary>
     /// True when a socket error means OUR side ran out of something — file descriptors (EMFILE; a macOS GUI app starts

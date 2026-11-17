@@ -24,6 +24,7 @@ namespace Echoes.ViewModels;
 /// </summary>
 public partial class CheckHostViewModel : ObservableObject
 {
+    private readonly ToolStore Store = ToolStore.Current;   // this instance's settings: its own copy when it is one of several tabs (ToolStore)
     /// <summary>The APIs' addresses and polling schedule; a test harness points them at a stand-in server.</summary>
     internal static Uri ApiBase { get; set; } = CheckHostClient.DefaultBase;
     internal static Uri GlobalpingBase { get; set; } = GlobalpingClient.DefaultBase;
@@ -58,8 +59,8 @@ public partial class CheckHostViewModel : ObservableObject
 
     public ObservableCollection<string> CheckTypes { get; } = new(CheckHostKinds.All.Select(k => k.Label()));
 
-    public ObservableCollection<string> HostHistory => HistoryService.Instance.Get("checkhost.host");
-    public ObservableCollection<string> ProxyHistory => HistoryService.Instance.Get("ip.proxy");
+    public ObservableCollection<string> HostHistory => Store.History.Get("checkhost.host");
+    public ObservableCollection<string> ProxyHistory => Store.History.Get("ip.proxy");
 
     public CheckHostKind Kind => CheckHostKinds.All[Math.Clamp(SelectedTypeIndex, 0, CheckHostKinds.All.Length - 1)];
     public bool HasError => ErrorText.Length > 0;
@@ -102,10 +103,10 @@ public partial class CheckHostViewModel : ObservableObject
 
     public CheckHostViewModel()
     {
-        var ps = ProfileService.Instance;
-        if (HistoryService.Instance.Last("checkhost.host") is { } lastHost) Host = lastHost;   // the target checked last
+        var ps = Store.Profile;
+        if (Store.History.Last("checkhost.host") is { } lastHost) Host = lastHost;   // the target checked last
         UseProxy = ps.GetBool("checkhost.useProxy");
-        ProxyAddress = ps.GetSetting("checkhost.proxyAddr") ?? (HistoryService.Instance.Last("ip.proxy") ?? string.Empty);
+        ProxyAddress = ps.GetSetting("checkhost.proxyAddr") ?? (Store.History.Last("ip.proxy") ?? string.Empty);
         ProxyUser = ps.GetSetting("checkhost.proxyUser") ?? string.Empty;
         // Stored encrypted via SecretProtector (per-user key); legacy plaintext and old-format values still
         // load and are re-saved in the current format right away.
@@ -176,7 +177,7 @@ public partial class CheckHostViewModel : ObservableObject
         MoveProxyCredentials(whileTyping: true);   // its property changes re-arm the debounce: cancelled again here
         _persistCts?.Cancel();
         _persistPending = false;
-        ProfileService.Instance.SetMany(
+        Store.Profile.SetMany(
             // the address goes into the plaintext profile: never with user info in it, even half-typed
             ("checkhost.useProxy", UseProxy ? "true" : "false"), ("checkhost.proxyAddr", CheckHostProxy.Clean(ProxyAddress)),
             ("checkhost.proxyUser", ProxyUser), ("checkhost.proxyPass", _unreadablePass ?? SecretProtector.Protect(ProxyPass)),
@@ -208,9 +209,9 @@ public partial class CheckHostViewModel : ObservableObject
         }
         MoveProxyCredentials(whileTyping: false);   // typing is done: credentials in the address go to the fields this run uses
         FlushPendingSave();   // the settings this run uses are saved even if the app closes mid-run
-        HistoryService.Instance.Add("checkhost.host", Host.Trim());
+        Store.History.Add("checkhost.host", Host.Trim());
         string? proxy = ProxyOrNull;
-        if (proxy != null) HistoryService.Instance.Add("ip.proxy", proxy);
+        if (proxy != null) Store.History.Add("ip.proxy", proxy);
 
         _cts?.Cancel();
         _cts?.Dispose();
@@ -233,7 +234,9 @@ public partial class CheckHostViewModel : ObservableObject
             {
                 end = await RunOnCheckHostAsync(http, proxy != null, kind, target, choice, runId, token);
             }
-            catch (CheckHostException ex) when (!token.IsCancellationRequested && runId == _runId)
+            // (not for the user's own setup, a proxy that wants a login or nodes no longer listed: Globalping would fail the
+            // same way, or run somewhere the user didn't choose, and check-host.net itself is fine)
+            catch (CheckHostException ex) when (!ex.UserSide && !token.IsCancellationRequested && runId == _runId)
             {
                 if (!NoneReported()) throw;   // some nodes reported before contact was lost: their results stay, with the error
                 end = await RunOnGlobalpingAsync(http, proxy != null, kind, target, choice, ex, runId, token);
@@ -284,7 +287,8 @@ public partial class CheckHostViewModel : ObservableObject
     }
 
     /// <summary>The run on check-host.net. A <see cref="CheckHostException"/> means it didn't run the check — nothing
-    /// started, or no node reported before contact was lost — and the run may move on.</summary>
+    /// started, or no node reported before contact was lost — and the run may move on, unless the cause is the user's
+    /// own (<see cref="CheckHostException.UserSide"/>).</summary>
     private async Task<CheckHostEnd> RunOnCheckHostAsync(HttpClient http, bool viaProxy, CheckHostKind kind, string target,
                                                           CheckHostNodeChoice choice, int runId, CancellationToken token)
     {
@@ -297,10 +301,12 @@ public partial class CheckHostViewModel : ObservableObject
             var (live, failure) = await LoadCatalogAsync(token, wait);
             token.ThrowIfCancellationRequested();
             if (live is null)
-                throw new CheckHostException($"Couldn't load check-host.net's node list to pick the {choice.Label(null)} nodes — {Lower(failure!.Message)}", failure);
+                throw new CheckHostException($"Couldn't load check-host.net's node list to pick the {choice.Label(null)} nodes — {Lower(failure!.Message)}", failure)
+                    { UserSide = failure.UserSide };
             var resolved = choice.Resolve(live, MaxNodes) ?? Array.Empty<string>();
             if (resolved.Count == 0)
-                throw new CheckHostException("None of the chosen nodes is on check-host.net's list any more — choose the nodes again, or use Automatic.");
+                throw new CheckHostException("None of the chosen nodes is on check-host.net's list any more — choose the nodes again, or use Automatic.")
+                    { UserSide = true };
             nodes = resolved;
         }
 

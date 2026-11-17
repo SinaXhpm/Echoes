@@ -349,6 +349,8 @@
         <Style Selector="Grid#ListRoot.narrow Grid#ColHead"><Setter Property="Margin" Value="{x:Static ctl:ScanRowLine.IndentNarrow}"/></Style>
         <Style Selector="Grid#ListRoot.narrow Button.cport"><Setter Property="Width" Value="{x:Static ctl:ScanRowLine.PortColumnNarrow}"/></Style>
         <Style Selector="Grid#ListRoot.narrow Button.cstate"><Setter Property="Width" Value="{x:Static ctl:ScanRowLine.StateColumnNarrow}"/></Style>
+        <!-- narrow, the rows give the service what the line has left (ScanPortLine): its head is as wide as its label -->
+        <Style Selector="Grid#ListRoot.narrow Button.csvc"><Setter Property="Width" Value="NaN"/></Style>
         <Style Selector="Grid#ListRoot.narrow TextBlock#ColVersion"><Setter Property="IsVisible" Value="False"/></Style>
         <Style Selector="Grid#ListRoot.narrow TextBlock#ColLatency"><Setter Property="IsVisible" Value="False"/></Style>
         <Style Selector="Grid#ListRoot.narrow Border.detail"><Setter Property="Margin" Value="20,0,10,8"/></Style>
@@ -416,6 +418,13 @@
                         </Style>
                         <Style Selector="Grid.narrow StackPanel#TimeoutField">
                             <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="2"/><Setter Property="Grid.ColumnSpan" Value="2"/><Setter Property="Margin" Value="0,12,0,0"/>
+                        </Style>
+                        <!-- the interface: a line of its own under the timing row -->
+                        <Style Selector="Grid.wide StackPanel#IfaceField">
+                            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/><Setter Property="Margin" Value="0,12,0,0"/>
+                        </Style>
+                        <Style Selector="Grid.narrow StackPanel#IfaceField">
+                            <Setter Property="Grid.Row" Value="2"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="4"/><Setter Property="Margin" Value="0,12,0,0"/>
                         </Style>
                     </Grid.Styles>
 
@@ -495,7 +504,23 @@
                                 <Border Classes="divider"/>
 
                                 <!-- TIMING + interval + timeout -->
-                                <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12">
+                                <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12">
+                                    <!-- the interface every probe leaves from (nmap -e): taken when a scan starts; the list is
+                                         read again whenever it opens -->
+                                    <StackPanel x:Name="IfaceField">
+                                        <TextBlock Classes="fieldLabel" Text="Interface"/>
+                                        <ComboBox x:Name="IfaceBox" Classes="field" HorizontalAlignment="Stretch"
+                                                  ItemsSource="{Binding Iface.Options}" SelectedItem="{Binding Iface.Selected}"
+                                                  IsEnabled="{Binding !IsScanning}" DropDownOpened="IfaceBox_DropDownOpened"
+                                                  AutomationProperties.Name="Interface"
+                                                  ToolTip.Tip="The network interface every probe leaves from (-e): scan the network behind Wi-Fi, Ethernet or a VPN adapter. Default route: the system chooses">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:IfaceOption">
+                                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Tip}"/>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                    </StackPanel>
                                     <StackPanel x:Name="TimingField">
                                         <TextBlock Classes="fieldLabel" Text="Timing"/>
                                         <ComboBox Classes="field" ItemsSource="{Binding TimingOptions}" SelectedItem="{Binding SelectedTiming}"
