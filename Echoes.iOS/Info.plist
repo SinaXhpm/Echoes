@@ -33,6 +33,15 @@
 		<key>UIColorName</key>
 		<string>LaunchBackground</string>
 	</dict>
+	<!-- The UIKit scene lifecycle, which apps built with the iOS 27 SDK must use (MT7199). Avalonia's app delegate hands
+	     out its scene delegate in code (application:configurationForConnectingSceneSession:options:), so no
+	     UISceneConfigurations here: a named one would be skipped by that delegate. One scene: the single-view lifetime
+	     has one view. -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UISupportedInterfaceOrientations</key>
