@@ -230,7 +230,8 @@ public partial class WebServerViewModel : ICatcherSink
         ReplyContentType = p.GetSetting(KReplyType) is { Length: > 0 } t ? t : "application/json";
         ReplyBody = p.GetSetting(KReplyBody) ?? "{\"ok\":true}";
         ReplyDelayMs = Math.Clamp(p.GetInt(KReplyDelay, 0), 0, RequestCatcher.MaxDelayMs);
-        RebuildCatchBinds(p.GetSetting(KCatchBind));
+        // (the adapters come in after the page's first frame: see WebServerViewModel())
+        RebuildCatchBinds(p.GetSetting(KCatchBind), NicSnapshot.Saved(p.GetSetting(KCatchBind)));
         _restoringCatch = false;
         UpdateCatchCounts();
     }
@@ -295,7 +296,11 @@ public partial class WebServerViewModel : ICatcherSink
     private bool _rebuildingCatchBinds;
 
     /// <summary>Every interface (loopback + LAN, IPv4 + IPv6), this device only, or one interface's IPv4 address.</summary>
-    public void RebuildCatchBinds(string? preferred = null)
+    public void RebuildCatchBinds(string? preferred = null) => RebuildCatchBinds(preferred, NicSnapshot.UpIPv4());
+
+    // up: the adapters' IPv4 addresses (empty on restricted platforms: loopback is enough), or what stands in for them
+    // until they are read (NicSnapshot.Saved).
+    private void RebuildCatchBinds(string? preferred, (string Name, IPAddress Address)[] up)
     {
         string? want = preferred ?? (SelectedCatchBind is { } cur ? (cur.Kind == "iface" ? cur.Address.ToString() : cur.Kind) : null);
         var list = new List<BindOption>
@@ -303,7 +308,7 @@ public partial class WebServerViewModel : ICatcherSink
             new("All interfaces (IPv4 + IPv6)", IPAddress.IPv6Any, "all"),
             new("This device only (127.0.0.1)", IPAddress.Loopback, "loopback"),
         };
-        foreach (var (addr, name) in LanAddresses()) list.Add(new BindOption($"{addr}  ({name})", addr, "iface"));
+        foreach (var (name, addr) in up) list.Add(new BindOption($"{addr}  ({name})", addr, "iface"));
         _rebuildingCatchBinds = true;
         try
         {
@@ -315,18 +320,14 @@ public partial class WebServerViewModel : ICatcherSink
                                 ?? CatchBindOptions.First(o => o.Kind == "loopback");
         }
         finally { _rebuildingCatchBinds = false; }
-        RefreshCatchUrls();
-    }
-
-    private static List<(IPAddress Addr, string Name)> LanAddresses()
-    {
-        var list = new List<(IPAddress, string)>();
-        foreach (var (name, address) in NicSnapshot.UpIPv4()) list.Add((address, name));   // empty on restricted platforms: loopback is enough
-        return list;
+        RefreshCatchUrls(up);
     }
 
     /// <summary>The URL(s) to send to: 127.0.0.1 first, then each LAN address the catcher is reachable on.</summary>
-    public void RefreshCatchUrls()
+    public void RefreshCatchUrls() => RefreshCatchUrls(null);
+
+    // up: the adapters' addresses when the caller has them already; null = read them (NicSnapshot) if needed.
+    private void RefreshCatchUrls((string Name, IPAddress Address)[]? up)
     {
         string? keep = SelectedCatchUrl;
         var bind = IsCatching ? _catchBindActive : SelectedCatchBind?.Address;
@@ -337,7 +338,7 @@ public partial class WebServerViewModel : ICatcherSink
         if (bind.Equals(IPAddress.IPv6Any) || bind.Equals(IPAddress.Any))
         {
             CatchUrls.Add(P(IPAddress.Loopback));
-            foreach (var (addr, _) in LanAddresses()) CatchUrls.Add(P(addr));
+            foreach (var (_, addr) in up ?? NicSnapshot.UpIPv4()) CatchUrls.Add(P(addr));
         }
         else CatchUrls.Add(P(bind));
         OnPropertyChanged(nameof(HasCatchUrls));

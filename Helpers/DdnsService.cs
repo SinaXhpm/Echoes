@@ -583,9 +583,14 @@ public sealed class DdnsService
             if (_loopCts != null) return;
             cts = _loopCts = new CancellationTokenSource();
         }
-        try { NetworkChange.NetworkAddressChanged += OnNetworkChanged; }
-        catch { /* not available on this platform: the 5-minute checks still run */ }
-        _ = Task.Run(() => LoopAsync(cts.Token));
+        // The network-change hook is set on the thread pool with the loop: the process's first NetworkAddressChanged
+        // subscriber sets up the system's address-change notification, some 25 ms that ran on the UI thread at every
+        // launch (App calls Start there), with or without records to keep.
+        _ = Task.Run(() =>
+        {
+            HookNetwork(cts);
+            return LoopAsync(cts.Token);
+        });
     }
 
     /// <summary>Stop the background loop (tests; a stopped service can be started again).</summary>
@@ -598,8 +603,37 @@ public sealed class DdnsService
             _loopCts = null;
         }
         if (cts is null) return;
-        try { NetworkChange.NetworkAddressChanged -= OnNetworkChanged; } catch { }
         cts.Cancel();
+        UnhookNetwork();
+    }
+
+    // The hook is set by the loop's task and removed by Stop, which may run first: both under _netGate, and a loop already
+    // stopped (Stop cancels before it unhooks) doesn't set it.
+    private readonly object _netGate = new();
+    private bool _netHooked;
+
+    private void HookNetwork(CancellationTokenSource cts)
+    {
+        lock (_netGate)
+        {
+            if (_netHooked || cts.IsCancellationRequested) return;
+            try
+            {
+                NetworkChange.NetworkAddressChanged += OnNetworkChanged;
+                _netHooked = true;
+            }
+            catch { /* not available on this platform: the 5-minute checks still run */ }
+        }
+    }
+
+    private void UnhookNetwork()
+    {
+        lock (_netGate)
+        {
+            if (!_netHooked) return;
+            try { NetworkChange.NetworkAddressChanged -= OnNetworkChanged; } catch { }
+            _netHooked = false;
+        }
     }
 
     internal bool IsRunning

@@ -564,7 +564,12 @@
 		</Grid>
 	</Border>
 
-	<!-- the About box, over the bar and page -->
-	<views:AboutView IsVisible="{Binding IsAboutOpen}"/>
+	<!-- the About box, over the bar and page: built the first time it opens (it used to be built hidden at every start, its
+	     256 px logo decoded with it) -->
+	<ctl:Deferred IsVisible="{Binding IsAboutOpen}">
+		<DataTemplate x:DataType="vm:MainViewModel">
+			<views:AboutView IsVisible="{Binding IsAboutOpen}"/>
+		</DataTemplate>
+	</ctl:Deferred>
 	</Panel>
 </UserControl>

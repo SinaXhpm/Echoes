@@ -108,7 +108,18 @@ public sealed partial class CaptureViewModel : ObservableObject, IToolSession
     public bool CanCapture => PacketCapture.Supported;
 
     /// <summary>The empty table's line: what to do, and what capturing needs here.</summary>
-    public string Hint => (CanCapture ? "Choose an interface and press Start, or open a capture file.\n" : string.Empty) + PacketCapture.Requirement;
+    public string Hint => (CanCapture ? "Choose an interface and press Start, or open a capture file.\n" : string.Empty) + _requirement;
+
+    // What capturing needs here (PacketCapture.Requirement). On Windows, finding out loads Npcap's wpcap.dll: worked out on
+    // the thread pool (ReadRequirement), not by this binding on the UI thread while the page is first built.
+    private string _requirement = string.Empty;
+
+    private void ReadRequirement()
+        => _ = Task.Run(() => PacketCapture.Requirement).ContinueWith(t => Dispatcher.UIThread.Post(() =>
+        {
+            _requirement = t.Result;
+            OnPropertyChanged(nameof(Hint));
+        }), CancellationToken.None, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
 
     /// <summary>Raised when packets were added at the end (the view follows them while it shows the last row).</summary>
     public event Action? Appended;
@@ -140,6 +151,7 @@ public sealed partial class CaptureViewModel : ObservableObject, IToolSession
         Promiscuous = Store.Profile.GetBool(PromiscuousKey);
         Status = string.Empty;
         UpdateCounts();
+        ReadRequirement();
     }
 
     partial void OnPromiscuousChanged(bool value)

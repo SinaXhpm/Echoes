@@ -38,6 +38,9 @@ public partial class AboutView : UserControl
         // Tunnel: Esc reaches the box before a tool's own Esc handling (cURL's search, Monitor's edit…) behind it.
         _topLevel.AddHandler(KeyDownEvent, OnTopLevelKeyDown, RoutingStrategies.Tunnel);
         _topLevel.BackRequested += OnBackRequested;
+        // The desktop shell builds the box the first time it opens (ctl:Deferred): shown from the start, it gets no
+        // IsVisible change to move the focus in (OnPropertyChanged), so that first opening does it here.
+        if (IsVisible && Vm is { IsAboutOpen: true }) FocusClose();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -55,9 +58,10 @@ public partial class AboutView : UserControl
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == IsVisibleProperty && change.GetNewValue<bool>())
-            Dispatcher.UIThread.Post(() => CloseButton.Focus(), DispatcherPriority.Background);
+        if (change.Property == IsVisibleProperty && change.GetNewValue<bool>()) FocusClose();
     }
+
+    private void FocusClose() => Dispatcher.UIThread.Post(() => CloseButton.Focus(), DispatcherPriority.Background);
 
     private void OnTopLevelKeyDown(object? sender, KeyEventArgs e)
     {

@@ -65,18 +65,19 @@ public partial class CurlViewModel : ObservableObject
         Parts = new CurlPartList(OnBodyChanged);
 
         RestoreSettings();
-        LoadInterfaces();
+        ShowSavedInterface();
         _loaded = true;
         SyncParamsFromUrl();
         RefreshChips();
         RefreshAutoHeaders();
         RegenerateSnippet();
         LoadLibrary();
+        _listedAtConstruction = Environment.TickCount64;
+        ListInterfacesLater();
 
-        // A debounced edit must not be lost when the window closes within the debounce window.
-        // (MainViewModel.FlushPersistence calls FlushPendingSave as well — it's idempotent.)
-        if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IControlledApplicationLifetime life)
-            life.Exit += (_, _) => FlushPendingSave();
+        // No handler on the app's Exit for a debounced edit: MainViewModel.FlushPersistence writes it on exit, for this tab
+        // and every further one it tracks. An Exit handler here kept every cURL tab ever opened (its page and its last
+        // response, body and preview included) alive until the app quit, closed ones too.
     }
 
     // ================================================================== network interfaces
@@ -91,6 +92,8 @@ public partial class CurlViewModel : ObservableObject
     private string? _preferredNicIp;
     private bool _applyingNics;
     private long _listedAtConstruction;
+    private bool _nicsListed;   // the adapters have been read (until then the box holds Auto and the saved choice)
+    private int _nicListing;    // the latest listing: an older one still on its way is dropped
     // Android: the picker is hidden and the OS routes (CanChooseInterface), so the adapters are only read when an imported
     // command names one (MatchInterface), not at every visit.
     private bool _listForImport;
@@ -109,39 +112,73 @@ public partial class CurlViewModel : ObservableObject
     /// selection while it still exists.</summary>
     public void RefreshInterfaces()
     {
-        // A first visit always asks, right after the page's first frame: the constructor listed them a moment before (on
-        // the UI thread, 10-20 ms with many virtual adapters), so that one refresh is skipped.
+        // A first visit always asks, right after the page's first frame: the constructor started a listing a moment before,
+        // so that one refresh is skipped.
         bool justListed = _listedAtConstruction != 0 && Environment.TickCount64 - _listedAtConstruction < 2000;
         _listedAtConstruction = 0;
-        if (!justListed) LoadInterfaces();
+        if (!justListed) ListInterfacesLater();
     }
 
+    private static readonly NicOption AutoNic = new("Auto (default route)", null);
+
+    // Until the adapters are read: Auto and the adapter last picked, by its address. A request sent meanwhile goes out of it
+    // as it would once the list is in (one that is down falls back to Auto then, shown and not saved).
+    private void ShowSavedInterface()
+    {
+        _preferredNicIp = CanChooseInterface ? Store.Profile.GetSetting("curl.nicIp") : null;   // (Android: never a saved adapter)
+        var list = new List<NicOption> { AutoNic };
+        if (!string.IsNullOrEmpty(_preferredNicIp)) list.Add(new NicOption(_preferredNicIp, _preferredNicIp));
+        ShowInterfaces(list);
+    }
+
+    // The adapters are read on the thread pool and shown on the UI thread: reading them takes 10-20 ms with many virtual
+    // adapters, which held up the first frame of a start that restores a cURL tab (and every visit's refresh after it).
+    private void ListInterfacesLater()
+    {
+        if (!CanChooseInterface && !_listForImport) return;   // Android: nothing to list until an import names an adapter
+        int listing = ++_nicListing;
+        _ = Task.Run(ReadInterfaces).ContinueWith(t => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (listing != _nicListing) return;   // a newer listing is shown already
+            ShowInterfaces(t.Result);
+            _nicsListed = true;
+        }), CancellationToken.None, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
+    }
+
+    // Now, on the UI thread: an imported command names an adapter before the listing the page started has come in.
     private void LoadInterfaces()
     {
-        var list = new List<NicOption> { new("Auto (default route)", null) };
-        if (CanChooseInterface || _listForImport)
+        ++_nicListing;   // what a listing still on its way would show is older than this
+        ShowInterfaces(CanChooseInterface || _listForImport ? ReadInterfaces() : new List<NicOption> { AutoNic });
+        _nicsListed = true;
+    }
+
+    // Auto, then every address of every adapter that is up (loopback and IPv6 link-local left out). Any thread.
+    private static List<NicOption> ReadInterfaces()
+    {
+        var list = new List<NicOption> { AutoNic };
+        try
         {
-            try
+            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
             {
-                foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+                if (ni.OperationalStatus != OperationalStatus.Up) continue;
+                if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+                foreach (var ua in ni.GetIPProperties().UnicastAddresses)
                 {
-                    if (ni.OperationalStatus != OperationalStatus.Up) continue;
-                    if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
-                    foreach (var ua in ni.GetIPProperties().UnicastAddresses)
-                    {
-                        var a = ua.Address;
-                        if (a.AddressFamily != AddressFamily.InterNetwork && a.AddressFamily != AddressFamily.InterNetworkV6) continue;
-                        if (a.IsIPv6LinkLocal || a.IsIPv6Multicast) continue;   // skip fe80::/link-local noise
-                        list.Add(new NicOption($"{ni.Name} — {a}", a.ToString()));
-                    }
+                    var a = ua.Address;
+                    if (a.AddressFamily != AddressFamily.InterNetwork && a.AddressFamily != AddressFamily.InterNetworkV6) continue;
+                    if (a.IsIPv6LinkLocal || a.IsIPv6Multicast) continue;   // skip fe80::/link-local noise
+                    list.Add(new NicOption($"{ni.Name} — {a}", a.ToString()));
                 }
             }
-            catch { }
         }
-        if (!_loaded) _listedAtConstruction = Environment.TickCount64;
+        catch { }
+        return list;
+    }
 
-        // (Android: never a saved adapter, see CanChooseInterface)
-        if (!_loaded) _preferredNicIp = CanChooseInterface ? Store.Profile.GetSetting("curl.nicIp") : null;
+    // UI thread: shows a list, with the adapter the user picked selected when it is in it, else Auto.
+    private void ShowInterfaces(List<NicOption> list)
+    {
         string? keep = _preferredNicIp;
         _applyingNics = true;   // a fallback to Auto (the adapter is down) is shown, not saved
         try

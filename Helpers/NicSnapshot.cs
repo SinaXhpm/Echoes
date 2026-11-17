@@ -23,6 +23,24 @@ public static class NicSnapshot
 
     public static (string Name, IPAddress Address)[] UpIPv4() => Read().V4;
 
+    /// <summary>
+    /// <see cref="UpIPv4"/> read on the thread pool and handed to <paramref name="apply"/> on the UI thread. For a listen-on
+    /// list built in a view-model's constructor (Web Server, Proxy): the page may be the one a start restores, and the read
+    /// held up its first frame. Until it comes, such a list holds <see cref="Saved"/>.
+    /// </summary>
+    public static void UpIPv4Later(Action<(string Name, IPAddress Address)[]> apply)
+        => System.Threading.Tasks.Task.Run(UpIPv4).ContinueWith(
+            t => Avalonia.Threading.Dispatcher.UIThread.Post(() => apply(t.Result)),
+            System.Threading.CancellationToken.None, System.Threading.Tasks.TaskContinuationOptions.OnlyOnRanToCompletion,
+            System.Threading.Tasks.TaskScheduler.Default);
+
+    /// <summary>Stands in for <see cref="UpIPv4"/> until the adapters are read: the saved interface alone, by its address
+    /// (a saved "all" / "loopback", or none, needs no adapter). Its name isn't known yet.</summary>
+    public static (string Name, IPAddress Address)[] Saved(string? saved)
+        => IPAddress.TryParse(saved, out var address) && address.AddressFamily == AddressFamily.InterNetwork
+            ? new[] { ("…", address) }
+            : Array.Empty<(string, IPAddress)>();
+
     /// <summary>Whether <paramref name="address"/> belongs to a cellular, VPN or tunnel interface (or is a link-local /
     /// CLAT address): reachable for nobody on the local network, and changing often.</summary>
     public static bool IsWanLike(IPAddress address) => Read().Wan.Contains(address);

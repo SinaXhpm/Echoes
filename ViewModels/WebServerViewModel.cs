@@ -149,17 +149,27 @@ public partial class WebServerViewModel : ObservableObject
 
     public WebServerViewModel()
     {
-        RebuildBindOptions();
+        // The adapters aren't read here (the page may be the one a start restores, and the read held up its first frame):
+        // until they are in, both listen-on lists hold All, This device and the saved interface by its address. Then they
+        // are rebuilt as on every visit, and a saved interface that isn't up gives way to this device only, as it did here.
+        RebuildBindOptions(NicSnapshot.Saved(ProfileService.Instance.GetSetting(KShareBind)));
         RestoreShareSettings();
         InitCatcher();   // the "Catch requests" mode (WebServerViewModel.Catcher.cs)
         InitInbox();     // received files (WebServerViewModel.Inbox.cs)
+        NicSnapshot.UpIPv4Later(up =>
+        {
+            if (!IsRunning && !IsStarting) RebuildBindOptions(up);
+            if (!IsCatching) RebuildCatchBinds(null, up);
+        });
     }
 
     // --- bind-interface selection ---
 
-    // Rebuild the "how to listen" dropdown: All interfaces (dual-stack) + Localhost + one row per live IPv4.
+    private void RebuildBindOptions() => RebuildBindOptions(NicSnapshot.UpIPv4());
+
+    // Rebuild the "how to listen" dropdown: All interfaces (dual-stack) + Localhost + one row per live IPv4 in up.
     // Preserves the current pick if it still exists, else defaults to All.
-    private void RebuildBindOptions()
+    private void RebuildBindOptions((string Name, IPAddress Address)[] up)
     {
         string? prevKind = SelectedBind?.Kind;
         string? prevAddr = SelectedBind?.Address.ToString();
@@ -169,7 +179,7 @@ public partial class WebServerViewModel : ObservableObject
             new("All interfaces (IPv4 + IPv6)", IPAddress.IPv6Any, "all"),
             new("This device only (127.0.0.1)", IPAddress.Loopback, "loopback"),
         };
-        foreach (var (name, address) in NicSnapshot.UpIPv4())
+        foreach (var (name, address) in up)
             list.Add(new BindOption($"{address}  ({name})", address, "iface"));
 
         _rebuildingBinds = true;

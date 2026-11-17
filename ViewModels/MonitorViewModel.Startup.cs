@@ -35,6 +35,10 @@ public sealed partial class MonitorViewModel
         catch { return true; }
     };
 
+    // Asked on the thread pool: GetIsNetworkAvailable reads every adapter (some 15 ms with many virtual ones, up to 50 seen),
+    // and a launch start asks right after the window first shows, then every 2 s while it waits.
+    private static Task<bool> IsNetworkUpAsync() => Task.Run(() => IsNetworkUp());
+
     /// <summary>
     /// "Start monitoring when Echoes opens", read by App at launch WITHOUT creating this view-model: when it's off the
     /// Monitor costs nothing until its tab is opened.
@@ -99,19 +103,21 @@ public sealed partial class MonitorViewModel
         // This start takes over from one still waiting (a boot start, then the launch start): the old wait won't clear
         // its "waiting for the network" flag (its token is stale now), so clear it here; a wait below sets it again.
         if (_waitingForNetwork) SetWaitingForNetwork(false);
-        if (!IsNetworkUp() || settle > TimeSpan.Zero)
+        bool networkUp = await IsNetworkUpAsync();
+        if (token != _launchToken) return;   // a click on Start / Stop decided meanwhile
+        if (!networkUp || settle > TimeSpan.Zero)
         {
             SetWaitingForNetwork(true);
             try
             {
                 var waited = TimeSpan.Zero;
-                bool hadNetwork = IsNetworkUp();
+                bool hadNetwork = networkUp;
                 while (!hadNetwork && waited < NetworkWaitLimit)
                 {
                     await Task.Delay(NetworkPoll);
                     waited += NetworkPoll;
                     if (token != _launchToken) return;
-                    hadNetwork = IsNetworkUp();
+                    hadNetwork = await IsNetworkUpAsync();
                 }
                 if (hadNetwork && settle > TimeSpan.Zero) await Task.Delay(settle);
             }

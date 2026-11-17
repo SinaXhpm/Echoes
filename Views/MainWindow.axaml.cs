@@ -18,8 +18,26 @@ public partial class MainWindow : Window
         // so are the buttons (CaptionButtonHeight, Styles/Tokens.axaml), in one row with About and the theme switch.
         // macOS keeps its own title bar for the traffic lights.
         if (!OperatingSystem.IsMacOS()) ExtendClientAreaTitleBarHeightHint = 44;
+        try { Icon = LoadIcon(); }
+        catch (Exception ex) { Helpers.CrashLog.Write("Window.Icon", ex); }   // Avalonia's default icon, then
         // The UI lives in MainView (shared with the Android single-view head);
         // it triggers the update check on Loaded.
+    }
+
+    /// <summary>
+    /// The app's icon for this system, the window's and the tray's (Desktop/TrayService takes the window's). Windows wants
+    /// the tray icon at 16 px times the taskbar's scale (16, 20, 24 … 48) and the window's at 16 / 24 / 32 times the
+    /// window's: given one picture (the 256 px PNG), Avalonia hands Windows that picture whole and Windows shrinks it without
+    /// smoothing, so the spiral's fine lines came out as grain. From a multi-size .ico Avalonia takes the frame of the exact
+    /// size instead; Assets/echoes-windows.ico has one for every scale up to 300 %, each the average of the full-size logo's
+    /// pixels. macOS and Linux scale the PNG smoothly themselves. Loaded once: the window used to decode the PNG (~7 ms of
+    /// the start) and the tray service then decode the .ico twice, for the window and for the tray.
+    /// </summary>
+    internal static WindowIcon LoadIcon()
+    {
+        string asset = OperatingSystem.IsWindows() ? "avares://Echoes/Assets/echoes-windows.ico" : "avares://Echoes/Assets/logo-256.png";
+        using var stream = Avalonia.Platform.AssetLoader.Open(new Uri(asset));
+        return new WindowIcon(stream);   // read right away; the stream isn't kept
     }
 
     // The window opens 828 x 607: every tool's page fits there without scrolling (the tools sit in a top bar, so the

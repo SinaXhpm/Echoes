@@ -152,8 +152,12 @@ public partial class ProxyViewModel : ObservableObject
 
     public ProxyViewModel()
     {
-        RebuildBindOptions();
+        // The adapters aren't read here (the page may be the one a start restores, and the read held up its first frame):
+        // until they are in, the listen-on list holds All, This device and the saved interface by its address. Then it is
+        // rebuilt as on every visit, and a saved interface that isn't up gives way to this device only, as it did here.
+        RebuildBindOptions(NicSnapshot.Saved(ProfileService.Instance.GetSetting(KBind)));
         RestoreSettings();
+        NicSnapshot.UpIPv4Later(RebuildBindOptions);
     }
 
     // --- remembered settings: each saved when it changes. The password only sealed (SecretProtector "enc2:"); one that
@@ -322,7 +326,10 @@ public partial class ProxyViewModel : ObservableObject
             ProfileService.Instance.SetSetting(KList, string.IsNullOrWhiteSpace(list) ? null : SecretProtector.Protect(list));
     }
 
-    private void RebuildBindOptions()
+    private void RebuildBindOptions() => RebuildBindOptions(NicSnapshot.UpIPv4());
+
+    // up: the adapters' IPv4 addresses, or what stands in for them until they are read (NicSnapshot.Saved).
+    private void RebuildBindOptions((string Name, IPAddress Address)[] up)
     {
         string? prevKind = SelectedBind?.Kind;
         string? prevAddr = SelectedBind?.Address.ToString();
@@ -332,7 +339,7 @@ public partial class ProxyViewModel : ObservableObject
             new("All interfaces (0.0.0.0)", IPAddress.Any, "all"),
             new("This device only (127.0.0.1)", IPAddress.Loopback, "loopback"),
         };
-        foreach (var (name, address) in NicSnapshot.UpIPv4())
+        foreach (var (name, address) in up)
             list.Add(new BindOption($"{address}  ({name})", address, "iface"));
 
         _rebuildingBinds = true;

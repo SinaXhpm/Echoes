@@ -55,7 +55,26 @@ public sealed partial class IfacePicker : ObservableObject
         _autoTip = autoTip;
         _withLoopback = withLoopback;
         string? saved = settings.GetSetting(key);
-        if (autoLabel is null) { Refresh(saved); return; }   // it has to show an interface: read them now
+        if (autoLabel is null)
+        {
+            // It has to show an interface. None saved yet: the adapters are read now (the first one is the default). One
+            // saved: it shows that one by name, and the adapters are read on the thread pool (Capture's page can be the
+            // one a start restores, and the read held up its first frame).
+            if (string.IsNullOrEmpty(saved)) { Refresh(saved); return; }
+            _filling = true;
+            try
+            {
+                Options.Add(new IfaceOption(saved, saved, saved));
+                Selected = Options[0];
+            }
+            finally { _filling = false; }
+            _ = System.Threading.Tasks.Task.Run(() => NetIfaces.Up(withLoopback)).ContinueWith(
+                // (unless the list was read again meanwhile: the picker opened)
+                t => Avalonia.Threading.Dispatcher.UIThread.Post(() => { if (_fills == 0) Fill(Name, t.Result); }),
+                System.Threading.CancellationToken.None, System.Threading.Tasks.TaskContinuationOptions.OnlyOnRanToCompletion,
+                System.Threading.Tasks.TaskScheduler.Default);
+            return;
+        }
 
         _filling = true;
         try
@@ -70,12 +89,17 @@ public sealed partial class IfacePicker : ObservableObject
     /// <summary>Reads the interfaces again and keeps the choice (the picker's DropDownOpened).</summary>
     public void Refresh() => Refresh(Name);
 
-    private void Refresh(string? want)
+    private void Refresh(string? want) => Fill(want, NetIfaces.Up(_withLoopback));
+
+    private int _fills;   // lists shown so far (a read on the thread pool doesn't replace a newer one)
+
+    private void Fill(string? want, IReadOnlyList<NetIface> up)
     {
+        _fills++;
         if (string.IsNullOrEmpty(want)) want = null;
         var list = new List<IfaceOption>();
         if (_autoLabel is not null) list.Add(new IfaceOption(null, _autoLabel, _autoTip ?? _autoLabel));
-        foreach (var i in NetIfaces.Up(_withLoopback)) list.Add(new IfaceOption(i.Name, i.Label, Tip(i)));
+        foreach (var i in up) list.Add(new IfaceOption(i.Name, i.Label, Tip(i)));
         if (want is not null && !list.Any(o => o.Name == want))
             list.Add(new IfaceOption(want, want + " (not connected)", want + " isn't connected right now"));
 

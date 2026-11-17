@@ -4,7 +4,6 @@
         xmlns:views="using:Echoes.Views"
         x:Class="Echoes.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Icon="avares://Echoes/Assets/logo-256.png"
         Title=""
         Width="828"
         Height="607"
