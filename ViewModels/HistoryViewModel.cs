@@ -26,13 +26,19 @@ public sealed class HistoryEntry
 
     public string Value { get; }
     public string Display { get; }
+
+    /// <summary>The last value of its tool field: its row closes the card (rounded bottom, the gap after it).</summary>
+    public bool IsLast { get; init; }
+
+    /// <summary>Copies <see cref="Value"/> (the page's command, handed to each row: no lookup up the tree per row).</summary>
+    public System.Windows.Input.ICommand? Copy { get; init; }
 }
 
-public class HistoryGroup
+/// <summary>A tool field's header in the history list: the top of its card.</summary>
+public sealed class HistoryHeader(string title, int count)
 {
-    public string Title { get; set; } = string.Empty;
-    public IReadOnlyList<HistoryEntry> Items { get; set; } = new List<HistoryEntry>();
-    public int Count => Items.Count;
+    public string Title { get; } = title;
+    public int Count { get; } = count;
 }
 
 /// <summary>
@@ -41,7 +47,11 @@ public class HistoryGroup
 /// </summary>
 public partial class HistoryViewModel : ObservableObject
 {
-    [ObservableProperty] private ObservableCollection<HistoryGroup> _groups = new();
+    /// <summary>One flat list for the view: each tool field's <see cref="HistoryHeader"/>, then its values
+    /// (<see cref="HistoryEntry"/>). Flat so that only the lines on screen are built: as cards holding a list of their
+    /// values, every card that scrolled into view built all its rows (up to 50 values of selectable text and a button),
+    /// and a long history scrolled at ~15 frames a second.</summary>
+    [ObservableProperty] private IReadOnlyList<object> _lines = System.Array.Empty<object>();
     [ObservableProperty] private int _totalCount;
 
     public bool HasItems => TotalCount > 0;
@@ -93,22 +103,20 @@ public partial class HistoryViewModel : ObservableObject
         if (version == _shownVersion) return;
         _shownVersion = version;
 
-        var groups = new ObservableCollection<HistoryGroup>();
+        var lines = new List<object>();
         int total = 0;
 
         foreach (var entry in ProfileService.Instance.AllHistory()
                      .OrderBy(kv => LabelFor(kv.Key), System.StringComparer.OrdinalIgnoreCase))
         {
-            var g = new HistoryGroup
-            {
-                Title = LabelFor(entry.Key),
-                Items = entry.Values.Select(v => new HistoryEntry(v)).ToList()
-            };
-            total += g.Items.Count;
-            groups.Add(g);
+            var values = entry.Values;
+            lines.Add(new HistoryHeader(LabelFor(entry.Key), values.Count));
+            for (int i = 0; i < values.Count; i++)
+                lines.Add(new HistoryEntry(values[i]) { IsLast = i == values.Count - 1, Copy = CopyCommand });
+            total += values.Count;
         }
 
-        Groups = groups;
+        Lines = lines;
         TotalCount = total;
     }
 

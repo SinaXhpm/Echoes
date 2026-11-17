@@ -50,10 +50,28 @@
             <Setter Property="Height" Value="40"/>
         </Style>
 
-        <!-- Virtualized: only the groups on screen are built (up to 50 wrapped entries each). The ScrollViewer sits
-             INSIDE the template — an outer one hands the panel infinite height and realizes everything (same
-             pattern as NetworkInfoView's tables). The 12px right margin is the scroll bar's gutter, so it never
-             paints over the cards. -->
+        <!-- a card's slices: its header line is the top (rounded), each value line the sides and the hairline above it,
+             the last one the rounded bottom and the gap to the next card (Border.card's look) -->
+        <Style Selector="Border.histTop">
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="1,1,1,0"/>
+            <Setter Property="CornerRadius" Value="10,10,0,0"/>
+        </Style>
+        <Style Selector="Border.histRow">
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="1,0,1,0"/>
+        </Style>
+        <Style Selector="Border.histRow.last">
+            <Setter Property="BorderThickness" Value="1,0,1,1"/>
+            <Setter Property="CornerRadius" Value="0,0,10,10"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+
+        <!-- Virtualized: only the lines on screen are built. The ScrollViewer sits INSIDE the template — an outer one
+             hands the panel infinite height and realizes everything (same pattern as NetworkInfoView's tables). The
+             12px right margin is the scroll bar's gutter, so it never paints over the cards. -->
         <Style Selector="ItemsControl.groups">
             <Setter Property="ItemsPanel">
                 <ItemsPanelTemplate>
@@ -119,41 +137,37 @@
                        HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0"/>
         </StackPanel>
 
-        <!-- one card per tool field: header, then a row per value (each row's top hairline separates it) -->
-        <ItemsControl Grid.Row="1" Classes="groups" IsVisible="{Binding HasItems}" ItemsSource="{Binding Groups}">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:HistoryGroup">
-                    <Border Classes="card" Margin="0,0,0,12">
-                        <StackPanel>
-                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="16,11,14,11">
-                                <TextBlock Grid.Column="0" Text="{Binding Title}" VerticalAlignment="Center"
-                                           FontSize="{StaticResource Font.Body}" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource Text.Primary}" TextTrimming="CharacterEllipsis"/>
-                                <Border Grid.Column="1" Classes="badge">
-                                    <TextBlock Text="{Binding Count}"/>
-                                </Border>
-                            </Grid>
-                            <ItemsControl ItemsSource="{Binding Items}">
-                                <ItemsControl.ItemTemplate>
-                                    <!-- Shows a shortened entry (~300 chars); copy takes the full value. -->
-                                    <DataTemplate x:DataType="vm:HistoryEntry">
-                                        <Border BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0" Padding="16,6,10,6">
-                                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12">
-                                                <SelectableTextBlock Grid.Column="0" Classes="val" Text="{Binding Display}"/>
-                                                <Button Grid.Column="1" Classes="icon copy"
-                                                        Command="{Binding ((vm:HistoryViewModel)DataContext).CopyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding Value}" ToolTip.Tip="Copy" AutomationProperties.Name="Copy">
-                                                    <Path Classes="glyph" Data="{StaticResource HistGlyphCopy}"/>
-                                                </Button>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
+        <!-- one card per tool field: header, then a row per value (each row's top hairline separates it); one flat list of
+             header and value lines (HistoryViewModel.Lines), each drawing its slice of its card -->
+        <ItemsControl Grid.Row="1" Classes="groups" IsVisible="{Binding HasItems}" ItemsSource="{Binding Lines}">
+            <ItemsControl.DataTemplates>
+                <DataTemplate DataType="vm:HistoryHeader" x:DataType="vm:HistoryHeader">
+                    <Border Classes="histTop">
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12" Margin="16,11,14,11">
+                            <TextBlock Grid.Column="0" Text="{Binding Title}" VerticalAlignment="Center"
+                                       FontSize="{StaticResource Font.Body}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Text.Primary}" TextTrimming="CharacterEllipsis"/>
+                            <Border Grid.Column="1" Classes="badge">
+                                <TextBlock Text="{Binding Count}"/>
+                            </Border>
+                        </Grid>
                     </Border>
                 </DataTemplate>
-            </ItemsControl.ItemTemplate>
+                <!-- Shows a shortened entry (~300 chars); copy takes the full value. -->
+                <DataTemplate DataType="vm:HistoryEntry" x:DataType="vm:HistoryEntry">
+                    <Border Classes="histRow" Classes.last="{Binding IsLast}">
+                        <Border BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0" Padding="16,6,10,6">
+                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="12">
+                                <SelectableTextBlock Grid.Column="0" Classes="val" Text="{Binding Display}"/>
+                                <Button Grid.Column="1" Classes="icon copy" Command="{Binding Copy}"
+                                        CommandParameter="{Binding Value}" ToolTip.Tip="Copy" AutomationProperties.Name="Copy">
+                                    <Path Classes="glyph" Data="{StaticResource HistGlyphCopy}"/>
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.DataTemplates>
         </ItemsControl>
     </Grid>
 </UserControl>
