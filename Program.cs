@@ -109,15 +109,29 @@ class Program
             // Inter on every OS (the Android head already registers it): Fluent prefers it when present, so the
             // UI renders with the same metrics everywhere instead of Segoe / SF / whatever the distro ships.
             .WithInterFont()
-            // Windows: DirectComposition rather than Avalonia's first choice, WinUI composition, whose extras (blur,
+            // Windows: Avalonia's software renderer (Skia on the CPU) unless ECHOES_RENDER=gpu. Echoes' solid, mostly still UI
+            // rarely redraws much, while the GPU path's costs came up front and stayed: measured with the Native AOT build on
+            // one laptop (2026-11-17), the process's first Direct3D device alone took 0.46-0.75 s on the UI thread before
+            // anything was drawn; drawing on the CPU, the app was ready ~0.15 s sooner on a third of the start-up CPU, and
+            // held 73 MB less memory and 27 fewer threads for the whole session (in the tray for days). The price: a
+            // whole-window redraw costs ~3x the CPU (~18 ms against ~6 ms at full screen), so a window being resized redraws
+            // at 40-50 fps.
+            // With the GPU: DirectComposition rather than Avalonia's first choice, WinUI composition, whose extras (blur,
             // Mica) Echoes' solid colors never use: the window's first frame showed about 120 ms sooner (Native AOT
             // build, 6 starts each), with the same memory.
-            .With(new Win32PlatformOptions
-            {
-                CompositionMode = new[] { Win32CompositionMode.DirectComposition, Win32CompositionMode.RedirectionSurface }
-            })
+            .With(GpuRendering
+                ? new Win32PlatformOptions
+                {
+                    CompositionMode = new[] { Win32CompositionMode.DirectComposition, Win32CompositionMode.RedirectionSurface }
+                }
+                : new Win32PlatformOptions { RenderingMode = new[] { Win32RenderingMode.Software } })
             .LogToTrace();
     }
+
+    // ECHOES_RENDER=gpu (Windows): Direct3D through ANGLE, as Echoes drew up to 1.1.0, for a machine where drawing on the
+    // CPU proves too slow (a very large window on a 4K screen, redrawn often). See BuildAvaloniaApp.
+    private static bool GpuRendering
+        => string.Equals(Environment.GetEnvironmentVariable("ECHOES_RENDER"), "gpu", StringComparison.OrdinalIgnoreCase);
 
     // A lock conflict is a plain IOException: a sharing / lock violation on Windows, flock's EWOULDBLOCK on Unix. The
     // errors that clearly aren't one (missing path, I/O error, disk full, read-only file system) start the app instead.

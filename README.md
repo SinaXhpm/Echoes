@@ -591,6 +591,9 @@ No. Echoes runs as a normal user. Where the system doesn't allow normal (ICMP) p
 **Do I need to install .NET?**
 No. The desktop builds are self-contained native apps: download and run.
 
+**Does Echoes use the graphics card on Windows?**
+Not by default: it draws on the CPU, which lets it start faster and keeps about 70 MB less memory while it waits in the tray. If redrawing feels slow on a very large window (on a 4K screen, say), set the environment variable `ECHOES_RENDER=gpu` before starting it to draw with Direct3D instead.
+
 **Why won't a website open for me?**
 Open the Doctor and enter the site. It checks your network, DNS, the connection, TLS and HTTP, and compares with servers abroad, then tells you whether it's DNS tampering, SNI filtering, a blocked IP, a filter page, or a site that is down for everyone.
 
