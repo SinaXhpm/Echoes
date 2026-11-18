@@ -1,6 +1,6 @@
 # Echoes — Free Network Tools for iPhone, iPad, Mac, Windows, Linux and Android
 
-**Connection doctor, ping, traceroute and MTR, internet speed test, port scanner, SSH and SFTP client, cURL / HTTP client, DNS over HTTPS and WHOIS lookup, SSL/TLS checker, Cloudflare manager with dynamic DNS, uptime monitor with Telegram alerts, Wi-Fi analyzer, proxy server, and HTTPS file sharing with chat for any browser: 21 network and developer tools in one free, open-source app. Now on the App Store for iPhone, iPad and Mac.**
+**Connection doctor, ping, traceroute and MTR, internet speed test, port scanner, SSH and SFTP client, cURL / HTTP client, DNS over HTTPS and WHOIS lookup, SSL/TLS checker, Cloudflare manager with dynamic DNS, uptime monitor with Telegram alerts, Wi-Fi analyzer and LAN device finder, packet capture, proxy server, and HTTPS file sharing with chat for any browser: 22 network and developer tools in one free, open-source app. Now on the App Store for iPhone, iPad and Mac.**
 
 [![License: MIT](https://img.shields.io/github/license/SinaXhpm/Echoes)](https://github.com/SinaXhpm/Echoes/blob/master/LICENSE)
 ![Platforms: iOS, iPadOS, macOS, Windows, Linux, Android](https://img.shields.io/badge/platform-iOS%20%7C%20iPadOS%20%7C%20macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Android-blue)
@@ -17,7 +17,7 @@
 **[App Store](https://apps.apple.com/app/id6824582968)** · **[Download](https://github.com/SinaXhpm/Echoes/releases/latest)** · [Tools](#tools-at-a-glance) · [Screenshots](#screenshots) · [Install](#download-and-install) · [iPhone & iPad](#iphone-ipad-and-mac-app-store) · [FAQ](#faq) · [Telegram](https://t.me/the_pink_palace)
 
 <p align="center">
-  <img src="docs/screenshots/demo.gif" width="860" alt="Echoes network toolkit slideshow: connection doctor finding SNI filtering with an anti-DPI fragment test, internet speed test with bufferbloat grade, ping latency graph, LAN file sharing and chat with QR code, uptime monitor, DNS over HTTPS resolver comparison, Wi-Fi analyzer, port scanner, cURL HTTP client, SSL/TLS inspector, proxy checker, Cloudflare DNS manager, SSH server health and String Lab JWT decoder">
+  <img src="docs/screenshots/demo.gif" width="828" alt="Echoes network toolkit slideshow, every tool in a browser-like tab: connection doctor finding SNI filtering with an anti-DPI fragment test, internet speed test with bufferbloat grade, ping latency graph, LAN file sharing and chat with QR code, uptime monitor, DNS over HTTPS resolver comparison, Wi-Fi analyzer, port scanner, cURL HTTP client, SSL/TLS inspector, proxy checker, Cloudflare DNS manager, SSH server health and String Lab JWT decoder">
 </p>
 
 ## What is Echoes?
@@ -32,6 +32,7 @@ Echoes is a free, open-source network toolkit with a simple graphical interface.
 - **No admin rights needed.** Where the system blocks normal (ICMP) ping, Echoes switches to UDP by itself. The one exception is [packet capture](#packet-capture), which every system guards.
 - **Private.** No account, no ads, no telemetry. Your data stays on your device and secrets are encrypted.
 - **Nothing runs by itself.** The web server, proxy, request catcher and socket listeners start only when you press Start, and stop when you stop them or quit.
+- **Tabs, like a browser.** Every tool opens in a tab, Ping, DNS, cURL or SSH as many times as you like; type a tool's name (or `dig`, `nmap`, `Postman`) to open it, and your tabs come back at the next start.
 - **Easy on the eyes.** Dark and light themes, a compact window, and layouts that also fit phone screens.
 
 ## Contents
@@ -124,6 +125,10 @@ The App Store versions update through the App Store. The downloaded versions sho
     <td><img src="docs/screenshots/ping-packet-options.png" width="380" alt="Ping packet options: payload size, Don't fragment, TTL, interval, count, timeout, IPv4 / IPv6"><br><b>Ping</b>: size, Don't fragment, TTL, count and more</td>
   </tr>
   <tr>
+    <td><img src="docs/screenshots/mtr-hop-whois.png" width="380" alt="MTR with one hop opened: the network, organization, country, address range, AS number and abuse contact of the router, with WHOIS, IP Info and Copy buttons"><br><b>MTR</b>: click a hop to see who runs it</td>
+    <td><img src="docs/screenshots/proxy-server-advanced.png" width="380" alt="Proxy server with Advanced open: outgoing interface, protocols, time-outs and limits, allowed clients and ports, blocked hosts, and an https:// upstream proxy whose certificate is trusted by its fingerprint"><br><b>Proxy</b>: outgoing interface, limits, rules and an upstream proxy</td>
+  </tr>
+  <tr>
     <td><img src="docs/screenshots/share-chat.png" width="380" alt="File sharing web server: HTTPS link, PIN and QR code, and a chat with a phone and a laptop"><br><b>Share &amp; chat</b>: link, PIN and QR code, live chat</td>
     <td><img src="docs/screenshots/share-files.png" width="380" alt="Share and chat files: shared and received files, the download folder, stored size and Clean up"><br><b>Share &amp; chat</b>: files both ways, folder and Clean up</td>
   </tr>
@@ -142,12 +147,12 @@ The App Store versions update through the App Store. The downloaded versions sho
 </table>
 
 <details>
-<summary><b>More screenshots</b>: TCP ping, email check, DoH / DoT, port scanner, network and Wi-Fi, cURL, TLS, proxy, Cloudflare, SSH, String Lab, password time to crack, About, light theme</summary>
+<summary><b>More screenshots</b>: TCP ping, email check, DoH / DoT, port scanner, network and Wi-Fi, devices on your network, packet capture, device info, cURL, TLS, proxy, Cloudflare, SSH, String Lab, password time to crack, About, light theme</summary>
 
 <table>
   <tr>
     <td><img src="docs/screenshots/ping-tcp.png" width="380" alt="TCP ping to port 443 with connect times"><br><b>Ping</b>: TCP ping to a port</td>
-    <td><img src="docs/screenshots/dns-email-check.png" width="380" alt="Email check: MX, SPF, DMARC, DKIM, MTA-STS, TLS-RPT and blocklists"><br><b>DNS</b>: email check (MX, SPF, DKIM, DMARC…)</td>
+    <td><img src="docs/screenshots/dns-email-check.png" width="380" alt="Email check: MX, SPF, DMARC, DKIM and MTA-STS, each with its verdict"><br><b>DNS</b>: email check (MX, SPF, DKIM, DMARC…)</td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/dns-doh-dot-lookup.png" width="380" alt="DNS lookup over DNS over HTTPS, DNS over TLS and plain DNS"><br><b>DNS</b>: lookups over DoH, DoT and plain DNS</td>
@@ -156,6 +161,10 @@ The App Store versions update through the App Store. The downloaded versions sho
   <tr>
     <td><img src="docs/screenshots/network-interfaces.png" width="380" alt="Network interfaces with IPv4, IPv6, gateway, DNS servers and MAC"><br><b>Network</b>: interfaces</td>
     <td><img src="docs/screenshots/wifi-analyzer.png" width="380" alt="Wi-Fi analyzer with signal, channel chart per band and nearby networks"><br><b>Network</b>: Wi-Fi analyzer and channel chart</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/network-find-devices.png" width="380" alt="Network devices: the devices found on the local network with their IP and MAC address, maker, name and services, the gateway and this device marked"><br><b>Network</b>: the devices on your network</td>
+    <td><img src="docs/screenshots/capture.png" width="380" alt="Packet capture: DNS, TCP, TLS, HTTP, QUIC, ICMP and ARP packets in a live table, with the selected TLS Client Hello's layers and hex dump"><br><b>Capture</b>: packets, their layers and bytes</td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/curl-http-client.png" width="380" alt="cURL HTTP client with a POST request and a pretty-printed JSON response"><br><b>cURL</b>: request and pretty JSON response</td>
@@ -174,7 +183,8 @@ The App Store versions update through the App Store. The downloaded versions sho
     <td><img src="docs/screenshots/string-lab-jwt.png" width="380" alt="String Lab JWT decoder verifying an HS256 signature"><br><b>String Lab</b>: JWT decode and verify</td>
   </tr>
   <tr>
-    <td colspan="2" align="center"><img src="docs/screenshots/string-lab-password-time-to-crack.png" width="380" alt="String Lab password generator with the time to crack in six situations, from a login with lockout to a state-level attacker"><br><b>String Lab</b>: password generator with time to crack</td>
+    <td><img src="docs/screenshots/string-lab-password-time-to-crack.png" width="380" alt="String Lab password generator with the time to crack in six situations, from a login with lockout to a state-level attacker"><br><b>String Lab</b>: password generator with time to crack</td>
+    <td><img src="docs/screenshots/device-info.png" width="380" alt="Device page: the computer's model, motherboard and firmware, processor, memory, graphics, disks and operating system"><br><b>Device</b>: every part of this computer</td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/about-box.png" width="380" alt="About box with version, update check and platform details"><br><b>About</b>: version, update check, bug-report info</td>
@@ -318,6 +328,10 @@ Interfaces work everywhere. Open ports are listed on every desktop system; devic
 
 A quick look at what is on the wire without leaving Echoes: a simple packet viewer in the spirit of Wireshark and tcpdump.
 
+<p align="center">
+  <img src="docs/screenshots/capture.png" width="640" alt="Echoes packet capture: DNS, TCP, TLS, HTTP, QUIC, ICMP, ARP and mDNS packets in a live table, and the selected TLS Client Hello with its layers, its server name and a hex dump">
+</p>
+
 - **Live table:** every packet on the interface you pick, one line each: time, source, destination, protocol, length and what it is (`51234 → 443 [SYN]`, `Standard query A example.com`, `Client Hello (SNI=example.com)`, `Who has 192.168.1.1?`). The table follows new packets until you scroll up or pick one.
 - **Reads the common protocols:** Ethernet (with VLAN tags), ARP, IPv4 and IPv6, TCP, UDP, ICMP and ICMPv6, DNS / mDNS / LLMNR, TLS (the server name of a Client Hello), HTTP, SSH, QUIC, DHCP, NTP, SSDP, STUN and WireGuard. Resets, ICMP errors and malformed packets are marked in red.
 - **Filters the way you already type them:** a protocol (`tcp`, `dns`, `arp`), tcpdump style (`host 1.1.1.1`, `net 10.0.0.0/8`, `port 443`, `src port 53`), Wireshark style (`ip.addr == 1.1.1.1`, `tcp.port == 443`, `frame.len > 1000`, `tcp.flags.syn`, `dns.name contains google`) or any text, joined with `and`, `or`, `not` and brackets. The filter applies as you type, and what it doesn't understand is said in a few words.
@@ -337,6 +351,10 @@ Nothing is reassembled or decrypted: it shows packets, not conversations. For th
 ### Device info
 
 Everything about the computer or phone Echoes runs on, read on the device itself when you open the page (nothing is sent anywhere, nothing runs in the background):
+
+<p align="center">
+  <img src="docs/screenshots/device-info.png" width="640" alt="Echoes device info: the computer's maker and model, motherboard and firmware, processor, memory, graphics, disks and operating system">
+</p>
 
 - **Device and firmware:** maker, model, type, serial number; the motherboard, BIOS / UEFI, Secure Boot and TPM.
 - **Processor:** name, cores and threads (performance and efficient cores on hybrid chips, clusters on phones), clocks, caches, instruction sets, and whether a hypervisor runs.
@@ -471,7 +489,7 @@ Chat and swap files with any phone or computer on your network. The other side o
 ### SOCKS5 and HTTP proxy server and proxy checker
 
 <p align="center">
-  <img src="docs/screenshots/proxy-checker.png" width="640" alt="Echoes proxy checker: a SOCKS5 and HTTP proxy list tested for type, connect time, first byte, exit IP and country">
+  <img src="docs/screenshots/proxy-server-advanced.png" width="640" alt="Echoes SOCKS5 and HTTP proxy server with Advanced open: outgoing interface, protocols with SOCKS5 UDP, time-outs and limits, allowed clients and ports, blocked hosts, and an https:// upstream proxy whose self-signed certificate is trusted by its fingerprint">
 </p>
 
 - A SOCKS5, SOCKS4 / 4a and HTTP proxy on a single port; the protocol is detected for each connection, and each one can be switched off.
@@ -519,7 +537,7 @@ Everyday developer text tools in one place.
 ## Interface
 
 <p align="center">
-  <img src="docs/screenshots/doctor-sni-filtering-light.png" width="640" alt="Echoes in the light theme: the connection doctor's SNI filtering verdict with the sidebar of all 20 tools">
+  <img src="docs/screenshots/doctor-sni-filtering-light.png" width="640" alt="Echoes in the light theme: the connection doctor's SNI filtering verdict, in its own tab">
 </p>
 
 - **Dark and light themes,** flat and built only from solid colors (no blur or transparency), so they stay light on older computers: near-black surfaces with hairline borders and one blue accent in the dark theme, light greys in the light one. Switch with the sun / moon button at the end of the top bar (in the slide-out menu on phones and tablets). The change is instant and remembered.
@@ -534,13 +552,13 @@ Everyday developer text tools in one place.
 Echoes is on the App Store as **[Echoes: Network Tools & Ping](https://apps.apple.com/app/id6824582968)**, free for iPhone, iPad and Mac. It's the same open-source app: a network troubleshooter, ping and traceroute, internet speed test, port scanner, DNS lookup, SSL certificate checker, SSH client, HTTP / API client and Wi-Fi file sharing, made for touch on iPhone and iPad.
 
 <p align="center">
-  <img src="docs/screenshots/ios-menu.png" width="200" alt="Echoes on iPhone: the menu of 20 network tools, including ping, speed test, DNS, port scanner and SSH">
+  <img src="docs/screenshots/ios-menu.png" width="200" alt="Echoes on iPhone: the menu of 21 network tools, including ping, Doctor, DNS, port scanner, speed test and device info">
   <img src="docs/screenshots/ios-doctor.png" width="200" alt="Echoes Doctor on iPhone: finds why a website won't open by checking the connection, DNS, TLS and HTTP">
   <img src="docs/screenshots/ios-speed-test.png" width="200" alt="Internet speed test on iPhone with download speed, ping and jitter">
   <img src="docs/screenshots/ios-share.png" width="200" alt="Wi-Fi file sharing and chat on iPhone with any browser, over HTTPS with a PIN">
 </p>
 <p align="center">
-  <img src="docs/screenshots/mac-app-store-doctor.png" width="640" alt="Echoes on the Mac App Store: the connection doctor beside the sidebar of all 20 network tools">
+  <img src="docs/screenshots/mac-app-store-doctor.png" width="640" alt="Echoes on the Mac App Store: the connection doctor checking a site, in its own tab">
 </p>
 
 - **Made for touch:** a slide-out menu with all 21 tools, finger-sized controls, pages that scroll in landscape or with the keyboard open, and press-and-hold to see what a button does.
