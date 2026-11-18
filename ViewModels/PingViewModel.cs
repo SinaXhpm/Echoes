@@ -132,6 +132,17 @@ public partial class PingViewModel : ObservableObject
         else Start();
     }
 
+    /// <summary>Another tool hands over a host (the Hetzner tool's server): pinged at once in Ping mode, as if it were
+    /// typed and started. A run going on stops first.</summary>
+    public void PingHost(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host)) return;
+        if (IsPinging) Stop();
+        ModeIndex = (int)PingMode.Ping;
+        TargetHost = host.Trim();
+        Start();
+    }
+
     /// <summary>Copies what the current mode shows: the MTR table as an mtr-style report, or the log (a ping run's log
     /// ends with ping's statistics summary).</summary>
     [RelayCommand]

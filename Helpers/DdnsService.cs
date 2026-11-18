@@ -22,20 +22,30 @@ public enum DdnsState
     Updated,
     /// <summary>The public IP couldn't be determined (offline, services disagree): nothing was changed.</summary>
     NoIp,
-    /// <summary>Cloudflare refused or couldn't be reached, or the record is gone.</summary>
+    /// <summary>The DNS provider refused or couldn't be reached, or the record is gone.</summary>
     Error,
+}
+
+/// <summary>Whose DNS a job keeps updated. A job saved without one (every job before Hetzner came) is Cloudflare's.</summary>
+public enum DdnsProvider
+{
+    Cloudflare,
+    Hetzner,
 }
 
 /// <summary>A read-only snapshot of one dynamic-DNS job, for the UI.</summary>
 public sealed class DdnsJobInfo
 {
     public string Id { get; init; } = string.Empty;
+    public DdnsProvider Provider { get; init; }
     /// <summary>The Echoes account it uses (its name when added / last synced).</summary>
     public string Account { get; init; } = string.Empty;
     /// <summary>Fingerprint of the account's credentials (<see cref="DdnsService.AccountKeyOf"/>), not a secret.</summary>
     public string AccountKey { get; init; } = string.Empty;
+    /// <summary>Cloudflare: the zone's 32-hex id. Hetzner: the zone's number.</summary>
     public string ZoneId { get; init; } = string.Empty;
     public string ZoneName { get; init; } = string.Empty;
+    /// <summary>Cloudflare: the record's 32-hex id. Hetzner: the record set's id, "name/TYPE" ("www/A", "@/AAAA").</summary>
     public string RecordId { get; init; } = string.Empty;
     public string RecordName { get; init; } = string.Empty;
     /// <summary>A or AAAA.</summary>
@@ -68,14 +78,19 @@ public sealed class DdnsPublicIp
 }
 
 /// <summary>
-/// Dynamic DNS for Cloudflare: keeps chosen A / AAAA records on this device's public IP. Runs while Echoes runs — the
-/// desktop tray included — every <see cref="Interval"/>, right away at start and shortly after a network change.
+/// Dynamic DNS for Cloudflare and Hetzner: keeps chosen A / AAAA records on this device's public IP. Runs while Echoes
+/// runs — the desktop tray included — every <see cref="Interval"/>, right away at start and shortly after a network change.
 ///
 /// <para>It must work after a restart WITHOUT the master password (the vault stays locked), so each job keeps its own
 /// copy of only what the update needs: the account's API token (or Global API key + email) and proxy settings — sealed
 /// with <see cref="SecretProtector"/> (the per-install device key, "enc2:") — plus the zone and record ids and names.
 /// The whole job list is sealed once more as the "ddns.jobs" profile setting; nothing of it is stored as plain text.
 /// Removing a job, or the account it uses, deletes that copy.</para>
+///
+/// <para>Each job names its <see cref="DdnsProvider"/>. Cloudflare jobs are saved exactly as before the provider came
+/// (no "prov" field, which reads as Cloudflare), so a list saved by an older build loads unchanged. A Hetzner job keeps
+/// one record set (zone number + "name/TYPE") holding a single value; it is changed with set_records only when the
+/// value differs, and a set with several values is left alone with an error, since replacing them would lose data.</para>
 ///
 /// <para>The public IP is asked directly (never through the account's proxy) and cross-checked between independent
 /// services (<see cref="DdnsIpDetector"/>); a record is written only when they agree and the record differs. The API
@@ -114,6 +129,7 @@ public sealed class DdnsService
 
     private sealed class Job
     {
+        public DdnsProvider Provider;
         public string Id = string.Empty, Account = string.Empty, AccountKey = string.Empty;
         public string ZoneId = string.Empty, ZoneName = string.Empty, RecordId = string.Empty, RecordName = string.Empty, Type = "A";
         public string Cred = string.Empty;   // the sealed credentials JSON: opened only for the API call that needs it
@@ -152,7 +168,18 @@ public sealed class DdnsService
     public sealed class Credentials
     {
         public Credentials(bool useToken, string? token, string? email, string? key, string? proxy, string? proxyUser, string? proxyPass)
+            : this(DdnsProvider.Cloudflare, useToken, token, email, key, proxy, proxyUser, proxyPass)
         {
+        }
+
+        /// <summary>A Hetzner project's API token and proxy.</summary>
+        public static Credentials ForHetzner(string? token, string? proxy, string? proxyUser, string? proxyPass)
+            => new(DdnsProvider.Hetzner, true, token, null, null, proxy, proxyUser, proxyPass);
+
+        private Credentials(DdnsProvider provider, bool useToken, string? token, string? email, string? key, string? proxy, string? proxyUser, string? proxyPass)
+        {
+            Provider = provider;
+            if (provider == DdnsProvider.Hetzner) useToken = true;   // a project has a token, nothing else
             UseToken = useToken;
             // only the sign-in method in use is kept
             Token = useToken ? (token ?? string.Empty).Trim() : string.Empty;
@@ -163,6 +190,7 @@ public sealed class DdnsService
             ProxyPass = Proxy.Length > 0 ? proxyPass ?? string.Empty : string.Empty;
         }
 
+        public DdnsProvider Provider { get; }
         public bool UseToken { get; }
         public string Token { get; }
         public string Email { get; }
@@ -172,22 +200,27 @@ public sealed class DdnsService
         public string ProxyPass { get; }
 
         public bool IsUsable => UseToken ? Token.Length > 0 : Email.Length > 0 && Key.Length > 0;
-        public string AccountKey => AccountKeyOf(UseToken, Token, Email, Key);
+        public string AccountKey => Provider == DdnsProvider.Hetzner ? HetznerKeyOf(Token) : AccountKeyOf(UseToken, Token, Email, Key);
 
         internal bool SameAs(Credentials o)
-            => UseToken == o.UseToken && Token == o.Token && Email == o.Email && Key == o.Key
+            => Provider == o.Provider && UseToken == o.UseToken && Token == o.Token && Email == o.Email && Key == o.Key
                && Proxy == o.Proxy && ProxyUser == o.ProxyUser && ProxyPass == o.ProxyPass;
 
-        internal string Seal() => SecretProtector.Protect(new JsonObject
+        internal string Seal()
         {
-            ["useToken"] = UseToken,
-            ["token"] = Token,
-            ["email"] = Email,
-            ["key"] = Key,
-            ["proxy"] = Proxy,
-            ["proxyUser"] = ProxyUser,
-            ["proxyPass"] = ProxyPass,
-        }.ToJsonString());
+            var o = new JsonObject
+            {
+                ["useToken"] = UseToken,
+                ["token"] = Token,
+                ["email"] = Email,
+                ["key"] = Key,
+                ["proxy"] = Proxy,
+                ["proxyUser"] = ProxyUser,
+                ["proxyPass"] = ProxyPass,
+            };
+            if (Provider == DdnsProvider.Hetzner) o["prov"] = "hetzner";   // a Cloudflare copy stays as it always was
+            return SecretProtector.Protect(o.ToJsonString());
+        }
 
         internal static Credentials? Open(string sealedJson)
         {
@@ -202,7 +235,14 @@ public sealed class DdnsService
             try
             {
                 if (JsonNode.Parse(json) is not JsonObject o) return null;
-                var c = new Credentials(CfJson.Bool(o["useToken"]), CfJson.Str(o["token"]), CfJson.Str(o["email"]), CfJson.Str(o["key"]),
+                var provider = CfJson.Str(o["prov"]) switch
+                {
+                    "" => DdnsProvider.Cloudflare,
+                    "hetzner" => DdnsProvider.Hetzner,
+                    _ => (DdnsProvider?)null,   // a provider of a newer build: not one this build can call
+                };
+                if (provider is null) return null;
+                var c = new Credentials(provider.Value, CfJson.Bool(o["useToken"]), CfJson.Str(o["token"]), CfJson.Str(o["email"]), CfJson.Str(o["key"]),
                                         CfJson.Str(o["proxy"]), CfJson.Str(o["proxyUser"]), CfJson.Str(o["proxyPass"]));
                 return c.IsUsable ? c : null;
             }
@@ -212,6 +252,9 @@ public sealed class DdnsService
         internal CloudflareApi CreateApi()
             => CloudflareApi.Create(UseToken, Token, Email, Key,
                                     Proxy.Length > 0 ? Proxy : null, Proxy.Length > 0 ? ProxyUser : null, Proxy.Length > 0 ? ProxyPass : null);
+
+        internal HetznerApi CreateHetznerApi()
+            => HetznerApi.Create(Token, Proxy.Length > 0 ? Proxy : null, Proxy.Length > 0 ? ProxyUser : null, Proxy.Length > 0 ? ProxyPass : null);
 
         public override string ToString() => "(credentials)";
     }
@@ -228,6 +271,29 @@ public sealed class DdnsService
             : "k|" + (email ?? string.Empty).Trim().ToLowerInvariant() + "|" + (key ?? string.Empty).Trim();
         byte[] mac = HMACSHA256.HashData(Encoding.UTF8.GetBytes("Echoes.DDNS.account.v1"), Encoding.UTF8.GetBytes(id));
         return Convert.ToHexString(mac, 0, 16).ToLowerInvariant();
+    }
+
+    /// <summary>The same kind of fingerprint for a Hetzner project's token, under its own label (so it can never equal a
+    /// Cloudflare account's).</summary>
+    public static string HetznerKeyOf(string? token)
+    {
+        byte[] mac = HMACSHA256.HashData(Encoding.UTF8.GetBytes("Echoes.DDNS.hetzner.v1"), Encoding.UTF8.GetBytes((token ?? string.Empty).Trim()));
+        return Convert.ToHexString(mac, 0, 16).ToLowerInvariant();
+    }
+
+    /// <summary>A Hetzner zone id as a job keeps it: the number in plain decimal ("12345", never "012345").</summary>
+    public static bool IsHetznerZoneKey(string? zoneId)
+        => HetznerApi.TryParseId(zoneId, out long id) && id.ToString(System.Globalization.CultureInfo.InvariantCulture) == zoneId;
+
+    /// <summary>A Hetzner record set id ("www/A", "@/AAAA") split into its checked name and type.</summary>
+    public static bool TrySplitRrsetId(string? id, out string name, out string type)
+    {
+        name = type = string.Empty;
+        int slash = id?.LastIndexOf('/') ?? -1;
+        if (slash <= 0) return false;
+        name = id![..slash];
+        type = id[(slash + 1)..];
+        return HetznerApi.IsRrName(name) && type is "A" or "AAAA";
     }
 
     // ================================================================ reading
@@ -260,16 +326,20 @@ public sealed class DdnsService
         get { lock (_gate) return _lastV6; }
     }
 
-    /// <summary>True when (<paramref name="zoneId"/>, <paramref name="recordId"/>) is kept updated.</summary>
-    public bool Has(string zoneId, string recordId)
+    /// <summary>True when the Cloudflare record (<paramref name="zoneId"/>, <paramref name="recordId"/>) is kept updated.</summary>
+    public bool Has(string zoneId, string recordId) => Has(DdnsProvider.Cloudflare, zoneId, recordId);
+
+    /// <summary>True when this provider's (<paramref name="zoneId"/>, <paramref name="recordId"/>) is kept updated.</summary>
+    public bool Has(DdnsProvider provider, string zoneId, string recordId)
     {
         EnsureLoaded();
-        lock (_gate) return Find(zoneId, recordId) != null;
+        lock (_gate) return Find(provider, zoneId, recordId) != null;
     }
 
     private static DdnsJobInfo Info(Job j) => new()
     {
         Id = j.Id,
+        Provider = j.Provider,
         Account = j.Account,
         AccountKey = j.AccountKey,
         ZoneId = j.ZoneId,
@@ -292,9 +362,11 @@ public sealed class DdnsService
     private static DateTimeOffset? Time(long unix) => unix > 0 ? DateTimeOffset.FromUnixTimeSeconds(unix) : null;
     private static long Now => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
-    private Job? Find(string zoneId, string recordId)
-        => _jobs.FirstOrDefault(j => string.Equals(j.ZoneId, zoneId, StringComparison.OrdinalIgnoreCase)
-                                     && string.Equals(j.RecordId, recordId, StringComparison.OrdinalIgnoreCase));
+    // Cloudflare ids are hex (any case); a Hetzner record set id holds a type, which is upper-case by definition.
+    private Job? Find(DdnsProvider provider, string zoneId, string recordId)
+        => _jobs.FirstOrDefault(j => j.Provider == provider
+                                     && string.Equals(j.ZoneId, zoneId, StringComparison.OrdinalIgnoreCase)
+                                     && string.Equals(j.RecordId, recordId, provider == DdnsProvider.Hetzner ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase));
 
     // ================================================================ changing
 
@@ -302,26 +374,33 @@ public sealed class DdnsService
     /// Keep a record updated with this device's public IP. Returns null when added (or already there: its account is
     /// refreshed), else a readable reason. The first check runs right away.
     /// </summary>
+    /// <remarks>The provider is the credentials' one. Hetzner: <paramref name="zoneId"/> is the zone's number and
+    /// <paramref name="recordId"/> the record set's "name/TYPE" (its type must be <paramref name="type"/>).</remarks>
     public string? Add(Credentials cred, string accountName, string zoneId, string zoneName, string recordId, string recordName,
                        string type, string? currentContent = null)
     {
-        if (!cred.IsUsable) return "This account has no API token or key.";
-        if (!CloudflareApi.IsId(zoneId) || !CloudflareApi.IsId(recordId)) return "This record can't be kept updated (unknown zone or record id).";
+        if (!cred.IsUsable) return cred.Provider == DdnsProvider.Hetzner ? "This project has no API token." : "This account has no API token or key.";
         type = (type ?? string.Empty).ToUpperInvariant();
         if (type is not ("A" or "AAAA")) return "Only A and AAAA records can follow your public IP.";
+        var provider = cred.Provider;
+        if (provider == DdnsProvider.Hetzner
+                ? !IsHetznerZoneKey(zoneId) || !TrySplitRrsetId(recordId, out _, out var setType) || setType != type
+                : !CloudflareApi.IsId(zoneId) || !CloudflareApi.IsId(recordId))
+            return "This record can't be kept updated (unknown zone or record id).";
         EnsureLoaded();
         lock (_gate)
         {
             if (_unreadable) return "Your saved dynamic DNS records can't be read right now (the device key is unavailable). Restart Echoes and try again.";
-            var job = Find(zoneId, recordId);
+            var job = Find(provider, zoneId, recordId);
             if (job is null)
             {
                 if (_jobs.Count >= MaxJobs) return $"At most {MaxJobs} records can be kept updated.";
                 job = new Job
                 {
+                    Provider = provider,
                     Id = Convert.ToHexString(RandomNumberGenerator.GetBytes(8)).ToLowerInvariant(),
                     ZoneId = zoneId.ToLowerInvariant(),
-                    RecordId = recordId.ToLowerInvariant(),
+                    RecordId = provider == DdnsProvider.Hetzner ? recordId : recordId.ToLowerInvariant(),
                     Type = type,
                     RecordIp = DdnsIpDetector.Canonical(currentContent) ?? string.Empty,
                 };
@@ -359,12 +438,15 @@ public sealed class DdnsService
         return removed;
     }
 
-    /// <summary>Stop keeping (<paramref name="zoneId"/>, <paramref name="recordId"/>) updated.</summary>
-    public bool RemoveRecord(string zoneId, string recordId)
+    /// <summary>Stop keeping the Cloudflare record (<paramref name="zoneId"/>, <paramref name="recordId"/>) updated.</summary>
+    public bool RemoveRecord(string zoneId, string recordId) => RemoveRecord(DdnsProvider.Cloudflare, zoneId, recordId);
+
+    /// <summary>Stop keeping this provider's (<paramref name="zoneId"/>, <paramref name="recordId"/>) updated.</summary>
+    public bool RemoveRecord(DdnsProvider provider, string zoneId, string recordId)
     {
         EnsureLoaded();
         string? id;
-        lock (_gate) id = Find(zoneId, recordId)?.Id;
+        lock (_gate) id = Find(provider, zoneId, recordId)?.Id;
         return id != null && Remove(id);
     }
 
@@ -399,7 +481,7 @@ public sealed class DdnsService
             if (_unreadable) return 0;
             string newKey = cred.AccountKey;
             string name = Clip(accountName, 60);
-            foreach (var j in _jobs.Where(j => j.AccountKey == oldKey))
+            foreach (var j in _jobs.Where(j => j.AccountKey == oldKey && j.Provider == cred.Provider))
             {
                 bool any = false;
                 var current = Credentials.Open(j.Cred);
@@ -466,7 +548,7 @@ public sealed class DdnsService
             {
                 if (JsonNode.Parse(json) is JsonArray arr)
                     foreach (var n in arr)
-                        if (n is JsonObject o && Parse(o) is { } job && Find(job.ZoneId, job.RecordId) is null && _jobs.Count < MaxJobs)
+                        if (n is JsonObject o && Parse(o) is { } job && Find(job.Provider, job.ZoneId, job.RecordId) is null && _jobs.Count < MaxJobs)
                             _jobs.Add(job);
             }
             catch (JsonException) { _jobs.Clear(); }
@@ -477,16 +559,32 @@ public sealed class DdnsService
     private static Job? Parse(JsonObject o)
     {
         string zone = CfJson.Str(o["zone"]), rec = CfJson.Str(o["rec"]), type = CfJson.Str(o["type"]);
-        if (!CloudflareApi.IsId(zone) || !CloudflareApi.IsId(rec) || type is not ("A" or "AAAA")) return null;
+        // no "prov": a job saved before providers existed, which is Cloudflare's
+        DdnsProvider provider;
+        switch (CfJson.Str(o["prov"]))
+        {
+            case "":
+                provider = DdnsProvider.Cloudflare;
+                if (!CloudflareApi.IsId(zone) || !CloudflareApi.IsId(rec)) return null;
+                break;
+            case "hetzner":
+                provider = DdnsProvider.Hetzner;
+                if (!IsHetznerZoneKey(zone) || !TrySplitRrsetId(rec, out _, out var setType) || setType != type) return null;
+                break;
+            default:
+                return null;   // a provider of a newer build
+        }
+        if (type is not ("A" or "AAAA")) return null;
         string id = CfJson.Str(o["id"]);
         var job = new Job
         {
+            Provider = provider,
             Id = id.Length is > 0 and <= 32 ? id : Convert.ToHexString(RandomNumberGenerator.GetBytes(8)).ToLowerInvariant(),
             Account = Clip(CfJson.Str(o["acct"]), 60),
             AccountKey = CfJson.Str(o["acctKey"]),
             ZoneId = zone.ToLowerInvariant(),
             ZoneName = Clip(CfJson.Str(o["zoneName"]), 253),
-            RecordId = rec.ToLowerInvariant(),
+            RecordId = provider == DdnsProvider.Hetzner ? rec : rec.ToLowerInvariant(),
             RecordName = Clip(CfJson.Str(o["name"]), 253),
             Type = type,
             Cred = CfJson.Str(o["cred"]),
@@ -522,7 +620,8 @@ public sealed class DdnsService
         }
         var arr = new JsonArray();
         foreach (var j in _jobs)
-            arr.Add((JsonNode)new JsonObject
+        {
+            var o = new JsonObject
             {
                 ["id"] = j.Id,
                 ["acct"] = j.Account,
@@ -548,7 +647,11 @@ public sealed class DdnsService
                     DdnsState.Error => "error",
                     _ => "pending",
                 },
-            });
+            };
+            // Cloudflare jobs are written as they always were (an older build reads them back unchanged)
+            if (j.Provider == DdnsProvider.Hetzner) o["prov"] = "hetzner";
+            arr.Add((JsonNode)o);
+        }
         ProfileService.Instance.SetSetting(SettingKey, SecretProtector.Protect(arr.ToJsonString()));
     }
 
@@ -785,12 +888,20 @@ public sealed class DdnsService
         }
 
         var creds = Credentials.Open(cred);
-        if (creds is null)
+        if (creds is null || creds.Provider != job.Provider)
         {
             lock (_gate) job.NeedsAccount = true;
             Finish(job, DdnsState.Error,
-                   "Its saved token can't be opened on this device. Unlock Cloudflare in Echoes once (with this account in it) to resume.",
+                   job.Provider == DdnsProvider.Hetzner
+                       ? "Its saved token can't be opened on this device. Open the Hetzner tool once (with this project in it, confirmed as yours) to resume."
+                       : "Its saved token can't be opened on this device. Unlock Cloudflare in Echoes once (with this account in it) to resume.",
                    Backoff.Refused);
+            return;
+        }
+
+        if (job.Provider == DdnsProvider.Hetzner)
+        {
+            await CheckHetznerAsync(job, creds, zoneId, recordId, address, ct).ConfigureAwait(false);
             return;
         }
 
@@ -838,6 +949,104 @@ public sealed class DdnsService
             Finish(job, DdnsState.Updated, old.Length > 0 ? $"Changed from {old} to {address}." : $"Set to {address}.",
                    Backoff.None, recordIp: address, verified: true, previous: old);
         }
+    }
+
+    // A Hetzner record set: one GET, and a set_records only when its single value isn't the address. A set with several
+    // values (round robin, a second host) is never rewritten to one: that would drop the others.
+    private async Task CheckHetznerAsync(Job job, Credentials creds, string zoneId, string recordId, string address, CancellationToken ct)
+    {
+        if (!HetznerApi.TryParseId(zoneId, out long zone) || !TrySplitRrsetId(recordId, out var name, out var type))
+        {
+            Finish(job, DdnsState.Error, "This record set can't be kept updated (unknown zone or name). Remove it here.", Backoff.Refused);
+            return;
+        }
+        HetznerApi api;
+        try { api = creds.CreateHetznerApi(); }
+        catch (ArgumentException ex)
+        {
+            Finish(job, DdnsState.Error, ex.Message, Backoff.Refused);
+            return;
+        }
+        using (api)
+        {
+            string path = HetznerApi.RrsetPath(zone, name, type);
+            var read = await api.GetAsync(path, ct).ConfigureAwait(false);
+            if (!read.Success)
+            {
+                FinishHetznerError(job, read, "read");
+                return;
+            }
+            var rrset = read.Body?["rrset"];
+            var records = rrset?["records"] as JsonArray;
+            int count = records?.Count ?? 0;
+            if (count > 1)
+            {
+                Finish(job, DdnsState.Error,
+                       $"This record set holds {count} values. Dynamic DNS keeps exactly one value on your IP, so nothing was changed. Leave one value in it, or remove it here.",
+                       Backoff.Refused);
+                return;
+            }
+            if (CfJson.Bool(rrset?["protection"]?["change"]))
+            {
+                Finish(job, DdnsState.Error, "This record set is protected against changes. Turn its protection off in the Hetzner Console, or remove it here.",
+                       Backoff.Refused);
+                return;
+            }
+            string currentRaw = count == 1 ? CfJson.Str(records![0]?["value"]) : string.Empty;
+            string? current = DdnsIpDetector.Canonical(currentRaw);
+            if (current == address)
+            {
+                Finish(job, DdnsState.UpToDate, $"Up to date ({address}).", Backoff.None, recordIp: address, verified: true);
+                return;
+            }
+
+            // removed (or replaced by a restore) while the set was read: no longer ours to change
+            lock (_gate)
+                if (!_jobs.Contains(job)) return;
+            var record = new JsonObject { ["value"] = address };
+            // the value's comment is the user's own note: it stays with the new address
+            string comment = count == 1 ? CfJson.Str(records![0]?["comment"]) : string.Empty;
+            if (comment.Length is > 0 and <= 1000) record["comment"] = comment;
+            var write = await api.PostAsync(path + "/actions/set_records", new JsonObject { ["records"] = new JsonArray { (JsonNode)record } }, ct)
+                                 .ConfigureAwait(false);
+            if (!write.Success)
+            {
+                FinishHetznerError(job, write, "update");
+                return;
+            }
+            if (HzAction.From(write.Body?["action"]) is { IsSuccess: false } action)
+            {
+                var done = await api.WaitActionAsync("zones", action, null, ct, TimeSpan.FromSeconds(60)).ConfigureAwait(false);
+                if (!done.Ok && !done.StillRunning)
+                {
+                    Finish(job, DdnsState.Error, "Hetzner couldn't update the record set: " + done.Error, Backoff.Network);
+                    return;
+                }
+            }
+            string old = current ?? HetznerApi.Clip(currentRaw, 100);
+            Finish(job, DdnsState.Updated, old.Length > 0 ? $"Changed from {old} to {address}." : $"Set to {address}.",
+                   Backoff.None, recordIp: address, verified: true, previous: old);
+        }
+    }
+
+    private void FinishHetznerError(Job job, HzResponse r, string what)
+    {
+        string zone;
+        lock (_gate) zone = job.ZoneName.Length > 0 ? job.ZoneName : "its zone";
+        if (r.NotFound)
+        {
+            Finish(job, DdnsState.Error, $"The record set no longer exists in {zone}. Remove it here, or turn it on again for the new one.", Backoff.Refused);
+            return;
+        }
+        if (r.AuthFailed || r.ReadOnly || r.Code == "protected")
+        {
+            Finish(job, DdnsState.Error, $"Hetzner refused to {what} the record set: {r.Error}", Backoff.Refused);
+            return;
+        }
+        string text = r.Error.StartsWith("Couldn't reach Hetzner", StringComparison.Ordinal) || r.Error.StartsWith("Hetzner", StringComparison.Ordinal)
+            ? r.Error
+            : $"Couldn't {what} the record set: {r.Error}";
+        Finish(job, DdnsState.Error, text, Backoff.Network);
     }
 
     private void FinishApiError(Job job, CfResponse r, string what)

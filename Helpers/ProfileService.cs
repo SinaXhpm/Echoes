@@ -349,6 +349,34 @@ public sealed class ProfileService : ISettings
         disabled.Add(key);
     }
 
+    // The Hetzner tool's projects (one sealed JSON value: names, API tokens, proxies). A backup may be someone else's: its
+    // projects come in marked "restored", so dynamic DNS doesn't take their tokens until the user confirms each project
+    // in the Hetzner tool (a planted project + record set would have this device write its public IP into another
+    // person's DNS), and their proxies come in switched off. A value that is neither carried nor plain JSON was sealed
+    // by another install and can't open here anyway (HetznerStore also treats any value it didn't seal as restored).
+    private static void DisarmHetznerImport(Dictionary<string, string> settings, List<string> disabled)
+    {
+        const string key = HetznerStore.SettingKey;
+        if (!settings.TryGetValue(key, out var value) || value.Length == 0) return;
+        bool carried = value.StartsWith(BackupPlainPrefix, StringComparison.Ordinal);
+        string json;
+        if (carried)
+        {
+            try { json = Encoding.UTF8.GetString(Convert.FromBase64String(value[BackupPlainPrefix.Length..])); }
+            catch (FormatException) { return; }   // SealBackupValue drops a damaged value
+        }
+        else if (value.TrimStart().StartsWith('{')) json = value;
+        else return;
+
+        string? rewritten = HetznerStore.DisarmJson(json, disabled);
+        if (rewritten is null)
+        {
+            settings.Remove(key);   // unreadable: the Hetzner tool would ignore it anyway
+            return;
+        }
+        settings[key] = carried ? BackupPlainPrefix + Convert.ToBase64String(Encoding.UTF8.GetBytes(rewritten)) : rewritten;
+    }
+
     // A known-hosts key ("host:port", IPv6 hosts included) as SshHostKeyCheck.PinId spells it: host trimmed, without a
     // trailing dot, lower-case.
     private static string NormalizePinId(string key)
@@ -415,6 +443,7 @@ public sealed class ProfileService : ISettings
 
         var disabled = new List<string>();
         DisarmCurlSavedImport(settings, disabled);   // before the sealing below: it reads the carried plain JSON
+        DisarmHetznerImport(settings, disabled);     // likewise
 
         // Secrets the backup carries in the clear (see ExportForBackup) are sealed again with this install's key.
         foreach (var key in settings.Keys.ToList())

@@ -28,6 +28,7 @@ public partial class MainViewModel : ObservableObject
     private NetworkInfoViewModel? _networkVM;
     private NoteViewModel? _noteVM;
     private CloudflareViewModel? _cloudflareVM;
+    private HetznerViewModel? _hetznerVM;
     private HistoryViewModel? _historyVM;
     private BackupViewModel? _backupVM;
     private WebServerViewModel? _webServerVM;
@@ -45,6 +46,7 @@ public partial class MainViewModel : ObservableObject
     public NetworkInfoViewModel NetworkVM => _networkVM ??= new();
     public NoteViewModel NoteVM => _noteVM ??= new();
     public CloudflareViewModel CloudflareVM => _cloudflareVM ??= new();
+    public HetznerViewModel HetznerVM => _hetznerVM ??= new(this);
     public HistoryViewModel HistoryVM => _historyVM ??= new();
     public BackupViewModel BackupVM => _backupVM ??= new();
     public WebServerViewModel WebServerVM => _webServerVM ??= new();
@@ -58,7 +60,7 @@ public partial class MainViewModel : ObservableObject
     public object? MainTool(string tag) => tag switch
     {
         "PING" => PingVM, "DOCTOR" => DoctorVM, "DNS" => DnsVM, "CURL" => CurlVM, "IP INFO" => IpInfoVM,
-        "CHECK-HOST" => CheckHostVM, "CLOUDFLARE" => CloudflareVM, "SCANNER" => PortScannerVM,
+        "CHECK-HOST" => CheckHostVM, "CLOUDFLARE" => CloudflareVM, "HETZNER" => HetznerVM, "SCANNER" => PortScannerVM,
         "WEB SERVER" => WebServerVM, "PROXY" => ProxyVM, "NETWORK" => NetworkVM, "MONITOR" => MonitorVM,
         "SSH" => SshVM, "STRING LAB" => StringTool, "NOTES" => NoteVM, "HISTORY" => HistoryVM, "BACKUP" => BackupVM,
         _ => null,

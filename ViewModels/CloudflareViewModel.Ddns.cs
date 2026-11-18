@@ -113,7 +113,7 @@ public partial class CfDdnsRow : ObservableObject
 /// </summary>
 public partial class CloudflareViewModel
 {
-    /// <summary>Every record kept updated (all zones and accounts), for the panel.</summary>
+    /// <summary>Every Cloudflare record kept updated (all zones and accounts), for the panel.</summary>
     public ObservableCollection<CfDdnsRow> DdnsRows { get; } = new();
 
     [ObservableProperty] private bool _isDdnsOpen;
@@ -174,7 +174,8 @@ public partial class CloudflareViewModel
     private void RefreshDdns()
     {
         var svc = DdnsService.Instance;
-        var jobs = svc.Jobs;
+        // the Hetzner tool shows and manages its own jobs
+        var jobs = svc.Jobs.Where(j => j.Provider == DdnsProvider.Cloudflare).ToList();
         _ddnsByRecord = new Dictionary<string, DdnsJobInfo>(StringComparer.OrdinalIgnoreCase);
         foreach (var j in jobs) _ddnsByRecord[DdnsRecordKey(j.ZoneId, j.RecordId)] = j;
 

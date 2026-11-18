@@ -284,6 +284,13 @@
 								<TextBlock Text="Cloudflare" VerticalAlignment="Center"/>
 							</StackPanel>
 						</ctl:NavListItem>
+						<ctl:NavListItem Tag="HETZNER" Title="Hetzner Cloud"
+										 Subtitle="Servers, firewalls, DNS, DDNS" AutomationProperties.Name="Hetzner Cloud">
+							<StackPanel Orientation="Horizontal" Spacing="12">
+								<Path Classes="ico" Data="{StaticResource IcoHetzner}"/>
+								<TextBlock Text="Hetzner Cloud" VerticalAlignment="Center"/>
+							</StackPanel>
+						</ctl:NavListItem>
 						<ctl:NavListItem Tag="TELEGRAM BOT" Title="Telegram Bot"
 										 Subtitle="Bot API calls, uploads, updates" AutomationProperties.Name="Telegram Bot">
 							<StackPanel Orientation="Horizontal" Spacing="12">
@@ -389,6 +396,7 @@
 					<Decorator/>	<!-- TLS -->
 					<Decorator/>	<!-- IP INFO -->
 					<Decorator/>	<!-- CLOUDFLARE -->
+					<Decorator/>	<!-- HETZNER -->
 					<Decorator/>	<!-- TELEGRAM BOT -->
 					<Decorator/>	<!-- SSH -->
 					<Decorator/>	<!-- SOCKET -->

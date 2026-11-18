@@ -1154,6 +1154,7 @@ internal static class ToolViews
         "IP INFO" => new IpInfoView { DataContext = vm.IpInfoVM },
         "CHECK-HOST" => new CheckHostView { DataContext = vm.CheckHostVM },
         "CLOUDFLARE" => new CloudflareView { DataContext = vm.CloudflareVM },
+        "HETZNER" => new HetznerView { DataContext = vm.HetznerVM },
         "SCANNER" => new PortScannerView { DataContext = vm.PortScannerVM },
         "WEB SERVER" => new WebServerView { DataContext = vm.WebServerVM },
         "PROXY" => new ProxyView { DataContext = vm.ProxyVM },

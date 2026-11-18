@@ -17,6 +17,13 @@ public interface IToolLinks
 
     /// <summary>DNS &amp; WHOIS, running WHOIS (RDAP) for <paramref name="query"/>: a domain, an IP or an AS number.</summary>
     void Whois(string query);
+
+    /// <summary>Ping, pinging <paramref name="host"/> at once.</summary>
+    void Ping(string host);
+
+    /// <summary>SSH, with <paramref name="host"/> in the connection form (a saved server with that address is picked).
+    /// It never connects by itself: the user signs in.</summary>
+    void Ssh(string host);
 }
 
 /// <summary>A tool to show (its nav tag). <paramref name="Apply"/>: what to hand it once its page is there, given the
@@ -38,6 +45,10 @@ public partial class MainViewModel : IToolLinks
     public void LookUpIp(string ip) => Hand("IP INFO", tool => (tool as IpInfoViewModel)?.LookUp(ip));
 
     public void Whois(string query) => Hand("DNS", tool => (tool as DnsViewModel)?.Whois(query));
+
+    public void Ping(string host) => Hand("PING", tool => (tool as PingViewModel)?.PingHost(host));
+
+    public void Ssh(string host) => Hand("SSH", tool => (tool as SshViewModel)?.Prefill(host));
 
     // The page first: the shell shows it (making its view-model) and hands that view-model over. With no shell listening
     // (a test harness), the main view-model gets it.

@@ -19,8 +19,16 @@ public static class AppStorage
     private static readonly object PermsGate = new();
     private static bool _permsTightened;
 
+    /// <summary>
+    /// Test hook: every file of the app (profile, secret key, vaults) goes into this folder instead of the user's data
+    /// folder. The test project sets it before anything is read, so a test never reads or writes the profile or the key
+    /// of the Echoes installed on the computer. Null in the app; not bound to any UI or setting.
+    /// </summary>
+    internal static string? TestDir { get; set; }
+
     public static string ResolvePath(string fileName)
     {
+        if (TestDir is not null) return Path.Combine(UserDir(), fileName);
         string baseDir = AppContext.BaseDirectory;
 
         // Next to the executable only on Windows (portable copies of old builds kept their files there). Elsewhere the
@@ -49,6 +57,11 @@ public static class AppStorage
     /// </summary>
     public static string UserDir()
     {
+        if (TestDir is { } test)
+        {
+            Directory.CreateDirectory(test);
+            return test;
+        }
         if (PortableDir.Value is { } portable) return portable;
         string dir = Path.Combine(AppDataRoot(), "Echoes");
         try
@@ -186,6 +199,7 @@ public static class AppStorage
     public static string UserPath(string fileName)
     {
         string userDir = UserDir();
+        if (TestDir is not null) return Path.Combine(userDir, fileName);   // nothing beside the test program is migrated
 
         string target = Path.Combine(userDir, fileName);
         string legacy = Path.Combine(AppContext.BaseDirectory, fileName);

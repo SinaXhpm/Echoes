@@ -1,6 +1,6 @@
 # Echoes privacy policy
 
-Last updated: 18 November 2026
+Last updated: 19 November 2026
 
 Echoes is a free, open-source network toolkit (ping, traceroute, port scanner, DNS, SSH, speed test, file-sharing web server and more). This page says what it does with your data. The short version: **it collects none.**
 
@@ -10,7 +10,7 @@ Nothing. Echoes has no account, no advertising, no analytics, no crash-reporting
 
 ## What stays on your device
 
-Your settings, the hosts and URLs you typed (history), notes, saved requests, SSH profiles and the tokens you add (Telegram, Cloudflare) are stored only on your device, in the app's own data folder.
+Your settings, the hosts and URLs you typed (history), notes, saved requests, SSH profiles and the tokens you add (Telegram, Cloudflare, Hetzner) are stored only on your device, in the app's own data folder.
 
 - Secrets (passwords, tokens) are encrypted on disk. Notes and the Cloudflare vault are encrypted with a key made from your master password.
 - You can export everything to one password-protected backup file and restore it on another device. The file goes only where you save it.
@@ -39,7 +39,7 @@ Echoes is a network tool, so it makes network requests: the ones you start, to t
 - **DNS blocklists** (Spamhaus, SpamCop, Barracuda, PSBL, DroneBL) and the domain's own mail records, when you run the mail check on a domain.
 - **Connectivity and public-IP services:** well-known sites such as Google, Microsoft and Cloudflare, and the connectivity checks of Cloudflare, Google, Microsoft, Apple, Xiaomi, Huawei and Ubuntu, one after another until one answers (the Doctor checks that the internet works), and Cloudflare, ipify, ident.me and icanhazip (Dynamic DNS reads your public IP).
 - **More public-IP services for Dynamic DNS**, asked only when the first two don't agree or don't answer: Cloudflare at one.one.one.one and 1.1.1.1, Amazon (checkip.amazonaws.com), ipinfo.io, ifconfig.me, ifconfig.co, ip.sb, ipecho.net, wtfismyip.com, myexternalip.com, Mullvad (am.i.mullvad.net), and the DNS servers of OpenDNS, Google and Cloudflare, which answer with the address they see.
-- **Telegram** (api.telegram.org), only if you add your own bot token for uptime alerts, and **Cloudflare** (api.cloudflare.com), only if you add your own API token. A token stays on your device and is sent only to its own service.
+- **Telegram** (api.telegram.org), only if you add your own bot token for uptime alerts, **Cloudflare** (api.cloudflare.com), only if you add your own API token, and **Hetzner** (api.hetzner.cloud), only if you add your own API token for a Hetzner Cloud project. A token stays on your device, encrypted, and is sent only to its own service.
 - **GitHub** (api.github.com, or github.com's page for the latest release when the API doesn't answer), only in the builds you download from GitHub, to see whether a newer version exists. Builds from an app store don't check: the store updates the app.
 
 ## Servers Echoes can run

@@ -1,0 +1,1434 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Echoes.ViewModels"
+             xmlns:helpers="using:Echoes.Helpers"
+             xmlns:ctl="using:Echoes.Views.Controls"
+             x:Class="Echoes.Views.HetznerView"
+             x:DataType="vm:HetznerViewModel">
+
+    <UserControl.Resources>
+        <!-- Stroked glyphs drawn in a 16x16 box (Path.glyph, Stretch=None), the Cloudflare tool's set -->
+        <StreamGeometry x:Key="HzGlyphHelp">M8 1.75 A6.25 6.25 0 1 0 8 14.25 A6.25 6.25 0 1 0 8 1.75 Z M6.25 6.3 A1.8 1.8 0 1 1 8.85 7.9 C8.3 8.2 8 8.6 8 9.25 V9.5 M8 11.5 V11.6</StreamGeometry>
+        <StreamGeometry x:Key="HzGlyphRefresh">M14 8 A6 6 0 1 1 8 2 C9.68 2 11.29 2.67 12.49 3.83 L14 5.33 M14 2 V5.33 H10.67</StreamGeometry>
+        <StreamGeometry x:Key="HzGlyphSearch">M7 2.5 A4.5 4.5 0 1 0 7 11.5 A4.5 4.5 0 1 0 7 2.5 Z M10.3 10.3 L13.5 13.5</StreamGeometry>
+        <StreamGeometry x:Key="HzGlyphPlus">M8 3 V13 M3 8 H13</StreamGeometry>
+        <StreamGeometry x:Key="HzGlyphEdit">M10.75 2.75 L13.25 5.25 L5.5 13 H3 V10.5 Z M9.25 4.25 L11.75 6.75</StreamGeometry>
+        <StreamGeometry x:Key="HzGlyphTrash">M2.5 4.5 H13.5 M6.5 4.5 V2.75 H9.5 V4.5 M4 4.5 L4.7 12.6 A1 1 0 0 0 5.7 13.5 H10.3 A1 1 0 0 0 11.3 12.6 L12 4.5 M6.75 7 V11 M9.25 7 V11</StreamGeometry>
+        <StreamGeometry x:Key="HzGlyphCopy">M6 5.5 H12 A1.5 1.5 0 0 1 13.5 7 V13 A1.5 1.5 0 0 1 12 14.5 H6 A1.5 1.5 0 0 1 4.5 13 V7 A1.5 1.5 0 0 1 6 5.5 Z M2.5 10.5 V4 A1.5 1.5 0 0 1 4 2.5 H10.5</StreamGeometry>
+        <StreamGeometry x:Key="HzGlyphMore">M3.5 8 H3.6 M8 8 H8.1 M12.5 8 H12.6</StreamGeometry>
+        <StreamGeometry x:Key="HzGlyphBack">M10 3.5 L5.5 8 L10 12.5</StreamGeometry>
+        <StreamGeometry x:Key="HzGlyphPower">M8 2 V7.5 M4.7 4.3 A5 5 0 1 0 11.3 4.3</StreamGeometry>
+        <StreamGeometry x:Key="HzGlyphLock">M4.5 7 H11.5 A1 1 0 0 1 12.5 8 V12.5 A1 1 0 0 1 11.5 13.5 H4.5 A1 1 0 0 1 3.5 12.5 V8 A1 1 0 0 1 4.5 7 Z M5.5 7 V5 A2.5 2.5 0 0 1 10.5 5 V7</StreamGeometry>
+        <!-- dynamic DNS: two arrows chasing round (the record follows the IP) -->
+        <StreamGeometry x:Key="HzGlyphSync">M13.25 6.5 A5.5 5.5 0 0 0 3.1 5.4 M2.75 2.5 V5.5 H5.75 M2.75 9.5 A5.5 5.5 0 0 0 12.9 10.6 M13.25 13.5 V10.5 H10.25</StreamGeometry>
+        <StreamGeometry x:Key="HzGlyphDown">M8 2.5 V10 M4.75 6.75 L8 10 L11.25 6.75 M2.5 10.5 V12 A1.5 1.5 0 0 0 4 13.5 H12 A1.5 1.5 0 0 0 13.5 12 V10.5</StreamGeometry>
+        <StreamGeometry x:Key="HzGlyphUp">M8 10 V2.5 M4.75 5.75 L8 2.5 L11.25 5.75 M2.5 10.5 V12 A1.5 1.5 0 0 0 4 13.5 H12 A1.5 1.5 0 0 0 13.5 12 V10.5</StreamGeometry>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- ===== glyphs (a Path doesn't inherit Foreground: follow the button's text color) ===== -->
+        <Style Selector="Path.glyph">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="None"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stroke" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Path.glyph.dots">
+            <Setter Property="StrokeThickness" Value="2.4"/>
+        </Style>
+        <Style Selector="Button.primary Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Button.primary:disabled Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
+        <Style Selector="Button.secondary Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.ghost:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.icon:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Button.secondary:disabled Path.glyph, Button.ghost:disabled Path.glyph, Button.icon:disabled Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
+
+        <!-- ===== small text styles ===== -->
+        <Style Selector="TextBlock.hint">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.tabHint">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.pageText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="LineHeight" Value="18"/>
+        </Style>
+        <Style Selector="TextBlock.emptyText">
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="24"/>
+            <Setter Property="MaxWidth" Value="460"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+
+        <!-- tinted note (a solid soft fill + hairline per tone) -->
+        <Style Selector="Border.note">
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+        </Style>
+        <Style Selector="Border.note TextBlock">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="LineHeight" Value="17"/>
+        </Style>
+        <Style Selector="Border.note.warning">
+            <Setter Property="Background" Value="{DynamicResource Warning.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Warning.Border}"/>
+        </Style>
+        <Style Selector="Border.note.warning TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="Border.note.danger">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+        </Style>
+        <Style Selector="Border.note.danger TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Border.note.info">
+            <Setter Property="Background" Value="{DynamicResource Info.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Info.Border}"/>
+        </Style>
+        <Style Selector="Border.note.info TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Info}"/>
+        </Style>
+        <Style Selector="Border.note SelectableTextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <!-- inline confirmation (remove, power off, delete): a solid danger-tinted strip -->
+        <Style Selector="Border.confirm">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Padding" Value="12,6,6,6"/>
+        </Style>
+        <Style Selector="Border.confirm TextBlock.confirmText">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- ===== the project line ===== -->
+        <Style Selector="TextBlock.acctSummary">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Ellipse.acctDot">
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Height" Value="8"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Fill" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
+        <Style Selector="Ellipse.acctDot.on">
+            <Setter Property="Fill" Value="{DynamicResource Success}"/>
+        </Style>
+        <!-- the picker beside its buttons (wide) · taking the line up to them (narrow) -->
+        <Style Selector="ComboBox#ProjectPicker">
+            <Setter Property="MinWidth" Value="200"/>
+            <Setter Property="MaxWidth" Value="320"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow ComboBox#ProjectPicker">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MaxWidth" Value="100000"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+
+        <!-- quiet square icon button for rows (edit / delete / copy); Control.Height square, so a 44px touch target on phones -->
+        <Style Selector="Button.rowBtn">
+            <Setter Property="Width" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.rowBtn Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+        <Style Selector="Button.rowBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedHover}"/>
+        </Style>
+        <Style Selector="Button.rowBtn:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedPressed}"/>
+        </Style>
+        <Style Selector="Button.rowBtn:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.rowBtn.del:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+        </Style>
+        <Style Selector="Button.rowBtn.del:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Button.rowBtn:disabled Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
+        <Style Selector="Button.rowBtn:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.rowBtn.ddns.on /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Accent.Soft}"/>
+        </Style>
+        <Style Selector="Button.rowBtn.ddns.on Path.glyph, Button.rowBtn.ddns.on:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Accent.Text}"/>
+        </Style>
+        <Style Selector="Button.rowBtn.ddns.on.err /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Warning.Soft}"/>
+        </Style>
+        <Style Selector="Button.rowBtn.ddns.on.err Path.glyph, Button.rowBtn.ddns.on.err:pointerover Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Warning}"/>
+        </Style>
+
+        <!-- a chip (dynamic DNS): green when every record set is fine, amber when a check failed -->
+        <Style Selector="Button.chip">
+            <Setter Property="Height" Value="{DynamicResource Control.Height}"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Md}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.RaisedHover}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Strong}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+        </Style>
+        <Style Selector="Button.chip.on">
+            <Setter Property="Background" Value="{DynamicResource Success.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Success.Border}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Success}"/>
+        </Style>
+        <Style Selector="Button.chip.on Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Success}"/>
+        </Style>
+        <Style Selector="Button.chip.pending">
+            <Setter Property="Background" Value="{DynamicResource Warning.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Warning.Border}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="Button.chip.pending Path.glyph">
+            <Setter Property="Stroke" Value="{DynamicResource Warning}"/>
+        </Style>
+
+        <!-- ===== list rows ===== -->
+        <Style Selector="ListBox.rows > ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="ListBox.plain > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.plain > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                         ListBox.plain > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}"/>
+        </Style>
+        <Style Selector="Border.recType">
+            <Setter Property="Width" Value="56"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.recType TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.recName">
+            <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.recContent">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.recMeta">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.recTtl">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
+        <Style Selector="TextBlock.colHead">
+            <Setter Property="FontSize" Value="{StaticResource Font.Caption}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="LetterSpacing" Value="0.3"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+        </Style>
+
+        <!-- a server's status dot: green running, grey off, amber while it changes -->
+        <Style Selector="Ellipse.srvDot">
+            <Setter Property="Width" Value="9"/>
+            <Setter Property="Height" Value="9"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Fill" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="Ellipse.srvDot.run">
+            <Setter Property="Fill" Value="{DynamicResource Success}"/>
+        </Style>
+        <Style Selector="Ellipse.srvDot.off">
+            <Setter Property="Fill" Value="{DynamicResource Text.Disabled}"/>
+        </Style>
+
+        <!-- a copyable value: label | value | copy -->
+        <Style Selector="Border.frow">
+            <Setter Property="Padding" Value="0,6"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+        </Style>
+        <Style Selector="TextBlock.fieldName">
+            <Setter Property="Width" Value="96"/>
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Muted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.fieldValue">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="SelectableTextBlock.fieldValue.mono">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+        </Style>
+
+        <!-- the dynamic DNS panel's rows -->
+        <Style Selector="Border.ddnsRow">
+            <Setter Property="Padding" Value="12,8,6,8"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        </Style>
+        <Style Selector="TextBlock.ddnsMsg">
+            <Setter Property="FontSize" Value="{StaticResource Font.Small}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="TextBlock.ddnsMsg.warn">
+            <Setter Property="Foreground" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="TextBlock.ddnsMsg.bad">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+
+        <!-- a change in the rules preview -->
+        <Style Selector="Border.rrow">
+            <Setter Property="Padding" Value="0,8"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+        </Style>
+
+        <!-- status line, tinted on failure -->
+        <Style Selector="Border#StatusBar">
+            <Setter Property="Background" Value="{DynamicResource Bg.Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+        </Style>
+        <Style Selector="Border#StatusBar.error">
+            <Setter Property="Background" Value="{DynamicResource Danger.Soft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Danger.Border}"/>
+        </Style>
+        <Style Selector="Border#StatusBar TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}"/>
+        </Style>
+        <Style Selector="Border#StatusBar.error TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+        </Style>
+        <Style Selector="Ellipse.statusDot">
+            <Setter Property="Fill" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="Ellipse.statusDot.busy">
+            <Setter Property="Fill" Value="{DynamicResource Warning}"/>
+        </Style>
+        <Style Selector="Border#StatusBar.error Ellipse.statusDot">
+            <Setter Property="Fill" Value="{DynamicResource Danger}"/>
+        </Style>
+
+        <!-- ===== Responsive: HzMain gets narrow / wide from its own width =====
+             wide   : the project buttons with their words; the form's name | token and the proxy fields side by side;
+                      the server list beside its details; one-line record set rows under column heads
+             narrow : icon-only project buttons; fields stack; the server list OR one server's details (a tap opens
+                      it, Back returns); two-line record set rows; the open project form takes the page -->
+        <Style Selector="Grid#HzMain.narrow TextBlock.wideOnly">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#HzMain.wide Button.narrowOnly">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow.form > Panel#TabsHost">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#ProjTop > StackPanel#ProjTokenField">
+            <Setter Property="Grid.Column" Value="1"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow Grid#ProjTop > StackPanel#ProjNameField">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow Grid#ProjTop > StackPanel#ProjTokenField">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#ProjProxy > StackPanel#ProjProxyUserField">
+            <Setter Property="Grid.Column" Value="1"/>
+        </Style>
+        <Style Selector="Grid#ProjProxy > StackPanel#ProjProxyPassField">
+            <Setter Property="Grid.Column" Value="2"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow Grid#ProjProxy > StackPanel#ProjProxyAddrField">
+            <Setter Property="Grid.ColumnSpan" Value="3"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow Grid#ProjProxy > StackPanel#ProjProxyUserField">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow Grid#ProjProxy > StackPanel#ProjProxyPassField">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+
+        <!-- servers: list | details (wide) · the list, or the details over it (narrow, class "detail") -->
+        <Style Selector="Grid#ServersPage > Panel#ServerDetailHost">
+            <Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow Grid#ServersPage > Border#ServerListCard">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow Grid#ServersPage > Panel#ServerDetailHost">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow Grid#ServersPage.detail > Panel#ServerDetailHost">
+            <Setter Property="IsVisible" Value="True"/>
+            <Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow Grid#ServersPage.detail > Border#ServerListCard">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+
+        <!-- record sets: one line under column heads (wide) / two lines, heads hidden (narrow) -->
+        <Style Selector="Grid#HzMain.narrow Border#RrHeader">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Grid.rrRow > TextBlock.recName">
+            <Setter Property="Grid.Column" Value="1"/>
+        </Style>
+        <Style Selector="Grid#HzMain.wide Grid.rrRow > TextBlock.recContent">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="2"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow Grid.rrRow > TextBlock.recName">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow Grid.rrRow > TextBlock.recContent">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="1"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,3,0,0"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow Grid.rrRow > TextBlock.recTtl">
+            <Setter Property="Grid.RowSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow Grid.rrRow > StackPanel.recActions">
+            <Setter Property="Grid.RowSpan" Value="2"/>
+        </Style>
+        <!-- phones: Edit / Delete give their room to the name; a tap opens the record set (its editor) -->
+        <Style Selector="Grid#HzMain.narrow.touch Grid.rrRow > StackPanel.recActions > Panel.wideAction">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+
+        <!-- DNS toolbar: search + type filter, then the actions (their own row when narrow) -->
+        <Style Selector="Grid#DnsBar.wide > WrapPanel#DnsActions">
+            <Setter Property="Grid.Row" Value="0"/><Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+        <Style Selector="Grid#DnsBar.narrow > Grid#DnsFind">
+            <Setter Property="Grid.ColumnSpan" Value="2"/>
+        </Style>
+        <Style Selector="Grid#DnsBar.narrow > WrapPanel#DnsActions">
+            <Setter Property="Grid.Row" Value="1"/><Setter Property="Grid.Column" Value="0"/><Setter Property="Grid.ColumnSpan" Value="2"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <Style Selector="Grid#DnsFind ComboBox#TypeFilterBox">
+            <Setter Property="Width" Value="130"/>
+        </Style>
+        <Style Selector="Grid#HzMain.narrow Grid#DnsFind ComboBox#TypeFilterBox">
+            <Setter Property="Width" Value="112"/>
+        </Style>
+        <Style Selector="WrapPanel#DnsActions > Button.primary">
+            <Setter Property="Padding" Value="12,0"/>
+        </Style>
+
+        <!-- the tab strip on phones: a little air between wrapped lines -->
+        <Style Selector="Grid#HzMain.narrow TabControl#HzTabs > TabItem">
+            <Setter Property="Margin" Value="0,0,4,6"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+      <!-- disabled under an open page (editor, review, import, dynamic DNS): the keyboard can't reach what is behind it -->
+      <Grid x:Name="HzMain" RowDefinitions="Auto, Auto, *, Auto" helpers:Responsive.BreakWidth="640"
+            Classes.form="{Binding IsProjectFormOpen}" AttachedToVisualTree="HzMain_Attached" IsEnabled="{Binding !IsOverlayOpen}">
+
+        <!-- ============ PROJECT: picker, Add / Edit / Remove, refresh; the project form folds out below ============ -->
+        <Border Grid.Row="0" Classes="card" Padding="12,8,8,8">
+            <StackPanel>
+                <Grid ColumnDefinitions="Auto, Auto, *, Auto" ColumnSpacing="10">
+                    <Ellipse Grid.Column="0" Classes="acctDot" Classes.on="{Binding IsConnected}"/>
+                    <ComboBox x:Name="ProjectPicker" Grid.Column="1" Classes="field" ItemsSource="{Binding Projects}"
+                              SelectedItem="{Binding SelectedProject}" IsVisible="{Binding HasProjects}"
+                              PlaceholderText="Choose a project" ToolTip.Tip="Switch project" AutomationProperties.Name="Project">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:HzProject"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/></DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <TextBlock Grid.Column="1" Classes="acctSummary" Text="No project yet" IsVisible="{Binding !HasProjects}"/>
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4">
+                        <Button Classes="ghost" Command="{Binding AddProjectCommand}" Padding="10,0"
+                                ToolTip.Tip="Add another Hetzner Cloud project" AutomationProperties.Name="Add project">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Path Classes="glyph" Data="{StaticResource HzGlyphPlus}"/>
+                                <TextBlock Classes="wideOnly" Text="Add project" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="ghost" Command="{Binding EditProjectCommand}" Padding="10,0" IsVisible="{Binding HasProject}"
+                                ToolTip.Tip="Edit this project: name, API token, proxy" AutomationProperties.Name="Edit project">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Path Classes="glyph" Data="{StaticResource HzGlyphEdit}"/>
+                                <TextBlock Classes="wideOnly" Text="Edit" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="ghost" Command="{Binding RequestRemoveProjectCommand}" Padding="10,0" IsVisible="{Binding HasProject}"
+                                ToolTip.Tip="Remove this project from Echoes (asks first)" AutomationProperties.Name="Remove project">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Path Classes="glyph" Data="{StaticResource HzGlyphTrash}"/>
+                                <TextBlock Classes="wideOnly" Text="Remove" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="icon" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsBusy}" IsVisible="{Binding HasProject}"
+                                ToolTip.Tip="Reload this tab" AutomationProperties.Name="Reload">
+                            <Path Classes="glyph" Data="{StaticResource HzGlyphRefresh}"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- removing a project deletes its token from this device: asks first -->
+                <Border Classes="confirm" IsVisible="{Binding ConfirmRemove}" Margin="0,8,0,0">
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                        <TextBlock Classes="confirmText"
+                                   Text="{Binding SelectedProject.Name, StringFormat='Remove {0}? Its token is deleted from this device and its dynamic DNS stops.', FallbackValue=''}"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <Button Classes="secondary" Content="Cancel" Command="{Binding CancelRemoveProjectCommand}"/>
+                            <Button Classes="danger" Content="Remove" Command="{Binding RemoveProjectCommand}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- the project form: add a project, or edit the selected one. The token box is never filled in -->
+                <StackPanel IsVisible="{Binding IsProjectFormOpen}" Spacing="12" Margin="4,10,4,4">
+                    <Border Classes="divider"/>
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                        <StackPanel Spacing="3">
+                            <TextBlock Classes="sectionTitle" Text="{Binding FormTitle}"/>
+                            <TextBlock Classes="hint" Text="{Binding FormHint}"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="icon" VerticalAlignment="Top"
+                                ToolTip.Tip="How do I get an API token?" AutomationProperties.Name="How to get an API token">
+                            <Path Classes="glyph" Data="{StaticResource HzGlyphHelp}"/>
+                            <Button.Flyout>
+                                <Flyout Placement="Bottom">
+                                    <StackPanel MaxWidth="300" Spacing="8" Margin="2">
+                                        <TextBlock Text="Which API token?" FontWeight="SemiBold" FontSize="{StaticResource Font.Body}"
+                                                   Foreground="{DynamicResource Text.Primary}"/>
+                                        <TextBlock TextWrapping="Wrap" FontSize="{StaticResource Font.Small}" LineHeight="18"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="In the Hetzner Console open the project, then Security → API tokens → Generate API token. A token belongs to one project: add one per project."/>
+                                        <TextBlock TextWrapping="Wrap" FontSize="{StaticResource Font.Small}" LineHeight="18"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="Read &amp; Write: power actions, firewall rules and DNS changes work. Read: you can look, and Echoes says so when Hetzner refuses a change."/>
+                                        <TextBlock Text="Hetzner shows a token only once. Echoes keeps it encrypted on this device and never shows it again."
+                                                   TextWrapping="Wrap" FontSize="{StaticResource Font.Small}" FontStyle="Italic"
+                                                   Foreground="{DynamicResource Text.Muted}"/>
+                                    </StackPanel>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                    </Grid>
+
+                    <!-- name | token (wide) · stacked (narrow): placed by the styles -->
+                    <Grid x:Name="ProjTop" ColumnDefinitions="*, 2*" RowDefinitions="Auto, Auto" ColumnSpacing="16">
+                        <StackPanel x:Name="ProjNameField">
+                            <TextBlock Classes="fieldLabel" Text="Name"/>
+                            <TextBox Classes="field" Text="{Binding FormName}" MaxLength="60" PlaceholderText="Optional, e.g. Production"/>
+                        </StackPanel>
+                        <StackPanel x:Name="ProjTokenField">
+                            <TextBlock Classes="fieldLabel" Text="API token"/>
+                            <TextBox Classes="field" Text="{Binding FormToken}" PasswordChar="●" IsUndoEnabled="False"
+                                     PlaceholderText="{Binding TokenPlaceholder}" AutomationProperties.Name="API token"
+                                     ToolTip.Tip="Hetzner Console → your project → Security → API tokens">
+                                <TextBox.KeyBindings>
+                                    <KeyBinding Command="{Binding SubmitProjectCommand}" Gesture="Enter"/>
+                                </TextBox.KeyBindings>
+                            </TextBox>
+                        </StackPanel>
+                    </Grid>
+
+                    <CheckBox IsChecked="{Binding FormUseProxy}" Content="Use a proxy"
+                              ToolTip.Tip="Send this project's API calls through an HTTP or SOCKS5 proxy"/>
+                    <Grid x:Name="ProjProxy" ColumnDefinitions="2*, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="12" Margin="0,-4,0,0"
+                          IsVisible="{Binding FormUseProxy}">
+                        <StackPanel x:Name="ProjProxyAddrField">
+                            <TextBlock Classes="fieldLabel" Text="Proxy"/>
+                            <AutoCompleteBox Classes="field" helpers:InputAssist.SelectAllOnFocus="True" Text="{Binding FormProxy}" TextInputOptions.ContentType="Url"
+                                             ItemsSource="{Binding ProxyHistory}" FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                             PlaceholderText="host:port" ToolTip.Tip="HTTP or SOCKS5 proxy, e.g. 127.0.0.1:1080"/>
+                        </StackPanel>
+                        <StackPanel x:Name="ProjProxyUserField">
+                            <TextBlock Classes="fieldLabel" Text="User"/>
+                            <TextBox Classes="field" Text="{Binding FormProxyUser}" PlaceholderText="Optional"/>
+                        </StackPanel>
+                        <StackPanel x:Name="ProjProxyPassField">
+                            <TextBlock Classes="fieldLabel" Text="Password"/>
+                            <TextBox Classes="field" Text="{Binding FormProxyPass}" PasswordChar="*" IsUndoEnabled="False" PlaceholderText="Optional"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Classes="note danger" IsVisible="{Binding FormError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="{Binding FormError}"/>
+                    </Border>
+
+                    <WrapPanel ItemSpacing="8" LineSpacing="8">
+                        <Button Classes="primary" Command="{Binding SubmitProjectCommand}" Content="{Binding SubmitLabel}"/>
+                        <Button Classes="secondary" Command="{Binding SaveProjectAnywayCommand}" Content="Save anyway"
+                                IsVisible="{Binding CanSaveUnchecked}" ToolTip.Tip="Save it without the check; it connects once Hetzner can be reached"/>
+                        <Button Classes="secondary" Command="{Binding CancelProjectCommand}" Content="Cancel" IsVisible="{Binding CanCancelForm}"/>
+                    </WrapPanel>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- ============ NOTES: a restored project, a read-only token, a store that can't be used ============ -->
+        <StackPanel Grid.Row="1" Spacing="8">
+            <Border Classes="note warning" Margin="0,12,0,0" IsVisible="{Binding SelectedProject.Restored, FallbackValue=False}">
+                <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10">
+                    <TextBlock VerticalAlignment="Center"
+                               Text="This project came from a backup. Its dynamic DNS stays paused until you confirm it is yours."/>
+                    <Button Grid.Column="1" Classes="secondary" Content="It's mine" Command="{Binding ConfirmRestoredProjectCommand}"
+                            VerticalAlignment="Center" ToolTip.Tip="Let dynamic DNS use this project's token"/>
+                </Grid>
+            </Border>
+            <Border Classes="note warning" Margin="0,12,0,0" IsVisible="{Binding SelectedProject.ReadOnly, FallbackValue=False}">
+                <TextBlock Text="This token can only read. To make changes, open the project in the Hetzner Console, go to Security → API tokens, generate a Read &amp; Write token, and paste it here with Edit."/>
+            </Border>
+            <Border Classes="note warning" Margin="0,12,0,0" IsVisible="{Binding HasStoreNote}">
+                <TextBlock Text="{Binding StoreNote}"/>
+            </Border>
+        </StackPanel>
+
+        <!-- ============ TABS (on a phone the open project form takes the page: styles, HzMain.narrow.form) ============ -->
+        <Panel x:Name="TabsHost" Grid.Row="2">
+        <TabControl x:Name="HzTabs" Classes="seg" Margin="0,12,0,0" Padding="0,12,0,0"
+                    SelectedIndex="{Binding SelectedTabIndex}" IsVisible="{Binding ShowTabs}">
+            <TabControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+            </TabControl.ItemsPanel>
+
+            <!-- ======================= SERVERS ======================= -->
+            <TabItem Header="Servers">
+                <ctl:Deferred><DataTemplate x:DataType="vm:HetznerViewModel">
+                <Grid x:Name="ServersPage" ColumnDefinitions="5*, 6*" Classes.detail="{Binding ServerDetailOpen}">
+                    <Border x:Name="ServerListCard" Classes="card output" ClipToBounds="True">
+                        <Panel>
+                            <ListBox x:Name="ServerList" Classes="rows plain" ItemsSource="{Binding Servers}" SelectedItem="{Binding SelectedServer}"
+                                     Background="{DynamicResource Bg.Inset}" BorderThickness="0" Padding="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" Tapped="OnServerTapped">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:HzServer">
+                                        <Grid ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="10" Margin="12,8">
+                                            <Ellipse Grid.Column="0" Classes="srvDot" Classes.run="{Binding IsRunning}" Classes.off="{Binding IsOff}"/>
+                                            <TextBlock Grid.Column="1" Classes="recName" FontWeight="SemiBold" Text="{Binding Name}"/>
+                                            <TextBlock Grid.Column="2" Classes="recMeta" Text="{Binding StatusText}"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Classes="recMeta" Margin="0,2,0,0">
+                                                <Run Text="{Binding TypeName, Mode=OneWay}" FontWeight="SemiBold"/>
+                                                <Run Text="{Binding TypeText, Mode=OneWay}"/>
+                                                <Run Text="{Binding Location, StringFormat='· {0}', Mode=OneWay}"/>
+                                            </TextBlock>
+                                            <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Classes="recContent" Margin="0,2,0,0">
+                                                <Run Text="{Binding Ipv4Text, Mode=OneWay}"/>
+                                                <Run Text="{Binding Ipv6Text, StringFormat='· {0}', Mode=OneWay}"/>
+                                            </TextBlock>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock Classes="emptyText" IsVisible="{Binding ShowServersEmpty}" Text="{Binding ServersEmptyText}"/>
+                            <TextBlock Classes="emptyText" IsVisible="{Binding IsLoadingServers}" Text="Loading servers…"/>
+                        </Panel>
+                    </Border>
+
+                    <!-- the selected server -->
+                    <Panel x:Name="ServerDetailHost">
+                        <Border Classes="card" Padding="16,12" IsVisible="{Binding HasServer}">
+                            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                <StackPanel Spacing="10" Margin="0,0,12,0">
+                                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="8">
+                                        <Button Grid.Column="0" Classes="icon narrowOnly" Command="{Binding CloseServerDetailsCommand}"
+                                                ToolTip.Tip="All servers" AutomationProperties.Name="Back to all servers">
+                                            <Path Classes="glyph" Data="{StaticResource HzGlyphBack}"/>
+                                        </Button>
+                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Classes="sectionTitle" Text="{Binding SelectedServer.Name, FallbackValue=''}" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Classes="hint" Text="{Binding SelectedServer.ImageText, FallbackValue=''}"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="2" Classes="badge" VerticalAlignment="Top"
+                                                Classes.success="{Binding SelectedServer.IsRunning, FallbackValue=False}"
+                                                Classes.warning="{Binding SelectedServer.IsChanging, FallbackValue=False}">
+                                            <TextBlock Text="{Binding SelectedServer.StatusText, FallbackValue=''}"/>
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- power: soft actions at once, hard ones (power off, reset) under More, asking first -->
+                                    <WrapPanel ItemSpacing="8" LineSpacing="8" IsEnabled="{Binding !IsPowerRunning}">
+                                        <Button Classes="secondary" Command="{Binding PowerOnCommand}" IsEnabled="{Binding SelectedServer.CanPowerOn, FallbackValue=False}"
+                                                ToolTip.Tip="Start the server">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <Path Classes="glyph" Data="{StaticResource HzGlyphPower}"/>
+                                                <TextBlock Text="Power on" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Classes="secondary" Content="Shut down" Command="{Binding ShutdownCommand}"
+                                                IsEnabled="{Binding SelectedServer.CanPowerOff, FallbackValue=False}"
+                                                ToolTip.Tip="Ask the operating system to shut down (ACPI)"/>
+                                        <Button Classes="secondary" Content="Reboot" Command="{Binding RebootCommand}"
+                                                IsEnabled="{Binding SelectedServer.CanPowerOff, FallbackValue=False}"
+                                                ToolTip.Tip="Ask the operating system to restart (ACPI)"/>
+                                        <Button Classes="icon" ToolTip.Tip="Hard power actions" AutomationProperties.Name="More power actions">
+                                            <Path Classes="glyph dots" Data="{StaticResource HzGlyphMore}"/>
+                                            <Button.Flyout>
+                                                <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                                    <MenuItem Header="Power off (cut the power)…" Command="{Binding RequestPowerOffCommand}"/>
+                                                    <MenuItem Header="Reset (hard restart)…" Command="{Binding RequestResetCommand}"/>
+                                                </MenuFlyout>
+                                            </Button.Flyout>
+                                        </Button>
+                                    </WrapPanel>
+
+                                    <Border Classes="confirm" IsVisible="{Binding IsConfirmingHard}">
+                                        <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="8">
+                                            <TextBlock Grid.ColumnSpan="2" Classes="confirmText" Text="{Binding ConfirmHardText}"/>
+                                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
+                                                <Button Classes="secondary" Content="Cancel" Command="{Binding CancelHardCommand}"/>
+                                                <Button Classes="danger" Content="{Binding ConfirmHardButton}" Command="{Binding ConfirmHardActionCommand}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+
+                                    <StackPanel Spacing="4" IsVisible="{Binding IsPowerRunning}">
+                                        <TextBlock Classes="hint" Text="{Binding PowerText}"/>
+                                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding PowerProgress, Mode=OneWay}" Height="4" MinHeight="4"/>
+                                    </StackPanel>
+
+                                    <ItemsControl ItemsSource="{Binding ServerFields}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:HzField">
+                                                <Border Classes="frow">
+                                                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10">
+                                                        <TextBlock Classes="fieldName" Text="{Binding Label}"/>
+                                                        <SelectableTextBlock Grid.Column="1" Classes="fieldValue" Classes.mono="{Binding Mono}" Text="{Binding Value}"/>
+                                                        <Button Grid.Column="2" Classes="rowBtn" VerticalAlignment="Center" IsVisible="{Binding CanCopy}"
+                                                                Command="{Binding $parent[UserControl].((vm:HetznerViewModel)DataContext).CopyFieldCommand}"
+                                                                CommandParameter="{Binding}" ToolTip.Tip="Copy" AutomationProperties.Name="Copy">
+                                                            <Path Classes="glyph" Data="{StaticResource HzGlyphCopy}"/>
+                                                        </Button>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <!-- hand the address to other tools -->
+                                    <WrapPanel ItemSpacing="8" LineSpacing="8" IsVisible="{Binding SelectedServer.HasHost, FallbackValue=False}">
+                                        <Button Classes="ghost" Content="Ping" Command="{Binding PingServerCommand}" IsVisible="{Binding HasLinks}"
+                                                ToolTip.Tip="Ping this server in the Ping tool"/>
+                                        <Button Classes="ghost" Content="SSH" Command="{Binding SshServerCommand}" IsVisible="{Binding HasLinks}"
+                                                ToolTip.Tip="Open the SSH tool with this server's address"/>
+                                        <Button Classes="ghost" Content="WHOIS" Command="{Binding WhoisServerCommand}" IsVisible="{Binding HasLinks}"
+                                                ToolTip.Tip="Who runs this address (WHOIS)"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+                    </Panel>
+                </Grid>
+                </DataTemplate></ctl:Deferred>
+            </TabItem>
+
+            <!-- ======================= FIREWALLS ======================= -->
+            <TabItem Header="Firewalls">
+                <ctl:Deferred><DataTemplate x:DataType="vm:HetznerViewModel">
+                <Grid RowDefinitions="Auto, Auto, *, Auto" RowSpacing="8">
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                        <ComboBox x:Name="FirewallPicker" Classes="field" ItemsSource="{Binding Firewalls}" SelectedItem="{Binding SelectedFirewall}"
+                                  IsEnabled="{Binding CanPickFirewall}" PlaceholderText="Choose a firewall" AutomationProperties.Name="Firewall"
+                                  HorizontalAlignment="Stretch" ToolTip.Tip="Save or discard the changes before choosing another firewall">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:HzFirewall">
+                                    <TextBlock TextTrimming="CharacterEllipsis">
+                                        <Run Text="{Binding Name, Mode=OneWay}"/>
+                                        <Run Text="{Binding RulesText, StringFormat=' ·  {0}', Mode=OneWay}" Foreground="{DynamicResource Text.Muted}"/>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button Grid.Column="1" Classes="primary" Command="{Binding NewRuleCommand}" IsEnabled="{Binding HasFirewall}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Path Classes="glyph" Data="{StaticResource HzGlyphPlus}"/>
+                                <TextBlock Text="Add rule" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <StackPanel Grid.Row="1" Spacing="8" IsVisible="{Binding HasFirewall}">
+                        <TextBlock Classes="tabHint" Text="{Binding SelectedFirewall.AppliedList, FallbackValue='', StringFormat='Applied to: {0}'}"/>
+                        <Border Classes="note warning" IsVisible="{Binding FirewallUnreadable}">
+                            <TextBlock Text="This firewall has a rule this version of Echoes can't show, and a save here would drop it. Edit its rules in the Hetzner Console."/>
+                        </Border>
+                    </StackPanel>
+
+                    <Border Grid.Row="2" Classes="card output" ClipToBounds="True">
+                        <Panel>
+                            <ListBox Classes="rows" ItemsSource="{Binding FirewallRules}" Background="{DynamicResource Bg.Inset}"
+                                     BorderThickness="0" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:HzRuleRow">
+                                        <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto, Auto" ColumnSpacing="8" Margin="12,6,4,6">
+                                            <WrapPanel ItemSpacing="6" LineSpacing="4" VerticalAlignment="Center">
+                                                <Border Classes="badge" Classes.success="{Binding IsIn}" Classes.info="{Binding !IsIn}">
+                                                    <TextBlock Text="{Binding DirectionText}" FontFamily="{StaticResource MonoFont}"/>
+                                                </Border>
+                                                <Border Classes="badge accent">
+                                                    <TextBlock Text="{Binding ProtocolText}" FontFamily="{StaticResource MonoFont}"/>
+                                                </Border>
+                                                <TextBlock Classes="recContent" Text="{Binding PortText, StringFormat='port {0}'}"/>
+                                                <Border Classes="badge warning" IsVisible="{Binding HasChange}">
+                                                    <TextBlock Text="{Binding ChangeText}"/>
+                                                </Border>
+                                            </WrapPanel>
+                                            <StackPanel Grid.Column="1" Grid.RowSpan="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
+                                                <Button Classes="rowBtn" Command="{Binding $parent[UserControl].((vm:HetznerViewModel)DataContext).EditRuleCommand}"
+                                                        CommandParameter="{Binding}" ToolTip.Tip="Edit" AutomationProperties.Name="Edit rule">
+                                                    <Path Classes="glyph" Data="{StaticResource HzGlyphEdit}"/>
+                                                </Button>
+                                                <Button Classes="rowBtn del" Command="{Binding $parent[UserControl].((vm:HetznerViewModel)DataContext).RemoveRuleCommand}"
+                                                        CommandParameter="{Binding}" ToolTip.Tip="Remove (asked again before saving)" AutomationProperties.Name="Remove rule">
+                                                    <Path Classes="glyph" Data="{StaticResource HzGlyphTrash}"/>
+                                                </Button>
+                                            </StackPanel>
+                                            <TextBlock Grid.Row="1" Classes="recContent" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                       Text="{Binding IpsText}"/>
+                                            <TextBlock Grid.Row="2" Classes="hint" Margin="0,2,0,0" Text="{Binding Description}" IsVisible="{Binding HasDescription}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock Classes="emptyText" IsVisible="{Binding ShowFirewallsEmpty}"
+                                       Text="This project has no firewalls. Create one in the Hetzner Console; its rules can then be edited here."/>
+                            <TextBlock Classes="emptyText" IsVisible="{Binding IsLoadingFirewalls}" Text="Loading firewalls…"/>
+                            <TextBlock Classes="emptyText" IsVisible="{Binding ShowNoRules}"
+                                       Text="No rules: with the firewall applied, nothing gets in. Add a rule."/>
+                        </Panel>
+                    </Border>
+
+                    <!-- unsaved changes: review (with removals confirmed) or discard -->
+                    <Border Grid.Row="3" Classes="note warning" IsVisible="{Binding HasRuleChanges}">
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                            <TextBlock VerticalAlignment="Center" Text="{Binding RuleChangesText}"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                <Button Classes="secondary" Content="Discard" Command="{Binding DiscardRulesCommand}"/>
+                                <Button Classes="primary" Content="Review and save" Command="{Binding ReviewRulesCommand}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+                </DataTemplate></ctl:Deferred>
+            </TabItem>
+
+            <!-- ======================= DNS ======================= -->
+            <TabItem Header="DNS">
+                <ctl:Deferred><DataTemplate x:DataType="vm:HetznerViewModel">
+                <Grid RowDefinitions="Auto, Auto, Auto, *" RowSpacing="8">
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                        <ComboBox x:Name="ZonePicker" Classes="field" ItemsSource="{Binding Zones}" SelectedItem="{Binding SelectedZone}" HorizontalAlignment="Stretch"
+                                  PlaceholderText="Choose a zone" AutomationProperties.Name="Zone" IsVisible="{Binding !!Zones.Count}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:HzZone"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/></DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock Classes="tabHint" VerticalAlignment="Center" IsVisible="{Binding ShowZonesEmpty}"
+                                   Text="No DNS zones in this project yet."/>
+                        <Button Grid.Column="1" Classes="secondary" Command="{Binding OpenAddZoneCommand}"
+                                ToolTip.Tip="Add a DNS zone to this project" AutomationProperties.Name="Add zone">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Path Classes="glyph" Data="{StaticResource HzGlyphPlus}"/>
+                                <TextBlock Text="Add zone" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <!-- the zone: published?, delegated?, records; the name servers for the registrar when not delegated -->
+                    <StackPanel Grid.Row="1" Spacing="8" IsVisible="{Binding HasZone}">
+                        <WrapPanel ItemSpacing="8" LineSpacing="4" Margin="2,0,0,0">
+                            <Border Classes="badge" VerticalAlignment="Center"
+                                    Classes.success="{Binding SelectedZone.IsOk, FallbackValue=False}"
+                                    Classes.warning="{Binding SelectedZone.IsUpdating, FallbackValue=False}"
+                                    Classes.danger="{Binding SelectedZone.IsError, FallbackValue=False}"
+                                    ToolTip.Tip="Whether Hetzner's name servers have the zone's current records">
+                                <TextBlock Text="{Binding SelectedZone.StatusText, FallbackValue=''}"/>
+                            </Border>
+                            <Border Classes="badge" VerticalAlignment="Center"
+                                    Classes.success="{Binding SelectedZone.DelegationOk, FallbackValue=False}"
+                                    Classes.warning="{Binding SelectedZone.DelegationWarn, FallbackValue=False}"
+                                    Classes.danger="{Binding SelectedZone.DelegationBad, FallbackValue=False}"
+                                    ToolTip.Tip="Whether the domain's registrar points to Hetzner's name servers">
+                                <TextBlock Text="{Binding SelectedZone.DelegationText, FallbackValue=''}"/>
+                            </Border>
+                            <TextBlock Classes="recMeta" Text="{Binding SelectedZone.RecordCountText, FallbackValue=''}"/>
+                            <TextBlock Classes="recMeta" Text="{Binding SelectedZone.TtlText, FallbackValue='', StringFormat='·  {0}'}"/>
+                        </WrapPanel>
+                        <Border Classes="note warning" IsVisible="{Binding SelectedZone.NeedsDelegation, FallbackValue=False}">
+                            <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" ColumnSpacing="8">
+                                <TextBlock Text="Set these name servers at your domain's registrar:"/>
+                                <SelectableTextBlock Grid.Row="1" Margin="0,4,0,0" Text="{Binding SelectedZone.AssignedText, FallbackValue=''}"/>
+                                <Button Grid.Column="1" Grid.RowSpan="2" Classes="rowBtn" Command="{Binding CopyNameServersCommand}" VerticalAlignment="Center"
+                                        ToolTip.Tip="Copy the name servers" AutomationProperties.Name="Copy the name servers">
+                                    <Path Classes="glyph" Data="{StaticResource HzGlyphCopy}"/>
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- toolbar: [search ......][type] [Add record set] [⋯] [DDNS] -->
+                    <Grid x:Name="DnsBar" Grid.Row="2" ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto"
+                          helpers:Responsive.BreakWidth="680" IsVisible="{Binding HasZone}">
+                        <Grid x:Name="DnsFind" ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                            <TextBox Grid.Column="0" Classes="field" Text="{Binding SearchText}" PlaceholderText="Search"
+                                     helpers:InputAssist.SelectAllOnFocus="True" Padding="8,0,8,0" AutomationProperties.Name="Search record sets">
+                                <TextBox.InnerLeftContent>
+                                    <Path Classes="glyph" Data="{StaticResource HzGlyphSearch}" Stroke="{DynamicResource Text.Muted}" Margin="12,0,0,0"/>
+                                </TextBox.InnerLeftContent>
+                                <TextBox.InnerRightContent>
+                                    <TextBlock Text="{Binding RrsetCountText}" FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Text.Muted}"
+                                               VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                </TextBox.InnerRightContent>
+                            </TextBox>
+                            <ComboBox x:Name="TypeFilterBox" Grid.Column="1" Classes="field" ItemsSource="{Binding TypeFilters}"
+                                      SelectedItem="{Binding SelectedTypeFilter}" ToolTip.Tip="Show one record type" AutomationProperties.Name="Record type"/>
+                        </Grid>
+                        <WrapPanel x:Name="DnsActions" ItemSpacing="8" LineSpacing="8">
+                            <Button Classes="primary" Command="{Binding NewRrsetCommand}" IsEnabled="{Binding SelectedZone.IsPrimary, FallbackValue=False}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Path Classes="glyph" Data="{StaticResource HzGlyphPlus}"/>
+                                    <TextBlock Text="Add record set" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Classes="icon" ToolTip.Tip="More" AutomationProperties.Name="More DNS actions">
+                                <Path Classes="glyph dots" Data="{StaticResource HzGlyphMore}"/>
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                        <MenuItem Header="Export the zone file…" Click="OnExportZoneFile"/>
+                                        <MenuItem Header="Import a zone file…" Click="OnImportZoneFile"/>
+                                        <MenuItem Header="Dynamic DNS…" Command="{Binding OpenDdnsCommand}"/>
+                                        <MenuItem Header="Reload record sets" Command="{Binding ReloadRrsetsCommand}"/>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                            <Button Classes="chip" Command="{Binding OpenDdnsCommand}" IsVisible="{Binding HasDdns}"
+                                    Classes.on="{Binding DdnsAllOk}" Classes.pending="{Binding DdnsHasProblem}"
+                                    ToolTip.Tip="Dynamic DNS: the record sets kept on this device's public IP" AutomationProperties.Name="Dynamic DNS">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Path Classes="glyph" Data="{StaticResource HzGlyphSync}"/>
+                                    <TextBlock Text="{Binding DdnsChipText}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </WrapPanel>
+                    </Grid>
+
+                    <Border Grid.Row="3" Classes="card output" ClipToBounds="True" IsVisible="{Binding HasZone}">
+                        <Grid RowDefinitions="Auto, *">
+                            <!-- column heads (wide only), mirroring the row's columns -->
+                            <Border x:Name="RrHeader" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource Border.Subtle}">
+                                <Grid ColumnDefinitions="Auto, 2*, 3*, Auto, Auto" ColumnSpacing="12" Margin="12,8,4,8">
+                                    <TextBlock Grid.Column="0" Classes="colHead" Text="Type" Width="56"/>
+                                    <TextBlock Grid.Column="1" Classes="colHead" Text="Name"/>
+                                    <TextBlock Grid.Column="2" Classes="colHead" Text="Values"/>
+                                    <TextBlock Grid.Column="3" Classes="colHead" Text="TTL" Width="52" TextAlignment="Right"/>
+                                    <Border Grid.Column="4" Width="100"/>
+                                </Grid>
+                            </Border>
+                            <ListBox x:Name="RrsetList" Grid.Row="1" Classes="rows" ItemsSource="{Binding VisibleRrsets}"
+                                     Background="{DynamicResource Bg.Inset}" BorderThickness="0" Padding="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" DoubleTapped="OnRrsetDoubleTapped" Tapped="OnRrsetTapped">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:HzRrset">
+                                        <Panel>
+                                            <Grid Classes="rrRow" ColumnDefinitions="Auto, 2*, 3*, Auto, Auto" RowDefinitions="Auto, Auto"
+                                                  ColumnSpacing="12" Margin="12,4,4,4">
+                                                <Border Grid.Column="0" Classes="badge accent recType">
+                                                    <TextBlock Text="{Binding Type}"/>
+                                                </Border>
+                                                <TextBlock Classes="recName" Text="{Binding DisplayName}"/>
+                                                <TextBlock Classes="recContent" Text="{Binding ValuesText}" ToolTip.Tip="{Binding AllValuesTip}"/>
+                                                <TextBlock Grid.Column="3" Classes="recTtl" Text="{Binding TtlText}" Width="52"/>
+                                                <StackPanel Grid.Column="4" Classes="recActions" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                                    <Panel Width="{DynamicResource Control.Height}">
+                                                        <Button Classes="rowBtn ddns" Classes.on="{Binding DdnsOn}" Classes.err="{Binding DdnsError}"
+                                                                IsVisible="{Binding CanDdns}" IsEnabled="{Binding IsIdle}"
+                                                                Command="{Binding $parent[UserControl].((vm:HetznerViewModel)DataContext).ToggleDdnsCommand}"
+                                                                CommandParameter="{Binding}" ToolTip.Tip="{Binding DdnsTip}" AutomationProperties.Name="Keep updated with my IP">
+                                                            <Path Classes="glyph" Data="{StaticResource HzGlyphSync}"/>
+                                                        </Button>
+                                                    </Panel>
+                                                    <!-- fixed slots, so every row's columns line up: edit (or the lock of a protected set), delete -->
+                                                    <Panel Classes="wideAction" Width="{DynamicResource Control.Height}">
+                                                        <Path Classes="glyph" Data="{StaticResource HzGlyphLock}" HorizontalAlignment="Center" IsVisible="{Binding Protected}"
+                                                              ToolTip.Tip="Protected: change it in the Hetzner Console"/>
+                                                        <Button Classes="rowBtn" IsEnabled="{Binding IsIdle}" IsVisible="{Binding IsEditable}"
+                                                                Command="{Binding $parent[UserControl].((vm:HetznerViewModel)DataContext).EditRrsetCommand}"
+                                                                CommandParameter="{Binding}" ToolTip.Tip="Edit" AutomationProperties.Name="Edit record set">
+                                                            <Path Classes="glyph" Data="{StaticResource HzGlyphEdit}"/>
+                                                        </Button>
+                                                    </Panel>
+                                                    <Panel Classes="wideAction" Width="{DynamicResource Control.Height}">
+                                                        <Button Classes="rowBtn del" IsEnabled="{Binding IsIdle}" IsVisible="{Binding IsEditable}"
+                                                                Command="{Binding $parent[UserControl].((vm:HetznerViewModel)DataContext).RequestDeleteRrsetCommand}"
+                                                                CommandParameter="{Binding}" ToolTip.Tip="Delete" AutomationProperties.Name="Delete record set">
+                                                            <Path Classes="glyph" Data="{StaticResource HzGlyphTrash}"/>
+                                                        </Button>
+                                                    </Panel>
+                                                </StackPanel>
+                                            </Grid>
+                                            <!-- inline delete confirmation, over the row -->
+                                            <Border Classes="confirm" IsVisible="{Binding PendingDelete}" Margin="6,3">
+                                                <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                                                    <TextBlock Classes="confirmText" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap">
+                                                        <Run Text="Delete"/>
+                                                        <Run Text="{Binding FullName, Mode=OneWay}"/>
+                                                        <Run Text="{Binding Type, StringFormat='({0})?', Mode=OneWay}"/>
+                                                    </TextBlock>
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                                        <Button Classes="secondary" Content="Cancel"
+                                                                Command="{Binding $parent[UserControl].((vm:HetznerViewModel)DataContext).CancelDeleteRrsetCommand}"
+                                                                CommandParameter="{Binding}"/>
+                                                        <Button Classes="danger" Content="Delete"
+                                                                Command="{Binding $parent[UserControl].((vm:HetznerViewModel)DataContext).DeleteRrsetCommand}"
+                                                                CommandParameter="{Binding}"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </Panel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock Grid.Row="1" Classes="emptyText" IsVisible="{Binding ShowRrsetsEmpty}" Text="{Binding RrsetsEmptyText}"/>
+                            <TextBlock Grid.Row="1" Classes="emptyText" IsVisible="{Binding IsLoadingRrsets}" Text="Loading record sets…"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+                </DataTemplate></ctl:Deferred>
+            </TabItem>
+        </TabControl>
+        </Panel>
+
+        <!-- ============ NO PROJECT / NOT CONNECTED ============ -->
+        <Border Grid.Row="2" Classes="card output" Margin="0,12,0,0" IsVisible="{Binding ShowEmptyCard}">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <StackPanel MaxWidth="440" Spacing="8" Margin="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border Width="44" Height="44" CornerRadius="{StaticResource Radius.Lg}" HorizontalAlignment="Center"
+                            Background="{DynamicResource Bg.Raised}" BorderBrush="{DynamicResource Border.Default}" BorderThickness="1">
+                        <Path Classes="ico" Data="{StaticResource IcoHetzner}" HorizontalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Classes="sectionTitle" Text="{Binding EmptyTitle}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,6,0,0"/>
+                    <TextBlock Text="{Binding EmptyText}" FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Text.Muted}"
+                               HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" LineHeight="18"/>
+                    <WrapPanel HorizontalAlignment="Center" Margin="0,6,0,0" ItemSpacing="8" LineSpacing="8">
+                        <Button Classes="primary" Command="{Binding ConnectCommand}" Content="Try again"
+                                IsVisible="{Binding !!ConnectProblem.Length}"/>
+                        <Button Classes="primary" Command="{Binding AddProjectCommand}" Content="Add project"
+                                IsVisible="{Binding ShowAddFromEmpty}"/>
+                    </WrapPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ============ STATUS ============ -->
+        <Border x:Name="StatusBar" Grid.Row="3" Margin="0,12,0,0" Padding="12,8" CornerRadius="{StaticResource Radius.Md}" BorderThickness="1"
+                Classes.error="{Binding StatusIsError}">
+            <Grid ColumnDefinitions="Auto, *" ColumnSpacing="8">
+                <Ellipse Grid.Column="0" Classes="statusDot" Classes.busy="{Binding IsBusy}" Width="7" Height="7"
+                         VerticalAlignment="Top" Margin="0,5,0,0"/>
+                <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" FontSize="{StaticResource Font.Small}" TextWrapping="Wrap"/>
+            </Grid>
+        </Border>
+      </Grid>
+
+      <!-- ============ RULE EDITOR (solid backdrop) ============ -->
+      <Border IsVisible="{Binding IsRuleEditorOpen}" Background="{DynamicResource Bg.App}">
+          <ctl:Deferred><DataTemplate x:DataType="vm:HetznerViewModel">
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <Border Classes="card" Padding="20" MaxWidth="520" Margin="0,8" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                  <StackPanel Spacing="12">
+                      <StackPanel Spacing="4">
+                          <TextBlock Classes="sectionTitle" Text="Add rule" IsVisible="{Binding IsNewRule}"/>
+                          <TextBlock Classes="sectionTitle" Text="Edit rule" IsVisible="{Binding !IsNewRule}"/>
+                          <TextBlock Classes="pageText" Text="{Binding SelectedFirewall.Name, FallbackValue='', StringFormat='In {0}. It is saved with the others when you review and save.'}"/>
+                      </StackPanel>
+                      <Grid ColumnDefinitions="Auto, *" ColumnSpacing="12">
+                          <StackPanel>
+                              <TextBlock Classes="fieldLabel" Text="Direction"/>
+                              <ListBox Classes="modeSwitch" SelectedIndex="{Binding EditDirection}" AutomationProperties.Name="Direction">
+                                  <ListBoxItem Content="In"/>
+                                  <ListBoxItem Content="Out"/>
+                              </ListBox>
+                          </StackPanel>
+                          <StackPanel Grid.Column="1">
+                              <TextBlock Classes="fieldLabel" Text="Protocol"/>
+                              <ComboBox Classes="field" ItemsSource="{Binding ProtocolOptions}" SelectedItem="{Binding EditProtocol}"
+                                        HorizontalAlignment="Stretch" AutomationProperties.Name="Protocol"/>
+                          </StackPanel>
+                      </Grid>
+                      <StackPanel IsVisible="{Binding EditHasPort}">
+                          <TextBlock Classes="fieldLabel" Text="Port"/>
+                          <TextBox Classes="field" Text="{Binding EditPort}" PlaceholderText="22, 8000-8100 or any" MaxLength="20"/>
+                      </StackPanel>
+                      <StackPanel>
+                          <TextBlock Classes="fieldLabel" Text="{Binding EditIpsLabel}"/>
+                          <TextBox Classes="field" Text="{Binding EditIps}" AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="96" MaxHeight="180"
+                                   Height="NaN" VerticalContentAlignment="Top" Padding="10,8" FontFamily="{StaticResource MonoFont}"
+                                   PlaceholderText="0.0.0.0/0 and ::/0 mean anywhere"/>
+                          <WrapPanel ItemSpacing="8" LineSpacing="8" Margin="0,8,0,0">
+                              <Button Classes="ghost" Content="Add my IPv4" Command="{Binding AddMyIpCommand}" CommandParameter="4"
+                                      IsEnabled="{Binding !IsDetectingIp}" ToolTip.Tip="This device's public IPv4, as a single host (/32)"/>
+                              <Button Classes="ghost" Content="Add my IPv6" Command="{Binding AddMyIpCommand}" CommandParameter="6"
+                                      IsEnabled="{Binding !IsDetectingIp}" ToolTip.Tip="This device's public IPv6, as a single host (/128)"/>
+                              <TextBlock Classes="hint" Text="Looking up your IP…" IsVisible="{Binding IsDetectingIp}" VerticalAlignment="Center"/>
+                          </WrapPanel>
+                      </StackPanel>
+                      <StackPanel>
+                          <TextBlock Classes="fieldLabel" Text="Description"/>
+                          <TextBox Classes="field" Text="{Binding EditDescription}" PlaceholderText="Optional" MaxLength="255"/>
+                      </StackPanel>
+                      <Border Classes="note danger" IsVisible="{Binding RuleEditorError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                          <TextBlock Text="{Binding RuleEditorError}"/>
+                      </Border>
+                      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                          <Button Classes="ghost" Content="Cancel" Command="{Binding CancelRuleCommand}"/>
+                          <Button Classes="primary" Content="Keep" Command="{Binding ApplyRuleCommand}"
+                                  ToolTip.Tip="Keep it in the changes; nothing is sent until you review and save"/>
+                      </StackPanel>
+                  </StackPanel>
+              </Border>
+          </ScrollViewer>
+          </DataTemplate></ctl:Deferred>
+      </Border>
+
+      <!-- ============ RULES: REVIEW AND SAVE (set_rules replaces them all) ============ -->
+      <Border IsVisible="{Binding IsRulePreviewOpen}" Background="{DynamicResource Bg.App}">
+          <ctl:Deferred><DataTemplate x:DataType="vm:HetznerViewModel">
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <Border Classes="card" Padding="20" MaxWidth="600" Margin="0,8" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                  <StackPanel Spacing="12">
+                      <StackPanel Spacing="4">
+                          <TextBlock Classes="sectionTitle" Text="Review the changes"/>
+                          <TextBlock Classes="pageText" Text="{Binding SelectedFirewall.Name, FallbackValue='', StringFormat='{}{0} gets exactly the rules in the list. These are the differences:'}"/>
+                      </StackPanel>
+                      <Border Classes="note warning" IsVisible="{Binding HasPreviewNote}">
+                          <TextBlock Text="{Binding PreviewNote}"/>
+                      </Border>
+                      <ItemsControl ItemsSource="{Binding RuleChanges}">
+                          <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:HzRuleChange">
+                                  <Border Classes="rrow">
+                                      <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10">
+                                          <Border Classes="badge" Width="70" VerticalAlignment="Top"
+                                                  Classes.accent="{Binding IsAdd}" Classes.danger="{Binding IsRemove}">
+                                              <TextBlock Text="{Binding Action}" HorizontalAlignment="Center"/>
+                                          </Border>
+                                          <StackPanel Grid.Column="1" Spacing="2">
+                                              <TextBlock Classes="recContent" Text="{Binding Text}" TextWrapping="Wrap" TextTrimming="None"/>
+                                              <TextBlock Classes="hint" Text="{Binding Description}" IsVisible="{Binding HasDescription}"/>
+                                          </StackPanel>
+                                      </Grid>
+                                  </Border>
+                              </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <Border Classes="confirm" IsVisible="{Binding PreviewHasRemoves}">
+                          <CheckBox IsChecked="{Binding PreviewConfirmed}" Content="{Binding PreviewRemoveText}"/>
+                      </Border>
+                      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                          <Button Classes="ghost" Content="Back" Command="{Binding CloseRulePreviewCommand}"/>
+                          <Button Classes="primary" Content="Save the rules" Command="{Binding SaveRulesCommand}" IsEnabled="{Binding CanSaveRules}"/>
+                      </StackPanel>
+                  </StackPanel>
+              </Border>
+          </ScrollViewer>
+          </DataTemplate></ctl:Deferred>
+      </Border>
+
+      <!-- ============ RECORD SET EDITOR ============ -->
+      <Border IsVisible="{Binding IsRrsetEditorOpen}" Background="{DynamicResource Bg.App}">
+          <ctl:Deferred><DataTemplate x:DataType="vm:HetznerViewModel">
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <Border Classes="card" Padding="20" MaxWidth="520" Margin="0,8" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                  <StackPanel Spacing="12">
+                      <StackPanel Spacing="4">
+                          <TextBlock Classes="sectionTitle" Text="Add record set" IsVisible="{Binding IsNewRrset}"/>
+                          <TextBlock Classes="sectionTitle" Text="Edit record set" IsVisible="{Binding !IsNewRrset}"/>
+                          <TextBlock Classes="pageText" Text="{Binding SelectedZone.Name, FallbackValue='', StringFormat='In {0}'}"/>
+                      </StackPanel>
+                      <Grid ColumnDefinitions="Auto, *" ColumnSpacing="12">
+                          <StackPanel>
+                              <TextBlock Classes="fieldLabel" Text="Type"/>
+                              <ComboBox Classes="field" ItemsSource="{Binding RrTypeOptions}" SelectedItem="{Binding EditRrType}" Width="110"
+                                        IsEnabled="{Binding IsNewRrset}" AutomationProperties.Name="Record type"/>
+                          </StackPanel>
+                          <StackPanel Grid.Column="1">
+                              <TextBlock Classes="fieldLabel" Text="Name"/>
+                              <TextBox Classes="field" Text="{Binding EditRrName}" IsEnabled="{Binding IsNewRrset}"
+                                       PlaceholderText="www, or @ (empty) for the zone itself" AutomationProperties.Name="Name"/>
+                          </StackPanel>
+                      </Grid>
+                      <StackPanel>
+                          <TextBlock Classes="fieldLabel" Text="Values"/>
+                          <TextBox Classes="field" Text="{Binding EditRrValues}" AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="96" MaxHeight="200"
+                                   Height="NaN" VerticalContentAlignment="Top" Padding="10,8" FontFamily="{StaticResource MonoFont}"
+                                   AutomationProperties.Name="Values"/>
+                          <TextBlock Classes="hint" Margin="0,4,0,0" Text="{Binding EditRrHint}"/>
+                      </StackPanel>
+                      <StackPanel>
+                          <TextBlock Classes="fieldLabel" Text="TTL (seconds)"/>
+                          <TextBox Classes="field" Text="{Binding EditRrTtl}" PlaceholderText="Empty: the zone's default" MaxLength="10"/>
+                      </StackPanel>
+                      <CheckBox IsChecked="{Binding EditRrDdns}" IsVisible="{Binding ShowRrDdns}" Content="Keep updated with my IP (dynamic DNS)"
+                                ToolTip.Tip="Echoes keeps this record set's one value on this device's public IP, checked every 5 minutes"/>
+                      <Border Classes="note danger" IsVisible="{Binding RrsetEditorError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                          <TextBlock Text="{Binding RrsetEditorError}"/>
+                      </Border>
+                      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                          <Button Classes="ghost" Content="Cancel" Command="{Binding CancelRrsetCommand}"/>
+                          <Button Classes="primary" Content="Save" Command="{Binding SaveRrsetCommand}" IsEnabled="{Binding !IsSavingRrset}"/>
+                      </StackPanel>
+                  </StackPanel>
+              </Border>
+          </ScrollViewer>
+          </DataTemplate></ctl:Deferred>
+      </Border>
+
+      <!-- ============ ADD A ZONE ============ -->
+      <Border IsVisible="{Binding IsAddZoneOpen}" Background="{DynamicResource Bg.App}">
+          <ctl:Deferred><DataTemplate x:DataType="vm:HetznerViewModel">
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <Border Classes="card" Padding="20" MaxWidth="480" Margin="0,8" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                  <StackPanel Spacing="12">
+                      <StackPanel Spacing="4">
+                          <TextBlock Classes="sectionTitle" Text="Add a DNS zone"/>
+                          <TextBlock Classes="pageText" Text="A domain you own, like example.com (not a subdomain). Hetzner then gives it name servers to set at your registrar."/>
+                      </StackPanel>
+                      <StackPanel>
+                          <TextBlock Classes="fieldLabel" Text="Domain"/>
+                          <TextBox Classes="field" Text="{Binding NewZoneName}" PlaceholderText="example.com" TextInputOptions.ContentType="Url">
+                              <TextBox.KeyBindings>
+                                  <KeyBinding Command="{Binding CreateZoneCommand}" Gesture="Enter"/>
+                              </TextBox.KeyBindings>
+                          </TextBox>
+                      </StackPanel>
+                      <StackPanel>
+                          <TextBlock Classes="fieldLabel" Text="Default TTL (seconds)"/>
+                          <TextBox Classes="field" Text="{Binding NewZoneTtl}" MaxLength="10"/>
+                      </StackPanel>
+                      <Border Classes="note danger" IsVisible="{Binding AddZoneError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                          <TextBlock Text="{Binding AddZoneError}"/>
+                      </Border>
+                      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                          <Button Classes="ghost" Content="Cancel" Command="{Binding CloseAddZoneCommand}"/>
+                          <Button Classes="primary" Content="Add zone" Command="{Binding CreateZoneCommand}" IsEnabled="{Binding !IsAddingZone}"/>
+                      </StackPanel>
+                  </StackPanel>
+              </Border>
+          </ScrollViewer>
+          </DataTemplate></ctl:Deferred>
+      </Border>
+
+      <!-- ============ IMPORT A ZONE FILE (it replaces every record set: a tick first) ============ -->
+      <Border IsVisible="{Binding IsImportOpen}" Background="{DynamicResource Bg.App}">
+          <ctl:Deferred><DataTemplate x:DataType="vm:HetznerViewModel">
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <Border Classes="card" Padding="20" MaxWidth="600" Margin="0,8" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                  <StackPanel Spacing="12">
+                      <StackPanel Spacing="4">
+                          <TextBlock Classes="sectionTitle" Text="Import a zone file"/>
+                          <TextBlock Classes="pageText" Text="{Binding ImportFileName}"/>
+                          <TextBlock Classes="pageText" Text="{Binding ImportSummary}"/>
+                      </StackPanel>
+                      <Border Classes="card output" Padding="10,8" MaxHeight="260">
+                          <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                              <SelectableTextBlock Text="{Binding ImportPreview}" FontFamily="{StaticResource MonoFont}" FontSize="{StaticResource Font.Small}"
+                                                   Foreground="{DynamicResource Text.Secondary}"/>
+                          </ScrollViewer>
+                      </Border>
+                      <Border Classes="note warning" IsVisible="{Binding HasImportWarning}">
+                          <TextBlock Text="{Binding ImportWarning}"/>
+                      </Border>
+                      <Border Classes="confirm">
+                          <CheckBox IsChecked="{Binding ImportConfirmed}"
+                                    Content="{Binding SelectedZone.Name, FallbackValue='', StringFormat='Replace every record set of {0} with this file'}"/>
+                      </Border>
+                      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                          <Button Classes="ghost" Content="Cancel" Command="{Binding CloseImportCommand}"/>
+                          <Button Classes="danger" Content="Import" Command="{Binding ImportZoneFileCommand}" IsEnabled="{Binding CanImport}"/>
+                      </StackPanel>
+                  </StackPanel>
+              </Border>
+          </ScrollViewer>
+          </DataTemplate></ctl:Deferred>
+      </Border>
+
+      <!-- ============ DYNAMIC DNS (this tool's record sets) ============ -->
+      <Border IsVisible="{Binding IsDdnsOpen}" Background="{DynamicResource Bg.App}">
+          <ctl:Deferred><DataTemplate x:DataType="vm:HetznerViewModel">
+          <Border Classes="card" Padding="20" MaxWidth="640" MaxHeight="640" Margin="0,8" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+              <Grid RowDefinitions="Auto, Auto, *, Auto, Auto" RowSpacing="12">
+                  <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
+                      <StackPanel Spacing="4">
+                          <TextBlock Classes="sectionTitle" Text="Dynamic DNS"/>
+                          <TextBlock Classes="pageText" Text="These A / AAAA record sets follow this device's public IP (checked every 5 min)."
+                                     ToolTip.Tip="Echoes checks the IP every 5 minutes while it runs (in the tray too) and changes a record set only when two IP services agree."/>
+                      </StackPanel>
+                      <Button Grid.Column="1" Classes="secondary" Command="{Binding DdnsCheckNowCommand}" VerticalAlignment="Top"
+                              IsEnabled="{Binding HasDdns}" ToolTip.Tip="Look up the public IP and check every record set now"
+                              AutomationProperties.Name="Check now">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                              <Path Classes="glyph" Data="{StaticResource HzGlyphRefresh}"/>
+                              <TextBlock Classes="wideOnly" Text="Check now" VerticalAlignment="Center"/>
+                          </StackPanel>
+                      </Button>
+                  </Grid>
+                  <StackPanel Grid.Row="1" Spacing="8">
+                      <TextBlock Classes="tabHint" Text="{Binding DdnsPublicText}"/>
+                      <Border Classes="note warning" IsVisible="{Binding DdnsUnreadable}">
+                          <TextBlock Text="Saved dynamic DNS records can't be read now (device key unavailable). They're kept; restart Echoes."/>
+                      </Border>
+                  </StackPanel>
+                  <Border Grid.Row="2" Classes="card output" ClipToBounds="True">
+                      <Panel>
+                          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasDdns}">
+                              <ItemsControl ItemsSource="{Binding DdnsRows}">
+                                  <ItemsControl.ItemTemplate>
+                                      <DataTemplate x:DataType="vm:CfDdnsRow">
+                                          <Border Classes="ddnsRow">
+                                              <Grid ColumnDefinitions="*, Auto, Auto" RowDefinitions="Auto, Auto, Auto, Auto" ColumnSpacing="10">
+                                                  <TextBlock Grid.Column="0" Classes="recName" Text="{Binding Title}"/>
+                                                  <Border Grid.Column="1" Classes="badge" VerticalAlignment="Center"
+                                                          Classes.success="{Binding IsOk}" Classes.warning="{Binding IsWarn}" Classes.danger="{Binding IsBad}">
+                                                      <TextBlock Text="{Binding StatusText}"/>
+                                                  </Border>
+                                                  <Button Grid.Column="2" Grid.RowSpan="2" Classes="rowBtn del" VerticalAlignment="Top"
+                                                          Command="{Binding $parent[UserControl].((vm:HetznerViewModel)DataContext).RemoveDdnsCommand}"
+                                                          CommandParameter="{Binding}" AutomationProperties.Name="Stop updating this record set"
+                                                          ToolTip.Tip="Stop updating this record set (it stays in DNS). Deletes its saved token copy.">
+                                                      <Path Classes="glyph" Data="{StaticResource HzGlyphTrash}"/>
+                                                  </Button>
+                                                  <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Margin="0,3,0,0"
+                                                             FontSize="{StaticResource Font.Small}" Foreground="{DynamicResource Text.Muted}" TextTrimming="CharacterEllipsis">
+                                                      <Run Text="{Binding Type, Mode=OneWay}" FontFamily="{StaticResource MonoFont}" Foreground="{DynamicResource Accent.Text}"/>
+                                                      <Run Text="  "/>
+                                                      <Run Text="{Binding IpText, Mode=OneWay}" FontFamily="{StaticResource MonoFont}" Foreground="{DynamicResource Text.Secondary}"/>
+                                                      <Run Text="  ·  "/>
+                                                      <Run Text="{Binding Where, Mode=OneWay}"/>
+                                                  </TextBlock>
+                                                  <TextBlock Grid.Row="2" Grid.ColumnSpan="3" Margin="0,2,0,0" Classes="hint" Text="{Binding WhenText}"/>
+                                                  <TextBlock Grid.Row="3" Grid.ColumnSpan="3" Margin="0,4,0,0" Classes="ddnsMsg"
+                                                             Classes.warn="{Binding IsWarn}" Classes.bad="{Binding IsBad}"
+                                                             Text="{Binding Message}" IsVisible="{Binding HasMessage}"/>
+                                              </Grid>
+                                          </Border>
+                                      </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                          </ScrollViewer>
+                          <TextBlock Classes="emptyText" IsVisible="{Binding !HasDdns}"
+                                     Text="No record set follows your IP yet. Use ↻ on an A or AAAA record set, or tick &quot;Keep updated with my IP&quot; in its editor."/>
+                      </Panel>
+                  </Border>
+                  <Border Grid.Row="3" Classes="note info">
+                      <TextBlock Text="A device-encrypted copy of the project's token keeps updates running; removing the record set or the project deletes it. Needs a Read &amp; Write token."/>
+                  </Border>
+                  <Grid Grid.Row="4" ColumnDefinitions="*, Auto">
+                      <Button Grid.Column="1" Classes="primary" Content="Close" Command="{Binding CloseDdnsCommand}" MinWidth="88"/>
+                  </Grid>
+              </Grid>
+          </Border>
+          </DataTemplate></ctl:Deferred>
+      </Border>
+    </Panel>
+</UserControl>

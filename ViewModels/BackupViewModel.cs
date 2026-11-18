@@ -147,6 +147,8 @@ public partial class BackupViewModel : ObservableObject
         ["ssh.servers/proxy"] = "saved SSH servers' proxy",
         ["ssh.servers/tunnel"] = "saved SSH servers' SOCKS tunnel",
         ["ssh.servers/forwards"] = "saved SSH servers' port forwards (not imported)",
+        ["hetzner.projects"] = "Hetzner projects' dynamic DNS (confirm each project in the Hetzner tool)",
+        ["hetzner.projects/proxy"] = "Hetzner projects' proxy",
     };
 
     private static string Describe(ProfileService.ImportReport? report)

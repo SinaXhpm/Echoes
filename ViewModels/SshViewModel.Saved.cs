@@ -65,6 +65,31 @@ public partial class SshViewModel
         finally { _filling = false; }
     }
 
+    /// <summary>
+    /// Another tool hands over a host (the Hetzner tool's server). A saved server with that address is picked (its own
+    /// user, key and password); otherwise the form gets the address on port 22 with no password, so a password typed
+    /// for another server never goes to this one. Never connects, and does nothing while a session is live.
+    /// </summary>
+    public void Prefill(string host)
+    {
+        host = (host ?? string.Empty).Trim();
+        if (host.Length == 0 || !CanEditConnection) return;
+        SelectedTab = TabTerminal;
+        if (SavedServers.FirstOrDefault(s => string.Equals(s.Host, host, StringComparison.OrdinalIgnoreCase)) is { } saved)
+        {
+            if (!ReferenceEquals(SelectedServer, saved)) SelectedServer = saved;
+            else Fill(saved);
+            return;
+        }
+        SelectedServer = null;
+        ServerName = string.Empty;
+        Host = host;
+        Port = 22;
+        Password = string.Empty;
+        KeyPassphrase = string.Empty;
+        ConnectError = string.Empty;
+    }
+
     partial void OnSelectedServerChanged(SshServerEntry? value)
     {
         DeleteServerConfirm = false;

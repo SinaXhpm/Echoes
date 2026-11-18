@@ -141,6 +141,14 @@ public static class ToolCatalog
                 "SSL/TLS, security, speed and cache, rules",
                 "Traffic overview, and several accounts",
             }, "Cloudflare dashboard, ddclient"),
+        new("HETZNER", Web, "Hetzner", "Hetzner Cloud", "Servers, firewalls and DNS", "IcoHetzner", false, null,
+            new[]
+            {
+                "Servers: status, addresses, traffic, and power on, reboot or shut down",
+                "Firewalls: see and edit the rules, add your own IP",
+                "DNS zones and records, zone files, and dynamic DNS",
+                "Several projects, their API tokens kept encrypted",
+            }, "Hetzner Console, hcloud CLI"),
         new("TELEGRAM BOT", Web, "Telegram Bot", "Telegram Bot", "Call any Bot API method", "IcoTelegram", true, null,
             new[]
             {
