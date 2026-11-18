@@ -124,8 +124,10 @@ public sealed partial class IfacePicker : ObservableObject
         if (value is null)
         {
             // ...and when its selection is lost some other way (the view re-templated or taken off the screen): the box
-            // must not stay blank, so the line chosen is shown again once the change has settled (RestoreSelection)
-            Avalonia.Threading.Dispatcher.UIThread.Post(RestoreSelection);
+            // must not stay blank, so the line chosen is shown again once the change has settled (RestoreSelection).
+            // Without an app (a unit test) there is no UI thread to post to: Avalonia 12's UIThread then isn't a working
+            // dispatcher (a test run crashed in Post), and the test calls RestoreSelection itself.
+            if (Avalonia.Application.Current is not null) Avalonia.Threading.Dispatcher.UIThread.Post(RestoreSelection);
             return;
         }
         string stored = value.Name ?? string.Empty;
