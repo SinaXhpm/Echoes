@@ -51,7 +51,7 @@ Echoes is a free, open-source network toolkit with a simple graphical interface.
 - [FAQ](#faq)
 - [Build from source](#build-from-source)
 - [License](#license)
-- [Also by the developer: Submarine](#also-by-the-developer-submarine)
+- [Also by the developer: Submarine and Captun](#also-by-the-developer)
 
 ## Download and install
 
@@ -472,7 +472,7 @@ Look after your Hetzner Cloud servers, firewalls and DNS without opening the Con
 - **Server health:** CPU, load, memory, swap, disks and the busiest processes, with nothing installed on the server.
 - **Host-key pinning:** each server's key is remembered on first use (SHA-256 fingerprint), and you are warned if it changes.
 - Connect through a SOCKS5 proxy. Paste `ssh -p 2222 root@host` and the host, user and port fields fill themselves.
-- For daily work on servers, the same developer's dedicated client [Submarine](#also-by-the-developer-submarine) adds a tab set per server, a dual-pane SFTP browser, a two-way folder mirror and encrypted sync.
+- For daily work on servers, the same developer's dedicated client [Submarine](#also-by-the-developer) adds a tab set per server, a dual-pane SFTP browser, a two-way folder mirror and encrypted sync.
 
 ### TCP, UDP and WebSocket tool
 
@@ -664,7 +664,7 @@ For a quick transfer between devices on the same network, yes. Run Echoes on one
 None by itself. The web server, request catcher, proxy and socket servers listen only after you press Start, on the port and network interface you choose, and stop when you press Stop or quit Echoes. See [Privacy and security](#privacy-and-security).
 
 **Is there an SSH client from the same developer?**
-Yes. [Submarine](#also-by-the-developer-submarine) is a free, open-source SSH and SFTP client for Windows, macOS, Linux and Android.
+Yes. [Submarine](#also-by-the-developer) is a free, open-source SSH and SFTP client for Windows, macOS, Linux and Android.
 
 **Is Echoes a replacement for nmap, Postman, PuTTY or Wireshark?**
 It covers the everyday tasks of nmap, curl / Postman, PuTTY, WinSCP and netcat in one app, and its Capture tool gives a quick look at the packets on an interface. For deep, specialized work the dedicated tools still go further: Wireshark reassembles streams, decrypts TLS and knows thousands of protocols, and Echoes saves a pcap you can open there.
@@ -709,64 +709,24 @@ Primary development and testing happen on **Windows**; the macOS, Linux, Android
 
 Echoes is released under the **[MIT License](LICENSE)**. You are free to use, copy, modify, share and even sell it, for personal or commercial use, as long as the copyright notice and license text stay included. The software is provided "as is", without warranty.
 
-## Also by the developer: Submarine
+## Also by the developer
 
-<p align="center">
-  <a href="https://github.com/SinaXhpm/Submarine"><img src="docs/logos/submarine.png" width="140" alt="Submarine logo: a submarine periscope above neon waves"></a>
-</p>
+### Submarine — SSH, SFTP, FTP, RDP, VNC and Telnet in one app
 
-<p align="center"><b>Submarine: a modern SSH and SFTP client</b><br>Free and open source, for Windows, macOS, Linux and Android</p>
+<a href="https://submarine.sinaxhpm.com"><img src="docs/also/submarine.webp" width="720" alt="Submarine: an SSH terminal and the two-pane SFTP browser in one server tab"></a>
 
-**[Submarine](https://github.com/SinaXhpm/Submarine)** is a fast, free, open-source **SSH and SFTP client** from the same developer, built with Rust and Tauri. It replaces the usual PuTTY + WinSCP + tunnel-manager stack with **one tabbed window per server**. Echoes' SSH tool covers quick jobs; Submarine is made for working on servers every day.
+A tab set for each server: terminal, files, port forwarding, a two-way folder mirror, Docker, and an AI assistant with your own key. Everything is encrypted on your device, with optional sync. Free and open source for Windows, macOS, Linux and Android.
 
-### Everything it does
+[Website](https://submarine.sinaxhpm.com) · [GitHub](https://github.com/SinaXhpm/Submarine) · [Download](https://github.com/SinaXhpm/Submarine/releases/latest)
 
-**Terminal**
-- Tabbed sessions per server and several shells per session, with a full xterm.js terminal (true colour, ANSI 256, mouse support).
-- Select to copy, right-click to paste, and wrapped lines copy as one line.
-- Scroll-back survives a reconnect, with a divider that marks where it dropped.
-- Container shells: one click opens a `docker exec` shell in a new tab (`bash`, then `sh`, then `ash`).
+### Captun — a smart hotspot
 
-**SFTP file browser**
-- Dual pane (local and remote) with drag and drop, as stacked tabs or a split view.
-- Live filter for each pane, multi-select with Ctrl / Shift-click and Select all, bulk download, move and delete.
-- Overwrite confirmation for uploads and downloads, with "apply to all" for batches.
-- Live edit: open a remote file in your editor and every save uploads back by itself.
-- Direct download to the folder you already have open, a permissions editor (chmod / chown), and drag files in from your file manager.
+<a href="https://captun.sinaxhpm.com"><img src="docs/also/captun.webp" width="720" alt="Captun: the helm that starts sharing over a Wi-Fi hotspot or USB, and the way out for connected devices"></a>
 
-**Port forwarding**
-- Local (`-L`), remote (`-R`) and dynamic (`-D`) tunnels. Dynamic tunnels speak SOCKS4, SOCKS4a, SOCKS5, SOCKS5h, HTTP CONNECT and plain HTTP proxy.
-- Each tunnel starts and stops on its own, is saved with the server, and shows its live connection count.
+Share your computer's internet, VPN or proxy with phones, TVs and consoles over Wi-Fi, a cable or USB, and decide where each device's traffic goes. For Windows and Linux; in development, no release yet.
 
-**Folder mirror**
-- Two-way sync between a local and a remote folder, compared by size and content hash.
-- A live watcher pushes every save, create, rename and delete. Pick what wins on a conflict for each mirror (local, remote or newer), deleted files go to `.submarine-trash/`, and a dry-run preview warns about files that would be overwritten.
+[Website](https://captun.sinaxhpm.com) · [Source code](https://github.com/SinaXhpm/captun)
 
-**Server tools, with nothing to install on the server**
-- **Info panel:** overview (OS, kernel, uptime, load, RAM, swap, disks), network (interfaces, routes, iptables and nftables rules), listening ports with their processes, and systemd services with start, stop and restart.
-- **Docker manager:** containers (start, stop, restart, pause, kill), live logs, stats, inspect, env, mounts and ports, images, volumes and networks, the compose file of a container, and a safe prune that never touches volumes.
-- **Monitoring:** CPU, RAM, disk and network sparklines for each server over SSH.
-
-**Many servers at once**
-- Split view to tile two sessions, a global **Wall** that pins terminals from any hosts in a grid, and **broadcast input** that sends what you type to several sessions together.
-
-**Productivity**
-- A command library and a notes field (runbook, contacts) for each server, autostart for chosen servers, and quick connect without saving.
-- Servers in folders with tag colours, saved passwords and SSH keys with built-in key generation, and keys from a file or pasted (PEM or OpenSSH, with or without a passphrase).
-- Import from PuTTY (`.reg`), MobaXterm (`.mxtsessions`), OpenSSH config and Submarine JSON exports.
-
-**Private by design**
-- Your master password becomes a key on your device (Argon2id) and everything saved is sealed with AES-256-GCM before it touches the disk.
-- Optional cloud sync uploads only that ciphertext, byte for byte: no registration, no recovery e-mail, and nothing on the server can derive your key.
-- Host keys are pinned on first use, the master key is wiped from memory on lock, and there is no telemetry or analytics.
-
-**Android**
-- A native build of the same core, with the same encrypted vault and sync, so your servers appear on the phone.
-- A touch terminal with a soft-key bar (sticky Ctrl, Alt, Shift, Esc and Tab), SFTP with multi-select, tunnels while the app is open, and the info and Docker tabs. The folder mirror is desktop-only for now.
-
-**Downloads:** Windows (`.exe` installer or `.msi`), macOS (`.dmg`, Apple Silicon, and Intel through Rosetta), Linux (`.deb`, `.rpm`, Arch package and AppImage) and Android (`.apk`).
-
-**[Get Submarine](https://github.com/SinaXhpm/Submarine/releases/latest)** · [Source code and README](https://github.com/SinaXhpm/Submarine)
 ---
 
 ## Keywords
