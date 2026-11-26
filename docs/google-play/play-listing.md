@@ -104,7 +104,10 @@ notification, the alert), uploaded unlisted.
 
 - The bundle comes from `.github/workflows/play.yml` (by hand): a store build (`-p:StoreBuild=true`: no update check,
   no Releases link) signed with the GitHub APK's key, checked for the certificate, targetSdk 36 and 16 KB alignment.
-- App signing: Play App Signing holds the same key (exported once with `play-signing-key.yml`), so an install from Play
-  and the APK from GitHub update each other. Certificate SHA-256 `47:FA:2F:FD:…:88:4E:FD`.
+- App signing: Play App Signing holds the same key (exported once with Google's PEPK tool from a one-off workflow, since
+  removed), so an install from Play and the APK from GitHub update each other. Certificate SHA-256
+  `47:FA:2F:FD:…:88:4E:FD`; it is the upload key too.
+- Package name: registered to the account under Play Console > Android developer verification, proved with a one-off
+  APK signed by this key.
 - Version codes: Play refuses a code it has had. 22 went to Play first (1.2.0); every later build, for GitHub or Play,
   takes the next number.
