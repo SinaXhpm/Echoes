@@ -343,6 +343,7 @@ public partial class IpInfoViewModel : ObservableObject
         new("db-ip.com", "https://api.db-ip.com/v2/free/self", "https://api.db-ip.com/v2/free/{ip}", ParseDbIp),
         new("geolocation-db", "https://geolocation-db.com/json/", "https://geolocation-db.com/json/{ip}", ParseGeolocationDb),
         new("country.is", "https://api.country.is/", "https://api.country.is/{ip}", ParseCountryIs),
+        new("internetdata.io", "https://api.internetdata.io/myip", "https://api.internetdata.io/{ip}", ParseInternetData),
     };
 
     // Auto asks the providers in three lanes (every third one), each a Fallback chain: its first provider at once, the
@@ -905,6 +906,22 @@ public partial class IpInfoViewModel : ObservableObject
 
     private static IpGeoResult ParseCountryIs(JsonElement r)   // api.country.is (the country only)
         => new() { Ip = S(r, "ip"), CountryCode = S(r, "country") };
+
+    // api.internetdata.io, keyless (https://internetdata.io/terms, https://internetdata.io/privacy): country, time zone, ASN, company, hostname, Tor and relay; no city
+    private static IpGeoResult ParseInternetData(JsonElement r)
+    {
+        var loc = Obj(r, "location"); var asn = Obj(r, "asn"); var company = Obj(r, "company");
+        string num = S(asn, "asn");
+        return new IpGeoResult
+        {
+            Ip = S(r, "ip"),
+            Country = S(loc, "country_name"), CountryCode = S(loc, "country"), Timezone = S(loc, "timezone"),
+            Isp = S(asn, "name"), Org = S(company, "name"), Asn = num == "0" ? "" : NormAsn(num),
+            Hostname = S(r, "hostname"),
+            IsProxy = B(r, "is_tor") || B(r, "is_relay"),
+            IsHosting = S(asn, "type") == "hosting",
+        };
+    }
 
     // ---- json + formatting helpers ----
 

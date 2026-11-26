@@ -417,7 +417,7 @@ Check a site's certificate and TLS setup in seconds.
 ### IP lookup and GeoIP
 
 - Your public IP address, and the location and network (ISP, ASN) of any IP.
-- Answers from three providers at a time cross-checked side by side, or one provider of your choice, out of 19: ip-api.com, ipwho.is, ipapi.co, ipinfo.io, freeipapi, GeoJS, iplocation.net, ipwhois.app, iplocate.io, ipquery.io, ip2location.io, geoiplookup.io, ifconfig.co, ipleak.net, ip.sb, ip.guide, db-ip, geolocation-db and country.is. A blocked or down provider is replaced by the next within moments.
+- Answers from three providers at a time cross-checked side by side, or one provider of your choice, out of 20: ip-api.com, ipwho.is, ipapi.co, ipinfo.io, freeipapi, GeoJS, iplocation.net, ipwhois.app, iplocate.io, ipquery.io, ip2location.io, geoiplookup.io, ifconfig.co, ipleak.net, ip.sb, ip.guide, db-ip, geolocation-db, country.is and internetdata.io. A blocked or down provider is replaced by the next within moments.
 - Country flags, a map link, and HTTP / SOCKS5 proxy support, to see the IP your proxy or VPN shows the world.
 
 ### Cloudflare manager
