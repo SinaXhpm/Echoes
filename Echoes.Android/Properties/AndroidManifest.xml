@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="21" android:versionName="1.2.0">
-	<uses-sdk android:minSdkVersion="23" android:targetSdkVersion="34" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="22" android:versionName="1.2.0">
+	<!-- targetSdk 36: what Google Play asks of new apps and updates since 2026-08-31. -->
+	<uses-sdk android:minSdkVersion="23" android:targetSdkVersion="36" />
 	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<!-- Keep Monitor / Scanner running when the app is backgrounded (foreground service + wake lock). -->
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 	<uses-permission android:name="android.permission.WAKE_LOCK" />
 	<!-- "Start monitoring when the phone starts" (Monitor settings): BootReceiver, off unless the user turns it on. -->
@@ -16,6 +17,8 @@
 	     dataExtractionRules (Resources/xml/data_extraction_rules.xml) excludes everything from both.
 	     usesCleartextTraffic: since targetSdk 28 Android blocks plain http:// by default, so the cURL WEB tab's WebView
 	     couldn't load http:// pages or their http:// sub-resources. A network tool has to inspect plain-HTTP sites.
-	     The app's own requests (HttpClient over the managed SocketsHttpHandler) aren't affected either way. -->
-	<application android:label="Echoes" android:icon="@mipmap/icon" android:roundIcon="@mipmap/icon" android:allowBackup="false" android:dataExtractionRules="@xml/data_extraction_rules" android:supportsRtl="true" android:usesCleartextTraffic="true" />
+	     The app's own requests (HttpClient over the managed SocketsHttpHandler) aren't affected either way.
+	     enableOnBackInvokedCallback=false: with targetSdk 36 on Android 16 the system would stop sending the back key
+	     to the app; this keeps back as it was at targetSdk 34 (Avalonia's back handling, MobileShellView.OnBackRequested). -->
+	<application android:label="Echoes" android:icon="@mipmap/icon" android:roundIcon="@mipmap/icon" android:allowBackup="false" android:dataExtractionRules="@xml/data_extraction_rules" android:supportsRtl="true" android:usesCleartextTraffic="true" android:enableOnBackInvokedCallback="false" />
 </manifest>

@@ -13,13 +13,20 @@
     <RootNamespace>Echoes.Android</RootNamespace>
 
     <ApplicationId>com.sinaxhpm.echoes</ApplicationId>
-    <ApplicationVersion>21</ApplicationVersion>
+    <!-- 22: the first Google Play upload (1.2.0 plus the Play changes); the next release goes on from here -->
+    <ApplicationVersion>22</ApplicationVersion>
     <ApplicationDisplayVersion>1.2.0</ApplicationDisplayVersion>
     <!-- the assembly version follows it (About box, update check, User-Agent); CI sets it from the tag -->
     <Version>$(ApplicationDisplayVersion)</Version>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <!-- Ship only real-device ABIs; x86/x86_64 are emulator-only and roughly double the native payload. -->
     <RuntimeIdentifiers>android-arm64;android-arm</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <!-- The Google Play build (.github/workflows/play.yml): -p:StoreBuild=true compiles with STORE, as for the Mac App Store,
+       so AppInfo.IsStoreBuild leaves out the update check and the Releases link (Play allows updates only through Play). -->
+  <PropertyGroup Condition="'$(StoreBuild)' == 'true'">
+    <DefineConstants>$(DefineConstants);STORE</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

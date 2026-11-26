@@ -11,11 +11,15 @@ namespace Echoes.Android;
 /// <see cref="AndroidBackgroundGuard"/>, which is driven by the shared
 /// <c>Echoes.Helpers.BackgroundGuard</c> ref-count.
 ///
-/// Declared as a <c>dataSync</c> foreground service; the <c>[Service]</c> attribute emits the
-/// matching &lt;service&gt; entry (with android:foregroundServiceType="dataSync") into the merged
-/// manifest, so only the permissions need to live in AndroidManifest.xml.
+/// Declared as a <c>specialUse</c> foreground service; the <c>[Service]</c> and <c>[Property]</c> attributes emit the
+/// matching &lt;service&gt; entry (android:foregroundServiceType="specialUse" and the subtype property Google Play
+/// reads) into the merged manifest, so only the permissions need to live in AndroidManifest.xml. Not <c>dataSync</c>:
+/// what runs here are servers, sessions and a monitor that pings on its own clock, not a transfer, and from targetSdk 35
+/// a dataSync service gets only 6 hours a day and can't be started at boot (BootReceiver).
 /// </summary>
-[Service(Exported = false, ForegroundServiceType = global::Android.Content.PM.ForegroundService.TypeDataSync)]
+[Service(Exported = false, ForegroundServiceType = global::Android.Content.PM.ForegroundService.TypeSpecialUse)]
+[Property("android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE",
+    Value = "Network tools the user starts and stops: an uptime monitor with alerts, local servers (file sharing, proxy, sockets), SSH sessions and scans keep running while the app is in the background")]
 public class KeepAliveService : Service
 {
     public const string ExtraReason = "reason";
@@ -51,9 +55,9 @@ public class KeepAliveService : Service
         EnsureChannel();
         Notification notification = BuildNotification(reason);
 
-        // API 34+ requires the FGS type to be passed to StartForeground and to match the manifest.
+        // API 34+ requires the FGS type to be passed to StartForeground and to match the manifest (specialUse exists from 34).
         if (OperatingSystem.IsAndroidVersionAtLeast(34))
-            StartForeground(NotificationId, notification, global::Android.Content.PM.ForegroundService.TypeDataSync);
+            StartForeground(NotificationId, notification, global::Android.Content.PM.ForegroundService.TypeSpecialUse);
         else
             StartForeground(NotificationId, notification);
         IsForeground = true;
@@ -85,8 +89,9 @@ public class KeepAliveService : Service
     }
 
 #if ANDROID35_0_OR_GREATER || __ANDROID_35__
-    // Android 15 (API 35) time-boxes dataSync foreground services (6 h per rolling 24 h) for apps targeting SDK 35+,
-    // and reports the timeout through THIS overload, not the one above — required before targetSdk goes to 35.
+    // Android 15 (API 35) time-boxes some foreground service types (dataSync: 6 h per rolling 24 h) for apps targeting
+    // SDK 35+, and reports the timeout through THIS overload, not the one above. specialUse has no such limit; kept so a
+    // timeout the platform may add later still ends the service cleanly.
     // (Compiled only against API 35+ bindings, where it exists; the type is bound as the ForegroundService enum.)
     [System.Runtime.Versioning.SupportedOSPlatform("android35.0")]
     public override void OnTimeout(int startId, global::Android.Content.PM.ForegroundService fgsType)

@@ -74,7 +74,8 @@ public class MainActivity : AvaloniaMainActivity
         try
         {
             window.DecorView.SetBackgroundColor(page);
-#pragma warning disable CA1422   // deprecated on API 35+, still honoured while targetSdk stays 34
+#pragma warning disable CA1422   // no effect on Android 15+, where the app is drawn edge to edge (targetSdk 35+): there
+                                 // Avalonia pads the content by the bars (TopLevel.AutoSafeAreaPadding) and they show it
             window.SetStatusBarColor(bar);
             window.SetNavigationBarColor(page);
 #pragma warning restore CA1422

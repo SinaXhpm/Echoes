@@ -19,9 +19,9 @@ namespace Echoes.Android;
 /// MainApplication.OnCreate, which initialized Avalonia, the App and its MainViewModel (without any activity or UI).</para>
 ///
 /// <para>It starts <see cref="KeepAliveService"/> right here, inside the broadcast: BOOT_COMPLETED and
-/// MY_PACKAGE_REPLACED are among the few moments a background app may start a foreground service. That holds for a
-/// dataSync service while targetSdk stays at 34 — apps that target 35+ may no longer start dataSync / mediaPlayback /
-/// camera … services from BOOT_COMPLETED, so moving targetSdk up means changing this service's type first. Then the
+/// MY_PACKAGE_REPLACED are among the few moments a background app may start a foreground service. That is why the
+/// service is a specialUse one: apps that target 35+ may no longer start dataSync / mediaPlayback / camera … services
+/// from BOOT_COMPLETED, while specialUse is still allowed there. Then the
 /// Monitor itself starts on the UI thread (waiting for a network first), and the receiver's hold on the service is
 /// released: the running Monitor holds its own.</para>
 ///

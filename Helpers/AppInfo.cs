@@ -26,8 +26,8 @@ public static class AppInfo
     public static string? DeviceName { get; set; }
 
     /// <summary>
-    /// True in a build that an app store distributes: the iOS head, and a Mac App Store build compiled with the STORE
-    /// constant. The store updates the app itself and its rules don't allow an app to look for or point to a copy
+    /// True in a build that an app store distributes: the iOS head, and the Mac App Store and Google Play builds compiled
+    /// with the STORE constant. The store updates the app itself and its rules don't allow an app to look for or point to a copy
     /// downloaded elsewhere, so the update check and the "Releases" link are left out there.
     /// </summary>
     public static bool IsStoreBuild =>
