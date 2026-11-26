@@ -98,7 +98,9 @@ is active, shows an ongoing notification naming it, and stops when the tool stop
 Echoes is a network toolkit. A foreground service keeps a tool the user started running while the app is in the background: the uptime monitor that checks the user's own servers and alerts when one goes down, local servers the user starts (file sharing web server, proxy, TCP/UDP socket servers), SSH sessions and port scans. The service starts only when the user starts one of these tools (or turns on "start monitoring when the phone starts"), shows an ongoing notification that names what is running, and stops as soon as the user stops the tool. None of these fit another foreground service type: they are not data transfers with an end (dataSync), media, location or a phone call. Without it, Android stops the monitor and the servers a few minutes after the user switches apps, and the user misses a down alert or loses a file transfer in progress.
 ```
 It also asks for a video link that shows the feature: a short screen recording (start the monitor, leave the app, the
-notification, the alert), uploaded unlisted.
+notification, the alert), shared as a Google Drive link anyone with it can view.
+
+**AI-generated assets:** "Don't label assets" (the art comes from the app's own icon and screenshots).
 
 ## Releases
 
@@ -111,3 +113,7 @@ notification, the alert), uploaded unlisted.
   APK signed by this key.
 - Version codes: Play refuses a code it has had. 22 went to Play first (1.2.0); every later build, for GitHub or Play,
   takes the next number.
+- Play's automatic protection is off: it needs minSdk 24, and Echoes supports Android 6 (minSdk 23).
+- Production needs a closed test first (personal account): at least 12 testers opted in for 14 days in a row. Track
+  "Closed testing - Alpha", all countries, testers from the email list "Echoes testers", feedback URL
+  `https://github.com/SinaXhpm/Echoes/issues`.
